@@ -5,11 +5,11 @@ use midgard/types/general.{POSIXTime, PubKeyHash, SetNode}
 
 pub type PublisherSetConfig {
   init_utxo: OutputReference,
-  deadline: POSIXTime,
-  penalty_address: Address,
   midgard_treasury_hash: ByteArray,
   refund_period: Int,
   min_lovelace_bond: Int,
+  deadline: POSIXTime,
+  penalty_address: Address,
 }
 
 pub type Common {

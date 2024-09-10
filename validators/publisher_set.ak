@@ -1,7 +1,7 @@
 use aiken/collection/list.{length}
 use aiken/interval.{Finite, Interval, is_entirely_before}
 use aiken/primitive/bytearray
-use cardano/assets.{PolicyId, flatten, lovelace_of, quantity_of}
+use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{Input, Output, Transaction}
 use midgard/constants
 use midgard/types/general.{Empty, Key, POSIXTime, PubKeyHash, SetNode}
@@ -39,15 +39,7 @@ validator publisher_set(cfg: PublisherSetConfig) {
       }
       PS_Slash { key_to_remove, covering_node, remove_set_node } -> {
         expect is_entirely_before(vrange, cfg.deadline)
-        slash(
-          common,
-          vrange,
-          cfg,
-          outputs,
-          key_to_remove,
-          covering_node,
-          remove_set_node,
-        )
+        slash(common, key_to_remove, covering_node, remove_set_node)
       }
       PS_InitRefund { key_to_mark } -> init_refund(common, key_to_mark)
       PS_CompleteRefund { key_to_remove, covering_node } -> {
@@ -157,9 +149,6 @@ fn insert(
 
 fn slash(
   common: Common,
-  range: Interval<POSIXTime>,
-  disc_config: PublisherSetConfig,
-  outs: List<Output>,
   remove_key: PubKeyHash,
   prev_set_node: SetNode,
   remove_set_node: SetNode,
@@ -194,34 +183,19 @@ fn slash(
         stay_node.val == node_pair.val && stay_node_new_datum == node_pair.publisher_data
       },
     )
+  //TODO
   let user_must_have_fraud_proof_token = True
   let must_mint_correct =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
-  //TODO What is this check?
-  let own_input_lovelace = lovelace_of(remove_node.val)
-  let own_input_fee = utils.div_ceil(own_input_lovelace, 4)
-  let disc_deadline = disc_config.deadline
-
-  let must_satisfy_removal_broke_phase_rules =
-    if interval.is_entirely_before(range, disc_deadline) {
-      True
-    } else {
-      list.any(
-        outs,
-        fn(out) {
-          out.address == disc_config.penalty_address && own_input_fee < lovelace_of(
-            out.value,
-          )
-        },
-      )
-    }
+  //TODO
+  let bond_goes_to_treasury_hash = True
   and {
     must_cover_remove_key,
     must_spend_two_nodes,
     correct_stay_node_output,
     must_mint_correct,
     user_must_have_fraud_proof_token,
-    must_satisfy_removal_broke_phase_rules,
+    bond_goes_to_treasury_hash,
   }
 }
 
