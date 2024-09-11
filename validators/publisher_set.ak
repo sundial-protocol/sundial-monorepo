@@ -4,17 +4,18 @@ use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{Input, Output, Transaction}
 use midgard/constants
-use midgard/types/general.{Empty, Key, POSIXTime, PubKeyHash, SetNode}
+use midgard/types/general.{
+  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash, SetNode,
+}
 use midgard/types/ps.{
-  Common, NodePair, PS_CompleteRefund, PS_Deinit, PS_Init, PS_InitRefund,
-  PS_Insert, PS_Slash, PublisherDatum, PublisherSetConfig, PublisherSetRedeemer,
+  PS_CompleteRefund, PS_Deinit, PS_Init, PS_InitRefund, PS_Insert, PS_Slash,
+  PublisherDatum, PublisherSetConfig, PublisherSetRedeemer, make_common,
 }
 use midgard/utils
 
 validator publisher_set(cfg: PublisherSetConfig) {
   mint(redeemer: PublisherSetRedeemer, policy_id: PolicyId, self: Transaction) {
-    let (common, inputs, outputs, sigs, vrange) =
-      utils.make_common(self, policy_id)
+    let (common, inputs, outputs, sigs, vrange) = make_common(self, policy_id)
     when redeemer is {
       PS_Init -> {
         expect
@@ -55,7 +56,7 @@ validator publisher_set(cfg: PublisherSetConfig) {
   }
 }
 
-fn init(common: Common) -> Bool {
+fn init(common: Common<PublisherDatum>) -> Bool {
   let must_spend_nodes = list.length(common.node_inputs) == 0
   let must_exactly_one_node_output = list.length(common.node_outputs) == 1
   let must_mint_correctly =
@@ -72,9 +73,9 @@ fn init(common: Common) -> Bool {
   }
 }
 
-fn deinit(common: Common) -> Bool {
+fn deinit(common: Common<PublisherDatum>) -> Bool {
   expect [head_node] = common.node_inputs
-  expect Empty = head_node.publisher_data.node.next
+  expect Empty = head_node.data.node.next
   let must_not_produce_node_output = list.length(common.node_outputs) == 0
   let must_burn_correctly =
     utils.validate_mint(
@@ -90,31 +91,33 @@ fn deinit(common: Common) -> Bool {
 }
 
 fn insert(
-  common: Common,
+  common: Common<PublisherDatum>,
   insert_key: PubKeyHash,
   prev_set_node: SetNode,
   validTo: POSIXTime,
   min_lovelace_bond: Int,
 ) -> Bool {
   expect [prev_node] = common.node_inputs
-  let prev_node_datum = prev_node.publisher_data
+  let prev_node_datum = prev_node.data
   expect prev_node_datum.node == prev_set_node
   let must_cover_inserting_key = utils.cover_key(prev_set_node, insert_key)
   let prev_node_new_datum =
-    PublisherDatum {
-      insert_time: prev_node_datum.insert_time,
-      refund_process_init_time: prev_node_datum.refund_process_init_time,
+    LinkedListDatum {
+      extra_data: prev_node_datum.extra_data,
       node: SetNode { key: prev_set_node.key, next: Key { key: insert_key } },
     }
+
   let new_node_datum =
-    PublisherDatum {
-      insert_time: validTo,
-      refund_process_init_time: -1,
+    LinkedListDatum {
+      extra_data: PublisherDatum {
+        insert_time: validTo,
+        refund_process_init_time: -1,
+      },
       node: SetNode { key: Key { key: insert_key }, next: prev_set_node.next },
     }
   let correct_new_node_output =
     list.any(common.node_outputs, fn(node_pair) { and {
-          new_node_datum == node_pair.publisher_data,
+          new_node_datum == node_pair.data,
           quantity_of(node_pair.val, "", "") >= min_lovelace_bond,
           length(flatten(node_pair.val)) <= 3,
         } })
@@ -122,7 +125,7 @@ fn insert(
     list.any(
       common.node_outputs,
       fn(node_pair) {
-        prev_node.val == node_pair.val && node_pair.publisher_data == prev_node_new_datum
+        prev_node.val == node_pair.val && node_pair.data == prev_node_new_datum
       },
     )
 
@@ -142,7 +145,7 @@ fn insert(
 }
 
 fn slash(
-  common: Common,
+  common: Common<PublisherDatum>,
   prev_set_node: SetNode,
   remove_set_node: SetNode,
   outputs: List<Output>,
@@ -153,21 +156,17 @@ fn slash(
   expect Some(stay_node) =
     list.find(
       common.node_inputs,
-      fn(input) { prev_set_node == input.publisher_data.node },
+      fn(input) { prev_set_node == input.data.node },
     )
   expect Some(remove_node) =
     list.find(
       common.node_inputs,
-      fn(input) { remove_set_node == input.publisher_data.node },
+      fn(input) { remove_set_node == input.data.node },
     )
   let prev_node_new_datum =
-    PublisherDatum {
-      insert_time: stay_node.publisher_data.insert_time,
-      refund_process_init_time: stay_node.publisher_data.refund_process_init_time,
-      node: SetNode {
-        key: prev_set_node.key,
-        next: remove_node.publisher_data.node.next,
-      },
+    LinkedListDatum {
+      extra_data: stay_node.data.extra_data,
+      node: SetNode { key: prev_set_node.key, next: remove_node.data.node.next },
     }
   let remove_token_name =
     bytearray.concat(constants.origin_node_token_name, remove_key)
@@ -175,7 +174,7 @@ fn slash(
     list.any(
       common.node_outputs,
       fn(node_pair) {
-        stay_node.val == node_pair.val && prev_node_new_datum == node_pair.publisher_data
+        stay_node.val == node_pair.val && prev_node_new_datum == node_pair.data
       },
     )
   //TODO
@@ -200,7 +199,7 @@ fn slash(
 }
 
 fn init_refund(
-  common: Common,
+  common: Common<PublisherDatum>,
   set_node_to_mark: SetNode,
   sigs: List<PubKeyHash>,
   validTo: POSIXTime,
@@ -208,21 +207,23 @@ fn init_refund(
   expect Some(node_to_mark) =
     list.find(
       common.node_inputs,
-      fn(input) { set_node_to_mark == input.publisher_data.node },
+      fn(input) { set_node_to_mark == input.data.node },
     )
-  expect Key(node_key) = node_to_mark.publisher_data.node.key
+  expect Key(node_key) = node_to_mark.data.node.key
   let must_be_signed_by_user = list.has(sigs, node_key)
   let node_to_mark_new_datum =
-    PublisherDatum {
-      insert_time: node_to_mark.publisher_data.insert_time,
-      refund_process_init_time: validTo,
-      node: node_to_mark.publisher_data.node,
+    LinkedListDatum {
+      extra_data: PublisherDatum {
+        insert_time: node_to_mark.data.extra_data.insert_time,
+        refund_process_init_time: validTo,
+      },
+      node: node_to_mark.data.node,
     }
   let correct_node_to_mark_output =
     list.any(
       common.node_outputs,
       fn(node_pair) {
-        node_to_mark.val == node_pair.val && node_to_mark_new_datum == node_pair.publisher_data
+        node_to_mark.val == node_pair.val && node_to_mark_new_datum == node_pair.data
       },
     )
   and {
@@ -232,7 +233,7 @@ fn init_refund(
 }
 
 fn complete_refund(
-  common: Common,
+  common: Common<PublisherDatum>,
   prev_set_node: SetNode,
   remove_set_node: SetNode,
   sigs: List<PubKeyHash>,
@@ -244,21 +245,17 @@ fn complete_refund(
   expect Some(stay_node) =
     list.find(
       common.node_inputs,
-      fn(input) { prev_set_node == input.publisher_data.node },
+      fn(input) { prev_set_node == input.data.node },
     )
   expect Some(remove_node) =
     list.find(
       common.node_inputs,
-      fn(input) { remove_set_node == input.publisher_data.node },
+      fn(input) { remove_set_node == input.data.node },
     )
   let prev_node_new_datum =
-    PublisherDatum {
-      insert_time: stay_node.publisher_data.insert_time,
-      refund_process_init_time: stay_node.publisher_data.refund_process_init_time,
-      node: SetNode {
-        key: prev_set_node.key,
-        next: remove_node.publisher_data.node.next,
-      },
+    LinkedListDatum {
+      extra_data: stay_node.data.extra_data,
+      node: SetNode { key: prev_set_node.key, next: remove_node.data.node.next },
     }
   let remove_token_name =
     bytearray.concat(constants.origin_node_token_name, remove_key)
@@ -267,15 +264,15 @@ fn complete_refund(
     list.any(
       common.node_outputs,
       fn(node_pair) {
-        stay_node.val == node_pair.val && prev_node_new_datum == node_pair.publisher_data
+        stay_node.val == node_pair.val && prev_node_new_datum == node_pair.data
       },
     )
   let must_mint_correct =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   let must_be_signed_by_user = list.has(sigs, remove_key)
-  let is_refund_init = remove_node.publisher_data.refund_process_init_time > 0
+  let is_refund_init = remove_node.data.extra_data.refund_process_init_time > 0
   let enough_time_passed =
-    validFrom - remove_node.publisher_data.refund_process_init_time > refund_waiting_period
+    validFrom - remove_node.data.extra_data.refund_process_init_time > refund_waiting_period
   and {
     must_cover_remove_key,
     must_spend_two_nodes,
