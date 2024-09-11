@@ -171,7 +171,6 @@ fn slash(
     }
   let remove_token_name =
     bytearray.concat(constants.origin_node_token_name, remove_key)
-  let must_spend_two_nodes = list.length(common.node_inputs) == 2
   let correct_stay_node_output =
     list.any(
       common.node_outputs,
@@ -191,7 +190,6 @@ fn slash(
       },
     )
   and {
-    must_spend_two_nodes,
     must_cover_remove_key,
     must_spend_two_nodes,
     correct_stay_node_output,
