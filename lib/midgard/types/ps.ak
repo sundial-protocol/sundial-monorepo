@@ -5,11 +5,9 @@ use midgard/types/general.{POSIXTime, PubKeyHash, SetNode}
 
 pub type PublisherSetConfig {
   init_utxo: OutputReference,
-  midgard_treasury_hash: ByteArray,
-  refund_period: Int,
+  midgard_treasury: Address,
+  refund_waiting_period: Int,
   min_lovelace_bond: Int,
-  deadline: POSIXTime,
-  penalty_address: Address,
 }
 
 pub type Common {
@@ -33,12 +31,8 @@ pub type NodePair {
 pub type PublisherSetRedeemer {
   PS_Init
   PS_Deinit
-  PS_Insert { key_to_insert: PubKeyHash, covering_node: SetNode }
-  PS_Slash {
-    key_to_remove: PubKeyHash,
-    covering_node: SetNode,
-    remove_set_node: SetNode,
-  }
-  PS_InitRefund { key_to_mark: PubKeyHash }
-  PS_CompleteRefund { key_to_remove: PubKeyHash, covering_node: SetNode }
+  PS_Insert { key_to_insert: PubKeyHash, prev_node: SetNode }
+  PS_Slash { prev_node: SetNode, remove_node: SetNode }
+  PS_InitRefund { node_to_mark: SetNode }
+  PS_CompleteRefund { prev_node: SetNode, remove_node: SetNode }
 }
