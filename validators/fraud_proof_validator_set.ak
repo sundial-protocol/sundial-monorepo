@@ -1,8 +1,8 @@
 use aiken/collection/list.{length}
 use aiken/interval.{Finite, Interval}
 use aiken/primitive/bytearray
-use cardano/assets.{PolicyId, flatten, quantity_of}
-use cardano/transaction.{Input, Output, Transaction}
+use cardano/assets.{PolicyId, flatten}
+use cardano/transaction.{Input, Transaction}
 use midgard/constants
 use midgard/types/fpvs.{
   FPVS_Deinit, FPVS_Init, FPVS_Insert, FPVS_Remove, FraudProofValidatorDatum,
@@ -19,7 +19,7 @@ validator fraud_proof_validator_set(cfg: FraudProofValidatorSetConfig) {
     policy_id: PolicyId,
     self: Transaction,
   ) {
-    let (common, inputs, outputs, sigs, vrange) = make_common(self, policy_id)
+    let (common, inputs, _outputs, sigs, vrange) = make_common(self, policy_id)
     when redeemer is {
       FPVS_Init -> {
         expect
@@ -33,16 +33,10 @@ validator fraud_proof_validator_set(cfg: FraudProofValidatorSetConfig) {
       FPVS_Insert { key_to_insert, prev_node_key } -> {
         expect Finite(validTo) = vrange.upper_bound.bound_type
         expect list.any(sigs, fn(sig) { sig == key_to_insert })
-        insert(
-          common,
-          key_to_insert,
-          prev_node_key,
-          validTo,
-          cfg.min_lovelace_bond,
-        )
+        insert(common, key_to_insert, prev_node_key, validTo)
       }
       FPVS_Remove { prev_node_key, remove_node_key } ->
-        remove(common, prev_node_key, remove_node_key, outputs)
+        remove(common, prev_node_key, remove_node_key)
     }
   }
 
@@ -90,7 +84,6 @@ fn insert(
   insert_key: PubKeyHash,
   prev_node_key: PubKeyHash,
   validTo: POSIXTime,
-  min_lovelace_bond: Int,
 ) -> Bool {
   expect [prev_node] = common.node_inputs
   expect prev_node.data.key == Key { key: prev_node_key }
@@ -111,7 +104,6 @@ fn insert(
   let correct_new_node_output =
     list.any(common.node_outputs, fn(node_pair) { and {
           new_node_datum == node_pair.data,
-          quantity_of(node_pair.val, "", "") >= min_lovelace_bond,
           length(flatten(node_pair.val)) <= 3,
         } })
   let correct_prev_node_output =
@@ -141,7 +133,6 @@ fn remove(
   common: Common<FraudProofValidatorDatum>,
   prev_node_key: PubKeyHash,
   remove_node_key: PubKeyHash,
-  outputs: List<Output>,
 ) -> Bool {
   let must_spend_two_nodes = list.length(common.node_inputs) == 2
   expect Some(prev_node) =
@@ -169,19 +160,11 @@ fn remove(
   let user_must_have_fraud_proof_token = True
   let must_mint_correct =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
-  let bond_goes_to_treasury_hash =
-    list.any(
-      outputs,
-      fn(output) {
-        quantity_of(output.value, "", "") >= cfg.min_lovelace_bond && output.address == cfg.midgard_treasury
-      },
-    )
   and {
     must_cover_remove_key,
     must_spend_two_nodes,
     correct_prev_node_output,
     must_mint_correct,
     user_must_have_fraud_proof_token,
-    bond_goes_to_treasury_hash,
   }
 }

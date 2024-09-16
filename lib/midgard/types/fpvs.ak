@@ -1,7 +1,6 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/interval.{Interval}
-use cardano/address.{Address}
 use cardano/assets.{PolicyId, flatten, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
@@ -16,9 +15,6 @@ use midgard/utils.{
 
 pub type FraudProofValidatorSetConfig {
   init_utxo: OutputReference,
-  midgard_treasury: Address,
-  refund_waiting_period: Int,
-  min_lovelace_bond: Int,
 }
 
 pub type FraudProofValidatorDatum {
