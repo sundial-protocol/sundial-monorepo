@@ -22,8 +22,7 @@ pub type StateQueueConfig {
 }
 
 pub type StateDatum {
-  insert_time: POSIXTime,
-  refund_process_init_time: POSIXTime,
+  state_time: POSIXTime,
 }
 
 pub type StateQueueRedeemer {

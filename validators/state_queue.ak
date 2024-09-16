@@ -99,10 +99,7 @@ fn append(
     LinkedListDatum {
       key: Key { key: insert_key },
       next: prev_node.data.next,
-      extra_data: StateDatum {
-        insert_time: validTo,
-        refund_process_init_time: -1,
-      },
+      extra_data: StateDatum { state_time: validTo },
     }
   let correct_new_node_output =
     list.any(common.node_outputs, fn(node_pair) { and {
@@ -152,7 +149,7 @@ fn merge(
   let is_root =
     quantity_of(root_node.val, common.own_cs, constants.root_node_token_name) > 0
   let is_mergeable_node_key_oldest =
-    root_node.data.key == mergeable_node.data.next
+    root_node.data.next == mergeable_node.data.key
   let must_spend_two_nodes = list.length(common.node_inputs) == 2
   let must_cover_remove_key =
     utils.cover_key(root_node.data, mergeable_node_key)
@@ -161,7 +158,7 @@ fn merge(
     LinkedListDatum {
       key: root_node.data.key,
       next: mergeable_node.data.next,
-      extra_data: root_node.data.extra_data,
+      extra_data: mergeable_node.data.extra_data,
     }
   let remove_token_name =
     bytearray.concat(constants.root_node_token_name, mergeable_node_key)
