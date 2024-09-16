@@ -8,7 +8,7 @@ use cardano/transaction.{
 }
 use midgard/constants.{set_node_prefix}
 use midgard/types/general.{
-  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash, SetNode,
+  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
 use midgard/utils.{
   find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key, valid_node,
@@ -29,10 +29,10 @@ pub type PublisherDatum {
 pub type PublisherSetRedeemer {
   PS_Init
   PS_Deinit
-  PS_Insert { key_to_insert: PubKeyHash, prev_node: SetNode }
-  PS_Slash { prev_node: SetNode, remove_node: SetNode }
-  PS_InitRefund { node_to_mark: SetNode }
-  PS_CompleteRefund { prev_node: SetNode, remove_node: SetNode }
+  PS_Insert { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
+  PS_Slash { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
+  PS_InitRefund { node_to_mark_key: PubKeyHash }
+  PS_CompleteRefund { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
 }
 
 pub fn make_common(
@@ -107,13 +107,13 @@ pub fn parse_node_output_utxo(
   expect amount == 1
   let node_key = parse_node_key(tn)
   let datum_key =
-    when publisher_datum.node.key is {
+    when publisher_datum.key is {
       Empty -> None
       Key(key) -> Some(key)
     }
   expect node_key == datum_key
   expect list.length(flatten(value)) == 2
-  expect valid_node(publisher_datum.node)
+  expect valid_node(publisher_datum)
   expect find_cs_by_token_prefix(value, set_node_prefix) == [cs]
   NodePair { val: value, data: publisher_datum }
 }

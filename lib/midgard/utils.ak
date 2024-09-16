@@ -4,7 +4,7 @@ use aiken/primitive/bytearray
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
 use cardano/transaction.{Input, Output}
 use midgard/constants.{set_node_prefix}
-use midgard/types/general.{Empty, Key, PubKeyHash, SetNode}
+use midgard/types/general.{Empty, Key, LinkedListDatum, PubKeyHash}
 
 pub fn validate_mint(
   mints: Value,
@@ -16,26 +16,21 @@ pub fn validate_mint(
   mints_policy == [Pair(expected_minting_name, expected_minting_amt)]
 }
 
-pub fn cover_key(node: SetNode, insert_key: PubKeyHash) -> Bool {
+pub fn cover_key(
+  data: LinkedListDatum<datum_type>,
+  insert_key: PubKeyHash,
+) -> Bool {
   let less_than_key =
-    when node.key is {
+    when data.key is {
       Empty -> True
       Key(key) -> bytearray.compare(key, insert_key) == Less
     }
   let more_than_key =
-    when node.next is {
+    when data.next is {
       Empty -> True
       Key(key) -> bytearray.compare(key, insert_key) == Greater
     }
   less_than_key? && more_than_key?
-}
-
-pub fn as_predecessor_of(node: SetNode, next_key: PubKeyHash) -> SetNode {
-  SetNode { key: node.key, next: Key(next_key) }
-}
-
-pub fn as_successor_of(prev_key: PubKeyHash, node: SetNode) -> SetNode {
-  SetNode { key: Key(prev_key), next: node.next }
 }
 
 pub fn div_ceil(a, b: Int) -> Int {
@@ -75,7 +70,7 @@ pub fn parse_node_key(tn: AssetName) -> Option<ByteArray> {
   }
 }
 
-pub fn valid_node(node: SetNode) -> Bool {
+pub fn valid_node(node: LinkedListDatum<datum_type>) -> Bool {
   when node.key is {
     Empty -> True
     Key(node_key) ->

@@ -14,17 +14,13 @@ pub type PubKeyHash =
   Hash<Blake2b_224, VerificationKey>
 
 pub type NodeKey {
-  Key { key: PubKeyHash }
+  Key { key: ByteArray }
   Empty
 }
 
-pub type SetNode {
+pub type LinkedListDatum<datum_type> {
   key: NodeKey,
   next: NodeKey,
-}
-
-pub type LinkedListDatum<datum_type> {
-  node: SetNode,
   extra_data: datum_type,
 }
 

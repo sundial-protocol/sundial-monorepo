@@ -8,7 +8,7 @@ use cardano/transaction.{
 }
 use midgard/constants.{set_node_prefix}
 use midgard/types/general.{
-  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash, SetNode,
+  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
 use midgard/utils.{
   find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key, valid_node,
@@ -29,9 +29,9 @@ pub type StateDatum {
 pub type StateQueueRedeemer {
   SQ_Init
   SQ_Deinit
-  SQ_Append { key_to_insert: PubKeyHash, prev_node: SetNode }
-  SQ_Merge { prev_node: SetNode, remove_node: SetNode }
-  SQ_Remove { prev_node: SetNode, remove_node: SetNode }
+  SQ_Append { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
+  SQ_Merge { root_node_key: PubKeyHash, mergeable_node_key: PubKeyHash }
+  SQ_Remove { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
 }
 
 pub fn make_common(
@@ -106,13 +106,13 @@ pub fn parse_node_output_utxo(
   expect amount == 1
   let node_key = parse_node_key(tn)
   let datum_key =
-    when list_datum.node.key is {
+    when list_datum.key is {
       Empty -> None
       Key(key) -> Some(key)
     }
   expect node_key == datum_key
   expect list.length(flatten(value)) == 2
-  expect valid_node(list_datum.node)
+  expect valid_node(list_datum)
   expect find_cs_by_token_prefix(value, set_node_prefix) == [cs]
   NodePair { val: value, data: list_datum }
 }
