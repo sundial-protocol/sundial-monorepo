@@ -15,7 +15,7 @@ use midgard/utils
 
 validator state_queue(cfg: StateQueueConfig) {
   mint(redeemer: StateQueueRedeemer, policy_id: PolicyId, self: Transaction) {
-    let (common, inputs, _outputs, sigs, vrange) = make_common(self, policy_id)
+    let (common, inputs, _outputs, _sigs, vrange) = make_common(self, policy_id)
     when redeemer is {
       SQ_Init -> {
         expect
@@ -28,7 +28,6 @@ validator state_queue(cfg: StateQueueConfig) {
       SQ_Deinit -> deinit(common)
       SQ_Append { key_to_insert, prev_node_key } -> {
         expect Finite(validTo) = vrange.upper_bound.bound_type
-        expect list.any(sigs, fn(sig) { sig == key_to_insert })
         append(common, key_to_insert, prev_node_key, validTo)
       }
       SQ_Merge { root_node_key, mergeable_node_key } ->
@@ -101,9 +100,12 @@ fn append(
       next: prev_node.data.next,
       extra_data: StateDatum { state_time: validTo },
     }
+  let new_token_name =
+    bytearray.concat(constants.root_node_token_name, insert_key)
   let correct_new_node_output =
     list.any(common.node_outputs, fn(node_pair) { and {
           new_node_datum == node_pair.data,
+          quantity_of(node_pair.val, common.own_cs, new_token_name) == 1,
           length(flatten(node_pair.val)) <= 3,
         } })
   let correct_prev_node_output =
@@ -115,12 +117,7 @@ fn append(
     )
 
   let must_mint_correct =
-    utils.validate_mint(
-      common.mint,
-      common.own_cs,
-      bytearray.concat(constants.root_node_token_name, insert_key),
-      1,
-    )
+    utils.validate_mint(common.mint, common.own_cs, new_token_name, 1)
   and {
     must_cover_inserting_key,
     signed_by_publisher,
@@ -148,6 +145,7 @@ fn merge(
     )
   let is_root =
     quantity_of(root_node.val, common.own_cs, constants.root_node_token_name) > 0
+  //TODO Is the following safe enough?
   let is_mergeable_node_key_oldest =
     root_node.data.next == mergeable_node.data.key
   let must_spend_two_nodes = list.length(common.node_inputs) == 2

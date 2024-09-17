@@ -122,10 +122,13 @@ fn insert(
         refund_process_init_time: -1,
       },
     }
+  let new_token_name =
+    bytearray.concat(constants.root_node_token_name, insert_key)
   let correct_new_node_output =
     list.any(common.node_outputs, fn(node_pair) { and {
           new_node_datum == node_pair.data,
           quantity_of(node_pair.val, "", "") >= min_lovelace_bond,
+          quantity_of(node_pair.val, common.own_cs, new_token_name) == 1,
           length(flatten(node_pair.val)) <= 3,
         } })
   let correct_prev_node_output =
@@ -137,12 +140,7 @@ fn insert(
     )
 
   let must_mint_correct =
-    utils.validate_mint(
-      common.mint,
-      common.own_cs,
-      bytearray.concat(constants.root_node_token_name, insert_key),
-      1,
-    )
+    utils.validate_mint(common.mint, common.own_cs, new_token_name, 1)
   and {
     must_cover_inserting_key,
     correct_new_node_output,
@@ -188,13 +186,11 @@ fn slash(
   let user_must_have_fraud_proof_token = True
   let must_mint_correct =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
-  let bond_goes_to_treasury_hash =
-    list.any(
-      outputs,
-      fn(output) {
-        quantity_of(output.value, "", "") >= cfg.min_lovelace_bond && output.address == cfg.midgard_treasury
-      },
-    )
+  let bond_goes_to_treasury_hash = list.any(outputs, fn(output) { and {
+          quantity_of(output.value, "", "") >= cfg.min_lovelace_bond,
+          output.address == cfg.midgard_treasury,
+          length(flatten(output.value)) <= 3,
+        } })
   and {
     must_cover_remove_key,
     must_spend_two_nodes,
@@ -211,11 +207,8 @@ fn init_refund(
   sigs: List<PubKeyHash>,
   validTo: POSIXTime,
 ) -> Bool {
-  expect Some(node_to_mark) =
-    list.find(
-      common.node_inputs,
-      fn(input) { input.data.key == Key { key: node_to_mark_key } },
-    )
+  expect [node_to_mark] = common.node_inputs
+  expect node_to_mark.data.key == Key { key: node_to_mark_key }
   let must_be_signed_by_user = list.has(sigs, node_to_mark_key)
   let node_to_mark_new_datum =
     LinkedListDatum {

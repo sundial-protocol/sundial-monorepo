@@ -1,7 +1,7 @@
 use aiken/collection/list.{length}
 use aiken/interval.{Finite, Interval}
 use aiken/primitive/bytearray
-use cardano/assets.{PolicyId, flatten}
+use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{Input, Transaction}
 use midgard/constants
 use midgard/types/fpvs.{
@@ -19,7 +19,7 @@ validator fraud_proof_validator_set(cfg: FraudProofValidatorSetConfig) {
     policy_id: PolicyId,
     self: Transaction,
   ) {
-    let (common, inputs, _outputs, sigs, vrange) = make_common(self, policy_id)
+    let (common, inputs, _outputs, _sigs, vrange) = make_common(self, policy_id)
     when redeemer is {
       FPVS_Init -> {
         expect
@@ -32,7 +32,6 @@ validator fraud_proof_validator_set(cfg: FraudProofValidatorSetConfig) {
       FPVS_Deinit -> deinit(common)
       FPVS_Insert { key_to_insert, prev_node_key } -> {
         expect Finite(validTo) = vrange.upper_bound.bound_type
-        expect list.any(sigs, fn(sig) { sig == key_to_insert })
         insert(common, key_to_insert, prev_node_key, validTo)
       }
       FPVS_Remove { prev_node_key, remove_node_key } ->
@@ -101,9 +100,12 @@ fn insert(
       next: prev_node.data.next,
       extra_data: FraudProofValidatorDatum { insert_time: validTo },
     }
+  let new_token_name =
+    bytearray.concat(constants.root_node_token_name, insert_key)
   let correct_new_node_output =
     list.any(common.node_outputs, fn(node_pair) { and {
           new_node_datum == node_pair.data,
+          quantity_of(node_pair.val, common.own_cs, new_token_name) == 1,
           length(flatten(node_pair.val)) <= 3,
         } })
   let correct_prev_node_output =
@@ -115,12 +117,7 @@ fn insert(
     )
 
   let must_mint_correct =
-    utils.validate_mint(
-      common.mint,
-      common.own_cs,
-      bytearray.concat(constants.root_node_token_name, insert_key),
-      1,
-    )
+    utils.validate_mint(common.mint, common.own_cs, new_token_name, 1)
   and {
     must_cover_inserting_key,
     correct_new_node_output,
