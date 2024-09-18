@@ -64,7 +64,16 @@ validator publisher_set(cfg: PublisherSetConfig) {
 
 fn init(common: Common<PublisherDatum>) -> Bool {
   let must_spend_nodes = list.length(common.node_inputs) == 0
-  let must_exactly_one_node_output = list.length(common.node_outputs) == 1
+  expect [root_node] = common.node_outputs
+  let root_node_datum =
+    LinkedListDatum {
+      key: Key { key: constants.root_node_token_name },
+      next: Empty,
+      extra_data: PublisherDatum {
+        insert_time: -1,
+        refund_process_init_time: -1,
+      },
+    }
   let must_mint_correctly =
     utils.validate_mint(
       common.mint,
@@ -73,27 +82,14 @@ fn init(common: Common<PublisherDatum>) -> Bool {
       1,
     )
   and {
+    root_node.data == root_node_datum,
     must_spend_nodes,
-    must_exactly_one_node_output,
     must_mint_correctly,
   }
 }
 
-fn deinit(common: Common<PublisherDatum>) -> Bool {
-  expect [root_node] = common.node_inputs
-  expect Empty = root_node.data.next
-  let must_not_produce_node_output = list.length(common.node_outputs) == 0
-  let must_burn_correctly =
-    utils.validate_mint(
-      common.mint,
-      common.own_cs,
-      constants.root_node_token_name,
-      -1,
-    )
-  and {
-    must_not_produce_node_output,
-    must_burn_correctly,
-  }
+fn deinit(_common: Common<PublisherDatum>) -> Bool {
+  True
 }
 
 fn insert(

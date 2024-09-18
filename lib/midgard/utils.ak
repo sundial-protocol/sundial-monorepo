@@ -4,7 +4,7 @@ use aiken/primitive/bytearray
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
 use cardano/transaction.{Input, Output}
 use midgard/constants.{set_node_prefix}
-use midgard/types/general.{Empty, Key, LinkedListDatum, PubKeyHash}
+use midgard/types/general.{Empty, Key, LinkedListDatum, NodeKey, PubKeyHash}
 
 pub fn validate_mint(
   mints: Value,
@@ -106,4 +106,24 @@ pub fn is_prefix_of(prefix: ByteArray, src: ByteArray) -> Bool {
     True -> bytearray.take(src, prefix_length) == prefix
     False -> False
   }
+}
+
+pub fn safe_list_last(elems: List<a>) -> a {
+  expect Some(last_elem) = list.last(elems)
+  last_elem
+}
+
+pub fn safe_list_head(elems: List<a>) -> a {
+  expect Some(last_elem) = list.head(elems)
+  last_elem
+}
+
+pub fn safe_get_key(k: NodeKey) {
+  expect Key(the_key) = k
+  the_key
+}
+
+pub fn safe_list_init(elems: List<a>) {
+  expect Some(elems_except_last) = list.init(elems)
+  elems_except_last
 }

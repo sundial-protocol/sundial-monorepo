@@ -46,7 +46,13 @@ validator fraud_proof_validator_set(cfg: FraudProofValidatorSetConfig) {
 
 fn init(common: Common<FraudProofValidatorDatum>) -> Bool {
   let must_spend_nodes = list.length(common.node_inputs) == 0
-  let must_exactly_one_node_output = list.length(common.node_outputs) == 1
+  expect [root_node] = common.node_outputs
+  let root_node_datum =
+    LinkedListDatum {
+      key: Key { key: constants.root_node_token_name },
+      next: Empty,
+      extra_data: FraudProofValidatorDatum { insert_time: -1 },
+    }
   let must_mint_correctly =
     utils.validate_mint(
       common.mint,
@@ -55,27 +61,14 @@ fn init(common: Common<FraudProofValidatorDatum>) -> Bool {
       1,
     )
   and {
+    root_node.data == root_node_datum,
     must_spend_nodes,
-    must_exactly_one_node_output,
     must_mint_correctly,
   }
 }
 
-fn deinit(common: Common<FraudProofValidatorDatum>) -> Bool {
-  expect [root_node] = common.node_inputs
-  expect Empty = root_node.data.next
-  let must_not_produce_node_output = list.length(common.node_outputs) == 0
-  let must_burn_correctly =
-    utils.validate_mint(
-      common.mint,
-      common.own_cs,
-      constants.root_node_token_name,
-      -1,
-    )
-  and {
-    must_not_produce_node_output,
-    must_burn_correctly,
-  }
+fn deinit(_common: Common<FraudProofValidatorDatum>) -> Bool {
+  True
 }
 
 fn insert(
@@ -115,13 +108,15 @@ fn insert(
         prev_node.val == node_pair.val && node_pair.data == prev_node_new_datum
       },
     )
-
+  //TODO
+  let user_must_have_governance_token = True
   let must_mint_correct =
     utils.validate_mint(common.mint, common.own_cs, new_token_name, 1)
   and {
     must_cover_inserting_key,
     correct_new_node_output,
     correct_prev_node_output,
+    user_must_have_governance_token,
     must_mint_correct,
   }
 }
@@ -154,7 +149,7 @@ fn remove(
       },
     )
   //TODO
-  let user_must_have_fraud_proof_token = True
+  let user_must_have_governance_token = True
   let must_mint_correct =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   and {
@@ -162,6 +157,6 @@ fn remove(
     must_spend_two_nodes,
     correct_prev_node_output,
     must_mint_correct,
-    user_must_have_fraud_proof_token,
+    user_must_have_governance_token,
   }
 }

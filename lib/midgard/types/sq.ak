@@ -15,6 +15,7 @@ use midgard/utils.{
 
 pub type StateQueueConfig {
   init_utxo: OutputReference,
+  refund_waiting_period: Int,
 }
 
 pub type StateDatum {
@@ -26,7 +27,11 @@ pub type StateQueueRedeemer {
   SQ_Deinit
   SQ_Append { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
   SQ_Merge { root_node_key: PubKeyHash, mergeable_node_key: PubKeyHash }
-  SQ_Remove { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
+  SQ_Invalidate { prev_node_key: PubKeyHash, invalidate_node_key: PubKeyHash }
+  SQ_Fraud_Fold {
+    prev_valid_node_key: ByteArray,
+    fraud_node_keys: List<ByteArray>,
+  }
 }
 
 pub fn make_common(

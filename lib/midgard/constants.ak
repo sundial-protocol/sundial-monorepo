@@ -1,3 +1,5 @@
 pub const root_node_token_name = "FSN"
 
 pub const set_node_prefix = "FSN"
+
+pub const invalidation_token_name = "INVALID"
