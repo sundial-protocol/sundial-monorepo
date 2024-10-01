@@ -20,17 +20,23 @@ pub type StateQueueConfig {
 
 pub type StateDatum {
   state_time: POSIXTime,
+  publisher_key: ByteArray,
 }
 
 pub type StateQueueRedeemer {
   SQ_Init
   SQ_Deinit
-  SQ_Append { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
+  SQ_Append { prev_node_key: PubKeyHash, publisher_key: PubKeyHash }
   SQ_Merge { root_node_key: PubKeyHash, mergeable_node_key: PubKeyHash }
-  SQ_Invalidate { prev_node_key: PubKeyHash, invalidate_node_key: PubKeyHash }
-  SQ_Fraud_Fold {
+  SQ_Remove_Fraud_Child {
+    prev_node_key: PubKeyHash,
+    remove_node_key: PubKeyHash,
+    fraud_token_ref_input_index: Int,
+  }
+  SQ_Remove_Fraud_Node {
     prev_valid_node_key: ByteArray,
-    fraud_node_keys: List<ByteArray>,
+    remove_node_key: ByteArray,
+    fraud_token_input_index: Int,
   }
 }
 
