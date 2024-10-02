@@ -16,13 +16,9 @@ use midgard/types/sq.{
 }
 use midgard/utils
 
-validator state_queue(
-  cfg: StateQueueConfig,
-  _publisher_set_hash: ByteArray,
-  _publisher_set_asset_name: ByteArray,
-) {
+validator state_queue(cfg: StateQueueConfig, publisher_set_hash: ByteArray) {
   mint(redeemer: StateQueueRedeemer, policy_id: PolicyId, self: Transaction) {
-    let (common, inputs, _outputs, _sigs, vrange) = make_common(self, policy_id)
+    let (common, inputs, _outputs, sigs, vrange) = make_common(self, policy_id)
     when redeemer is {
       SQ_Init -> {
         expect
@@ -33,19 +29,32 @@ validator state_queue(
         init(common)
       }
       SQ_Deinit -> deinit(common)
-      SQ_Append { prev_node_key, publisher_key } -> {
+      SQ_Append { prev_node_key, publisher_key, publisher_ref_input_index } -> {
         expect Finite(validTo) = vrange.upper_bound.bound_type
-        //TODO CHECK THAT A VALID PUBLISHER IS DOING THIS (nft in the utxo + utxo is inside the publisher set + tx must be signed by that publisher)
-        //TODO check that publisher_turn_to_publish
-        append(
-          common,
-          blake2b_224(
-            serialise(StateDatum { state_time: validTo, publisher_key }),
+        expect Some(publisher_input) =
+          list.at(self.reference_inputs, publisher_ref_input_index)
+        expect list.any(sigs, fn(sig) { sig == publisher_key })
+        let publisher_token_name =
+          bytearray.concat(constants.root_node_token_name, publisher_key)
+        and {
+          //We don't need to check that the publisher_input comes from the PS contract as the publisher NFTs cannot leave the contact
+          quantity_of(
+            publisher_input.output.value,
+            publisher_set_hash,
+            publisher_token_name,
+          ) == 1,
+          //TODO check that publisher_turn_to_publish
+          False,
+          append(
+            common,
+            blake2b_224(
+              serialise(StateDatum { state_time: validTo, publisher_key }),
+            ),
+            prev_node_key,
+            publisher_key,
+            validTo,
           ),
-          prev_node_key,
-          publisher_key,
-          validTo,
-        )
+        }
       }
       SQ_Merge { root_node_key, mergeable_node_key } -> {
         expect Finite(validTo) = vrange.upper_bound.bound_type

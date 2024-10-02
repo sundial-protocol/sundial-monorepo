@@ -26,7 +26,11 @@ pub type StateDatum {
 pub type StateQueueRedeemer {
   SQ_Init
   SQ_Deinit
-  SQ_Append { prev_node_key: PubKeyHash, publisher_key: PubKeyHash }
+  SQ_Append {
+    prev_node_key: PubKeyHash,
+    publisher_key: PubKeyHash,
+    publisher_ref_input_index: Int,
+  }
   SQ_Merge { root_node_key: PubKeyHash, mergeable_node_key: PubKeyHash }
   SQ_Remove_Fraud_Child {
     prev_node_key: PubKeyHash,
