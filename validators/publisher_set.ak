@@ -70,8 +70,8 @@ fn init(common: Common<PublisherDatum>) -> Bool {
       key: Key { key: constants.root_node_token_name },
       next: Empty,
       extra_data: PublisherDatum {
-        insert_time: -1,
-        refund_process_init_time: -1,
+        insert_time: constants.posix_time_none,
+        refund_process_init_time: constants.posix_time_none,
       },
     }
   let must_mint_correctly =
@@ -115,7 +115,7 @@ fn insert(
       next: prev_node.data.next,
       extra_data: PublisherDatum {
         insert_time: validTo,
-        refund_process_init_time: -1,
+        refund_process_init_time: constants.posix_time_none,
       },
     }
   let new_token_name =

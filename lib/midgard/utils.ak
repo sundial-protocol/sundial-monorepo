@@ -4,7 +4,9 @@ use aiken/primitive/bytearray
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
 use cardano/transaction.{Input, Output}
 use midgard/constants.{set_node_prefix}
-use midgard/types/general.{Empty, Key, LinkedListDatum, NodeKey, PubKeyHash}
+use midgard/types/general.{
+  Empty, Key, LinkedListDatum, NodeKey, POSIXTime, PubKeyHash,
+}
 
 pub fn validate_mint(
   mints: Value,
@@ -126,4 +128,8 @@ pub fn safe_get_key(k: NodeKey) {
 pub fn safe_list_init(elems: List<a>) {
   expect Some(elems_except_last) = list.init(elems)
   elems_except_last
+}
+
+pub fn is_posix_time_none(time: POSIXTime) {
+  time == constants.posix_time_none
 }

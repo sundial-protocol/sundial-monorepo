@@ -35,7 +35,8 @@ validator state_queue(
       SQ_Deinit -> deinit(common)
       SQ_Append { prev_node_key, publisher_key } -> {
         expect Finite(validTo) = vrange.upper_bound.bound_type
-        //TODO CHECK THAT A VALID PUBLISHER IS DOING THIS (tx must be signed and must belong to the publisher set)
+        //TODO CHECK THAT A VALID PUBLISHER IS DOING THIS (nft in the utxo + utxo is inside the publisher set + tx must be signed by that publisher)
+        //TODO check that publisher_turn_to_publish
         append(
           common,
           blake2b_224(

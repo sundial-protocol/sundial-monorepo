@@ -1,17 +1,14 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/interval.{Interval}
-use cardano/assets.{PolicyId, flatten, tokens}
+use cardano/assets.{PolicyId, from_asset, tokens, without_lovelace}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
-use midgard/constants.{set_node_prefix}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
-use midgard/utils.{
-  find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key, valid_node,
-}
+use midgard/utils.{get_outputs, has_data_cs, parse_node_key, valid_node}
 
 pub type FraudProofValidatorSetConfig {
   init_utxo: OutputReference,
@@ -19,6 +16,7 @@ pub type FraudProofValidatorSetConfig {
 
 pub type FraudProofValidatorDatum {
   insert_time: POSIXTime,
+  fraud_proof_first_step: ByteArray,
 }
 
 pub type FraudProofValidatorSetRedeemer {
@@ -107,8 +105,7 @@ pub fn parse_node_output_utxo(
       Key(key) -> Some(key)
     }
   expect node_key == datum_key
-  expect list.length(flatten(value)) == 2
+  expect without_lovelace(value) == from_asset(cs, tn, 1)
   expect valid_node(publisher_datum)
-  expect find_cs_by_token_prefix(value, set_node_prefix) == [cs]
   NodePair { val: value, data: publisher_datum }
 }

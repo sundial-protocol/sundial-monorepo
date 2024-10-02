@@ -51,7 +51,10 @@ fn init(common: Common<FraudProofValidatorDatum>) -> Bool {
     LinkedListDatum {
       key: Key { key: constants.root_node_token_name },
       next: Empty,
-      extra_data: FraudProofValidatorDatum { insert_time: -1 },
+      extra_data: FraudProofValidatorDatum {
+        insert_time: -1,
+        fraud_proof_first_step: "TODO",
+      },
     }
   let must_mint_correctly =
     utils.validate_mint(
@@ -91,7 +94,10 @@ fn insert(
     LinkedListDatum {
       key: Key { key: insert_key },
       next: prev_node.data.next,
-      extra_data: FraudProofValidatorDatum { insert_time: validTo },
+      extra_data: FraudProofValidatorDatum {
+        insert_time: validTo,
+        fraud_proof_first_step: "TODO",
+      },
     }
   let new_token_name =
     bytearray.concat(constants.root_node_token_name, insert_key)
