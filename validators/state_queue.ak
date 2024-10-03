@@ -4,19 +4,24 @@ use aiken/crypto.{blake2b_224}
 use aiken/interval.{Finite, Interval}
 use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, flatten, quantity_of}
-use cardano/transaction.{Input, Transaction}
+use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/constants
+use midgard/types/fpvs.{FraudProofValidatorDatum}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime,
 }
 use midgard/types/sq.{
   SQ_Append, SQ_Deinit, SQ_Init, SQ_Merge, SQ_Remove_Fraud_Child,
   SQ_Remove_Fraud_Node, StateDatum, StateQueueConfig, StateQueueRedeemer,
-  make_common,
+  is_publisher_slashed_now_or_before, make_common,
 }
 use midgard/utils
 
-validator state_queue(cfg: StateQueueConfig, publisher_set_hash: ByteArray) {
+validator state_queue(
+  cfg: StateQueueConfig,
+  publisher_set_hash: ByteArray,
+  fraud_proof_hash: ByteArray,
+) {
   mint(redeemer: StateQueueRedeemer, policy_id: PolicyId, self: Transaction) {
     let (common, inputs, _outputs, sigs, vrange) = make_common(self, policy_id)
     when redeemer is {
@@ -63,25 +68,57 @@ validator state_queue(cfg: StateQueueConfig, publisher_set_hash: ByteArray) {
       SQ_Remove_Fraud_Child {
         prev_node_key,
         remove_node_key,
+        publisher_set_prev_node_key,
+        publisher_set_remove_node_key,
         fraud_token_ref_input_index,
-      } ->
-        remove_fraud_child(
-          common,
-          prev_node_key,
-          remove_node_key,
-          fraud_token_ref_input_index,
-        )
+        slash_publisher_node_input_index,
+      } -> {
+        expect Some(fraud_token_input) =
+          list.at(self.reference_inputs, fraud_token_ref_input_index)
+        and {
+          is_publisher_slashed_now_or_before(
+            self,
+            publisher_set_hash,
+            publisher_set_prev_node_key,
+            publisher_set_remove_node_key,
+            slash_publisher_node_input_index,
+          ),
+          remove_fraud_child(
+            common,
+            prev_node_key,
+            remove_node_key,
+            fraud_token_input,
+            fraud_proof_hash,
+          ),
+        }
+      }
       SQ_Remove_Fraud_Node {
         prev_valid_node_key,
         remove_node_key,
+        publisher_set_prev_node_key,
+        publisher_set_remove_node_key,
         fraud_token_input_index,
-      } ->
-        remove_fraud_node(
-          common,
-          prev_valid_node_key,
-          remove_node_key,
-          fraud_token_input_index,
-        )
+        slash_publisher_node_input_index,
+      } -> {
+        expect Some(fraud_token_input) =
+          list.at(self.inputs, fraud_token_input_index)
+        and {
+          is_publisher_slashed_now_or_before(
+            self,
+            publisher_set_hash,
+            publisher_set_prev_node_key,
+            publisher_set_remove_node_key,
+            slash_publisher_node_input_index,
+          ),
+          remove_fraud_node(
+            common,
+            prev_valid_node_key,
+            remove_node_key,
+            fraud_token_input,
+            fraud_proof_hash,
+          ),
+        }
+      }
     }
   }
 
@@ -155,13 +192,13 @@ fn append(
       },
     )
 
-  let must_mint_correct =
+  let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, new_token_name, 1)
   and {
     is_prev_node_last,
     correct_new_node_output,
     correct_prev_node_output,
-    must_mint_correct,
+    must_mint_correctly,
   }
 }
 
@@ -204,7 +241,7 @@ fn merge(
         root_node.val == node_pair.val && root_node_new_datum == node_pair.data
       },
     )
-  let must_mint_correct =
+  let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   and {
     is_root,
@@ -212,31 +249,40 @@ fn merge(
     enough_time_passed,
     must_spend_two_nodes,
     correct_root_node_output,
-    must_mint_correct,
+    must_mint_correctly,
   }
 }
 
 fn remove_fraud_child(
   common: Common<StateDatum>,
   prev_node_key: ByteArray,
-  invalidate_node_key: ByteArray,
-  fraud_token_ref_input_index: Int,
+  remove_node_key: ByteArray,
+  fraud_token_input: Input,
+  fraud_proof_hash: ByteArray,
 ) -> Bool {
+  expect Output { value, datum: InlineDatum(raw_fraud_datum), .. } =
+    fraud_token_input.output
+  let correct_input_fraud_token =
+    quantity_of(value, fraud_proof_hash, constants.invalidation_token_name) == 1
+  expect fraud_input_datum: LinkedListDatum<FraudProofValidatorDatum> =
+    raw_fraud_datum
+  expect Key(fraud_input_key) = fraud_input_datum.key
+  let fraud_input_key_is_prev_node_key = fraud_input_key == prev_node_key
   let must_spend_two_nodes = list.length(common.node_inputs) == 2
   expect Some(prev_node) =
     list.find(
       common.node_inputs,
       fn(input) { input.data.key == Key { key: prev_node_key } },
     )
-  expect Some(invalidate_node) =
+  expect Some(remove_node) =
     list.find(
       common.node_inputs,
-      fn(input) { input.data.key == Key { key: invalidate_node_key } },
+      fn(input) { input.data.key == Key { key: remove_node_key } },
     )
   let prev_node_new_datum =
     LinkedListDatum {
       key: prev_node.data.key,
-      next: Empty,
+      next: remove_node.data.key,
       extra_data: prev_node.data.extra_data,
     }
   let correct_prev_node_output =
@@ -246,39 +292,16 @@ fn remove_fraud_child(
         prev_node.val == node_pair.val && prev_node_new_datum == node_pair.data
       },
     )
-  //TODO
-  let user_has_fraud_proof_token = False
-  let must_mint_correctly =
-    utils.validate_mint(
-      common.mint,
-      common.own_cs,
-      constants.invalidation_token_name,
-      1,
-    )
-  expect Key(invalidate_node_key) = invalidate_node.data.key
-  let invalidated_state_token_name =
-    bytearray.concat(constants.root_node_token_name, invalidate_node_key)
-  let correct_invalidated_node_output =
-    list.any(common.node_outputs, fn(node_pair) { and {
-          invalidate_node.data == node_pair.data,
-          quantity_of(
-            node_pair.val,
-            common.own_cs,
-            invalidated_state_token_name,
-          ) == 1,
-          quantity_of(
-            node_pair.val,
-            common.own_cs,
-            constants.invalidation_token_name,
-          ) == 1,
-          length(flatten(node_pair.val)) <= 3,
-        } })
+  let remove_token_name =
+    bytearray.concat(constants.root_node_token_name, remove_node_key)
+  let must_burn_node_nft =
+    utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   and {
+    correct_input_fraud_token,
+    fraud_input_key_is_prev_node_key,
     must_spend_two_nodes,
     correct_prev_node_output,
-    correct_invalidated_node_output,
-    user_has_fraud_proof_token,
-    must_mint_correctly,
+    must_burn_node_nft,
   }
 }
 
@@ -286,7 +309,58 @@ fn remove_fraud_node(
   common: Common<StateDatum>,
   prev_valid_node_key: ByteArray,
   remove_node_key: ByteArray,
-  fraud_token_input_index: Int,
+  fraud_token_input: Input,
+  fraud_proof_hash: ByteArray,
 ) {
-  todo
+  expect Output { value, datum: InlineDatum(raw_fraud_datum), .. } =
+    fraud_token_input.output
+  let correct_input_fraud_token =
+    quantity_of(value, fraud_proof_hash, constants.invalidation_token_name) == 1
+  expect fraud_input_datum: LinkedListDatum<FraudProofValidatorDatum> =
+    raw_fraud_datum
+  expect Key(fraud_input_key) = fraud_input_datum.key
+  let fraud_input_key_is_remove_node_key = fraud_input_key == remove_node_key
+  let must_spend_two_nodes = list.length(common.node_inputs) == 2
+  expect Some(prev_node) =
+    list.find(
+      common.node_inputs,
+      fn(input) { input.data.key == Key { key: prev_valid_node_key } },
+    )
+  expect Some(remove_node) =
+    list.find(
+      common.node_inputs,
+      fn(input) { input.data.key == Key { key: remove_node_key } },
+    )
+  let prev_node_new_datum =
+    LinkedListDatum {
+      key: prev_node.data.key,
+      next: remove_node.data.key,
+      extra_data: prev_node.data.extra_data,
+    }
+  let correct_prev_node_output =
+    list.any(
+      common.node_outputs,
+      fn(node_pair) {
+        prev_node.val == node_pair.val && prev_node_new_datum == node_pair.data
+      },
+    )
+  let remove_token_name =
+    bytearray.concat(constants.root_node_token_name, remove_node_key)
+  let must_burn_node_nft =
+    utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
+  let must_burn_fraud_proof_token =
+    utils.validate_mint(
+      common.mint,
+      fraud_proof_hash,
+      constants.invalidation_token_name,
+      -1,
+    )
+  and {
+    correct_input_fraud_token,
+    fraud_input_key_is_remove_node_key,
+    must_spend_two_nodes,
+    correct_prev_node_output,
+    must_burn_node_nft,
+    must_burn_fraud_proof_token,
+  }
 }

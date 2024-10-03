@@ -1,16 +1,20 @@
 use aiken/collection/dict
 use aiken/collection/list
+use aiken/collection/pairs.{get_first}
 use aiken/interval.{Interval}
-use cardano/assets.{PolicyId, flatten, tokens}
+use cardano/address.{Address, VerificationKey}
+use cardano/assets.{PolicyId, flatten, quantity_of, tokens}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use midgard/constants.{set_node_prefix}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
+use midgard/types/ps.{PS_Slash}
 use midgard/utils.{
-  find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key, valid_node,
+  cover_key, find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key,
+  valid_node,
 }
 
 pub type StateQueueConfig {
@@ -35,12 +39,18 @@ pub type StateQueueRedeemer {
   SQ_Remove_Fraud_Child {
     prev_node_key: PubKeyHash,
     remove_node_key: PubKeyHash,
+    publisher_set_prev_node_key: PubKeyHash,
+    publisher_set_remove_node_key: PubKeyHash,
     fraud_token_ref_input_index: Int,
+    slash_publisher_node_input_index: Int,
   }
   SQ_Remove_Fraud_Node {
     prev_valid_node_key: ByteArray,
     remove_node_key: ByteArray,
+    publisher_set_prev_node_key: PubKeyHash,
+    publisher_set_remove_node_key: PubKeyHash,
     fraud_token_input_index: Int,
+    slash_publisher_node_input_index: Int,
   }
 }
 
@@ -125,4 +135,59 @@ pub fn parse_node_output_utxo(
   expect valid_node(list_datum)
   expect find_cs_by_token_prefix(value, set_node_prefix) == [cs]
   NodePair { val: value, data: list_datum }
+}
+
+pub fn is_publisher_slashed_now_or_before(
+  self: Transaction,
+  publisher_set_hash: ByteArray,
+  prev_node_key: PubKeyHash,
+  publisher_node_key: PubKeyHash,
+  slash_publisher_node_input_index: Int,
+) -> Bool {
+  let maybe_ps_redeemer = get_first(self.redeemers, Mint(publisher_set_hash))
+  expect Some(publisher_input) =
+    list.at(self.inputs, slash_publisher_node_input_index)
+  if maybe_ps_redeemer == None {
+    let prev_node_datum =
+      ps.node_input_utxo_datum_unsafe(publisher_input.output).data
+    //TODO here I'm not 100% sure
+    and {
+      prev_node_datum.key == Key { key: prev_node_key },
+      valid_publisher_node_input(
+        publisher_input,
+        publisher_set_hash,
+        prev_node_key,
+      ),
+      cover_key(prev_node_datum, publisher_node_key),
+    }
+  } else {
+    expect Some(ps_redeemer) = maybe_ps_redeemer
+    expect PS_Slash { prev_node_key: _prev_node_key, remove_node_key } =
+      ps_redeemer
+    and {
+      valid_publisher_node_input(
+        publisher_input,
+        publisher_set_hash,
+        publisher_node_key,
+      ),
+      remove_node_key == publisher_node_key,
+    }
+  }
+}
+
+pub fn valid_publisher_node_input(
+  publisher_input: Input,
+  publisher_set_hash: ByteArray,
+  publisher_node_key: ByteArray,
+) {
+  expect VerificationKey(hash) =
+    publisher_input.output.address.payment_credential
+  and {
+    hash == publisher_set_hash,
+    quantity_of(
+      publisher_input.output.value,
+      publisher_set_hash,
+      publisher_node_key,
+    ) == 1,
+  }
 }

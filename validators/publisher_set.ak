@@ -135,13 +135,13 @@ fn insert(
       },
     )
 
-  let must_mint_correct =
+  let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, new_token_name, 1)
   and {
     must_cover_inserting_key,
     correct_new_node_output,
     correct_prev_node_output,
-    must_mint_correct,
+    must_mint_correctly,
   }
 }
 
@@ -180,7 +180,7 @@ fn slash(
     )
   //TODO
   let user_must_have_fraud_proof_token = True
-  let must_mint_correct =
+  let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   let bond_goes_to_treasury_hash = list.any(outputs, fn(output) { and {
           quantity_of(output.value, "", "") >= cfg.min_lovelace_bond,
@@ -191,7 +191,7 @@ fn slash(
     must_cover_remove_key,
     must_spend_two_nodes,
     correct_stay_node_output,
-    must_mint_correct,
+    must_mint_correctly,
     user_must_have_fraud_proof_token,
     bond_goes_to_treasury_hash,
   }
@@ -264,7 +264,7 @@ fn complete_refund(
         prev_node.val == node_pair.val && prev_node_new_datum == node_pair.data
       },
     )
-  let must_mint_correct =
+  let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   let must_be_signed_by_user = list.has(sigs, remove_node_key)
   let is_refund_init = remove_node.data.extra_data.refund_process_init_time > 0
@@ -274,7 +274,7 @@ fn complete_refund(
     must_cover_remove_key,
     must_spend_two_nodes,
     correct_stay_node_output,
-    must_mint_correct,
+    must_mint_correctly,
     must_be_signed_by_user,
     is_refund_init,
     enough_time_passed,

@@ -116,14 +116,14 @@ fn insert(
     )
   //TODO
   let user_must_have_governance_token = True
-  let must_mint_correct =
+  let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, new_token_name, 1)
   and {
     must_cover_inserting_key,
     correct_new_node_output,
     correct_prev_node_output,
     user_must_have_governance_token,
-    must_mint_correct,
+    must_mint_correctly,
   }
 }
 
@@ -156,13 +156,13 @@ fn remove(
     )
   //TODO
   let user_must_have_governance_token = True
-  let must_mint_correct =
+  let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   and {
     must_cover_remove_key,
     must_spend_two_nodes,
     correct_prev_node_output,
-    must_mint_correct,
+    must_mint_correctly,
     user_must_have_governance_token,
   }
 }
