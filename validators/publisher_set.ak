@@ -2,8 +2,9 @@ use aiken/collection/list.{length}
 use aiken/interval.{Finite, Interval}
 use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, flatten, quantity_of}
-use cardano/transaction.{Input, Output, Transaction}
+use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/constants
+use midgard/types/fpvs.{FraudProofValidatorDatum}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
@@ -13,7 +14,7 @@ use midgard/types/ps.{
 }
 use midgard/utils
 
-validator publisher_set(cfg: PublisherSetConfig) {
+validator publisher_set(cfg: PublisherSetConfig, fraud_proof_hash: ByteArray) {
   mint(redeemer: PublisherSetRedeemer, policy_id: PolicyId, self: Transaction) {
     let (common, inputs, outputs, sigs, vrange) = make_common(self, policy_id)
     when redeemer is {
@@ -37,8 +38,17 @@ validator publisher_set(cfg: PublisherSetConfig) {
           cfg.min_lovelace_bond,
         )
       }
-      PS_Slash { prev_node_key, remove_node_key } ->
-        slash(common, prev_node_key, remove_node_key, outputs)
+      PS_Slash { prev_node_key, remove_node_key, fraud_token_ref_input_index } -> {
+        expect Some(fraud_token_input) =
+          list.at(self.reference_inputs, fraud_token_ref_input_index)
+        slash(
+          common,
+          prev_node_key,
+          remove_node_key,
+          outputs,
+          fraud_token_input,
+        )
+      }
       PS_InitRefund { node_to_mark_key } -> {
         expect Finite(validTo) = vrange.upper_bound.bound_type
         init_refund(common, node_to_mark_key, sigs, validTo)
@@ -150,6 +160,7 @@ fn slash(
   prev_node_key: PubKeyHash,
   remove_node_key: PubKeyHash,
   outputs: List<Output>,
+  fraud_token_ref_input: Input,
 ) -> Bool {
   let must_spend_two_nodes = list.length(common.node_inputs) == 2
   expect Some(prev_node) =
@@ -178,8 +189,14 @@ fn slash(
         prev_node.val == node_pair.val && prev_node_new_datum == node_pair.data
       },
     )
-  //TODO
-  let user_must_have_fraud_proof_token = True
+  expect Output { value, datum: InlineDatum(raw_fraud_datum), .. } =
+    fraud_token_ref_input.output
+  let correct_input_fraud_token =
+    quantity_of(value, fraud_proof_hash, constants.invalidation_token_name) == 1
+  expect fraud_input_datum: LinkedListDatum<FraudProofValidatorDatum> =
+    raw_fraud_datum
+  expect Key(fraud_input_key) = fraud_input_datum.key
+  let fraud_input_key_is_node_key = fraud_input_key == remove_node_key
   let must_mint_correctly =
     utils.validate_mint(common.mint, common.own_cs, remove_token_name, -1)
   let bond_goes_to_treasury_hash = list.any(outputs, fn(output) { and {
@@ -192,7 +209,8 @@ fn slash(
     must_spend_two_nodes,
     correct_stay_node_output,
     must_mint_correctly,
-    user_must_have_fraud_proof_token,
+    correct_input_fraud_token,
+    fraud_input_key_is_node_key,
     bond_goes_to_treasury_hash,
   }
 }

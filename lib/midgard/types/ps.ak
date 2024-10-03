@@ -27,7 +27,11 @@ pub type PublisherSetRedeemer {
   PS_Init
   PS_Deinit
   PS_Insert { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
-  PS_Slash { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
+  PS_Slash {
+    prev_node_key: PubKeyHash,
+    remove_node_key: PubKeyHash,
+    fraud_token_ref_input_index: Int,
+  }
   PS_InitRefund { node_to_mark_key: PubKeyHash }
   PS_CompleteRefund { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
 }

@@ -162,8 +162,11 @@ pub fn is_publisher_slashed_now_or_before(
     }
   } else {
     expect Some(ps_redeemer) = maybe_ps_redeemer
-    expect PS_Slash { prev_node_key: _prev_node_key, remove_node_key } =
-      ps_redeemer
+    expect PS_Slash {
+      prev_node_key: _prev_node_key,
+      remove_node_key,
+      fraud_token_ref_input_index: _fraud_token_ref_input_index,
+    } = ps_redeemer
     and {
       valid_publisher_node_input(
         publisher_input,

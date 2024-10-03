@@ -73,7 +73,7 @@ validator state_queue(
         fraud_token_ref_input_index,
         slash_publisher_node_input_index,
       } -> {
-        expect Some(fraud_token_input) =
+        expect Some(fraud_token_ref_input) =
           list.at(self.reference_inputs, fraud_token_ref_input_index)
         and {
           is_publisher_slashed_now_or_before(
@@ -87,7 +87,7 @@ validator state_queue(
             common,
             prev_node_key,
             remove_node_key,
-            fraud_token_input,
+            fraud_token_ref_input,
             fraud_proof_hash,
           ),
         }
