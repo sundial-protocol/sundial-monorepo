@@ -42,7 +42,7 @@ pub type StateQueueRedeemer {
     publisher_set_prev_node_key: PubKeyHash,
     publisher_set_remove_node_key: PubKeyHash,
     fraud_token_ref_input_index: Int,
-    slash_publisher_node_input_index: Int,
+    node_input_index: Int,
   }
   SQ_Remove_Fraud_Node {
     prev_valid_node_key: ByteArray,
@@ -50,7 +50,7 @@ pub type StateQueueRedeemer {
     publisher_set_prev_node_key: PubKeyHash,
     publisher_set_remove_node_key: PubKeyHash,
     fraud_token_input_index: Int,
-    slash_publisher_node_input_index: Int,
+    node_input_index: Int,
   }
 }
 
@@ -142,15 +142,14 @@ pub fn is_publisher_slashed_now_or_before(
   publisher_set_hash: ByteArray,
   prev_node_key: PubKeyHash,
   publisher_node_key: PubKeyHash,
-  slash_publisher_node_input_index: Int,
+  node_input_index: Int,
 ) -> Bool {
   let maybe_ps_redeemer = get_first(self.redeemers, Mint(publisher_set_hash))
-  expect Some(publisher_input) =
-    list.at(self.inputs, slash_publisher_node_input_index)
+  expect Some(publisher_input) = list.at(self.inputs, node_input_index)
   if maybe_ps_redeemer == None {
+    //In this case we passed as input node the prev_node and we check that covers the slashed key
     let prev_node_datum =
       ps.node_input_utxo_datum_unsafe(publisher_input.output).data
-    //TODO here I'm not 100% sure
     and {
       prev_node_datum.key == Key { key: prev_node_key },
       valid_publisher_node_input(
@@ -161,6 +160,7 @@ pub fn is_publisher_slashed_now_or_before(
       cover_key(prev_node_datum, publisher_node_key),
     }
   } else {
+    //In this case we passed as input node the slashed node and we check it
     expect Some(ps_redeemer) = maybe_ps_redeemer
     expect PS_Slash {
       prev_node_key: _prev_node_key,
@@ -178,7 +178,7 @@ pub fn is_publisher_slashed_now_or_before(
   }
 }
 
-pub fn valid_publisher_node_input(
+fn valid_publisher_node_input(
   publisher_input: Input,
   publisher_set_hash: ByteArray,
   publisher_node_key: ByteArray,

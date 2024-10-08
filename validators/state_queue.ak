@@ -71,7 +71,7 @@ validator state_queue(
         publisher_set_prev_node_key,
         publisher_set_remove_node_key,
         fraud_token_ref_input_index,
-        slash_publisher_node_input_index,
+        node_input_index,
       } -> {
         expect Some(fraud_token_ref_input) =
           list.at(self.reference_inputs, fraud_token_ref_input_index)
@@ -81,7 +81,7 @@ validator state_queue(
             publisher_set_hash,
             publisher_set_prev_node_key,
             publisher_set_remove_node_key,
-            slash_publisher_node_input_index,
+            node_input_index,
           ),
           remove_fraud_child(
             common,
@@ -98,7 +98,7 @@ validator state_queue(
         publisher_set_prev_node_key,
         publisher_set_remove_node_key,
         fraud_token_input_index,
-        slash_publisher_node_input_index,
+        node_input_index,
       } -> {
         expect Some(fraud_token_input) =
           list.at(self.inputs, fraud_token_input_index)
@@ -108,7 +108,7 @@ validator state_queue(
             publisher_set_hash,
             publisher_set_prev_node_key,
             publisher_set_remove_node_key,
-            slash_publisher_node_input_index,
+            node_input_index,
           ),
           remove_fraud_node(
             common,
