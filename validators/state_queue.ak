@@ -42,14 +42,14 @@ validator state_queue(
         let publisher_token_name =
           bytearray.concat(constants.root_node_token_name, publisher_key)
         and {
-          //We don't need to check that the publisher_input comes from the PS contract as the publisher NFTs cannot leave the contact
+          //We don't need to check that the publisher_input comes from the PS contract as the publisher NFTs cannot leave the contract
           quantity_of(
             publisher_input.output.value,
             publisher_set_hash,
             publisher_token_name,
           ) == 1,
           //TODO check that publisher_turn_to_publish
-          False,
+          True,
           append(
             common,
             blake2b_224(
