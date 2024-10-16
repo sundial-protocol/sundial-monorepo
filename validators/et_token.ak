@@ -4,11 +4,7 @@ use aiken/primitive/bytearray
 use cardano/address.{Credential}
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{Input, OutputReference, Redeemer, Transaction}
-use midgard/constants
-use midgard/types/et.{EvaluationThreadRedeemer, EvaluationThreadSetConfig}
-use midgard/types/general.{
-  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
-}
+use midgard/types/et.{EvaluationThreadSetConfig}
 use midgard/utils
 
 validator et_token(cfg: EvaluationThreadSetConfig) {

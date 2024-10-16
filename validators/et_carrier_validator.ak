@@ -6,11 +6,7 @@ use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{Input, OutputReference, Redeemer, Transaction}
 use midgard/constants
 use midgard/types/et.{
-  ET_ABORT, ET_CONTINUE_PROOF, EvaluationThreadRedeemer,
-  EvaluationThreadSetConfig, etTokenBurnt,
-}
-use midgard/types/general.{
-  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
+  ET_ABORT, ET_CONTINUE_PROOF, EvaluationThreadRedeemer, etTokenBurnt,
 }
 use midgard/utils
 
