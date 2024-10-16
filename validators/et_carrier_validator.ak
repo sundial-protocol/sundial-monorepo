@@ -12,7 +12,7 @@ use midgard/utils
 
 validator et_carrier_validator(
   partial_validator_script_hash: ByteArray,
-  next_carrier_validator: ByteArray,
+  next_carrier_validator_script_hash: ByteArray,
 ) {
   spend(
     _datumOpt: Option<Data>,

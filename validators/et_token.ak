@@ -4,10 +4,10 @@ use aiken/primitive/bytearray
 use cardano/address.{Credential}
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{Input, OutputReference, Redeemer, Transaction}
-use midgard/types/et.{EvaluationThreadSetConfig}
+use midgard/types/et.{EvaluationThreadConfig}
 use midgard/utils
 
-validator et_token(cfg: EvaluationThreadSetConfig) {
+validator et_token(cfg: EvaluationThreadConfig) {
   mint(redeemer: Redeemer, policy_id: PolicyId, self: Transaction) {
     todo
     //Put 1 minted token in the first carrier

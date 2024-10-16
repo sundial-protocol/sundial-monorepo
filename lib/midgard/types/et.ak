@@ -17,8 +17,8 @@ use midgard/utils.{
   valid_node,
 }
 
-pub type EvaluationThreadSetConfig {
-  init_utxo: OutputReference,
+pub type EvaluationThreadConfig {
+  fraud_proof_validator_set_script_hash: ByteArray,
 }
 
 pub type EvaluationThreadDatum {
