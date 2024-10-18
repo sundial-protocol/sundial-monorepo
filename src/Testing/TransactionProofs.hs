@@ -37,6 +37,7 @@ import PlutusLedgerApi.V3
 import PlutusLedgerApi.V1.Value
 import PlutusTx.AssocMap qualified as Map
 import Data.Maybe (mapMaybe)
+import Prettyprinter
 
 -- [TxInInfo {txInInfoOutRef = TxOutRef {txOutRefId = 0a04d88a1f166ed9586d8b09e4fd4e5b4c9e0843f49c26887836019903aab146, txOutRefIdx = 0}, txInInfoResolved = TxOut {txOutAddress = Address {addressCredential = ScriptCredential f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef, addressStakingCredential = Nothing}, txOutValue = Value {getValue = Map {unMap = [(,Map {unMap = [("",2324041)]}),(6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978,Map {unMap = [("DjedOrderTicket",1)]})]}}, txOutDatum = OutputDatum (Datum {getDatum = toBuiltinData $ Constr 0 [Constr 2 [I 1240,I 911],Constr 0 [Constr 0 [B "(\140\182\147\254c\159\n/1\155t\216Ga\NUL\226^\254\179y\252\NULB\251\253\156\221"],Constr 1 []],Constr 0 [I 100,I 153],I 1640995390000,B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]}), txOutReferenceScript = Nothing}}
 -- ,TxInInfo {txInInfoOutRef = TxOutRef {txOutRefId = 1769b7044d8a1866e5d6c0cebda3a97a9891db65999228b3cc73fd24ff08ccea, txOutRefIdx = 0}, txInInfoResolved = TxOut {txOutAddress = Address {addressCredential = ScriptCredential f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef, addressStakingCredential = Nothing}, txOutValue = Value {getValue = Map {unMap = [(,Map {unMap = [("",715417902)]}),(6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978,Map {unMap = [("DjedOrderTicket",1)]})]}}, txOutDatum = OutputDatum (Datum {getDatum = toBuiltinData $ Constr 0 [Constr 2 [I 1000000000,I 692810458],Constr 0 [Constr 0 [B "5\219h\ESC_\172\237-\133\142\140\171\201\151\162\211\217\SI\ESC\204\238\155\USJLwJ\177"],Constr 1 []],Constr 0 [I 100,I 153],I 1640995389000,B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]}), txOutReferenceScript = Nothing}}
@@ -354,24 +355,6 @@ mockOutputs =
 hashMidgardTx :: MidgardTxInfo -> ByteString
 hashMidgardTx midgardTx = plift $ pblake2b_256 # (pserialiseData # (pforgetData $ pconstantData midgardTx))
 
--- data MidgardTxInfo = MidgardTxInfo
---   { txInfoInputs                :: [TxInInfo]
---   , txInfoInputsLength          :: Integer
---   , txInfoReferenceInputs       :: [TxInInfo]
---   , txInfoReferenceInputsLength :: Integer 
---   , txInfoOutputs               :: [V2.TxOut]
---   , txInfoOutputsLength         :: Integer 
---   , txInfoFee                   :: V2.Lovelace
---   , txInfoMint                  :: V2.Value
---   , txInfoObservers             :: [V2.ScriptHash]
---   , txInfoValidRange            :: V2.POSIXTimeRange
---   , txInfoSignatories           :: [V2.PubKeyHash]
---   , txInfoRedeemers             :: Map ScriptPurpose V2.Redeemer
---   , txInfoData                  :: Map V2.DatumHash V2.Datum
---   , txInfoId                    :: V3.TxId
---   }
---   deriving stock (Generic)
-
 txInfoToMidgardTxInfo :: TxInfo -> MidgardTxInfo
 txInfoToMidgardTxInfo txInfo = 
   MidgardTxInfo 
@@ -403,5 +386,9 @@ txInfoToMidgardTxInfo txInfo =
 dumpDebug :: IO ()
 dumpDebug = do
   let midgardTxInfo = txInfoToMidgardTxInfo mockInfo
-  print mockInfo
-  print midgardTxInfo 
+  putStrLn "Cardano TxInfo\n"
+  print (pretty mockInfo)
+  putStrLn "\Midgard TxInfo\n"
+  print midgardTxInfo
+  putStrLn "\Hashed TxInfo\n"
+  print midgardTxInfo
