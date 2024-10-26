@@ -23,6 +23,10 @@ import Plutarch.LedgerApi.V3 (
   PDatumHash,
   PTxInInfo
   )
+import Plutarch.Crypto (pblake2b_256)
+import Plutarch.Builtin (pserialiseData, pforgetData)
+import Plutarch.Prelude
+import MerkleTree.MerklePatriciaForestry
 import Plutarch.LedgerApi.Value qualified as Value
 import Plutarch.LedgerApi.AssocMap qualified as AssocMap
 import Plutarch.LedgerApi.Interval qualified as Interval
@@ -163,6 +167,7 @@ data MidgardTxInfo = MidgardTxInfo
 
 PlutusTx.unstableMakeIsData ''MidgardTxInfo
 
+-- TODO: should we have two transaction formats? txInfo and serializedTx?
 newtype PMidgardTxInfo (s :: S)
   = PMidgardTxInfo
       ( Term
@@ -190,6 +195,8 @@ newtype PMidgardTxInfo (s :: S)
                , "redeemers" ':= PBuiltinList (PBuiltinPair (PAsData PScriptPurpose) (PAsData PRedeemer)) 
                , "data" ':= PBuiltinList (PBuiltinPair (PAsData PDatumHash) (PAsData PDatum))
                -- hash of the pending transaction
+               -- TODO:
+               -- probably have to change this to script data integrity hash or something
                , "id" ':= PTxId
                ]
           )
@@ -229,3 +236,16 @@ data PMidgardContext (s :: S) =
 
 instance DerivePlutusType PMidgardContext where
   type DPTStrat _ = PlutusTypeData
+
+
+-- Test whether a transaction hash is present in the given tx_root.
+-- Returns `False` when the element isn't in the tree.
+phasTransactionHash :: Term s (PMerklePatriciaForestry :--> PByteString :--> PProof :--> PBool)
+phasTransactionHash = phoistAcyclic $ plam $ \txroot txhash proof -> 
+  phas # txroot # txhash # txhash # proof 
+
+
+ptxHashMatches :: Term s (PByteString :--> PAsData PMidgardTxInfo :--> PBool)
+ptxHashMatches = phoistAcyclic $ plam $ \hash transaction -> 
+  hash #== pblake2b_256 # (pserialiseData # (pforgetData transaction))
+ 
