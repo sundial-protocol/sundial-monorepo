@@ -21,10 +21,21 @@ validator et_carrier_validator(
     self: Transaction,
   ) {
     when redeemer is {
-      ET_ABORT -> etTokenBurnt()
-      ET_CONTINUE_PROOF -> and {
-          //TODO there must be a reference input of the frauded state queue node
-          correctOutputToNextCarrierValidator(),
+      ET_ABORT ->
+        etTokenBurnt(
+          input.output.value,
+          et_token_policy_id,
+          et_token_asset_name,
+        )
+      ET_CONTINUE_PROOF(frauded_state_queue_node_ref_input_index) -> {
+        expect Some(frauded_state_queue_node_input) =
+          list.at(
+            self.reference_inputs,
+            frauded_state_queue_node_ref_input_index,
+          )
+        and {
+          validate_frauded_state_queue_node_input(),
+          correct_output_to_next_carrier_validator(),
           list.any(
             self.withdrawals,
             fn(withdrawal) {
@@ -36,6 +47,7 @@ validator et_carrier_validator(
             },
           ),
         }
+      }
       _ -> False
     }
   }

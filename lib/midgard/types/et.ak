@@ -3,7 +3,7 @@ use aiken/collection/list
 use aiken/collection/pairs.{get_first}
 use aiken/interval.{Interval}
 use cardano/address.{Address, VerificationKey}
-use cardano/assets.{PolicyId, flatten, quantity_of, tokens}
+use cardano/assets.{AssetName, PolicyId, Value, flatten, quantity_of, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
@@ -29,10 +29,10 @@ pub type EvaluationThreadDatum {
 
 pub type EvaluationThreadRedeemer {
   ET_ABORT
-  ET_CONTINUE_PROOF
-  ET_FINISH_PROOF
+  ET_CONTINUE_PROOF { frauded_state_queue_node_ref_input_index: Int }
+  ET_FINISH_PROOF { frauded_state_queue_node_ref_input_index: Int }
 }
 
-pub fn etTokenBurnt() {
-  todo
+pub fn etTokenBurnt(value: Value, policy_id: PolicyId, asset_name: AssetName) {
+  quantity_of(value, policy_id, asset_name) == -1
 }

@@ -9,7 +9,10 @@ use midgard/types/et.{
 }
 use midgard/utils
 
-validator et_final_carrier_validator(partial_validator_script_hash: ByteArray) {
+validator et_final_carrier_validator(
+  partial_validator_script_hash: ByteArray,
+  et_token_policy_id: PolicyId,
+) {
   spend(
     _datumOpt: Option<Data>,
     redeemer: EvaluationThreadRedeemer,
@@ -17,10 +20,25 @@ validator et_final_carrier_validator(partial_validator_script_hash: ByteArray) {
     self: Transaction,
   ) {
     when redeemer is {
-      ET_ABORT -> etTokenBurnt()
-      ET_FINISH_PROOF -> and {
-          //TODO there must be a reference input of the frauded state queue node
-          etTokenBurnt(),
+      ET_ABORT ->
+        etTokenBurnt(
+          input.output.value,
+          et_token_policy_id,
+          et_token_asset_name,
+        )
+      ET_FINISH_PROOF(frauded_state_queue_node_ref_input_index) -> {
+        expect Some(frauded_state_queue_node_input) =
+          list.at(
+            self.reference_inputs,
+            frauded_state_queue_node_ref_input_index,
+          )
+        and {
+          validate_frauded_state_queue_node_input(),
+          etTokenBurnt(
+            input.output.value,
+            et_token_policy_id,
+            et_token_asset_name,
+          ),
           fpvsTokenMinted(),
           list.any(
             self.withdrawals,
@@ -33,6 +51,7 @@ validator et_final_carrier_validator(partial_validator_script_hash: ByteArray) {
             },
           ),
         }
+      }
       _ -> False
     }
   }
