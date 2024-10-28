@@ -53,7 +53,7 @@ fn init(common: Common<FraudProofValidatorDatum>) -> Bool {
       next: Empty,
       extra_data: FraudProofValidatorDatum {
         insert_time: -1,
-        fraud_proof_first_step: "TODO",
+        first_carrier_validator_script_hash: "TODO",
       },
     }
   let must_mint_correctly =
@@ -96,7 +96,7 @@ fn insert(
       next: prev_node.data.next,
       extra_data: FraudProofValidatorDatum {
         insert_time: validTo,
-        fraud_proof_first_step: "TODO",
+        first_carrier_validator_script_hash: "TODO",
       },
     }
   let new_token_name =

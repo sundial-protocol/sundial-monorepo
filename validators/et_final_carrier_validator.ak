@@ -19,10 +19,13 @@ validator et_final_carrier_validator(
     input: OutputReference,
     self: Transaction,
   ) {
+    let et_token_asset_name = "TODO"
+    expect Some(actual_input) =
+      list.find(self.inputs, fn(a_input) { a_input.output_reference == input })
     when redeemer is {
       ET_ABORT ->
         etTokenBurnt(
-          input.output.value,
+          actual_input.output.value,
           et_token_policy_id,
           et_token_asset_name,
         )
@@ -35,11 +38,11 @@ validator et_final_carrier_validator(
         and {
           validate_frauded_state_queue_node_input(),
           etTokenBurnt(
-            input.output.value,
+            actual_input.output.value,
             et_token_policy_id,
             et_token_asset_name,
           ),
-          fpvsTokenMinted(),
+          fpvs_token_minted(),
           list.any(
             self.withdrawals,
             fn(withdrawal) {
@@ -61,6 +64,10 @@ validator et_final_carrier_validator(
   }
 }
 
-fn fpvsTokenMinted() {
+fn validate_frauded_state_queue_node_input() {
+  todo
+}
+
+fn fpvs_token_minted() {
   todo
 }

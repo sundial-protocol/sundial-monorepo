@@ -27,6 +27,11 @@ pub type EvaluationThreadDatum {
   first_carrier_validator_script_hash: ByteArray,
 }
 
+pub type EvaluationThreadTokenRedeemer {
+  fraud_proof_set_node_ref_input_index: Int,
+  frauded_state_queue_node_ref_input_index: Int,
+}
+
 pub type EvaluationThreadRedeemer {
   ET_ABORT
   ET_CONTINUE_PROOF { frauded_state_queue_node_ref_input_index: Int }

@@ -21,13 +21,20 @@ validator et_carrier_validator(
     input: OutputReference,
     self: Transaction,
   ) {
+    let et_token_asset_name = "TODO"
     when redeemer is {
-      ET_ABORT ->
+      ET_ABORT -> {
+        expect Some(actual_input) =
+          list.find(
+            self.inputs,
+            fn(a_input) { a_input.output_reference == input },
+          )
         etTokenBurnt(
-          input.output.value,
+          actual_input.output.value,
           et_token_policy_id,
           et_token_asset_name,
         )
+      }
       ET_CONTINUE_PROOF(frauded_state_queue_node_ref_input_index) -> {
         expect Some(frauded_state_queue_node_input) =
           list.at(
@@ -58,6 +65,10 @@ validator et_carrier_validator(
   }
 }
 
-fn correctOutputToNextCarrierValidator() {
+fn validate_frauded_state_queue_node_input() {
+  todo
+}
+
+fn correct_output_to_next_carrier_validator() {
   todo
 }
