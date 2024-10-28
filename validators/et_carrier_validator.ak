@@ -12,6 +12,7 @@ use midgard/utils
 
 validator et_carrier_validator(
   partial_validator_script_hash: ByteArray,
+  et_token_policy_id: PolicyId,
   next_carrier_validator_script_hash: ByteArray,
 ) {
   spend(
