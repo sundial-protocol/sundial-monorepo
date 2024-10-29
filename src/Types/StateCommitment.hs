@@ -59,8 +59,8 @@ data PBlock (s :: S)
                , "withdrawalEventRoot" ':= PMerklePatriciaForestry
                , "startTimestamp" ':= PPosixTime
                , "endTimestamp" ':= PPosixTime
-               , "oldStateRoot" ':= PMerklePatriciaForestry
-               , "newStateRoot" ':= PMerklePatriciaForestry
+               , "oldUtxoRoot" ':= PMerklePatriciaForestry
+               , "newUtxoRoot" ':= PMerklePatriciaForestry
                , "transactionCount" ':= PInteger
                ]
           )
@@ -83,8 +83,6 @@ deriving via
 data StateCommitment = StateCommitment
   { publisher :: BuiltinByteString
   , block :: Block
-  , oldUtxoRoot :: MerklePatriciaForestry
-  , newUtxoRoot :: MerklePatriciaForestry
   }
   deriving stock (Generic, Show)
 
@@ -97,8 +95,6 @@ data PStateCommitment (s :: S)
           ( PDataRecord
               '[ "publisher" ':= PPubKeyHash
                , "block" ':= PBlock
-               , "oldUtxoRoot" ':= PMerklePatriciaForestry
-               , "newUtxoRoot" ':= PMerklePatriciaForestry
                ]
           )
       )
@@ -149,13 +145,11 @@ deriving via
 
 data MidgardTxInfo = MidgardTxInfo
   { mtxInfoInputs                :: [TxInInfo]
-  , mtxInfoInputsLength          :: Integer
   , mtxInfoReferenceInputs       :: [TxInInfo]
-  , mtxInfoReferenceInputsLength :: Integer 
   , mtxInfoOutputs               :: [V2.TxOut]
-  , mtxInfoOutputsLength         :: Integer 
   , mtxInfoFee                   :: V2.Lovelace
   , mtxInfoMint                  :: V2.Value
+  , mtxInfoMintCount             :: Integer 
   , mtxInfoObservers             :: [V2.ScriptHash]
   , mtxInfoValidRange            :: V2.POSIXTimeRange
   , mtxInfoSignatories           :: [V2.PubKeyHash]
@@ -174,14 +168,8 @@ newtype PMidgardTxInfo (s :: S)
           s
           ( PDataRecord
               '[ "inputs" ':= PBuiltinList (PAsData PTxInInfo)
-               -- total number of inputs
-               , "inputsCount" ':= PInteger 
                , "referenceInputs" ':= PBuiltinList (PAsData PTxInInfo)
-               -- total number of reference inputs
-               , "referenceInputsLength" ':= PInteger 
                , "outputs" ':= PBuiltinList (PAsData PTxOut)
-               -- total number of outputs 
-               , "outputsLength" ':= PInteger
                -- the transaction fee
                , "fee" ':= Value.PLovelace
                -- value minted by the transaction
@@ -196,7 +184,7 @@ newtype PMidgardTxInfo (s :: S)
                , "data" ':= PBuiltinList (PBuiltinPair (PAsData PDatumHash) (PAsData PDatum))
                -- hash of the pending transaction
                -- TODO:
-               -- probably have to change this to script data integrity hash or something
+               -- probably have to change this to script data integrity hash 
                , "id" ':= PTxId
                ]
           )
@@ -237,15 +225,75 @@ data PMidgardContext (s :: S) =
 instance DerivePlutusType PMidgardContext where
   type DPTStrat _ = PlutusTypeData
 
+data MidgardTxBodyContent = MidgardTxBodyContent
+  { txIns :: [TxOutRef]
+  , txInsCollateral :: [TxOutRef]
+  , txInsReference :: [TxOutRef]
+  , txOuts :: [TxOut]
+  , txTotalCollateral :: V2.Lovelace
+  , txReturnCollateral :: TxOut
+  , txFee :: V2.Lovelace
+  , txValidityLowerBound :: Maybe V2.POSIXTime
+  , txValidityUpperBound :: Maybe V2.POSIXTime
+  -- signed tx body
+  , txRequiredSigners :: [V2.PubKeyHash]
+  , txMintValue :: V2.Value
+  }
+  deriving stock (Generic, Show)
 
--- Test whether a transaction hash is present in the given tx_root.
--- Returns `False` when the element isn't in the tree.
-phasTransactionHash :: Term s (PMerklePatriciaForestry :--> PByteString :--> PProof :--> PBool)
-phasTransactionHash = phoistAcyclic $ plam $ \txroot txhash proof -> 
-  phas # txroot # txhash # txhash # proof 
+PlutusTx.unstableMakeIsData ''MidgardTxBodyContent
 
+newtype PubKey = PubKey {getPubKey :: BuiltinByteString}
+  deriving stock (Generic, Show)
 
+newtype Signature = Signature {getSignature :: BuiltinByteString}
+  deriving stock (Generic, Show)
+
+data MidgardTxWitness = MidgardTxWitness 
+  { pkWits :: [(PubKey, Signature, V2.PubKeyHash)]
+  , scriptWits :: [(V2.ScriptHash, V2.Redeemer)]
+  }
+  deriving stock (Generic, Show) 
+
+PlutusTx.unstableMakeIsData ''MidgardTxWitness 
+
+data MidgardTx = MidgardTx 
+  { txBody :: MidgardTxBodyContent
+  , txWitness :: MidgardTxWitness
+  }
+  deriving stock (Generic, Show)
+
+PlutusTx.unstableMakeIsData ''MidgardTx 
+
+-- | Check if a transaction hash is present in the given transaction root.
+--
+-- This function verifies whether a given transaction hash exists within the Merkle Patricia Forestry
+-- represented by the transaction root. It uses the provided proof to perform the verification.
+--
+-- @param txroot The Merkle Patricia Forestry root of transactions
+-- @param txhash The hash of the transaction to check
+-- @param proof The Merkle proof for the transaction
+-- @return True if the transaction hash is present, False otherwise
+phasTransactionHash :: Term s (PMerklePatriciaForestry :--> PByteString :--> PByteString :--> PProof :--> PBool)
+phasTransactionHash = phoistAcyclic $ plam $ \txroot txHash txInfoHash proof -> 
+  phas # txroot # txHash # txInfoHash # proof 
+
+-- | Verify if a given hash matches the hash of a MidgardTxInfo.
+--
+-- This function computes the Blake2b-256 hash of the serialized MidgardTxInfo
+-- and compares it with the provided hash.
+--
+-- @param hash The hash to compare against
+-- @param transaction The MidgardTxInfo to hash and compare
+-- @return True if the hashes match, False otherwise 
 ptxHashMatches :: Term s (PByteString :--> PAsData PMidgardTxInfo :--> PBool)
 ptxHashMatches = phoistAcyclic $ plam $ \hash transaction -> 
   hash #== pblake2b_256 # (pserialiseData # (pforgetData transaction))
  
+-- TODO
+-- The MPF structure of for tx_root should be:
+-- key := TxHash 
+-- value := TxInfoHash
+--
+-- This means we need to create functions that convert between MidgardTx and MidgardTxInfo 
+-- and utility functions for fraud proofs on these structures.
