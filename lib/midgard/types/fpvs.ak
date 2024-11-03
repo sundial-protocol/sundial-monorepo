@@ -16,7 +16,7 @@ pub type FraudProofValidatorSetConfig {
 
 pub type FraudProofValidatorDatum {
   insert_time: POSIXTime,
-  first_carrier_validator_script_hash: ByteArray,
+  init_step_script_hash: ByteArray,
 }
 
 pub type FraudProofValidatorSetRedeemer {

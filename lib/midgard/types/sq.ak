@@ -25,6 +25,7 @@ pub type StateQueueConfig {
 pub type StateDatum {
   state_time: POSIXTime,
   publisher_key: ByteArray,
+  block_hash: ByteArray,
 }
 
 pub type StateQueueRedeemer {

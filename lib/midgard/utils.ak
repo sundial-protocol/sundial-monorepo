@@ -1,8 +1,9 @@
 use aiken/collection/dict.{has_key}
 use aiken/collection/list
 use aiken/primitive/bytearray
+use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
-use cardano/transaction.{Input, Output}
+use cardano/transaction.{Input, Output, OutputReference}
 use midgard/constants.{set_node_prefix}
 use midgard/types/general.{
   Empty, Key, LinkedListDatum, NodeKey, POSIXTime, PubKeyHash,
@@ -132,4 +133,17 @@ pub fn safe_list_init(elems: List<a>) {
 
 pub fn is_posix_time_none(time: POSIXTime) {
   time == constants.posix_time_none
+}
+
+/// Returns the quantity of all tokens with the policyId
+pub fn quantity_of_policy_id(value: Value, policyId: PolicyId) {
+  dict.foldl(tokens(value, policyId), 0, fn(_k, v, result) { v + result })
+}
+
+pub fn get_own_hash(output_reference: OutputReference, txInputs: List<Input>) {
+  expect Some(input) =
+    list.find(txInputs, fn(x) { x.output_reference == output_reference })
+
+  expect Script(hash) = input.output.address.payment_credential
+  hash
 }
