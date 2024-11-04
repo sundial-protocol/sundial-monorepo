@@ -2,6 +2,7 @@ pub type FraudProofMintRedeemer {
   Mint {
     hub_oracle_ref_input_index: Int,
     computation_thread_token_asset_name: ByteArray,
+    output_with_fraud_proof_index: Int,
   }
   Burn {
     hub_oracle_ref_input_index: Int,
