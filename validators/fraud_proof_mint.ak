@@ -1,20 +1,10 @@
-use aiken/collection/list.{length}
-use aiken/interval.{Finite, Interval}
-use aiken/primitive/bytearray
-use cardano/address.{Credential, Script}
-use cardano/assets.{PolicyId, flatten, quantity_of}
-use cardano/transaction.{
-  InlineDatum, Input, OutputReference, Redeemer, Transaction,
-}
-use midgard/types/fp.{
-  Burn, FraudProofMintRedeemer, FraudProofSpendRedeemer, Mint,
-}
-use midgard/types/fpvs.{FraudProofValidatorDatum}
-use midgard/types/general.{Key, LinkedListDatum}
-use midgard/types/sq.{StateDatum}
+use aiken/collection/list
+use cardano/assets.{PolicyId, quantity_of}
+use cardano/transaction.{Transaction}
+use midgard/types/fp.{Burn, FraudProofMintRedeemer, Mint}
 use midgard/utils
 
-validator fraud_proof(
+validator fraud_proof_mint(
   computation_thread_script_hash: ByteArray,
   hub_oracle_script_hash: PolicyId,
 ) {
@@ -27,7 +17,7 @@ validator fraud_proof(
       ) -> {
         expect Some(hub_oracle_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
-        let fraud_proof_addr = "TODO field of the Midgard hub oracle"
+        let fraud_proof_spend_addr = "TODO field of the Midgard hub oracle"
         expect Some(output_with_fraud_proof) =
           list.at(self.outputs, output_with_fraud_proof_index)
 
@@ -42,7 +32,7 @@ validator fraud_proof(
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
           validate_output_to_fraud_proof_addr(
             output_with_fraud_proof,
-            fraud_proof_addr,
+            fraud_proof_spend_addr,
           ),
         }
       }
@@ -74,23 +64,6 @@ validator fraud_proof(
           is_signed_by_prover(fraud_prover),
         }
       }
-    }
-  }
-
-  spend(
-    datumOpt: Option<Data>,
-    redeemer: FraudProofSpendRedeemer,
-    input: OutputReference,
-    self: Transaction,
-  ) {
-    let ownScriptHash = utils.get_own_hash(input, self.inputs)
-    and {
-      quantity_of(
-        self.mint,
-        ownScriptHash,
-        redeemer.fraud_proof_token_asset_name,
-      ) == -1,
-      utils.quantity_of_policy_id(self.mint, ownScriptHash) == 1,
     }
   }
 
