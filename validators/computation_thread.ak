@@ -5,6 +5,7 @@ use cardano/transaction.{InlineDatum, Input, Transaction}
 use midgard/types/ct.{Cancel, ComputationThreadRedeemer, Mint, Success}
 use midgard/types/fpvs.{FraudProofValidatorDatum}
 use midgard/types/general.{Key, LinkedListDatum}
+use midgard/types/hub.{HubOracleDatum}
 use midgard/types/sq.{StateDatum}
 use midgard/utils
 
@@ -29,7 +30,6 @@ validator computation_thread(
           list.at(self.reference_inputs, fraud_proof_set_node_ref_input_index)
         expect Some(hub_oracle_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
-        let state_queue_policy_id = "TODO field of the Midgard hub oracle"
         expect Some(frauded_state_queue_node_input) =
           list.at(
             self.reference_inputs,
@@ -37,6 +37,10 @@ validator computation_thread(
           )
         expect Some(output_to_init_step) =
           list.at(self.outputs, output_to_init_step_index)
+
+        expect InlineDatum(hub_oracle_datum) = hub_oracle_input.output.datum
+        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        let state_queue_policy_id = parsed_hub_oracle_datum.state_queue
 
         expect InlineDatum(fraud_proof_catalogue_node_datum) =
           fraud_proof_catalogue_node_input.output.datum

@@ -1,8 +1,9 @@
 use aiken/collection/list
 use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, quantity_of}
-use cardano/transaction.{Transaction}
+use cardano/transaction.{InlineDatum, Transaction}
 use midgard/types/fp.{Burn, FraudProofMintRedeemer, Mint}
+use midgard/types/hub.{HubOracleDatum}
 use midgard/utils
 
 validator fraud_proof_mint(
@@ -18,9 +19,12 @@ validator fraud_proof_mint(
       ) -> {
         expect Some(hub_oracle_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
-        let fraud_proof_spend_addr = "TODO field of the Midgard hub oracle"
         expect Some(output_with_fraud_proof) =
           list.at(self.outputs, output_with_fraud_proof_index)
+
+        expect InlineDatum(hub_oracle_datum) = hub_oracle_input.output.datum
+        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        let fraud_proof_spend_addr = parsed_hub_oracle_datum.fraud_proof_addr
 
         and {
           validate_hub_oracle_input(hub_oracle_input, hub_oracle_script_hash),
@@ -44,12 +48,15 @@ validator fraud_proof_mint(
       ) -> {
         expect Some(hub_oracle_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
-        let state_queue_policy_id = "TODO field of the Midgard hub oracle"
         expect Some(frauded_state_queue_node_input) =
           list.at(
             self.reference_inputs,
             frauded_state_queue_node_ref_input_index,
           )
+        expect InlineDatum(hub_oracle_datum) = hub_oracle_input.output.datum
+        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        let state_queue_policy_id = parsed_hub_oracle_datum.state_queue
+
         //Last 28 bytes contain the block_hash
         let block_hash = bytearray.drop(fraud_proof_token_asset_name, 4)
         let fraud_prover = "TODO"
