@@ -1,4 +1,5 @@
 use aiken/collection/list
+use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, quantity_of}
 use cardano/transaction.{Transaction}
 use midgard/types/fp.{Burn, FraudProofMintRedeemer, Mint}
@@ -49,7 +50,8 @@ validator fraud_proof_mint(
             self.reference_inputs,
             frauded_state_queue_node_ref_input_index,
           )
-        let block_hash = "TODO Last 28 bytes of fraud_proof_token_asset_name"
+        //Last 28 bytes contain the block_hash
+        let block_hash = bytearray.drop(fraud_proof_token_asset_name, 4)
         let fraud_prover = "TODO"
 
         and {
