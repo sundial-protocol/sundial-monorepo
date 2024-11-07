@@ -1,8 +1,8 @@
 use aiken/collection/list
 use aiken/primitive/bytearray
-use cardano/address.{Address, VerificationKey}
-use cardano/assets.{PolicyId, quantity_of}
-use cardano/transaction.{InlineDatum, Input, Transaction}
+use cardano/address.{Address, Script}
+use cardano/assets.{PolicyId, flatten, quantity_of}
+use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/types/datum.{HubOracleDatum}
 use midgard/types/redeemer.{FP_Burn, FP_Mint, FraudProofMintRedeemer}
 use midgard/utils
@@ -44,6 +44,8 @@ validator fraud_proof_mint(
           validate_output_to_fraud_proof_addr(
             output_with_fraud_proof,
             fraud_proof_spend_addr,
+            policy_id,
+            computation_thread_token_asset_name,
           ),
         }
       }
@@ -104,19 +106,30 @@ fn validate_hub_oracle_input(
   ) == 1
 }
 
-fn validate_output_to_fraud_proof_addr(
-  output_with_fraud_proof,
-  fraud_proof_addr,
-) {
-  todo
-}
-
 fn validate_non_member_state_queue_input(
   frauded_state_queue_node_input,
   state_queue_policy_id,
   block_hash,
 ) {
   todo
+}
+
+fn validate_output_to_fraud_proof_addr(
+  output_with_fraud_proof: Output,
+  fraud_proof_spend_addr: Address,
+  own_hash: ByteArray,
+  token_asset_name: ByteArray,
+) {
+  expect Script(script_hash) = fraud_proof_spend_addr.payment_credential
+  //TODO No datum?
+  let correctValue = and {
+      quantity_of(output_with_fraud_proof.value, own_hash, token_asset_name) == 1,
+      list.length(flatten(output_with_fraud_proof.value)) == 2,
+    }
+  and {
+    utils.is_output_to_sc(output_with_fraud_proof, script_hash),
+    correctValue,
+  }
 }
 
 fn is_signed_by_prover(transaction: Transaction, fraud_prover: ByteArray) {
