@@ -1,7 +1,8 @@
 use aiken/collection/list
 use aiken/primitive/bytearray
+use cardano/address.{Address, VerificationKey}
 use cardano/assets.{PolicyId, quantity_of}
-use cardano/transaction.{InlineDatum, Transaction}
+use cardano/transaction.{InlineDatum, Input, Transaction}
 use midgard/types/datum.{HubOracleDatum}
 use midgard/types/redeemer.{FP_Burn, FP_Mint, FraudProofMintRedeemer}
 use midgard/utils
@@ -16,6 +17,7 @@ validator fraud_proof_mint(
         hub_oracle_ref_input_index,
         computation_thread_token_asset_name,
         output_with_fraud_proof_index,
+        hub_oracle_asset_name,
       ) -> {
         expect Some(hub_oracle_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
@@ -27,7 +29,11 @@ validator fraud_proof_mint(
         let fraud_proof_spend_addr = parsed_hub_oracle_datum.fraud_proof_addr
 
         and {
-          validate_hub_oracle_input(hub_oracle_input, hub_oracle_script_hash),
+          validate_hub_oracle_input(
+            hub_oracle_input,
+            hub_oracle_script_hash,
+            hub_oracle_asset_name,
+          ),
           quantity_of(
             self.mint,
             computation_thread_script_hash,
@@ -45,6 +51,7 @@ validator fraud_proof_mint(
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
         fraud_proof_token_asset_name,
+        hub_oracle_asset_name,
       ) -> {
         expect Some(hub_oracle_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
@@ -62,7 +69,11 @@ validator fraud_proof_mint(
         let fraud_prover = "TODO"
 
         and {
-          validate_hub_oracle_input(hub_oracle_input, hub_oracle_script_hash),
+          validate_hub_oracle_input(
+            hub_oracle_input,
+            hub_oracle_script_hash,
+            hub_oracle_asset_name,
+          ),
           validate_non_member_state_queue_input(
             frauded_state_queue_node_input,
             state_queue_policy_id,
@@ -70,7 +81,7 @@ validator fraud_proof_mint(
           ),
           quantity_of(self.mint, policy_id, fraud_proof_token_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
-          is_signed_by_prover(fraud_prover),
+          is_signed_by_prover(self, fraud_prover),
         }
       }
     }
@@ -81,8 +92,16 @@ validator fraud_proof_mint(
   }
 }
 
-fn validate_hub_oracle_input(hub_oracle_input, hub_oracle_script_hash) {
-  todo
+fn validate_hub_oracle_input(
+  hub_oracle_input: Input,
+  hub_oracle_script_hash: ByteArray,
+  hub_oracle_asset_name: ByteArray,
+) {
+  quantity_of(
+    hub_oracle_input.output.value,
+    hub_oracle_script_hash,
+    hub_oracle_asset_name,
+  ) == 1
 }
 
 fn validate_output_to_fraud_proof_addr(
@@ -100,6 +119,10 @@ fn validate_non_member_state_queue_input(
   todo
 }
 
-fn is_signed_by_prover(fraud_prover) {
-  todo
+fn is_signed_by_prover(transaction: Transaction, fraud_prover: ByteArray) {
+  True
 }
+//fn is_signed_by_prover(transaction: Transaction, fraud_prover: Address) {
+//  expect VerificationKey(hash) = fraud_prover.payment_credential
+//  list.has(transaction.extra_signatories, hash)
+//}
