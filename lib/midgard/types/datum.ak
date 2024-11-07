@@ -1,8 +1,6 @@
 use cardano/address.{Address}
 use cardano/assets.{PolicyId}
-use midgard/types/general.{
-  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
-}
+use midgard/types/general.{POSIXTime}
 
 pub type HubOracleDatum {
   registered_operators: PolicyId,

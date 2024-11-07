@@ -1,6 +1,4 @@
-use midgard/types/general.{
-  Empty, Key, LinkedListDatum, NodeKey, POSIXTime, PubKeyHash,
-}
+use midgard/types/general.{PubKeyHash}
 
 pub type PublisherSetRedeemer {
   PS_Init
@@ -20,6 +18,33 @@ pub type FraudProofValidatorSetRedeemer {
   FPVS_Deinit
   FPVS_Insert { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
   FPVS_Remove { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
+}
+
+pub type StateQueueRedeemer {
+  SQ_Init
+  SQ_Deinit
+  SQ_Append {
+    prev_node_key: PubKeyHash,
+    publisher_key: PubKeyHash,
+    publisher_ref_input_index: Int,
+  }
+  SQ_Merge { root_node_key: PubKeyHash, mergeable_node_key: PubKeyHash }
+  SQ_Remove_Fraud_Child {
+    prev_node_key: PubKeyHash,
+    remove_node_key: PubKeyHash,
+    publisher_set_prev_node_key: PubKeyHash,
+    publisher_set_remove_node_key: PubKeyHash,
+    fraud_token_ref_input_index: Int,
+    node_input_index: Int,
+  }
+  SQ_Remove_Fraud_Node {
+    prev_valid_node_key: ByteArray,
+    remove_node_key: ByteArray,
+    publisher_set_prev_node_key: PubKeyHash,
+    publisher_set_remove_node_key: PubKeyHash,
+    fraud_token_input_index: Int,
+    node_input_index: Int,
+  }
 }
 
 pub type ComputationThreadRedeemer {

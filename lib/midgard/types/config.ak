@@ -1,7 +1,5 @@
-use cardano/address.{Address, VerificationKey}
-use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
-}
+use cardano/address.{Address}
+use cardano/transaction.{OutputReference}
 
 pub type PublisherSetConfig {
   init_utxo: OutputReference,
