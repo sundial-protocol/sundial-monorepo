@@ -39,3 +39,7 @@ pub type StepDatum {
   fraud_prover: ByteArray,
   data: Data,
 }
+
+pub type FraudProofSpendDatum {
+  fraud_prover: ByteArray,
+}

@@ -4,15 +4,13 @@ use aiken/collection/pairs.{get_first}
 use aiken/interval.{Interval}
 use cardano/address.{Address, VerificationKey}
 use cardano/assets.{PolicyId, flatten, quantity_of, tokens}
-use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
-}
+use cardano/transaction.{InlineDatum, Input, Mint, Output, Transaction}
 use midgard/constants.{set_node_prefix}
+use midgard/helpers/ps
 use midgard/types/datum.{StateDatum}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
-use midgard/types/ps
 use midgard/types/redeemer.{PS_Slash}
 use midgard/utils.{
   cover_key, find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key,
