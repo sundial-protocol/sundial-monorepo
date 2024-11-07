@@ -1,5 +1,8 @@
 use cardano/address.{Address}
 use cardano/assets.{PolicyId}
+use midgard/types/general.{
+  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
+}
 
 pub type HubOracleDatum {
   registered_operators: PolicyId,
@@ -16,4 +19,25 @@ pub type HubOracleDatum {
   state_queue_addr: Address,
   fraud_proof_catalogue_addr: Address,
   fraud_proof_addr: Address,
+}
+
+pub type PublisherDatum {
+  insert_time: POSIXTime,
+  refund_process_init_time: POSIXTime,
+}
+
+pub type StateDatum {
+  state_time: POSIXTime,
+  publisher_key: ByteArray,
+  block_hash: ByteArray,
+}
+
+pub type FraudProofValidatorDatum {
+  insert_time: POSIXTime,
+  init_step_script_hash: ByteArray,
+}
+
+pub type StepDatum {
+  fraud_prover: ByteArray,
+  data: Data,
 }

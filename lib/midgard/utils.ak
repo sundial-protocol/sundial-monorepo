@@ -147,3 +147,10 @@ pub fn get_own_hash(output_reference: OutputReference, txInputs: List<Input>) {
   expect Script(hash) = input.output.address.payment_credential
   hash
 }
+
+pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
+  when output.address.payment_credential is {
+    Script(hash) -> hash == scHash
+    _ -> False
+  }
+}

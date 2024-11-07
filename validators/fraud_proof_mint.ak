@@ -2,8 +2,8 @@ use aiken/collection/list
 use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, quantity_of}
 use cardano/transaction.{InlineDatum, Transaction}
-use midgard/types/fp.{Burn, FraudProofMintRedeemer, Mint}
-use midgard/types/hub.{HubOracleDatum}
+use midgard/types/datum.{HubOracleDatum}
+use midgard/types/redeemer.{FP_Burn, FP_Mint, FraudProofMintRedeemer}
 use midgard/utils
 
 validator fraud_proof_mint(
@@ -12,7 +12,7 @@ validator fraud_proof_mint(
 ) {
   mint(redeemer: FraudProofMintRedeemer, policy_id: PolicyId, self: Transaction) {
     when redeemer is {
-      Mint(
+      FP_Mint(
         hub_oracle_ref_input_index,
         computation_thread_token_asset_name,
         output_with_fraud_proof_index,
@@ -41,7 +41,7 @@ validator fraud_proof_mint(
           ),
         }
       }
-      Burn(
+      FP_Burn(
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
         fraud_proof_token_asset_name,

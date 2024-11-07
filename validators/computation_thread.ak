@@ -1,13 +1,15 @@
 use aiken/collection/list
 use aiken/primitive/bytearray
-use cardano/assets.{PolicyId, quantity_of}
-use cardano/transaction.{InlineDatum, Input, Transaction}
-use midgard/types/ct.{Cancel, ComputationThreadRedeemer, Mint, Success}
-use midgard/types/fpvs.{FraudProofValidatorDatum}
+use cardano/assets.{PolicyId, flatten, quantity_of}
+use cardano/transaction.{InlineDatum, Input, Output, Transaction}
+use midgard/types/datum.{
+  FraudProofValidatorDatum, HubOracleDatum, StateDatum, StepDatum,
+}
 use midgard/types/general.{Key, LinkedListDatum}
-use midgard/types/hub.{HubOracleDatum}
-use midgard/types/sq.{StateDatum}
-use midgard/utils
+use midgard/types/redeemer.{
+  CT_Cancel, CT_Mint, CT_Success, ComputationThreadRedeemer,
+}
+use midgard/utils.{is_output_to_sc}
 
 validator computation_thread(
   fraud_proof_catalogue_script_hash: ByteArray,
@@ -19,12 +21,15 @@ validator computation_thread(
     self: Transaction,
   ) {
     when redeemer is {
-      Mint(
+      CT_Mint(
         fraud_proof_set_node_ref_input_index,
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
         output_to_init_step_index,
         fraud_prover_hash,
+        fraud_proof_catalogue_asset_name,
+        hub_oracle_asset_name,
+        state_queue_asset_name,
       ) -> {
         expect Some(fraud_proof_catalogue_node_input) =
           list.at(self.reference_inputs, fraud_proof_set_node_ref_input_index)
@@ -66,24 +71,32 @@ validator computation_thread(
           validate_fraud_proof_catalogue_node_input(
             fraud_proof_catalogue_node_input,
             fraud_proof_catalogue_script_hash,
+            fraud_proof_catalogue_asset_name,
           ),
-          validate_hub_oracle_input(hub_oracle_input, hub_oracle_script_hash),
+          validate_hub_oracle_input(
+            hub_oracle_input,
+            hub_oracle_script_hash,
+            hub_oracle_asset_name,
+          ),
           validate_frauded_state_queue_node_input(
             frauded_state_queue_node_input,
             state_queue_policy_id,
+            state_queue_asset_name,
           ),
           validate_output_to_initial_fraud_proof_step(
             output_to_init_step,
             fraud_prover_hash,
             parsed_fraud_proof_catalogue_node_datum.extra_data.init_step_script_hash,
+            policy_id,
+            token_to_mint_asset_name,
           ),
         }
       }
-      Success(token_to_burn_asset_name) -> and {
+      CT_Success(token_to_burn_asset_name) -> and {
           quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
-      Cancel(token_to_burn_asset_name) -> and {
+      CT_Cancel(token_to_burn_asset_name) -> and {
           quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
@@ -96,30 +109,60 @@ validator computation_thread(
 }
 
 fn validate_fraud_proof_catalogue_node_input(
-  fraud_proof_catalogue_node_input,
-  fraud_proof_catalogue_script_hash,
+  fraud_proof_catalogue_node_input: Input,
+  fraud_proof_catalogue_script_hash: ByteArray,
+  fraud_proof_asset_name: ByteArray,
 ) {
-  todo
+  quantity_of(
+    fraud_proof_catalogue_node_input.output.value,
+    fraud_proof_catalogue_script_hash,
+    fraud_proof_asset_name,
+  ) == 1
 }
 
-fn validate_hub_oracle_input(hub_oracle_input, hub_oracle_script_hash) {
-  todo
+fn validate_hub_oracle_input(
+  hub_oracle_input: Input,
+  hub_oracle_script_hash: ByteArray,
+  hub_oracle_asset_name: ByteArray,
+) {
+  quantity_of(
+    hub_oracle_input.output.value,
+    hub_oracle_script_hash,
+    hub_oracle_asset_name,
+  ) == 1
 }
 
 fn validate_frauded_state_queue_node_input(
-  frauded_state_queue_node_input,
-  state_queue_policy_id,
+  frauded_state_queue_node_input: Input,
+  state_queue_script_hash: ByteArray,
+  state_queue_asset_name: ByteArray,
 ) {
-  todo
+  quantity_of(
+    frauded_state_queue_node_input.output.value,
+    state_queue_script_hash,
+    state_queue_asset_name,
+  ) == 1
 }
 
 fn validate_output_to_initial_fraud_proof_step(
-  output_to_init_step,
-  fraud_prover_hash,
-  init_step_script_hash,
+  output_to_init_step: Output,
+  fraud_prover_hash: ByteArray,
+  init_step_script_hash: ByteArray,
+  own_hash: ByteArray,
+  token_asset_name: ByteArray,
 ) {
-  //TODO output goes to init_step_script_hash
-  //TODO The output state datum type must be StepDatum(fraud_prover_hash, Void)
-  //TODO Value must only contain CT token and ADA
-  todo
+  expect InlineDatum(outputDatum) = output_to_init_step.datum
+  expect parsedDatum: StepDatum = outputDatum
+
+  let newDatum = StepDatum { fraud_prover: fraud_prover_hash, data: None }
+
+  let correctValue = and {
+      quantity_of(output_to_init_step.value, own_hash, token_asset_name) == 1,
+      list.length(flatten(output_to_init_step.value)) == 2,
+    }
+  and {
+    is_output_to_sc(output_to_init_step, init_step_script_hash),
+    parsedDatum == newDatum,
+    correctValue,
+  }
 }

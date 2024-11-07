@@ -5,26 +5,11 @@ use cardano/assets.{PolicyId, from_asset, tokens, without_lovelace}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
+use midgard/types/datum.{FraudProofValidatorDatum}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
 use midgard/utils.{get_outputs, has_data_cs, parse_node_key, valid_node}
-
-pub type FraudProofValidatorSetConfig {
-  init_utxo: OutputReference,
-}
-
-pub type FraudProofValidatorDatum {
-  insert_time: POSIXTime,
-  init_step_script_hash: ByteArray,
-}
-
-pub type FraudProofValidatorSetRedeemer {
-  FPVS_Init
-  FPVS_Deinit
-  FPVS_Insert { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
-  FPVS_Remove { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
-}
 
 pub fn make_common(
   transaction: Transaction,

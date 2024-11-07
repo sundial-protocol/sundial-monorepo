@@ -6,35 +6,11 @@ use cardano/assets.{PolicyId, from_asset, tokens, without_lovelace}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
+use midgard/types/datum.{PublisherDatum}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
 use midgard/utils.{get_outputs, has_data_cs, parse_node_key, valid_node}
-
-pub type PublisherSetConfig {
-  init_utxo: OutputReference,
-  midgard_treasury: Address,
-  refund_waiting_period: Int,
-  min_lovelace_bond: Int,
-}
-
-pub type PublisherDatum {
-  insert_time: POSIXTime,
-  refund_process_init_time: POSIXTime,
-}
-
-pub type PublisherSetRedeemer {
-  PS_Init
-  PS_Deinit
-  PS_Insert { key_to_insert: PubKeyHash, prev_node_key: PubKeyHash }
-  PS_Slash {
-    prev_node_key: PubKeyHash,
-    remove_node_key: PubKeyHash,
-    fraud_token_ref_input_index: Int,
-  }
-  PS_InitRefund { node_to_mark_key: PubKeyHash }
-  PS_CompleteRefund { prev_node_key: PubKeyHash, remove_node_key: PubKeyHash }
-}
 
 pub fn make_common(
   transaction: Transaction,

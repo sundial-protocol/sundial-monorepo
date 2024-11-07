@@ -8,24 +8,15 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use midgard/constants.{set_node_prefix}
+use midgard/types/datum.{StateDatum}
 use midgard/types/general.{
   Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
 }
-use midgard/types/ps.{PS_Slash}
+use midgard/types/ps
+use midgard/types/redeemer.{PS_Slash}
 use midgard/utils.{
   cover_key, find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key,
   valid_node,
-}
-
-pub type StateQueueConfig {
-  init_utxo: OutputReference,
-  refund_waiting_period: Int,
-}
-
-pub type StateDatum {
-  state_time: POSIXTime,
-  publisher_key: ByteArray,
-  block_hash: ByteArray,
 }
 
 pub type StateQueueRedeemer {

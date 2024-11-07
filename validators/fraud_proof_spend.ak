@@ -1,6 +1,6 @@
 use cardano/assets.{quantity_of}
 use cardano/transaction.{OutputReference, Transaction}
-use midgard/types/fp.{FraudProofSpendRedeemer}
+use midgard/types/redeemer.{FraudProofSpendRedeemer}
 use midgard/utils
 
 validator fraud_proof_spend(fraud_proof_script_hash: ByteArray) {
