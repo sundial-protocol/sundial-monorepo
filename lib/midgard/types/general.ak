@@ -18,20 +18,15 @@ pub type NodeKey {
   Empty
 }
 
-pub type LinkedListDatum<datum_type> {
+pub type NodeDatum<app_data> {
   key: NodeKey,
-  next: NodeKey,
-  extra_data: datum_type,
-}
-
-pub type NodePair<datum_type> {
-  val: Value,
-  data: LinkedListDatum<datum_type>,
+  link: NodeKey,
+  data: app_data,
 }
 
 pub type Common<datum_type> {
   own_cs: PolicyId,
   mint: Value,
-  node_inputs: List<NodePair<datum_type>>,
-  node_outputs: List<NodePair<datum_type>>,
+  node_inputs: List<NodeDatum<datum_type>>,
+  node_outputs: List<NodeDatum<datum_type>>,
 }

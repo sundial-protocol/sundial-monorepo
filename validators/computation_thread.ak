@@ -5,7 +5,7 @@ use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/types/datum.{
   FraudProofValidatorDatum, HubOracleDatum, StateDatum, StepDatum,
 }
-use midgard/types/general.{Key, LinkedListDatum}
+use midgard/types/general.{Key, NodeDatum}
 use midgard/types/redeemer.{
   CT_Cancel, CT_Mint, CT_Success, ComputationThreadRedeemer,
 }
@@ -49,21 +49,20 @@ validator computation_thread(
 
         expect InlineDatum(fraud_proof_catalogue_node_datum) =
           fraud_proof_catalogue_node_input.output.datum
-        expect parsed_fraud_proof_catalogue_node_datum: LinkedListDatum<
+        expect parsed_fraud_proof_catalogue_node_datum: NodeDatum<
           FraudProofValidatorDatum,
         > = fraud_proof_catalogue_node_datum
         expect Key(parsed_fraud_proof_catalogue_node_datum_key) =
           parsed_fraud_proof_catalogue_node_datum.key
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-        expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
-          StateDatum,
-        > = frauded_state_queue_node_datum
+        expect parsed_frauded_state_queue_node_datum: NodeDatum<StateDatum> =
+          frauded_state_queue_node_datum
 
         let token_to_mint_asset_name =
           bytearray.concat(
             parsed_fraud_proof_catalogue_node_datum_key,
-            parsed_frauded_state_queue_node_datum.extra_data.block_hash,
+            parsed_frauded_state_queue_node_datum.data.block_hash,
           )
         and {
           quantity_of(self.mint, policy_id, token_to_mint_asset_name) == 1,
@@ -86,7 +85,7 @@ validator computation_thread(
           validate_output_to_initial_fraud_proof_step(
             output_to_init_step,
             fraud_prover_hash,
-            parsed_fraud_proof_catalogue_node_datum.extra_data.init_step_script_hash,
+            parsed_fraud_proof_catalogue_node_datum.data.init_step_script_hash,
             policy_id,
             token_to_mint_asset_name,
           ),

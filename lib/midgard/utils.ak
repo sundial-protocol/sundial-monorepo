@@ -5,9 +5,8 @@ use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
 use midgard/constants.{set_node_prefix}
-use midgard/types/general.{
-  Empty, Key, LinkedListDatum, NodeKey, POSIXTime, PubKeyHash,
-}
+use midgard/types/general.{Empty,
+  Key, NodeDatum, NodeKey, POSIXTime, PubKeyHash}
 
 pub fn validate_mint(
   mints: Value,
@@ -19,17 +18,14 @@ pub fn validate_mint(
   mints_policy == [Pair(expected_minting_name, expected_minting_amt)]
 }
 
-pub fn cover_key(
-  data: LinkedListDatum<datum_type>,
-  insert_key: PubKeyHash,
-) -> Bool {
+pub fn cover_key(data: NodeDatum<datum_type>, insert_key: PubKeyHash) -> Bool {
   let less_than_key =
     when data.key is {
       Empty -> True
       Key(key) -> bytearray.compare(key, insert_key) == Less
     }
   let more_than_key =
-    when data.next is {
+    when data.link is {
       Empty -> True
       Key(key) -> bytearray.compare(key, insert_key) == Greater
     }
@@ -73,11 +69,11 @@ pub fn parse_node_key(tn: AssetName) -> Option<ByteArray> {
   }
 }
 
-pub fn valid_node(node: LinkedListDatum<datum_type>) -> Bool {
+pub fn valid_node(node: NodeDatum<datum_type>) -> Bool {
   when node.key is {
     Empty -> True
     Key(node_key) ->
-      when node.next is {
+      when node.link is {
         Empty -> True
         Key(next_key) -> bytearray.compare(node_key, next_key) == Less
       }

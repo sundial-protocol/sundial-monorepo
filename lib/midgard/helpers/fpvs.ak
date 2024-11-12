@@ -6,9 +6,7 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use midgard/types/datum.{FraudProofValidatorDatum}
-use midgard/types/general.{
-  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
-}
+use midgard/types/general.{Common, Empty, Key, NodeDatum, POSIXTime, PubKeyHash}
 use midgard/utils.{get_outputs, has_data_cs, parse_node_key, valid_node}
 
 pub fn make_common(
@@ -66,18 +64,18 @@ pub fn only_at_node_val(outputs: List<Output>, cs: PolicyId) -> List<Output> {
 
 pub fn node_input_utxo_datum_unsafe(
   output: Output,
-) -> NodePair<FraudProofValidatorDatum> {
+) -> NodeDatum<FraudProofValidatorDatum> {
   expect Output { value, datum: InlineDatum(raw_node), .. } = output
-  expect list_datum: LinkedListDatum<FraudProofValidatorDatum> = raw_node
-  NodePair { val: value, data: list_datum }
+  expect node_datum: NodeDatum<FraudProofValidatorDatum> = raw_node
+  node_datum
 }
 
 pub fn parse_node_output_utxo(
   cs: PolicyId,
   output: Output,
-) -> NodePair<FraudProofValidatorDatum> {
+) -> NodeDatum<FraudProofValidatorDatum> {
   expect Output { value, datum: InlineDatum(raw_node), .. } = output
-  expect publisher_datum: LinkedListDatum<FraudProofValidatorDatum> = raw_node
+  expect publisher_datum: NodeDatum<FraudProofValidatorDatum> = raw_node
   expect [Pair(tn, amount)] =
     value
       |> tokens(cs)
@@ -92,5 +90,5 @@ pub fn parse_node_output_utxo(
   expect node_key == datum_key
   expect without_lovelace(value) == from_asset(cs, tn, 1)
   expect valid_node(publisher_datum)
-  NodePair { val: value, data: publisher_datum }
+  publisher_datum
 }

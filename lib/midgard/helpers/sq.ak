@@ -8,9 +8,7 @@ use cardano/transaction.{InlineDatum, Input, Mint, Output, Transaction}
 use midgard/constants.{set_node_prefix}
 use midgard/helpers/ps
 use midgard/types/datum.{StateDatum}
-use midgard/types/general.{
-  Common, Empty, Key, LinkedListDatum, NodePair, POSIXTime, PubKeyHash,
-}
+use midgard/types/general.{Common, Empty, Key, NodeDatum, POSIXTime, PubKeyHash}
 use midgard/types/redeemer.{PS_Slash}
 use midgard/utils.{
   cover_key, find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key,
@@ -70,18 +68,18 @@ pub fn only_at_node_val(outputs: List<Output>, cs: PolicyId) -> List<Output> {
       )
 }
 
-pub fn node_input_utxo_datum_unsafe(output: Output) -> NodePair<StateDatum> {
+pub fn node_input_utxo_datum_unsafe(output: Output) -> NodeDatum<StateDatum> {
   expect Output { value, datum: InlineDatum(raw_node), .. } = output
-  expect list_datum: LinkedListDatum<StateDatum> = raw_node
-  NodePair { val: value, data: list_datum }
+  expect node_datum: NodeDatum<StateDatum> = raw_node
+  node_datum
 }
 
 pub fn parse_node_output_utxo(
   cs: PolicyId,
   output: Output,
-) -> NodePair<StateDatum> {
+) -> NodeDatum<StateDatum> {
   expect Output { value, datum: InlineDatum(raw_node), .. } = output
-  expect list_datum: LinkedListDatum<StateDatum> = raw_node
+  expect list_datum: NodeDatum<StateDatum> = raw_node
   expect [Pair(tn, amount)] =
     value
       |> tokens(cs)
@@ -97,7 +95,7 @@ pub fn parse_node_output_utxo(
   expect list.length(flatten(value)) == 2
   expect valid_node(list_datum)
   expect find_cs_by_token_prefix(value, set_node_prefix) == [cs]
-  NodePair { val: value, data: list_datum }
+  list_datum
 }
 
 pub fn is_publisher_slashed_now_or_before(
@@ -112,7 +110,7 @@ pub fn is_publisher_slashed_now_or_before(
   if maybe_ps_redeemer == None {
     //In this case we passed as input node the prev_node and we check that covers the slashed key
     let prev_node_datum =
-      ps.node_input_utxo_datum_unsafe(publisher_input.output).data
+      ps.node_input_utxo_datum_unsafe(publisher_input.output)
     and {
       prev_node_datum.key == Key { key: prev_node_key },
       valid_publisher_node_input(
