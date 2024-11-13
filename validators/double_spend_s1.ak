@@ -1,13 +1,17 @@
-// imports 
 // midgard-merkle is used as a library to verify merkle inclusion proofs 
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
-use cardano/assets.{PolicyId, flatten, quantity_of}
+use aiken/primitive/bytearray.{drop}
+
+use cardano/address.{Address, Script, VerificationKey}
+use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/types/ct.{StepDatum}
-use midgard/types/redeemer.{DS_Cancel,
-  DS_Continue, DoubleSpendStep1Redeemer}
-use midgard/utils.{ct_token_burnt, is_output_to_sc}
+
+use midgard/types/datum.{StateDatum, StepDatum}
+use midgard/types/general.{LinkedListDatum}
+use midgard/types/redeemer.{DS_Cancel, DS_Continue, DoubleSpendStep1Redeemer}
+
+use aiken_design_patterns/merkelized_validator as merkelized_validator // Used to forward merkle inclusion proof logic to external script validator
 
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs who spent the same input UTxO
 
@@ -25,8 +29,8 @@ use midgard/utils.{ct_token_burnt, is_output_to_sc}
 //   Outputs (tx_out2): [UTxO_D]
 
 // Common input: UTxO_A
-// Verify i is an input of tx:
-// Merkle proof of membership: i ∈ tx.inputs root
+// Verify i is an input of tx_1 and tx_2:
+// Merkle proof of membership: i ∈ tx_1.inputs_root ∧ i ∈ tx_2.inputs_root
 
 // -------- Variable Definition ---------------------------------------
 // (i) a state queue block with a block hash matching the last 28 bytes of the computation thread token name
@@ -34,43 +38,59 @@ use midgard/utils.{ct_token_burnt, is_output_to_sc}
 // (iii) tx_hash is the hash of the transaction that is being proven to be in tx_root
 // (iv) proof_path is the minimum set of hashes needed to reconstruct the path from the tx to the root
 
-validator double_spend_s1(double_spend_s2_validator_script_hash: ByteArray, ct_token_policy_id: PolicyId, stake_validator: ScriptHash) {
+pub type DoubleSpendStep1State {
+  tx1_hash: ByteArray,
+}
+
+validator double_spend_s1(
+  double_spend_s2_validator_script_hash: ByteArray,
+  ct_token_policy_id: PolicyId,
+  plutarch_merkle_inclusion_validator: ScriptHash,
+) {
   spend(
-    step_datum: StepDatum,
-    redeemer: DoubleSpendStep1Redeemer,
-    input: OutputReference, // UTxO spent from the validator with the StepDatum { fraud_prover, Void }
+    maybe_datum: Option<StepDatum>, // StepDatum { fraud_prover, data }
+    redeemer: DoubleSpendStep1Redeemer, // DS_Cancel | DS_Continue
+    input: OutputReference,  // UTxO spent from the validator with the StepDatum { fraud_prover, Void } (Step 0)
     self: Transaction,
   ) {
+    expect Some(step_datum) = maybe_datum
     when redeemer is {
+
       // --------- PURPOSE - Cancel Redeemer----------------------------------
       // (1) Burn the computation thread token 
       // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
-      DS_Cancel  -> {
+
+      DS_Cancel -> {
+        // (1.1) Get ct token asset name
         expect Some(own_input) =
           list.find(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
-        
+        expect Some((_, ct_token_asset_name, _)) =
+          list.at(flatten(own_input.output.value), 1)
+
+        expect Some((_, _, lovelace)) =
+          list.at(flatten(own_input.output.value), 0)
+        // (2.1)
+        expect Some(output_to_fraud_prover) = list.at(self.outputs, 0)
         and {
-          ct_token_burnt(
-            own_input.output.value,
-            ct_token_policy_id,
-            ct_token_asset_name,
+          self.mint == from_asset(
+            // (1.2)
+            policy_id: ct_token_policy_id,
+            asset_name: ct_token_asset_name,
+            quantity: -1,
           ),
-          // (1) Burn CT Token, (2) Return ADA to fraud_prover 
-          validate_output_to_fraud_prover(output_to_fraud_prover, fraud_prover_hash),
-          
-          // (3) TODO: No mint or burn of any other token
-          // quantity_of_policy_id(
-          //   self.mint,
-          //   ct_token_policy_id,
-          // ) == ,
+          validate_output_to_fraud_prover(
+            // (2.2)
+            output_to_fraud_prover,
+            step_datum.fraud_prover,
+          ),
+          quantity_of(output_to_fraud_prover.value, "", "") == lovelace,
+          // TODO: (3)
         }
       }
-      //  ------- Computation Step 1 - Membership Verification of tx1 ------- 
-      // Step - 1: Fraud Prover Input: state_queue_node_ref_input_index, tx1_hash, proof_path 
 
       // --------- PURPOSE - Continue Redeemer-------------------------------
       // (1) Reference a state queue block with a block hash matching the last 28 bytes of the computation thread token name
@@ -79,18 +99,15 @@ validator double_spend_s1(double_spend_s2_validator_script_hash: ByteArray, ct_t
       // (4) Verify the state transition from the previous state to the new state
       // (5) The computation thread token must be sent to the next step’s spending validator
       // (6) Transaction must not mint or burn any other tokens
-      // --------------------------------------------------------------------
 
       DS_Continue {
         frauded_state_queue_node_ref_input_index,
+        frauded_state_queue_tx_root,
         frauded_state_queue_tx1_hash,
-        tx1_to_root_proof_path,
+        frauded_state_queue_tx1_info_hash,
+        frauded_state_queue_tx1_to_root_proof_path,
       } -> {
-
-       
-
-        // (1) Reference input with block_hash (tx_root) which carries the last 28 bytes of ct token name
-        // --------------------------------------------------------------------
+        // (1.1) Reference input with block_hash (tx_root) which carries the last 28 bytes of ct token name
         expect Some(frauded_state_queue_node_input) =
           list.at(
             self.reference_inputs,
@@ -98,6 +115,7 @@ validator double_spend_s1(double_spend_s2_validator_script_hash: ByteArray, ct_t
           )
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
+
         expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
           StateDatum,
         > = frauded_state_queue_node_datum
@@ -105,53 +123,73 @@ validator double_spend_s1(double_spend_s2_validator_script_hash: ByteArray, ct_t
         let block_hash =
           parsed_frauded_state_queue_node_datum.extra_data.block_hash
 
-        //  ct token name 32 byte long - last 28 bytes of it should match the block_hash
-
-
-        // (2) TODO: Delegate compute to merkelized validator - call out midgard-merkle endpoint to verify the inclusion of tx1 in the tx_root
-        // Purpose: Prove inclusion, that the given transaction (tx1) exists in the frauded state commitment (tx_root) by delegating compute
-        // --------------------------------------------------------------------
-        
-        expect [has_tx_hash] =
-      [rdmr.tx_root, rdmr.tx_hash, rdmr.tx_info_hash, rdmr.proof]
-        |> merkelized_validator.delegated_compute(
-            plutarch_merkle_inclusion, // must come from parameters
-            // Input coercer - handles different types based on index
-            fn(i, x) {
-              if i == 0 {
-                utils.coerce_tx_root(x)
-              } else if i == 3 {
-                utils.coerce_proof(x)
-              } else {
-                builtin.un_b_data(x)
-              }
-            },
-            // Output coercer
-            fn(_i, x) {
-              expect bool_result: Bool = x
-              bool_result
-            },
-            tx.redeemers,
+        // (1.2) Get the ct token asset name
+        expect Some(own_input) =
+          list.find(
+            self.inputs,
+            fn(a_input) { a_input.output_reference == input },
           )
+        expect Some((_, ct_token_asset_name, _)) =
+          list.at(flatten(own_input.output.value), 1)
 
-      
-        // (6) Transaction must not mint or burn any other tokens
-        // --------------------------------------------------------------------
-        // utils.quantity_of_policy_id(self.mint, policy_id_or_own_script_hash_of_step_1) == 
-       
+        // (2) TODO: Delegate compute to merkelized validator - call out midgard-merkle endpoint to verify the inclusion of tx1 in the tx_root 
+        expect [has_tx_hash] =
+          [
+            frauded_state_queue_tx_root, frauded_state_queue_tx1_hash,
+            frauded_state_queue_tx1_info_hash,
+            frauded_state_queue_tx1_to_root_proof_path,
+          ] // (2.1)
+            
+          |> merkelized_validator.delegated_compute(
+                plutarch_merkle_inclusion_validator, // parameterized in the spending validator
+              
+                // Input coercer - handles different types based on index
+                fn(i, x) {
+                  if i == 0 {
+                    utils.coerce_tx_root(x)
+                  } else if i == 3 {
+                    utils.coerce_proof(x)
+                  } else {
+                    builtin.un_b_data(x)
+                  }
+                },
+
+                // Output coercer
+                fn(_i, x) {
+                  expect bool_result: Bool = x
+                  bool_result
+                },
+                tx.redeemers,
+              )
+
+        // (3) The fraud prover field must match between the output state and the input datum
+        expect Some(output_to_step_2) = list.at(self.outputs, 0)
+        expect InlineDatum(output_to_step_2_datum) = output_to_step_2.datum
+        expect parsed_output_to_step_2_datum: StepDatum = output_to_step_2_datum
+        // (5.1) Get the next step spending validator hash from the output
+        expect Script(hash) = output_to_step_2.address.payment_credential
+
+        // (4.1) Define the state transition        
+        let step1_state =
+          DoubleSpendStep1State { tx1_hash: frauded_state_queue_tx1_hash }
+        // we now have verified tx1 is in tx_root, and should carry the verified txhash to step 2
+        let step_1_datum =
+          StepDatum {
+            fraud_prover: parsed_output_to_step_2_datum.fraud_prover,
+            data: step1_state,
+          }
+
         and {
-          todo,
-          tx_root_matches_block_hash(tx_root, block_hash),
-          has_tx_hash,
-          // (3), (4), (5)
-          validate_output_to_double_spend_step_2(
-            output_to_init_step,
-            fraud_prover_hash,
-            double_spend_s2_validator_script_hash,
-            policy_id,
-            token_to_mint_asset_name,
-          ),
-          
+          drop(ct_token_asset_name, n: 28) == block_hash, // (1.3) tx_root matches block_hash
+          //has_tx_hash, // (2) Merkelized validator returns true if tx1 is in tx_root
+          parsed_output_to_step_2_datum.fraud_prover == step_datum.fraud_prover,  // (3) fraud prover field matches
+          step_1_datum == parsed_output_to_step_2_datum, // (4.2) state transition verified
+          hash == double_spend_s2_validator_script_hash, // (5.2)
+          quantity_of( // (6) no other mints or burns
+            output_to_step_2.value,
+            ct_token_policy_id,
+            ct_token_asset_name,
+          ) == 1,
         }
       }
     }
@@ -162,46 +200,12 @@ validator double_spend_s1(double_spend_s2_validator_script_hash: ByteArray, ct_t
   }
 }
 
-fn tx_root_matches_block_hash(tx_root: ByteArray, block_hash: ByteArray) {
-  todo,
-}
-
-// fn validate_output_to_fraud_prover(output: Output, fraud_prover_hash: ByteArray) {
-//   when output.address.payment_credential is {
-//     VerificationKey(hash) -> hash == fraud_prover_hash
-//     _ -> False
-//   }
-
-//   and {
-//     todo,
-// }
-// }
-
-fn validate_output_to_double_spend_step_2(
-  output_to_step_2: Output,
-  fraud_prover_hash: ByteArray,
-  double_spend_s2_validator_script_hash: ByteArray,
-  own_hash: ByteArray,
-  ct_token_asset_name: ByteArray,
+pub fn validate_output_to_fraud_prover(
+  output_to_fraud_prover: Output,
+  prover_hash: ByteArray,
 ) {
-  expect InlineDatum(output_datum) = output_to_step_2.datum
-  expect parsed_output_datum: StepDatum = output_datum
-
-  let step1_state =
-          DoubleSpendStep1State {
-            tx1_hash: frauded_state_queue_tx1_hash,
-            merkle_proof: tx1_to_root_proof_path,
-          }
-
-  let step_1_datum = StepDatum { fraud_prover: fraud_prover_hash, data: step1_state }
-
-  let correctValue = and {
-      quantity_of(output_to_step_2.value, own_hash, ct_token_asset_name) == 1,
-      // list.length(flatten(output_to_step_2.value)) == ,
-    }
-  and {
-    is_output_to_sc(output_to_step_2, double_spend_s2_validator_script_hash),
-    parsed_output_datum == step_1_datum,
-    correctValue,
+  when output_to_fraud_prover.address.payment_credential is {
+    VerificationKey(hash) -> hash == prover_hash
+    _ -> False
   }
 }

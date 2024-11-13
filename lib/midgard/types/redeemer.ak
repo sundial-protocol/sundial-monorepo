@@ -87,9 +87,9 @@ pub type DoubleSpendStep1Redeemer {
   DS_Cancel
   DS_Continue {
     frauded_state_queue_node_ref_input_index: Int,
-    frauded_state_queue_tx_root: Root,
+    frauded_state_queue_tx_root: ByteArray,
     frauded_state_queue_tx1_hash: ByteArray,
     frauded_state_queue_tx1_info_hash: ByteArray,
-    frauded_state_queue_tx1_to_root_proof_path: Proof<a>,
+    frauded_state_queue_tx1_to_root_proof_path: ByteArray,
   }
 }
