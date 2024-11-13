@@ -42,8 +42,8 @@ pub type DoubleSpendStep1State {
   tx1_hash: ByteArray,
 }
 
-validator double_spend_s1(
-  double_spend_s2_validator_script_hash: ByteArray,
+validator double_spend_s_1(
+  double_spend_s_2_validator_script_hash: ByteArray,
   ct_token_policy_id: PolicyId,
   plutarch_merkle_inclusion_validator: ScriptHash,
 ) {
@@ -184,7 +184,7 @@ validator double_spend_s1(
           //has_tx_hash, // (2) Merkelized validator returns true if tx1 is in tx_root
           parsed_output_to_step_2_datum.fraud_prover == step_datum.fraud_prover,  // (3) fraud prover field matches
           step_1_datum == parsed_output_to_step_2_datum, // (4.2) state transition verified
-          hash == double_spend_s2_validator_script_hash, // (5.2)
+          hash == double_spend_s_2_validator_script_hash, // (5.2)
           quantity_of( // (6) no other mints or burns
             output_to_step_2.value,
             ct_token_policy_id,
