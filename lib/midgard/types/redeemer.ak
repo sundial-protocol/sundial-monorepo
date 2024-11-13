@@ -1,4 +1,4 @@
-use midgard/types/general.{PubKeyHash}
+use midgard/types/general.{PubKeyHash, Proof}
 
 pub type PublisherSetRedeemer {
   PS_Init
@@ -90,6 +90,6 @@ pub type DoubleSpendStep1Redeemer {
     frauded_state_queue_tx_root: ByteArray,
     frauded_state_queue_tx1_hash: ByteArray,
     frauded_state_queue_tx1_info_hash: ByteArray,
-    frauded_state_queue_tx1_to_root_proof_path: ByteArray,
+    frauded_state_queue_tx1_to_root_proof_path: Proof,
   }
 }
