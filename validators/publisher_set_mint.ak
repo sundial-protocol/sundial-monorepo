@@ -5,9 +5,10 @@ use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/constants
 use midgard/helpers/ps.{make_common}
+use midgard/linked_list.{Common, Empty, Key, NodeDatum, NodeKey}
 use midgard/types/config.{PublisherSetConfig}
 use midgard/types/datum.{FraudProofValidatorDatum, PublisherDatum}
-use midgard/types/general.{Common, Empty, Key, NodeDatum, POSIXTime, PubKeyHash}
+use midgard/types/general.{POSIXTime, PubKeyHash}
 use midgard/types/redeemer.{
   PS_CompleteRefund, PS_Deinit, PS_Init, PS_InitRefund, PS_Insert, PS_Slash,
   PublisherSetRedeemer,

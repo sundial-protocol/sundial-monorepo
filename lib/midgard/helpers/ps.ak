@@ -1,14 +1,12 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/interval.{Interval}
-use cardano/address.{Address}
 use cardano/assets.{PolicyId, from_asset, tokens, without_lovelace}
-use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Transaction,
-}
+use cardano/transaction.{InlineDatum, Input, Output, Transaction}
+use midgard/linked_list.{Common, Empty, Key, NodeDatum, valid_node}
 use midgard/types/datum.{PublisherDatum}
-use midgard/types/general.{Common, Empty, Key, NodeDatum, POSIXTime, PubKeyHash}
-use midgard/utils.{get_outputs, has_data_cs, parse_node_key, valid_node}
+use midgard/types/general.{POSIXTime, PubKeyHash}
+use midgard/utils.{get_outputs, has_data_cs, parse_node_key}
 
 pub fn make_common(
   transaction: Transaction,

@@ -5,8 +5,7 @@ use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
 use midgard/constants.{set_node_prefix}
-use midgard/types/general.{Empty,
-  Key, NodeDatum, NodeKey, POSIXTime, PubKeyHash}
+use midgard/types/general.{POSIXTime}
 
 pub fn validate_mint(
   mints: Value,
@@ -16,20 +15,6 @@ pub fn validate_mint(
 ) -> Bool {
   let mints_policy = dict.to_pairs(tokens(mints, expected_minting_policy))
   mints_policy == [Pair(expected_minting_name, expected_minting_amt)]
-}
-
-pub fn cover_key(data: NodeDatum<datum_type>, insert_key: PubKeyHash) -> Bool {
-  let less_than_key =
-    when data.key is {
-      Empty -> True
-      Key(key) -> bytearray.compare(key, insert_key) == Less
-    }
-  let more_than_key =
-    when data.link is {
-      Empty -> True
-      Key(key) -> bytearray.compare(key, insert_key) == Greater
-    }
-  less_than_key? && more_than_key?
 }
 
 pub fn div_ceil(a, b: Int) -> Int {
@@ -69,17 +54,6 @@ pub fn parse_node_key(tn: AssetName) -> Option<ByteArray> {
   }
 }
 
-pub fn valid_node(node: NodeDatum<datum_type>) -> Bool {
-  when node.key is {
-    Empty -> True
-    Key(node_key) ->
-      when node.link is {
-        Empty -> True
-        Key(next_key) -> bytearray.compare(node_key, next_key) == Less
-      }
-  }
-}
-
 pub fn find_cs_by_token_prefix(
   value: Value,
   prefix: ByteArray,
@@ -115,11 +89,6 @@ pub fn safe_list_last(elems: List<a>) -> a {
 pub fn safe_list_head(elems: List<a>) -> a {
   expect Some(last_elem) = list.head(elems)
   last_elem
-}
-
-pub fn safe_get_key(k: NodeKey) {
-  expect Key(the_key) = k
-  the_key
 }
 
 pub fn safe_list_init(elems: List<a>) {

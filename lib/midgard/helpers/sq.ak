@@ -7,12 +7,12 @@ use cardano/assets.{PolicyId, flatten, quantity_of, tokens}
 use cardano/transaction.{InlineDatum, Input, Mint, Output, Transaction}
 use midgard/constants.{set_node_prefix}
 use midgard/helpers/ps
+use midgard/linked_list.{Common, Empty, Key, NodeDatum, cover_key, valid_node}
 use midgard/types/datum.{StateDatum}
-use midgard/types/general.{Common, Empty, Key, NodeDatum, POSIXTime, PubKeyHash}
+use midgard/types/general.{POSIXTime, PubKeyHash}
 use midgard/types/redeemer.{PS_Slash}
 use midgard/utils.{
-  cover_key, find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key,
-  valid_node,
+  find_cs_by_token_prefix, get_outputs, has_data_cs, parse_node_key,
 }
 
 pub fn make_common(
