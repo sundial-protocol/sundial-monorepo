@@ -49,20 +49,23 @@ validator computation_thread(
 
         expect InlineDatum(fraud_proof_catalogue_node_datum) =
           fraud_proof_catalogue_node_input.output.datum
-        expect parsed_fraud_proof_catalogue_node_datum: NodeDatum<
-          FraudProofValidatorDatum,
-        > = fraud_proof_catalogue_node_datum
+        expect parsed_fraud_proof_catalogue_node_datum: NodeDatum =
+          fraud_proof_catalogue_node_datum
+        expect parsed_fraud_proof_catalogue_node_app_data: FraudProofValidatorDatum =
+          parsed_fraud_proof_catalogue_node_datum.data
         expect Key(parsed_fraud_proof_catalogue_node_datum_key) =
           parsed_fraud_proof_catalogue_node_datum.key
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-        expect parsed_frauded_state_queue_node_datum: NodeDatum<StateDatum> =
+        expect parsed_frauded_state_queue_node_datum: NodeDatum =
           frauded_state_queue_node_datum
+        expect parsed_frauded_state_queue_node_app_data: StateDatum =
+          parsed_frauded_state_queue_node_datum.data
 
         let token_to_mint_asset_name =
           bytearray.concat(
             parsed_fraud_proof_catalogue_node_datum_key,
-            parsed_frauded_state_queue_node_datum.data.block_hash,
+            parsed_frauded_state_queue_node_app_data.block_hash,
           )
         and {
           quantity_of(self.mint, policy_id, token_to_mint_asset_name) == 1,
@@ -85,7 +88,7 @@ validator computation_thread(
           validate_output_to_initial_fraud_proof_step(
             output_to_init_step,
             fraud_prover_hash,
-            parsed_fraud_proof_catalogue_node_datum.data.init_step_script_hash,
+            parsed_fraud_proof_catalogue_node_app_data.init_step_script_hash,
             policy_id,
             token_to_mint_asset_name,
           ),

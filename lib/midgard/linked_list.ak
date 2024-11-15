@@ -1,10 +1,11 @@
 use aiken/builtin
-use aiken/collection/dict
+use aiken/collection/dict.{Dict}
 use aiken/collection/list
 use aiken/interval.{Interval}
 use aiken/primitive/bytearray
 use cardano/assets.{
-  PolicyId, Value, from_asset, quantity_of, tokens, without_lovelace,
+  AssetName, PolicyId, Value, flatten, from_asset, quantity_of, tokens,
+  without_lovelace,
 }
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
@@ -20,30 +21,49 @@ pub type NodeKey {
   Empty
 }
 
-pub type NodeDatum<app_data> {
+pub type NodeDatum {
   key: NodeKey,
   link: NodeKey,
-  data: app_data,
+  data: Data,
 }
 
-pub type Common<datum_type> {
-  own_cs: PolicyId,
-  mint: Value,
+pub type Common {
+  node_cs: PolicyId,
+  node_mint: Dict<AssetName, Int>,
   node_in_outputs: List<Output>,
   node_outputs: List<Output>,
+}
+
+pub fn get_raw_key_and_link(node_output: Output) -> (Data, Data) {
+  expect InlineDatum(node_output_datum) = node_output.datum
+  let constr = builtin.un_constr_data(node_output_datum).2nd
+  let key = builtin.head_list(constr)
+  let link = builtin.head_list(builtin.tail_list(constr))
+  (key, link)
+}
+
+pub fn get_key(raw_key_and_link: (Data, Data)) -> NodeKey {
+  expect key: NodeKey = raw_key_and_link.1st
+  key
+}
+
+pub fn get_link(raw_key_and_link: (Data, Data)) -> NodeKey {
+  expect link: NodeKey = raw_key_and_link.2nd
+  link
+}
+
+pub fn serialize_key(key: NodeKey) {
+  when key is {
+    Empty -> constants.root_node_token_name
+    Key(actual_key) ->
+      bytearray.concat(constants.root_node_token_name, actual_key)
+  }
 }
 
 pub fn make_common(
   transaction: Transaction,
   own_cs: PolicyId,
-  output_data_coercer: fn(Data) -> NodeDatum<app_data>,
-) -> (
-  Common<app_data>,
-  List<Input>,
-  List<Output>,
-  List<PubKeyHash>,
-  Interval<POSIXTime>,
-) {
+) -> (Common, List<Input>, List<Output>, List<PubKeyHash>, Interval<POSIXTime>) {
   let Transaction {
     inputs,
     outputs,
@@ -71,21 +91,10 @@ pub fn make_common(
             }
           },
         )
-  let node_inputs =
-    list.map(
-      from_node_val,
-      fn(node) { node_input_utxo_datum_unsafe(node, output_data_coercer) },
-    )
-  let node_outputs =
-    list.map(
-      to_node_val,
-      fn(node) { parse_node_output_utxo(own_cs, node, output_data_coercer) },
-    )
-  //TODO Do we need the list of minted tokens with the list policy instead of the whole mint object?
   let common =
     Common {
-      own_cs,
-      mint,
+      node_cs: own_cs,
+      node_mint: tokens(mint, own_cs),
       node_in_outputs: from_node_val,
       node_outputs: to_node_val,
     }
@@ -103,170 +112,292 @@ pub fn only_at_node_val(outputs: List<Output>, cs: PolicyId) -> List<Output> {
       )
 }
 
-pub fn node_input_utxo_datum_unsafe(
-  output: Output,
-  output_data_coercer: fn(Data) -> NodeDatum<app_data>,
-) -> NodeDatum<app_data> {
-  expect Output { address, value, datum: InlineDatum(raw_node), .. } = output
-  output_data_coercer(raw_node)
-}
-
-pub fn parse_node_output_utxo(
-  cs: PolicyId,
-  output: Output,
-  output_data_coercer: fn(Data) -> NodeDatum<app_data>,
-) -> NodeDatum<app_data> {
-  expect Output { address, value, datum: InlineDatum(raw_node), .. } = output
-  let node_datum = output_data_coercer(raw_node)
-  expect [Pair(tn, amount)] =
-    value
-      |> tokens(cs)
-      |> dict.to_pairs()
-  expect amount == 1
-  let node_key = parse_node_key(tn)
-  let datum_key =
-    when node_datum.key is {
-      Empty -> None
-      Key(key) -> Some(key)
-    }
-  expect node_key == datum_key
-  expect without_lovelace(value) == from_asset(cs, tn, 1)
-  expect valid_node(node_datum)
-  node_datum
-}
-
-pub fn list_state_transition(mint_value: Value, node_nft_policy_id: ByteArray) {
-  quantity_of_policy_id(mint_value, node_nft_policy_id) != 0
+pub fn list_state_transition(node_mint: Dict<AssetName, Int>) {
+  dict.is_empty(node_mint) == False
 }
 
 pub fn modify_data(
-  mint_value: Value,
+  node_mint: Dict<AssetName, Int>,
   own_input: Input,
   own_output: Output,
   node_nft_policy_id: ByteArray,
   node_nft_asset_name: ByteArray,
 ) -> Bool {
-  expect InlineDatum(input_datum) = own_input.output.datum
-  let input_constr = builtin.un_constr_data(input_datum).2nd
-  let input_key = builtin.head_list(input_constr)
-  let input_link = builtin.head_list(builtin.tail_list(input_constr))
-
-  expect InlineDatum(output_datum) = own_output.datum
-  let output_constr = builtin.un_constr_data(output_datum).2nd
-  let output_key = builtin.head_list(output_constr)
-  let output_link = builtin.head_list(builtin.tail_list(output_constr))
+  let input_key_and_link = get_raw_key_and_link(own_input.output)
+  let output_key_and_link = get_raw_key_and_link(own_output)
 
   and {
-    input_key == output_key,
-    input_link == output_link,
-    quantity_of_policy_id(mint_value, node_nft_policy_id) == 0,
+    input_key_and_link == output_key_and_link,
+    dict.is_empty(node_mint),
     quantity_of(own_input.output.value, node_nft_policy_id, node_nft_asset_name) == 1,
     quantity_of(own_output.value, node_nft_policy_id, node_nft_asset_name) == 1,
   }
 }
 
-pub fn is_root_node(node: NodeDatum<datum_type>) {
-  node.key == Empty
+pub fn is_root_node(node_key: NodeKey) {
+  node_key == Empty
 }
 
-pub fn is_last_node(node: NodeDatum<datum_type>) {
-  node.link == Empty
+pub fn is_last_node(node_link: NodeKey) {
+  node_link == Empty
 }
 
-pub fn is_empty_list(root_node: NodeDatum<datum_type>) {
-  is_last_node(root_node)
+pub fn is_empty_list(node_key: NodeKey, node_link: NodeKey) {
+  and {
+    is_root_node(node_key),
+    is_last_node(node_link),
+  }
 }
 
-pub fn is_member(k: NodeKey, node: NodeDatum<datum_type>) {
-  k == node.key
+pub fn key_added(key: NodeKey, node_mint: Dict<AssetName, Int>) {
+  and {
+    dict.size(node_mint) == 1,
+    dict.get(node_mint, serialize_key(key)) == Some(1),
+  }
+}
+
+pub fn key_removed(key: NodeKey, node_mint: Dict<AssetName, Int>) {
+  and {
+    dict.size(node_mint) == 1,
+    dict.get(node_mint, serialize_key(key)) == Some(-1),
+  }
+}
+
+pub fn is_member(k: NodeKey, node_key: NodeKey) {
+  k == node_key
 }
 
 //Only for ordered-list!
-pub fn is_not_member(k: NodeKey, node: NodeDatum<datum_type>) {
+pub fn is_not_member(k: NodeKey, node_key: NodeKey, node_link: NodeKey) {
   or {
     k == Empty,
     {
       expect Key(actual_key) = k
-      expect Key(actual_node_key) = node.key
-      expect Key(actual_node_link) = node.link
       and {
         or {
-          is_root_node(node),
-          bytearray.compare(actual_node_key, actual_key) == Less,
+          is_root_node(node_key),
+          {
+            expect Key(actual_node_key) = node_key
+            bytearray.compare(actual_node_key, actual_key) == Less
+          },
         },
         or {
-          is_last_node(node),
-          bytearray.compare(actual_key, actual_node_link) == Less,
+          is_last_node(node_link),
+          {
+            expect Key(actual_node_link) = node_link
+            bytearray.compare(actual_key, actual_node_link) == Less
+          },
         },
       }
     },
   }
 }
 
-//init_utxo must be constant
-pub fn init(
-  init_utxo: OutputReference,
-  inputs: List<Input>,
-  common: Common<app_data>,
+//Application code must ensure that this action can happen only once
+pub fn init(common: Common) {
+  expect Some(output_root_node) = list.head(common.node_outputs)
+  let raw_key_and_link = get_raw_key_and_link(output_root_node)
+  and {
+    key_added(Empty, common.node_mint),
+    is_empty_list(get_key(raw_key_and_link), get_link(raw_key_and_link)),
+    quantity_of(
+      output_root_node.value,
+      common.node_cs,
+      constants.root_node_token_name,
+    ) == 1,
+    list.length(flatten(output_root_node.value)) == 2,
+  }
+}
+
+pub fn deinit(common: Common) {
+  expect Some(input_root_node) = list.head(common.node_in_outputs)
+  let raw_key_and_link = get_raw_key_and_link(input_root_node)
+  and {
+    key_removed(Empty, common.node_mint),
+    is_empty_list(get_key(raw_key_and_link), get_link(raw_key_and_link)),
+    quantity_of(
+      input_root_node.value,
+      common.node_cs,
+      constants.root_node_token_name,
+    ) == 1,
+  }
+}
+
+//The indexes are relative to utxos of this linkedlist, they are NOT absolute
+pub fn unordered_prepend(
+  key_to_prepend: NodeKey,
+  prepended_node_output_index: Int,
+  anchor_node_output_index: Int,
+  common: Common,
 ) {
-  and {
-    //TODO Check that output to list contains root nft
-    list.any(inputs, fn(input) { init_utxo == input.output_reference }),
-    list.length(common.node_inputs) == 0,
-    list.length(common.node_outputs) == 1,
-    quantity_of(common.mint, common.own_cs, constants.root_node_token_name) == 1,
-  }
-}
+  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
+  expect InlineDatum(anchor_node_in_output_datum) = anchor_node_in_output.datum
+  expect parsed_anchor_node_in_output_datum: NodeDatum =
+    anchor_node_in_output_datum
+  let anchor_node_raw_key_and_link = get_raw_key_and_link(anchor_node_in_output)
+  expect Some(prepended_node_output) =
+    list.at(common.node_outputs, prepended_node_output_index)
+  expect Some(anchor_node_output) =
+    list.at(common.node_outputs, anchor_node_output_index)
+  expect InlineDatum(anchor_node_output_datum) = anchor_node_output.datum
+  expect parsed_anchor_node_output_datum: NodeDatum = anchor_node_output_datum
+  let prepended_node_output_raw_key_and_link =
+    get_raw_key_and_link(prepended_node_output)
 
-pub fn deinit(common: Common<app_data>) {
-  and {
-    list.length(common.node_inputs) == 1,
-    list.length(common.node_outputs) == 0,
-    quantity_of(common.mint, common.own_cs, constants.root_node_token_name) == -1,
-    quantity_of_policy_id(common.mint, common.own_cs) == 1,
-  }
-}
-
-pub fn prepend() {
-  todo
-}
-
-pub fn append() {
-  todo
-}
-
-pub fn remove() {
-  todo
-}
-
-//TODO CHECK FROM HERE
-
-pub fn cover_key(data: NodeDatum<datum_type>, insert_key: PubKeyHash) -> Bool {
-  let less_than_key =
-    when data.key is {
-      Empty -> True
-      Key(key) -> bytearray.compare(key, insert_key) == Less
+  let anchor_node_new_datum =
+    NodeDatum {
+      key: parsed_anchor_node_in_output_datum.key,
+      link: key_to_prepend,
+      data: parsed_anchor_node_in_output_datum.data,
     }
-  let more_than_key =
-    when data.link is {
-      Empty -> True
-      Key(key) -> bytearray.compare(key, insert_key) == Greater
-    }
-  less_than_key? && more_than_key?
-}
-
-pub fn valid_node(node: NodeDatum<datum_type>) -> Bool {
-  when node.key is {
-    Empty -> True
-    Key(node_key) ->
-      when node.link is {
-        Empty -> True
-        Key(next_key) -> bytearray.compare(node_key, next_key) == Less
-      }
+  and {
+    key_added(key_to_prepend, common.node_mint),
+    list.length(common.node_in_outputs) == 1,
+    is_root_node(get_key(anchor_node_raw_key_and_link)),
+    list.length(common.node_outputs) == 2,
+    is_member(key_to_prepend, get_key(prepended_node_output_raw_key_and_link)),
+    get_link(anchor_node_raw_key_and_link) == get_link(
+      prepended_node_output_raw_key_and_link,
+    ),
+    parsed_anchor_node_output_datum.link == key_to_prepend,
+    anchor_node_in_output.address == anchor_node_output.address,
+    anchor_node_in_output.value == anchor_node_output.value,
+    anchor_node_new_datum == parsed_anchor_node_output_datum,
+    prepended_node_output.address == anchor_node_output.address,
   }
 }
 
-pub fn safe_get_key(k: NodeKey) {
-  expect Key(the_key) = k
-  the_key
+//The indexes are relative to utxos of this linkedlist, they are NOT absolute
+pub fn ordered_prepend(
+  key_to_prepend: NodeKey,
+  prepended_node_output_index: Int,
+  anchor_node_output_index: Int,
+  common: Common,
+) {
+  //We know it's only 1 from unordered_prepend()
+  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
+  let anchor_node_in_output_raw_key_and_link =
+    get_raw_key_and_link(anchor_node_in_output)
+  and {
+    unordered_prepend(
+      key_to_prepend,
+      prepended_node_output_index,
+      anchor_node_output_index,
+      common,
+    ),
+    is_not_member(
+      key_to_prepend,
+      node_key: get_key(anchor_node_in_output_raw_key_and_link),
+      node_link: get_link(anchor_node_in_output_raw_key_and_link),
+    ),
+  }
 }
+
+pub fn unordered_append(
+  key_to_append: NodeKey,
+  appended_node_output_index: Int,
+  anchor_node_output_index: Int,
+  common: Common,
+) {
+  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
+  expect InlineDatum(anchor_node_in_output_datum) = anchor_node_in_output.datum
+  expect parsed_anchor_node_in_output_datum: NodeDatum =
+    anchor_node_in_output_datum
+  let anchor_node_raw_key_and_link = get_raw_key_and_link(anchor_node_in_output)
+  expect Some(appended_node_output) =
+    list.at(common.node_outputs, appended_node_output_index)
+  expect Some(anchor_node_output) =
+    list.at(common.node_outputs, anchor_node_output_index)
+  expect InlineDatum(anchor_node_output_datum) = anchor_node_output.datum
+  expect parsed_anchor_node_output_datum: NodeDatum = anchor_node_output_datum
+  let appended_node_output_raw_key_and_link =
+    get_raw_key_and_link(appended_node_output)
+
+  let anchor_node_new_datum =
+    NodeDatum {
+      key: parsed_anchor_node_in_output_datum.key,
+      link: key_to_append,
+      data: parsed_anchor_node_in_output_datum.data,
+    }
+  and {
+    key_added(key_to_append, common.node_mint),
+    list.length(common.node_in_outputs) == 1,
+    is_last_node(get_link(anchor_node_raw_key_and_link)),
+    list.length(common.node_outputs) == 2,
+    is_member(key_to_append, get_key(appended_node_output_raw_key_and_link)),
+    is_last_node(get_link(appended_node_output_raw_key_and_link)),
+    get_link(appended_node_output_raw_key_and_link) == key_to_append,
+    anchor_node_in_output.address == anchor_node_output.address,
+    anchor_node_in_output.value == anchor_node_output.value,
+    anchor_node_new_datum == parsed_anchor_node_output_datum,
+    appended_node_output.address == anchor_node_output.address,
+  }
+}
+
+pub fn ordered_append(
+  key_to_append: NodeKey,
+  appended_node_output_index: Int,
+  anchor_node_output_index: Int,
+  common: Common,
+) {
+  //We know it's only 1 from unordered_prepend()
+  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
+  let anchor_node_in_output_raw_key_and_link =
+    get_raw_key_and_link(anchor_node_in_output)
+  and {
+    unordered_prepend(
+      key_to_append,
+      appended_node_output_index,
+      anchor_node_output_index,
+      common,
+    ),
+    is_not_member(
+      key_to_append,
+      node_key: get_key(anchor_node_in_output_raw_key_and_link),
+      node_link: get_link(anchor_node_in_output_raw_key_and_link),
+    ),
+  }
+}
+
+pub fn unordered_remove() {
+  todo
+}
+
+pub fn ordered_remove() {
+  todo
+}
+
+pub fn ordered_insert() {
+  todo
+}
+//TODO OLD STUFF FROM HERE
+
+// pub fn cover_key(data: NodeDatum<datum_type>, insert_key: PubKeyHash) -> Bool {
+//   let less_than_key =
+//     when data.key is {
+//       Empty -> True
+//       Key(key) -> bytearray.compare(key, insert_key) == Less
+//     }
+//   let more_than_key =
+//     when data.link is {
+//       Empty -> True
+//       Key(key) -> bytearray.compare(key, insert_key) == Greater
+//     }
+//   less_than_key? && more_than_key?
+// }
+
+// pub fn valid_node(node: NodeDatum<datum_type>) -> Bool {
+//   when node.key is {
+//     Empty -> True
+//     Key(node_key) ->
+//       when node.link is {
+//         Empty -> True
+//         Key(next_key) -> bytearray.compare(node_key, next_key) == Less
+//       }
+//   }
+// }
+
+// pub fn safe_get_key(k: NodeKey) {
+//   expect Key(the_key) = k
+//   the_key
+// }
