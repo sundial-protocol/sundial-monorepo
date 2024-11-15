@@ -359,6 +359,10 @@ pub fn ordered_append(
   }
 }
 
+pub fn ordered_insert() {
+  todo
+}
+
 pub fn unordered_remove() {
   todo
 }
@@ -366,38 +370,3 @@ pub fn unordered_remove() {
 pub fn ordered_remove() {
   todo
 }
-
-pub fn ordered_insert() {
-  todo
-}
-//TODO OLD STUFF FROM HERE
-
-// pub fn cover_key(data: NodeDatum<datum_type>, insert_key: PubKeyHash) -> Bool {
-//   let less_than_key =
-//     when data.key is {
-//       Empty -> True
-//       Key(key) -> bytearray.compare(key, insert_key) == Less
-//     }
-//   let more_than_key =
-//     when data.link is {
-//       Empty -> True
-//       Key(key) -> bytearray.compare(key, insert_key) == Greater
-//     }
-//   less_than_key? && more_than_key?
-// }
-
-// pub fn valid_node(node: NodeDatum<datum_type>) -> Bool {
-//   when node.key is {
-//     Empty -> True
-//     Key(node_key) ->
-//       when node.link is {
-//         Empty -> True
-//         Key(next_key) -> bytearray.compare(node_key, next_key) == Less
-//       }
-//   }
-// }
-
-// pub fn safe_get_key(k: NodeKey) {
-//   expect Key(the_key) = k
-//   the_key
-// }
