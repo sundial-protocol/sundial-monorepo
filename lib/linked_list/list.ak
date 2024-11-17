@@ -1,75 +1,16 @@
-use aiken/builtin
-use aiken/collection/dict.{Dict, has_key}
+use aiken/collection/dict.{Dict}
 use aiken/collection/list
 use aiken/interval.{Interval}
 use aiken/primitive/bytearray
-use cardano/assets.{
-  AssetName, PolicyId, Value, flatten, quantity_of, to_dict, tokens,
-}
+use cardano/assets.{AssetName, PolicyId, flatten, quantity_of, tokens}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use midgard/constants
+use linked_list/constants
+use linked_list/data.{Common, Empty, Key, NodeDatum, NodeKey}
+use linked_list/utils.{
+  get_key, get_link, get_outputs, get_raw_key_and_link, only_at_node_val,
+  serialize_key,
+}
 use midgard/types/general.{POSIXTime, PubKeyHash}
-
-pub type NodeKey {
-  Key { key: ByteArray }
-  Empty
-}
-
-pub type NodeDatum {
-  key: NodeKey,
-  link: NodeKey,
-  data: Data,
-}
-
-pub type Common {
-  node_cs: PolicyId,
-  node_mint: Dict<AssetName, Int>,
-  node_in_outputs: List<Output>,
-  node_outputs: List<Output>,
-}
-
-// Checks if a Currency Symbol is held within a Value
-pub fn has_data_cs(cs: PolicyId, value: Value) -> Bool {
-  value
-    |> to_dict()
-    |> has_key(cs)
-}
-
-pub fn get_outputs(inputs: List<Input>) -> List<Output> {
-  list.map(
-    inputs,
-    fn(input) {
-      let Input { output, .. } = input
-      output
-    },
-  )
-}
-
-pub fn get_raw_key_and_link(node_output: Output) -> (Data, Data) {
-  expect InlineDatum(node_output_datum) = node_output.datum
-  let constr = builtin.un_constr_data(node_output_datum).2nd
-  let key = builtin.head_list(constr)
-  let link = builtin.head_list(builtin.tail_list(constr))
-  (key, link)
-}
-
-pub fn get_key(raw_key_and_link: (Data, Data)) -> NodeKey {
-  expect key: NodeKey = raw_key_and_link.1st
-  key
-}
-
-pub fn get_link(raw_key_and_link: (Data, Data)) -> NodeKey {
-  expect link: NodeKey = raw_key_and_link.2nd
-  link
-}
-
-//TODO Is this the correct serialization of the key?
-pub fn serialize_key(key: NodeKey) -> ByteArray {
-  when key is {
-    Empty -> constants.node_prefix
-    Key(actual_key) -> bytearray.concat(constants.node_prefix, actual_key)
-  }
-}
 
 pub fn make_common(
   transaction: Transaction,
@@ -111,16 +52,6 @@ pub fn make_common(
     }
   //TODO Do we need inputs and outputs here?
   (common, inputs, outputs, extra_signatories, validity_range)
-}
-
-pub fn only_at_node_val(outputs: List<Output>, cs: PolicyId) -> List<Output> {
-  outputs
-    |> list.filter(
-        fn(output) {
-          let Output { value, .. } = output
-          has_data_cs(cs, value)
-        },
-      )
 }
 
 pub fn list_state_transition(node_mint: Dict<AssetName, Int>) {
@@ -232,11 +163,9 @@ pub fn unordered_prepend(
   anchor_node_output_index: Int,
   common: Common,
 ) {
-  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
-  expect InlineDatum(anchor_node_in_output_datum) = anchor_node_in_output.datum
-  expect parsed_anchor_node_in_output_datum: NodeDatum =
-    anchor_node_in_output_datum
-  let anchor_node_raw_key_and_link = get_raw_key_and_link(anchor_node_in_output)
+  expect Some(anchor_node_input) = list.head(common.node_in_outputs)
+  expect InlineDatum(anchor_node_input_datum) = anchor_node_input.datum
+  expect parsed_anchor_node_input_datum: NodeDatum = anchor_node_input_datum
   expect Some(prepended_node_output) =
     list.at(common.node_outputs, prepended_node_output_index)
   expect Some(anchor_node_output) =
@@ -248,28 +177,27 @@ pub fn unordered_prepend(
 
   let anchor_node_new_datum =
     NodeDatum {
-      key: parsed_anchor_node_in_output_datum.key,
+      key: parsed_anchor_node_input_datum.key,
       link: key_to_prepend,
-      data: parsed_anchor_node_in_output_datum.data,
+      data: parsed_anchor_node_input_datum.data,
     }
   and {
     key_added(key_to_prepend, common.node_mint),
     list.length(common.node_in_outputs) == 1,
-    is_root_node(get_key(anchor_node_raw_key_and_link)),
+    is_root_node(parsed_anchor_node_input_datum.key),
     list.length(common.node_outputs) == 2,
     is_member(key_to_prepend, get_key(prepended_node_output_raw_key_and_link)),
-    get_link(anchor_node_raw_key_and_link) == get_link(
+    parsed_anchor_node_input_datum.link == get_link(
       prepended_node_output_raw_key_and_link,
     ),
-    parsed_anchor_node_output_datum.link == key_to_prepend,
-    anchor_node_in_output.address == anchor_node_output.address,
-    anchor_node_in_output.value == anchor_node_output.value,
+    anchor_node_input.address == anchor_node_output.address,
+    anchor_node_input.value == anchor_node_output.value,
     anchor_node_new_datum == parsed_anchor_node_output_datum,
     prepended_node_output.address == anchor_node_output.address,
+    list.length(flatten(prepended_node_output.value)) == 2,
   }
 }
 
-//The indexes are relative to utxos of this linkedlist, they are NOT absolute
 pub fn ordered_prepend(
   key_to_prepend: NodeKey,
   prepended_node_output_index: Int,
@@ -277,9 +205,9 @@ pub fn ordered_prepend(
   common: Common,
 ) {
   //We know it's only 1 from unordered_prepend()
-  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
-  let anchor_node_in_output_raw_key_and_link =
-    get_raw_key_and_link(anchor_node_in_output)
+  expect Some(anchor_node_input) = list.head(common.node_in_outputs)
+  let anchor_node_input_raw_key_and_link =
+    get_raw_key_and_link(anchor_node_input)
   and {
     unordered_prepend(
       key_to_prepend,
@@ -289,8 +217,8 @@ pub fn ordered_prepend(
     ),
     ordered_is_not_member(
       key_to_prepend,
-      node_key: get_key(anchor_node_in_output_raw_key_and_link),
-      node_link: get_link(anchor_node_in_output_raw_key_and_link),
+      node_key: get_key(anchor_node_input_raw_key_and_link),
+      node_link: get_link(anchor_node_input_raw_key_and_link),
     ),
   }
 }
@@ -301,11 +229,10 @@ pub fn unordered_append(
   anchor_node_output_index: Int,
   common: Common,
 ) {
-  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
-  expect InlineDatum(anchor_node_in_output_datum) = anchor_node_in_output.datum
-  expect parsed_anchor_node_in_output_datum: NodeDatum =
-    anchor_node_in_output_datum
-  let anchor_node_raw_key_and_link = get_raw_key_and_link(anchor_node_in_output)
+  expect Some(anchor_node_input) = list.head(common.node_in_outputs)
+  expect InlineDatum(anchor_node_input_datum) = anchor_node_input.datum
+  expect parsed_anchor_node_input_datum: NodeDatum = anchor_node_input_datum
+  let anchor_node_raw_key_and_link = get_raw_key_and_link(anchor_node_input)
   expect Some(appended_node_output) =
     list.at(common.node_outputs, appended_node_output_index)
   expect Some(anchor_node_output) =
@@ -317,9 +244,9 @@ pub fn unordered_append(
 
   let anchor_node_new_datum =
     NodeDatum {
-      key: parsed_anchor_node_in_output_datum.key,
+      key: parsed_anchor_node_input_datum.key,
       link: key_to_append,
-      data: parsed_anchor_node_in_output_datum.data,
+      data: parsed_anchor_node_input_datum.data,
     }
   and {
     key_added(key_to_append, common.node_mint),
@@ -329,10 +256,11 @@ pub fn unordered_append(
     is_member(key_to_append, get_key(appended_node_output_raw_key_and_link)),
     is_last_node(get_link(appended_node_output_raw_key_and_link)),
     get_link(appended_node_output_raw_key_and_link) == key_to_append,
-    anchor_node_in_output.address == anchor_node_output.address,
-    anchor_node_in_output.value == anchor_node_output.value,
+    anchor_node_input.address == anchor_node_output.address,
+    anchor_node_input.value == anchor_node_output.value,
     anchor_node_new_datum == parsed_anchor_node_output_datum,
     appended_node_output.address == anchor_node_output.address,
+    list.length(flatten(appended_node_output.value)) == 2,
   }
 }
 
@@ -343,9 +271,9 @@ pub fn ordered_append(
   common: Common,
 ) {
   //We know it's only 1 from unordered_prepend()
-  expect Some(anchor_node_in_output) = list.head(common.node_in_outputs)
-  let anchor_node_in_output_raw_key_and_link =
-    get_raw_key_and_link(anchor_node_in_output)
+  expect Some(anchor_node_input) = list.head(common.node_in_outputs)
+  let anchor_node_input_raw_key_and_link =
+    get_raw_key_and_link(anchor_node_input)
   and {
     unordered_prepend(
       key_to_append,
@@ -355,8 +283,8 @@ pub fn ordered_append(
     ),
     ordered_is_not_member(
       key_to_append,
-      node_key: get_key(anchor_node_in_output_raw_key_and_link),
-      node_link: get_link(anchor_node_in_output_raw_key_and_link),
+      node_key: get_key(anchor_node_input_raw_key_and_link),
+      node_link: get_link(anchor_node_input_raw_key_and_link),
     ),
   }
 }
@@ -404,6 +332,7 @@ pub fn ordered_insert(
     anchor_node_input.value == anchor_node_output.value,
     anchor_node_new_datum == parsed_anchor_node_output_datum,
     inserted_node_output.address == anchor_node_output.address,
+    list.length(flatten(inserted_node_output.value)) == 2,
   }
 }
 

@@ -2,7 +2,7 @@ use aiken/collection/list
 use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use midgard/linked_list.{Key, NodeDatum}
+use linked_list/data.{Key, NodeDatum}
 use midgard/types/datum.{
   FraudProofValidatorDatum, HubOracleDatum, StateDatum, StepDatum,
 }

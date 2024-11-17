@@ -1,10 +1,10 @@
-use aiken/collection/dict.{has_key}
+use aiken/collection/dict
 use aiken/collection/list
 use aiken/primitive/bytearray
 use cardano/address.{Address, Script}
-use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
+use cardano/assets.{PolicyId, Value, flatten, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
-use midgard/constants
+use linked_list/constants
 use midgard/types/general.{POSIXTime}
 
 pub fn validate_mint(
