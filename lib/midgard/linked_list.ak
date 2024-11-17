@@ -66,9 +66,8 @@ pub fn get_link(raw_key_and_link: (Data, Data)) -> NodeKey {
 //TODO Is this the correct serialization of the key?
 pub fn serialize_key(key: NodeKey) -> ByteArray {
   when key is {
-    Empty -> constants.root_node_token_name
-    Key(actual_key) ->
-      bytearray.concat(constants.root_node_token_name, actual_key)
+    Empty -> constants.node_prefix
+    Key(actual_key) -> bytearray.concat(constants.node_prefix, actual_key)
   }
 }
 
@@ -180,8 +179,8 @@ pub fn is_member(k: NodeKey, node_key: NodeKey) {
 }
 
 pub fn ordered_is_not_member(k: NodeKey, node_key: NodeKey, node_link: NodeKey) {
-  or {
-    k == Empty,
+  and {
+    k != Empty,
     {
       expect Key(actual_key) = k
       and {
@@ -211,11 +210,7 @@ pub fn init(common: Common) {
   and {
     key_added(Empty, common.node_mint),
     is_empty_list(get_key(raw_key_and_link), get_link(raw_key_and_link)),
-    quantity_of(
-      output_root_node.value,
-      common.node_cs,
-      constants.root_node_token_name,
-    ) == 1,
+    quantity_of(output_root_node.value, common.node_cs, constants.node_prefix) == 1,
     list.length(flatten(output_root_node.value)) == 2,
   }
 }
@@ -226,11 +221,7 @@ pub fn deinit(common: Common) {
   and {
     key_removed(Empty, common.node_mint),
     is_empty_list(get_key(raw_key_and_link), get_link(raw_key_and_link)),
-    quantity_of(
-      input_root_node.value,
-      common.node_cs,
-      constants.root_node_token_name,
-    ) == 1,
+    quantity_of(input_root_node.value, common.node_cs, constants.node_prefix) == 1,
   }
 }
 

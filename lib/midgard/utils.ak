@@ -4,7 +4,7 @@ use aiken/primitive/bytearray
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
-use midgard/constants.{set_node_prefix}
+use midgard/constants
 use midgard/types/general.{POSIXTime}
 
 pub fn validate_mint(
@@ -26,16 +26,16 @@ pub fn div_ceil(a, b: Int) -> Int {
   }
 }
 
-pub fn parse_node_key(tn: AssetName) -> Option<ByteArray> {
-  let prefix_length = bytearray.length(set_node_prefix)
-  let tn_length = bytearray.length(tn)
-  let key = bytearray.drop(tn, prefix_length)
-  expect set_node_prefix == bytearray.take(tn, prefix_length)
-  when prefix_length < tn_length is {
-    True -> Some(key)
-    False -> None
-  }
-}
+// pub fn parse_node_key(tn: AssetName) -> Option<ByteArray> {
+//   let prefix_length = bytearray.length(set_node_prefix)
+//   let tn_length = bytearray.length(tn)
+//   let key = bytearray.drop(tn, prefix_length)
+//   expect set_node_prefix == bytearray.take(tn, prefix_length)
+//   when prefix_length < tn_length is {
+//     True -> Some(key)
+//     False -> None
+//   }
+// }
 
 pub fn find_cs_by_token_prefix(
   value: Value,
