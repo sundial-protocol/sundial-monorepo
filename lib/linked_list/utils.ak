@@ -42,7 +42,6 @@ pub fn get_link(raw_key_and_link: (Data, Data)) -> NodeKey {
   link
 }
 
-//TODO Is this the correct serialization of the key?
 pub fn serialize_key(key: NodeKey) -> ByteArray {
   when key is {
     Empty -> constants.node_prefix
