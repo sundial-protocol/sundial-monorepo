@@ -1,4 +1,4 @@
-use midgard/types/general.{PubKeyHash, Proof}
+use midgard/types/general.{PubKeyHash}
 
 pub type PublisherSetRedeemer {
   PS_Init
@@ -83,12 +83,3 @@ pub type FraudProofSpendRedeemer {
   fraud_proof_token_asset_name: ByteArray,
 }
 
-pub type DoubleSpendStep1Redeemer {
-  DS_Cancel
-  DS_Continue {
-    frauded_state_queue_node_ref_input_index: Int,
-    unverified_frauded_state_queue_tx1_hash: ByteArray,
-    unverified_frauded_state_queue_tx1_info_hash: ByteArray,
-    unverified_frauded_state_queue_tx1_to_root_proof_path: Proof,
-  }
-}

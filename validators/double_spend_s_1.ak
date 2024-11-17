@@ -8,7 +8,6 @@ use cardano/transaction.{
 }
 use midgard/types/datum.{StateDatum, StepDatum}
 use midgard/types/general.{LinkedListDatum}
-use midgard/types/redeemer.{DS_Cancel, DS_Continue, DoubleSpendStep1Redeemer}
 use midgard/utils.{spend_custom}
 
 // -------- GOAL DEFINITION --------------------------------------
@@ -34,15 +33,27 @@ use midgard/utils.{spend_custom}
 // -------- EXPECTATIONS ---------------------------------------
 // -- tx_root provided from reference input of block header
 
+pub type DoubleSpendStep1Redeemer {
+  DS_Cancel_Step1
+  DS_Continue_Step1 {
+    frauded_state_queue_node_ref_input_index: Int,
+    unverified_frauded_state_queue_tx1_hash: ByteArray,
+    unverified_frauded_state_queue_tx1_info_hash: ByteArray,
+    unverified_frauded_state_queue_tx1_to_root_proof_path: Proof,
+  }
+}
+
 pub type DoubleSpendStep1State {
   verified_tx1_hash: ByteArray,
 }
 
-
 validator double_spend_s_1(
-  double_spend_s_2_validator_script_hash: ScriptHash, // Script hash of next step (requires backwards compilation)
-  plutarch_merkle_inclusion_validator: ScriptHash, // Script hash of stake validator (forwarded logic)
-  ct_token_policy_id: PolicyId, // Computation thread token policy
+  // Script hash of next step (requires backwards compilation)
+  double_spend_s_2_validator_script_hash: ScriptHash,
+   // Script hash of stake validator (forwarded logic)
+  plutarch_merkle_inclusion_validator: ScriptHash,
+  // Computation thread token policy
+  ct_token_policy_id: PolicyId,
 ) {
   spend(
     maybe_datum: Option<StepDatum>,
@@ -52,14 +63,11 @@ validator double_spend_s_1(
   ) {
     expect Some(step_datum) = maybe_datum
     when redeemer is {
-      
       // --------- REDEEMER: CANCEL -----------------------------------
       // (1) Burn the computation thread token 
       // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
-
-      DS_Cancel -> {
-        
+      DS_Cancel_Step1 -> {
         // (1.1) Get ct token asset name
         expect Some(own_input) =
           list.find(
@@ -96,20 +104,19 @@ validator double_spend_s_1(
       // (4) Verify the state transition from the previous state to the new state
       // (5) The computation thread token must be sent to the next step’s spending validator
       // (6) Transaction must not mint or burn any other tokens
-
-      // -------- PARAMETERS DEFINITION --------------------------------
+      
+      // -------- PARAMETERS DEFINITION ------------------------------
       // (i) state queue block with a block hash matching the last 28 bytes of the computation thread token name
       // (ii) tx_root, merkle root of transactions in the state queue block
       // (iii) tx_hash, hash of the transaction that is being proven to be in tx_root
       // (iv) proof_path: minimum set of hashes needed to reconstruct the path from the tx to the root
 
-      DS_Continue {
+      DS_Continue_Step1 {
         frauded_state_queue_node_ref_input_index,
         unverified_frauded_state_queue_tx1_hash,
         unverified_frauded_state_queue_tx1_info_hash,
         unverified_frauded_state_queue_tx1_to_root_proof_path,
       } -> {
-       
         // (1.1) Reference input with block_hash (last 28 bytes -> ct_token_asset_name)
         expect Some(frauded_state_queue_node_input) =
           list.at(
@@ -118,15 +125,11 @@ validator double_spend_s_1(
           )
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-        
         expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
           StateDatum,
         > = frauded_state_queue_node_datum
-        
         let block_hash =
           parsed_frauded_state_queue_node_datum.extra_data.block_hash
-       
-        
         // (1.2) Get ct_token_asset_name
         expect Some(own_input) =
           list.find(
@@ -139,25 +142,24 @@ validator double_spend_s_1(
         // (2) -- Awaiting observer scripts to circumvent registering the stake validator --
         // Until then: Delegate merkle proof verification to a stake validator - call out midgard-merkle endpoint to 
         // verify the inclusion of tx1 in tx_root 
-        
         // midgard-merkle endpoints are assumed to contain stake validator withdraw logic to verify merkle inclusion proofs 
-
+        
         // TODO: (2.1) Extract tx_root from block_hash (implementation depends on block header format)
         // "data: block_compact" from codec.cddl ?
         // let extracted_tx_root = unwrap block_hash to get tx_root? block_hash.tx_root
-       
+        
         // (2.2) Forward proof logic to a stake validator (plutarch_merkle_inclusion_validator) 
-        // The plutarch membership proof script will likely have multiple redeemer "endpoints"
-        // and we need to ensure that a specific/ intended redeemer is being executed 
 
+        // The plutarch membership proof script will likely have multiple redeemer "endpoints" and we need to ensure that
+        // always a specific/intended redeemer is being executed 
+        
         // This function expects the script hash of the membership proof validator written in Plutarch
         // and a function that takes the redeemer format expected by the membership proof validator and outputs a Boolean 
-
+        
         // Fraud prover inputs `DoubleSpendStep1Redeemer` arguments
         // They should match the redeemer arguments of the stake validator 
         // Essentially extracting fields from fraud prover data (parameters of the DoubleSpendStep1Redeemer) 
         // and matching them to the arguments expected by the stake validator (withdraw_redeemer)
-
         spend_custom(
           plutarch_merkle_inclusion_validator,
           fn(withdraw_redeemer: Data) {
@@ -190,7 +192,6 @@ validator double_spend_s_1(
           DoubleSpendStep1State {
             verified_tx1_hash: unverified_frauded_state_queue_tx1_hash,
           }
-        
         let step_1_datum =
           StepDatum {
             fraud_prover: parsed_output_to_step_2_datum.fraud_prover,

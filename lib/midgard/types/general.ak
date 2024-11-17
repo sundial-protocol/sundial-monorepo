@@ -36,27 +36,3 @@ pub type Common<datum_type> {
   node_outputs: List<NodePair<datum_type>>,
 }
 
-pub type ProofStep {
-  Branch {
-    skip: Int,
-    neighbors: ByteArray 
-  }
-  Fork {
-    skip: Int,
-    direction: Direction  // This would replace the Neighbor type
-  }
-  Leaf {
-    skip: Int,
-    key: ByteArray,
-    value: ByteArray
-  }
-}
-
-pub type Direction {
-  Left
-  Right
-}
-
-pub type Proof {
-  steps: List<ProofStep>
-}
