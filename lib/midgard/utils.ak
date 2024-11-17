@@ -1,9 +1,12 @@
+use aiken/builtin
 use aiken/collection/dict.{has_key}
 use aiken/collection/list
+use aiken/collection/pairs
+use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray
-use cardano/address.{Address, Script}
+use cardano/address.{Address, Script, Credential}
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
-use cardano/transaction.{Input, Output, OutputReference}
+use cardano/transaction.{Input, Output, OutputReference, Redeemer, Transaction, Withdraw}
 use midgard/constants.{set_node_prefix}
 use midgard/types/general.{
   Empty, Key, LinkedListDatum, NodeKey, POSIXTime, PubKeyHash,
@@ -153,4 +156,24 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
     Script(hash) -> hash == scHash
     _ -> False
   }
+}
+
+/// Originated from [Aiken Design Patterns - Stake Validator](https://github.com/Anastasia-Labs/aiken-design-patterns)
+//  As withdraw_amount as a parameter is irrelevant to Midgard, customize the function to avoid further costs on `Transaction` for `withdrawals`
+
+pub fn spend_custom(
+  withdraw_script_hash: ScriptHash,
+  withdraw_redeemer_validator: fn(Redeemer) -> Bool,
+  tx: Transaction,
+) -> Bool {
+  let Transaction { redeemers, .. } = tx
+
+  let withdraw_script = Script(withdraw_script_hash)
+
+  let withdraw_purpose = Withdraw(withdraw_script)
+
+  let withdraw_redeemer: Redeemer =
+    redeemers |> pairs.get_first(withdraw_purpose)
+
+  withdraw_redeemer_validator(withdraw_redeemer)
 }

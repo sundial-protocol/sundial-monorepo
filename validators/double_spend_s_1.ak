@@ -1,18 +1,17 @@
-// midgard-merkle is used as a library to verify merkle inclusion proofs 
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
-
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
-use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-
+use cardano/transaction.{
+  InlineDatum, Output, OutputReference, Redeemer, Transaction,
+}
 use midgard/types/datum.{StateDatum, StepDatum}
 use midgard/types/general.{LinkedListDatum}
 use midgard/types/redeemer.{DS_Cancel, DS_Continue, DoubleSpendStep1Redeemer}
+use midgard/utils.{spend_custom}
 
-use aiken_design_patterns/merkelized_validator as merkelized_validator // Used to forward merkle inclusion proof logic to external script validator
-
+// -------- GOAL DEFINITION --------------------------------------
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs who spent the same input UTxO
 
 // tx1 and tx2 refers to entire tx that contain:
@@ -32,36 +31,35 @@ use aiken_design_patterns/merkelized_validator as merkelized_validator // Used t
 // Verify i is an input of tx_1 and tx_2:
 // Merkle proof of membership: i ∈ tx_1.inputs_root ∧ i ∈ tx_2.inputs_root
 
-// -------- Variable Definition ---------------------------------------
-// (i) a state queue block with a block hash matching the last 28 bytes of the computation thread token name
-// (ii) tx_root is merkle root of transactions in the state queue block
-// (iii) tx_hash is the hash of the transaction that is being proven to be in tx_root
-// (iv) proof_path is the minimum set of hashes needed to reconstruct the path from the tx to the root
+// -------- EXPECTATIONS ---------------------------------------
+// -- tx_root provided from reference input of block header
 
 pub type DoubleSpendStep1State {
-  tx1_hash: ByteArray,
+  verified_tx1_hash: ByteArray,
 }
 
+
 validator double_spend_s_1(
-  double_spend_s_2_validator_script_hash: ByteArray,
-  ct_token_policy_id: PolicyId,
-  plutarch_merkle_inclusion_validator: ScriptHash,
+  double_spend_s_2_validator_script_hash: ScriptHash, // Script hash of next step (requires backwards compilation)
+  plutarch_merkle_inclusion_validator: ScriptHash, // Script hash of stake validator (forwarded logic)
+  ct_token_policy_id: PolicyId, // Computation thread token policy
 ) {
   spend(
-    maybe_datum: Option<StepDatum>, // StepDatum { fraud_prover, data }
-    redeemer: DoubleSpendStep1Redeemer, // DS_Cancel | DS_Continue
-    input: OutputReference,  // UTxO spent from the validator with the StepDatum { fraud_prover, Void } (Step 0)
+    maybe_datum: Option<StepDatum>,
+    redeemer: DoubleSpendStep1Redeemer,
+    input: OutputReference,
     self: Transaction,
   ) {
     expect Some(step_datum) = maybe_datum
     when redeemer is {
-
-      // --------- PURPOSE - Cancel Redeemer----------------------------------
+      
+      // --------- REDEEMER: CANCEL -----------------------------------
       // (1) Burn the computation thread token 
       // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
 
       DS_Cancel -> {
+        
         // (1.1) Get ct token asset name
         expect Some(own_input) =
           list.find(
@@ -76,23 +74,22 @@ validator double_spend_s_1(
         // (2.1)
         expect Some(output_to_fraud_prover) = list.at(self.outputs, 0)
         and {
+          // (1.2)
           self.mint == from_asset(
-            // (1.2)
             policy_id: ct_token_policy_id,
             asset_name: ct_token_asset_name,
             quantity: -1,
           ),
+          // (2.2)
           validate_output_to_fraud_prover(
-            // (2.2)
             output_to_fraud_prover,
             step_datum.fraud_prover,
           ),
           quantity_of(output_to_fraud_prover.value, "", "") == lovelace,
-          // TODO: (3)
         }
       }
 
-      // --------- PURPOSE - Continue Redeemer-------------------------------
+      // --------- REDEEMER: CONTINUE -------------------------------
       // (1) Reference a state queue block with a block hash matching the last 28 bytes of the computation thread token name
       // (2) Delegate compute to the merkleized validator to verify the inclusion of tx1 in the tx_root
       // (3) The fraud prover field must match between the output state and the input datum
@@ -100,14 +97,20 @@ validator double_spend_s_1(
       // (5) The computation thread token must be sent to the next step’s spending validator
       // (6) Transaction must not mint or burn any other tokens
 
+      // -------- PARAMETERS DEFINITION --------------------------------
+      // (i) state queue block with a block hash matching the last 28 bytes of the computation thread token name
+      // (ii) tx_root, merkle root of transactions in the state queue block
+      // (iii) tx_hash, hash of the transaction that is being proven to be in tx_root
+      // (iv) proof_path: minimum set of hashes needed to reconstruct the path from the tx to the root
+
       DS_Continue {
         frauded_state_queue_node_ref_input_index,
-        frauded_state_queue_tx_root,
-        frauded_state_queue_tx1_hash,
-        frauded_state_queue_tx1_info_hash,
-        frauded_state_queue_tx1_to_root_proof_path,
+        unverified_frauded_state_queue_tx1_hash,
+        unverified_frauded_state_queue_tx1_info_hash,
+        unverified_frauded_state_queue_tx1_to_root_proof_path,
       } -> {
-        // (1.1) Reference input with block_hash (tx_root) which carries the last 28 bytes of ct token name
+       
+        // (1.1) Reference input with block_hash (last 28 bytes -> ct_token_asset_name)
         expect Some(frauded_state_queue_node_input) =
           list.at(
             self.reference_inputs,
@@ -115,15 +118,16 @@ validator double_spend_s_1(
           )
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-
+        
         expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
           StateDatum,
         > = frauded_state_queue_node_datum
-
+        
         let block_hash =
           parsed_frauded_state_queue_node_datum.extra_data.block_hash
-
-        // (1.2) Get the ct token asset name
+       
+        
+        // (1.2) Get ct_token_asset_name
         expect Some(own_input) =
           list.find(
             self.inputs,
@@ -132,60 +136,81 @@ validator double_spend_s_1(
         expect Some((_, ct_token_asset_name, _)) =
           list.at(flatten(own_input.output.value), 1)
 
-        // (2) TODO: Delegate compute to merkelized validator - call out midgard-merkle endpoint to verify the inclusion of tx1 in the tx_root 
-        expect [has_tx_hash] =
-          [
-            frauded_state_queue_tx_root, frauded_state_queue_tx1_hash,
-            frauded_state_queue_tx1_info_hash,
-            frauded_state_queue_tx1_to_root_proof_path,
-          ] // (2.1)
-            
-          |> merkelized_validator.delegated_compute(
-                plutarch_merkle_inclusion_validator, // parameterized in the spending validator
-              
-                // Input coercer - handles different types based on index
-                fn(i, x) {
-                  if i == 0 {
-                    utils.coerce_tx_root(x)
-                  } else if i == 3 {
-                    utils.coerce_proof(x)
-                  } else {
-                    builtin.un_b_data(x)
-                  }
-                },
+        // (2) -- Awaiting observer scripts to circumvent registering the stake validator --
+        // Until then: Delegate merkle proof verification to a stake validator - call out midgard-merkle endpoint to 
+        // verify the inclusion of tx1 in tx_root 
+        
+        // midgard-merkle endpoints are assumed to contain stake validator withdraw logic to verify merkle inclusion proofs 
 
-                // Output coercer
-                fn(_i, x) {
-                  expect bool_result: Bool = x
-                  bool_result
-                },
-                tx.redeemers,
-              )
+        // TODO: (2.1) Extract tx_root from block_hash (implementation depends on block header format)
+        // "data: block_compact" from codec.cddl ?
+        // let extracted_tx_root = unwrap block_hash to get tx_root? block_hash.tx_root
+       
+        // (2.2) Forward proof logic to a stake validator (plutarch_merkle_inclusion_validator) 
+        // The plutarch membership proof script will likely have multiple redeemer "endpoints"
+        // and we need to ensure that a specific/ intended redeemer is being executed 
 
-        // (3) The fraud prover field must match between the output state and the input datum
+        // This function expects the script hash of the membership proof validator written in Plutarch
+        // and a function that takes the redeemer format expected by the membership proof validator and outputs a Boolean 
+
+        // Fraud prover inputs `DoubleSpendStep1Redeemer` arguments
+        // They should match the redeemer arguments of the stake validator 
+        // Essentially extracting fields from fraud prover data (parameters of the DoubleSpendStep1Redeemer) 
+        // and matching them to the arguments expected by the stake validator (withdraw_redeemer)
+
+        spend_custom(
+          plutarch_merkle_inclusion_validator,
+          fn(withdraw_redeemer: Data) {
+            expect MembershipProofInputs {
+              tx_root,
+              tx1_hash,
+              tx1_info_hash,
+              tx1_to_root_proof_path,
+            } = withdraw_redeemer
+            // Validate match: expected format <-> input_x  
+            and {
+              tx_root == extracted_tx_root,
+              tx1_hash == unverified_frauded_state_queue_tx1_hash,
+              tx1_info_hash == unverified_frauded_state_queue_tx1_info_hash,
+              tx1_to_root_proof_path == unverified_frauded_state_queue_tx1_to_root_proof_path,
+            }
+          },
+          // Redeemer list of tx is accessed via self field 
+          self,
+        )
+
+        // (3) Fraud prover field must match between the output state and the input datum
         expect Some(output_to_step_2) = list.at(self.outputs, 0)
         expect InlineDatum(output_to_step_2_datum) = output_to_step_2.datum
         expect parsed_output_to_step_2_datum: StepDatum = output_to_step_2_datum
-        // (5.1) Get the next step spending validator hash from the output
-        expect Script(hash) = output_to_step_2.address.payment_credential
 
-        // (4.1) Define the state transition        
+        // (4.1) Define state transition 
+        // At this point, tx1_hash has been verified by the Plutarch validator       
         let step1_state =
-          DoubleSpendStep1State { tx1_hash: frauded_state_queue_tx1_hash }
-        // we now have verified tx1 is in tx_root, and should carry the verified txhash to step 2
+          DoubleSpendStep1State {
+            verified_tx1_hash: unverified_frauded_state_queue_tx1_hash,
+          }
+        
         let step_1_datum =
           StepDatum {
             fraud_prover: parsed_output_to_step_2_datum.fraud_prover,
             data: step1_state,
           }
 
+        // (5.1) Step 2 spending validator hash from output
+        expect Script(hash) = output_to_step_2.address.payment_credential
+
         and {
-          drop(ct_token_asset_name, n: 28) == block_hash, // (1.3) tx_root matches block_hash
-          //has_tx_hash, // (2) Merkelized validator returns true if tx1 is in tx_root
-          parsed_output_to_step_2_datum.fraud_prover == step_datum.fraud_prover,  // (3) fraud prover field matches
-          step_1_datum == parsed_output_to_step_2_datum, // (4.2) state transition verified
-          hash == double_spend_s_2_validator_script_hash, // (5.2)
-          quantity_of( // (6) no other mints or burns
+          // (1.3) tx_root matches block_hash
+          drop(ct_token_asset_name, n: 28) == block_hash,
+          // (3) Fraud prover field matches
+          parsed_output_to_step_2_datum.fraud_prover == step_datum.fraud_prover,
+          // (4.2) State transition verified
+          step_1_datum == parsed_output_to_step_2_datum,
+          // (5.2) Next step spending validator hash matches
+          hash == double_spend_s_2_validator_script_hash,
+          // (6) No other mints or burns
+          quantity_of(
             output_to_step_2.value,
             ct_token_policy_id,
             ct_token_asset_name,
@@ -209,3 +234,28 @@ pub fn validate_output_to_fraud_prover(
     _ -> False
   }
 }
+// --------- MERKLE VALIDATOR EXAMPLE APPROACH ----------------------------
+// merkle validator example would be:
+// let [has_tx_hash] =
+//   MerkleInputs { frauded_state_queue_tx_root, frauded_state_queue_tx1_hash, frauded_state_queue_tx1_info_hash, frauded_state_queue_tx1_to_root_proof_path } // (2.1)
+//   |> merkelized_validator.delegated_compute(
+//         plutarch_merkle_inclusion_validator,
+//         // Input coercer - handles different types based on index  
+//         fn(d: Data) -> MerkleInputs { expect merkle_inputs: MerkleInputs = d merkle_inputs },
+//         // Output coercer
+//         fn(d: Data) -> Bool { expect bool_result: Bool = d bool_result },
+//         tx.redeemers,
+//       )
+
+// validator inclusion_proof {
+//       withdraw(
+//         redeemer: WithdrawRedeemer<MerkleParameters, Boolean>,
+//         _own_credential: Credential,
+//         _self: Transaction,
+//       ) {
+//        let MerkleInputs {tx_root, tx_hash, tx_info_hash, proof} = redeemer
+//       }
+//         has_tx_hash(tx_root, tx_hash, tx_info_hash, proof)
+//     }
+
+// Conclusion: As we are not interested in manipulating the return value of a membership proof other than True/False, we will use stake validator instead.
