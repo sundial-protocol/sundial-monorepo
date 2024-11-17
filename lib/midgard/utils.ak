@@ -26,23 +26,6 @@ pub fn div_ceil(a, b: Int) -> Int {
   }
 }
 
-// Checks if a Currency Symbol is held within a Value
-pub fn has_data_cs(cs: PolicyId, value: Value) -> Bool {
-  value
-    |> to_dict()
-    |> has_key(cs)
-}
-
-pub fn get_outputs(inputs: List<Input>) -> List<Output> {
-  list.map(
-    inputs,
-    fn(input) {
-      let Input { output, .. } = input
-      output
-    },
-  )
-}
-
 pub fn parse_node_key(tn: AssetName) -> Option<ByteArray> {
   let prefix_length = bytearray.length(set_node_prefix)
   let tn_length = bytearray.length(tn)

@@ -1,20 +1,14 @@
 use aiken/builtin
-use aiken/collection/dict.{Dict}
+use aiken/collection/dict.{Dict, has_key}
 use aiken/collection/list
 use aiken/interval.{Interval}
 use aiken/primitive/bytearray
 use cardano/assets.{
-  AssetName, PolicyId, Value, flatten, from_asset, quantity_of, tokens,
-  without_lovelace,
+  AssetName, PolicyId, Value, flatten, quantity_of, to_dict, tokens,
 }
-use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Transaction,
-}
+use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/constants
 use midgard/types/general.{POSIXTime, PubKeyHash}
-use midgard/utils.{
-  get_outputs, has_data_cs, parse_node_key, quantity_of_policy_id,
-}
 
 pub type NodeKey {
   Key { key: ByteArray }
@@ -32,6 +26,23 @@ pub type Common {
   node_mint: Dict<AssetName, Int>,
   node_in_outputs: List<Output>,
   node_outputs: List<Output>,
+}
+
+// Checks if a Currency Symbol is held within a Value
+pub fn has_data_cs(cs: PolicyId, value: Value) -> Bool {
+  value
+    |> to_dict()
+    |> has_key(cs)
+}
+
+pub fn get_outputs(inputs: List<Input>) -> List<Output> {
+  list.map(
+    inputs,
+    fn(input) {
+      let Input { output, .. } = input
+      output
+    },
+  )
 }
 
 pub fn get_raw_key_and_link(node_output: Output) -> (Data, Data) {
@@ -52,7 +63,8 @@ pub fn get_link(raw_key_and_link: (Data, Data)) -> NodeKey {
   link
 }
 
-pub fn serialize_key(key: NodeKey) {
+//TODO Is this the correct serialization of the key?
+pub fn serialize_key(key: NodeKey) -> ByteArray {
   when key is {
     Empty -> constants.root_node_token_name
     Key(actual_key) ->
@@ -106,7 +118,7 @@ pub fn only_at_node_val(outputs: List<Output>, cs: PolicyId) -> List<Output> {
   outputs
     |> list.filter(
         fn(output) {
-          let Output { address, value, .. } = output
+          let Output { value, .. } = output
           has_data_cs(cs, value)
         },
       )
@@ -167,8 +179,7 @@ pub fn is_member(k: NodeKey, node_key: NodeKey) {
   k == node_key
 }
 
-//Only for ordered-list!
-pub fn is_not_member(k: NodeKey, node_key: NodeKey, node_link: NodeKey) {
+pub fn ordered_is_not_member(k: NodeKey, node_key: NodeKey, node_link: NodeKey) {
   or {
     k == Empty,
     {
@@ -285,7 +296,7 @@ pub fn ordered_prepend(
       anchor_node_output_index,
       common,
     ),
-    is_not_member(
+    ordered_is_not_member(
       key_to_prepend,
       node_key: get_key(anchor_node_in_output_raw_key_and_link),
       node_link: get_link(anchor_node_in_output_raw_key_and_link),
@@ -351,7 +362,7 @@ pub fn ordered_append(
       anchor_node_output_index,
       common,
     ),
-    is_not_member(
+    ordered_is_not_member(
       key_to_append,
       node_key: get_key(anchor_node_in_output_raw_key_and_link),
       node_link: get_link(anchor_node_in_output_raw_key_and_link),
@@ -359,14 +370,83 @@ pub fn ordered_append(
   }
 }
 
-pub fn ordered_insert() {
-  todo
+pub fn ordered_insert(
+  key_to_insert: NodeKey,
+  inserted_node_output_index: Int,
+  anchor_node_output_index: Int,
+  common: Common,
+) {
+  expect Some(anchor_node_input) = list.head(common.node_in_outputs)
+  expect InlineDatum(anchor_node_input_datum) = anchor_node_input.datum
+  expect parsed_anchor_node_input_datum: NodeDatum = anchor_node_input_datum
+
+  expect Some(inserted_node_output) =
+    list.at(common.node_outputs, inserted_node_output_index)
+  expect Some(anchor_node_output) =
+    list.at(common.node_outputs, anchor_node_output_index)
+  let inserted_node_output_raw_key_and_link =
+    get_raw_key_and_link(inserted_node_output)
+  expect InlineDatum(anchor_node_output_datum) = anchor_node_output.datum
+  expect parsed_anchor_node_output_datum: NodeDatum = anchor_node_output_datum
+
+  let anchor_node_new_datum =
+    NodeDatum {
+      key: parsed_anchor_node_input_datum.key,
+      link: key_to_insert,
+      data: parsed_anchor_node_input_datum.data,
+    }
+  and {
+    key_added(key_to_insert, common.node_mint),
+    list.length(common.node_in_outputs) == 1,
+    ordered_is_not_member(
+      key_to_insert,
+      parsed_anchor_node_input_datum.key,
+      parsed_anchor_node_input_datum.link,
+    ),
+    list.length(common.node_outputs) == 2,
+    is_member(key_to_insert, get_key(inserted_node_output_raw_key_and_link)),
+    parsed_anchor_node_output_datum.link == key_to_insert,
+    parsed_anchor_node_input_datum.link == get_link(
+      inserted_node_output_raw_key_and_link,
+    ),
+    anchor_node_input.address == anchor_node_output.address,
+    anchor_node_input.value == anchor_node_output.value,
+    anchor_node_new_datum == parsed_anchor_node_output_datum,
+    inserted_node_output.address == anchor_node_output.address,
+  }
 }
 
-pub fn unordered_remove() {
-  todo
-}
+pub fn remove(
+  key_to_remove: NodeKey,
+  removed_node_input_index: Int,
+  anchor_node_input_index: Int,
+  common: Common,
+) {
+  expect Some(removed_node_input) =
+    list.at(common.node_in_outputs, removed_node_input_index)
+  expect Some(anchor_node_input) =
+    list.at(common.node_in_outputs, anchor_node_input_index)
+  let removed_node_raw_key_and_link = get_raw_key_and_link(removed_node_input)
+  expect InlineDatum(anchor_node_input_datum) = anchor_node_input.datum
+  expect parsed_anchor_node_input_datum: NodeDatum = anchor_node_input_datum
+  expect Some(anchor_node_output) = list.head(common.node_outputs)
+  expect InlineDatum(anchor_node_output_datum) = anchor_node_output.datum
+  expect parsed_anchor_node_output_datum: NodeDatum = anchor_node_output_datum
 
-pub fn ordered_remove() {
-  todo
+  let anchor_node_new_datum =
+    NodeDatum {
+      key: parsed_anchor_node_input_datum.key,
+      link: get_link(removed_node_raw_key_and_link),
+      data: parsed_anchor_node_input_datum.data,
+    }
+  and {
+    key_removed(key_to_remove, common.node_mint),
+    list.length(common.node_in_outputs) == 2,
+    is_member(key_to_remove, get_key(removed_node_raw_key_and_link)),
+    parsed_anchor_node_input_datum.link == key_to_remove,
+    list.length(common.node_outputs) == 1,
+    anchor_node_input.address == anchor_node_output.address,
+    anchor_node_input.value == anchor_node_output.value,
+    anchor_node_new_datum == parsed_anchor_node_output_datum,
+  }
 }
