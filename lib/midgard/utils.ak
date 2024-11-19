@@ -1,8 +1,14 @@
+use aiken/builtin
 use aiken/collection/dict.{has_key}
 use aiken/collection/list
+use aiken/collection/pairs
+use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray
+use cardano/address.{Address, Credential, Script}
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
-use cardano/transaction.{Input, Output}
+use cardano/transaction.{
+  Input, Output, OutputReference, Redeemer, Transaction, Withdraw,
+}
 use midgard/constants.{set_node_prefix}
 use midgard/types/general.{
   Empty, Key, LinkedListDatum, NodeKey, POSIXTime, PubKeyHash,
@@ -132,4 +138,44 @@ pub fn safe_list_init(elems: List<a>) {
 
 pub fn is_posix_time_none(time: POSIXTime) {
   time == constants.posix_time_none
+}
+
+/// Returns the quantity of all tokens with the policyId
+pub fn quantity_of_policy_id(value: Value, policyId: PolicyId) {
+  dict.foldl(tokens(value, policyId), 0, fn(_k, v, result) { v + result })
+}
+
+pub fn get_own_hash(output_reference: OutputReference, txInputs: List<Input>) {
+  expect Some(input) =
+    list.find(txInputs, fn(x) { x.output_reference == output_reference })
+
+  expect Script(hash) = input.output.address.payment_credential
+  hash
+}
+
+pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
+  when output.address.payment_credential is {
+    Script(hash) -> hash == scHash
+    _ -> False
+  }
+}
+
+//  As withdraw_amount as a parameter is irrelevant to Midgard, customize the function to avoid further costs on `Transaction` for `withdrawals`
+
+/// Originated from [Aiken Design Patterns - Stake Validator](https://github.com/Anastasia-Labs/aiken-design-patterns)
+pub fn spend_custom(
+  withdraw_script_hash: ScriptHash,
+  withdraw_redeemer_validator: fn(Redeemer) -> Bool,
+  tx: Transaction,
+) -> Bool { 
+  let Transaction { redeemers, .. } = tx
+
+  let withdraw_script = Script(withdraw_script_hash)
+
+  let withdraw_purpose = Withdraw(withdraw_script)
+
+  let withdraw_redeemer: Redeemer =
+    redeemers |> pairs.get_first(withdraw_purpose)
+
+  withdraw_redeemer_validator(withdraw_redeemer)
 }
