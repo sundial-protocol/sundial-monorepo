@@ -4,7 +4,7 @@ use aiken/primitive/bytearray
 use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId, Value, flatten, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
-use linked_list/constants
+use midgard/constants.{posix_time_none}
 use midgard/types/general.{POSIXTime}
 
 pub fn validate_mint(
@@ -80,7 +80,7 @@ pub fn safe_list_init(elems: List<a>) {
 }
 
 pub fn is_posix_time_none(time: POSIXTime) {
-  time == constants.posix_time_none
+  time == posix_time_none
 }
 
 /// Returns the quantity of all tokens with the policyId
