@@ -1,0 +1,314 @@
+\documentclass[../main.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\usepackage{amsmath}
+\begin{document}
+
+\section{Midgard Ledger Rules and Fraud Proofs}
+\label{sec:ledger-rules-fraud-proofs}
+
+In the following sections the following premises are used:
+
+\begin{equation*}
+\begin{split}
+           b & \in Blocks             \\
+         txs & := transactions(b)     \\
+ utxos_{old} & := old\_utxos(b)       \\
+        wtxs & := withdrawn\_utxos(b)
+\end{split}
+\end{equation*}
+
+\subsection{All inputs must be valid}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \forall t \in Ledger, &\forall i \in inputs(t): \\
+    &( \exists t_1 \in Ledger, t \neq t_1 \land i \in outputs(t_1) ) \land \\
+    &( \nexists t_2 \in Ledger, t \neq t_2 \land i \in inputs(t_2) )
+\end{split}
+\end{equation*}
+
+\item[Description:] A transaction cannot spend a non-existing (or an already spent) UTxO.
+\item[Violating conditions:] If any of the following conditions are met (\hyperref[sec:NO-INPUT]{NO-INPUT}, \hyperref[sec:INPUT-NO-IDX]{INPUT-NO-IDX}, \hyperref[sec:WITHDRAWN-INPUT]{WITHDRAWN-INPUT}, \hyperref[sec:DOUBLE-SPEND]{DOUBLE-SPEND} or \hyperref[sec:DOUBLE-WITHDRAW]{DOUBLE-WITHDRAW}), then this property is broken, the new block must be eliminated.
+
+\end{description}
+
+\subsubsection{Violating condition - "NO-INPUT"}
+\label{sec:NO-INPUT}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \exists t \in txs, &\exists i \in inputs(t): \\
+    &( i \notin utxos_{old} ) \land  \\
+    &( \nexists t_1 \in txs, t \neq t_1 \land tx\_hash(t_1) = tx\_hash(i) )
+\end{split}
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
+    \item an input $i$ must be specified such that $i \in inputs(t)$
+    \item a non-membership proof must be created to show that $i$ is not in $utxos_{old}$
+    \item a non-membership proof must also be generated that shows that there are no transactions in $txs$ that have id $tx\_hash(i)$
+\end{itemize}
+
+\item[Rationale:] The items defined above together prove that transaction $t$ attempted to spend the UTxO $i$ that does not exist or was spent in a previous block.
+
+\end{description}
+
+\subsubsection{Violating condition - "INPUT-NO-IDX"}
+\label{sec:INPUT-NO-IDX}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \exists t \in txs, &\exists i \in inputs(t): \\
+    &( \exists t_1 \in txs, tx\_hash(t_1) = tx\_hash(i) \land i \notin outputs(t_1) )
+\end{split}
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
+    \item an input $i$ must be specified such that $i \in inputs(t)$
+    \item a membership proof must be created to show that $t_1$ is in $txs$ and $t_1$ does not have the required output
+\end{itemize}
+
+\item[Rationale:] The items defined above prove that $t$ attempted to spend the input $i$, which did not exist at all.
+
+\end{description}
+
+\subsubsection{Violating condition - "WITHDRAWN-INPUT"}
+\label{sec:WITHDRAWN-INPUT}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \exists t \in txs, \exists i \in inputs(t), \exists wtx \in wtxs, i \in inputs(wtx)
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
+    \item an input $i$ must be specified such that $i \in inputs(t)$
+    \item a membership proof must be created to show that $wtx$ is in $w$, which also spends input $i$
+\end{itemize}
+
+\item[Rationale:] The items defined above prove that $t$ attempted to spend the input $i$, which was spent in a withdraw transaction.
+
+\end{description}
+
+\subsubsection{Violating condition - "DOUBLE-SPEND"}
+\label{sec:DOUBLE-SPEND}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \exists t \in txs, \exists i \in inputs(t), \exists t_1 \in tx, t \neq t_1 \land i \in inputs(t_1)
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
+    \item an input $i$ must be specified such that $i \in inputs(t)$
+    \item a membership proof must be created to show that $t_1$ is in $txs$, which also spends input $i$
+\end{itemize}
+
+\item[Rationale:] The items defined above prove that $t$ attempted to spend the input $i$, which was spent in another transaction.
+
+\end{description}
+
+\subsubsection{Violating condition - "DOUBLE-WITHDRAW"}
+\label{sec:DOUBLE-WITHDRAW}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \exists w \in wtxs, \exists i \in inputs(w), \exists w_1 \in wtxs, w \neq w_1 \land i \in inputs(w_1)
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided for $w$ that shows that the withdraw transaction is included in the block ($w \in wtxs$)
+    \item an input $i$ must be specified such that $i \in inputs(t)$
+    \item a membership proof must be created to show that $w_1$ is in $wtxs$, which also spends input $i$
+\end{itemize}
+
+\item[Rationale:] The items defined above prove that $w$ attempted to spend the input $i$, which was already withdrawn by $w_1$.
+
+\end{description}
+
+\subsection{Transaction validity range}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \forall t \in Ledger, time\_range(block(t)) \subseteq validity\_range(t)
+\end{split}
+\end{equation*}
+
+\item[Description:] Every valid transaction in the ledger must be included at a timestamp that conforms to the validity range that the transaction prescribes. Whenever the condition \hyperref[sec:INVALID-RANGE]{INVALID-RANGE} is met, that indicates that this property is violated, and the block in question must not be included in the $Ledger$.
+
+\end{description}
+
+\subsubsection{Violating condition - "INVALID-RANGE"}
+\label{sec:INVALID-RANGE}
+
+\begin{description}
+
+\item[Violating condition:]
+\begin{equation*}
+    \exists t \in txs, time\_range(b) \nsubseteq validity\_range(t)
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exists a transaction $tx$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided that proves that transaction $t$ is included in the block $b$
+\end{itemize}
+
+\item[Rationale:] with the provided proofs, it can be shown that $t$ is included in the block $b$ with the violating condition $time\_range(b) \nsubseteq validity\_range(t)$ being true.
+
+\end{description}
+
+\subsection{At least one input}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \forall t \in Ledger, |inputs(t)| > 0
+\end{equation*}
+
+\item[Description:] Every valid transaction in the ledger must spend at least one UTxO. If the violating condition \hyperref[sec:ZERO-INPUT]{ZERO-INPUT} is satisfied, then this property is broken and the block must be removed.
+
+\end{description}
+
+\subsubsection{Violating condition - "ZERO-INPUT"}
+\label{sec:ZERO-INPUT}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \exists t \in txs, |inputs(t)| = 0
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided that shows that the transaction is included in the ledger
+\end{itemize}
+
+\item[Rationale:] with the provided proof, it can be shown that a transaction $t$ is in the ledger, while $|inputs(t)| = 0$
+
+\end{description}
+
+\subsection{Minimum fee}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \forall t \in Ledger, tx\_fee(t) \geq min\_fee(t)
+\end{equation*}
+
+\item[Description:] Every valid transaction in the ledger must pay the fees for inclusion. Proving violating condition \hyperref[sec:MIN-FEE]{MIN-FEE} indicates that this property is broken.
+
+\item[Calculating the minimum fee:] !!! TODO: ...
+% Same structure as in Cardano L1
+
+\end{description}
+
+\subsubsection{Violating condition - "MIN-FEE"}
+\label{sec:MIN-FEE}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \exists t \in txs, tx_fee(t) < min_fee(t)
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided that shows that the transaction is included in the ledger
+\end{itemize}
+
+\item[Rationale:] with the provided proof, it can be shown that a transaction $t$ is in the ledger, while $tx\_fee(t) < min\_fee(t)$
+
+\end{description}
+
+\subsection{Required signatures are correct}
+
+\subsection{Signatures are valid}
+
+\subsection{Every needed signature is provided}
+
+\subsection{Metadata is empty}
+
+\subsection{Multisig scripts are available}
+
+\subsection{Multisig scripts validated}
+
+\subsection{Value preservation}
+
+\subsection{No Ada minted}
+
+\subsection{Maximum transaction size}
+
+\subsection{Maximum reference script size}
+
+!!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
+
+\subsection{Maximum value size}
+
+\subsection{No negative value}
+
+\subsection{Minimum UTxO value}
+% Same structure as in Cardano L1
+
+\subsection{Network id of inputs}
+
+\subsection{Network id of reference inputs}
+
+% Reference inputs are needed
+
+\subsection{Network id of outputs}
+
+\subsection{Network id of withdrawals}
+
+\subsection{Network id of transaction}
+
+\subsection{All reference inputs must be valid}
+
+% TODO: maybe also include $inputs \cap reference_inputs = \varnothing$
+
+\subsection{Validator scripts are available}
+
+!!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
+
+\subsection{Validator scripts adhere to execution limits}
+
+!!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
+
+\subsection{Validator scripts accept transaction}
+
+!!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
+% Maybe separate out staking and minting scripts in a separate rule
+
+\subsection{Maximum number of collateral inputs}
+
+!!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
+
+\end{document}

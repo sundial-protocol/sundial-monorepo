@@ -1,0 +1,70 @@
+\documentclass[../midgard.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\begin{document}
+
+\section{Midgard hub oracle}
+\label{h:midgard-hub-oracle}
+
+This oracle keeps track of minting policy IDs and spending validator addresses for the lists used in the operator directory, state queue, and fraud proof set of the Midgard protocol. It consists of a single utxo holding the hub oracle NFT and a datum of the following type:
+\begin{equation*}
+    \T{HubOracleDatum} \coloneq \left\{
+    \begin{array}{ll}
+        \T{registered\_operators} : & \T{PolicyId} \\
+        \T{active\_operators} : & \T{PolicyId} \\
+        \T{retired\_operators} : & \T{PolicyId} \\
+        \T{scheduler} : & \T{PolicyId} \\
+        \T{state\_queue} : & \T{PolicyId} \\
+        \T{fraud\_proof\_catalogue} : & \T{PolicyId} \\
+        \T{fraud\_proof} : & \T{PolicyId} \\
+        \\
+        \T{registered\_operators\_addr} : & \T{Address} \\
+        \T{active\_operators\_addr} : & \T{Address} \\
+        \T{retired\_operators\_addr} : & \T{Address} \\
+        \T{scheduler\_addr} : & \T{Address} \\
+        \T{state\_queue\_addr} : & \T{Address} \\
+        \T{fraud\_proof\_catalogue\_addr} : & \T{Address} \\
+        \T{fraud\_proof\_addr} : & \T{Address}
+    \end{array} \right\}
+\end{equation*}
+
+\notebox{Add missing policy IDs and addresses to the hub oracle datum.}\todo
+
+\subsection{Minting policy}
+\label{h:hub-oracle-minting-policy}
+
+The \code{hub\_oracle} minting policy ensures that all Midgard lists are initialized together, sent to their respective spending validator addresses, and deinitialized together. Redeemers:
+\begin{description}
+    \item[Init.] Initialize all Midgard lists and send their root nodes to their respective validator addresses. Conditions:
+        \begin{enumerate}
+            \item Let \code{nonce\_utxo} be a static parameter of the \code{hub\_oracle} minting policy.
+            \item \code{nonce\_utxo} must be spent.
+            \item The hub oracle NFT must be minted.
+            \item Let \code{hub\_oracle\_output} be the transaction output with the hub oracle NFT.
+            \item \code{hub\_oracle\_output} must \emph{not} contain any other non-ADA tokens.
+            \item \code{hub\_oracle\_output} must be sent to the \code{burn\_everything} spending validator address.
+            \item The root node NFT of every linked list policy ID in \code{hub\_oracle\_output} must be minted and sent to the corresponding spending validator address in \code{hub\_oracle}.
+            \item The NFT of the \code{scheduler} policy ID in \code{hub\_oracle\_output} must be minted and sent to the \code{scheduler\_addr}.
+            \item No other tokens must be minted or burned.
+        \end{enumerate}
+    The nonce utxo proves authority for initialization --- whoever controls it is authorized to initialize the Midgard L1 data structures.
+    
+    \item[Burn.] Deinitialize all Midgard lists and burn the hub oracle NFT. Conditions:
+        \begin{enumerate}
+            \item The transaction must burn the hub oracle NFT.
+            \item Let \code{hub\_oracle\_input} be the transaction input that holds the hub oracle NFT.
+            \item The root node NFT of every linked list policy ID in the \code{hub\_oracle\_input} datum must be burned.
+            \item The NFT of the \code{scheduler} policy ID in \code{hub\_oracle\_output} must be burned.
+        \end{enumerate}
+    Any other burned tokens are irrelevant, and the \code{burn\_everyting} spending validator ensures that no tokens are minted.
+\end{description}
+
+\subsection{Spending validator}
+\label{h:hub-oracle-spending-validator}
+
+The \code{burn\_everything} validator requires every non-ADA token in the transaction to be burned. Conditions:
+\begin{enumerate}
+    \item The transaction must have a single output.
+    \item The transaction's output must only contain ADA.
+\end{enumerate}
+
+\end{document}

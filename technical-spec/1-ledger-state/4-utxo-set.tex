@@ -1,0 +1,47 @@
+\documentclass[../midgard.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\begin{document}
+
+\section{Utxo set}
+\label{h:utxo-set}
+
+A utxo set is a finite map from output references to outputs of transactions:
+\begin{equation*}
+    \T{UtxoSet} \coloneq \Bigl\{
+        (k_i: \T{OutputRef}, v_i: \T{Output}) \mid \forall i \neq j.\; k_i \neq k_j
+    \Bigr\}
+\end{equation*}
+
+An output reference is a tuple that uniquely identifies an output by a hash of the ledger event that created it (either a transaction or a deposit) and its index among the outputs of that event.
+\begin{equation*}
+    \T{OutputRef} \coloneq \left\{
+    \begin{array}{ll}
+        \T{id} : & \T{EventHash} \\
+        \T{index} : & \T{Int}
+    \end{array} \right\}
+\end{equation*}
+
+An output is a tuple describing a bundle of tokens, data, and a script that have been placed by a transaction at an address in the ledger:
+\begin{equation*}
+    \T{Output} \coloneq \left\{
+    \begin{array}{ll}
+        \T{value} : & \T{Value} \\
+        \T{addr} : & \T{Address} \\
+        \T{datum} : & \T{Option(Data)} \\
+        \T{script} : & \T{Option(Script)}
+    \end{array} \right\}
+\end{equation*}
+
+Within the context of a Midgard block, the utxo set that we are interested in consists of the outputs created by deposits and transactions but not yet spent by transactions and withdrawals, considering all the deposits, transactions, and withdrawals of this block and all its predecessors. This is the utxo set that we transform into an MPT and place into the block body's \code{utxo} field.
+
+
+\notebox{Midgard requires all L2 datums to be inline.}
+\todo
+
+\notebox{Midgard uses a different network ID for L2 utxos' addresses.}
+\todo
+
+\tipbox{Midgard is considering to use a network ID prefix in minting policy IDs, to distinguish tokens deposited from L1 from tokens minted on L2.}
+\todo
+
+\end{document}

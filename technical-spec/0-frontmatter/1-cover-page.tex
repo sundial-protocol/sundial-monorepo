@@ -1,0 +1,33 @@
+\documentclass[../midgard.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\begin{document}
+
+\input{\subfix{0-meta}}
+
+\begin{titlepage}
+    \begin{tikzpicture}[remember picture, overlay, scale = 1]
+        \node[anchor = north, below = 4cm] at (current page.north)
+            {\includesvg[inkscapearea = nocrop]{\subfix{../images/midgard-logo-whitepaper-bar.svg}}};
+    \end{tikzpicture}
+    \begin{center}
+        \color{midgard-cover-page-green}
+        \vspace{9cm}
+        {\Large \uppercase{Technical Specification}}\\[0.5cm]
+        {\fontsize{3em}{3.6em}\selectfont \midgardcovertitle}
+        \ifthenelse{\isundefined{\midgardversion}}{}{\vspace{0.5cm}\Large \MakeUppercase{\midgardversion}}
+        
+        \vfill
+        
+        \begin{turn}{10}
+            \color{midgard-cover-page-draft} \Huge
+            \begin{tabular}{c}
+                \textbf{WORKING DRAFT} \\ \today
+            \end{tabular}
+        \end{turn}
+
+        \vfill
+        \includegraphics[width=0.75\textwidth]{images/midgard-company-logos.png}
+    \end{center}
+\end{titlepage}
+
+\end{document}
