@@ -15,14 +15,14 @@
 ; Data Representation
 ; Midgard employs two distinct data representations to balance external interactions with on-chain constraints on Cardano L1:
 
-; Full Representation Representation:
+; Full Representation:
 ;   - Contains complete data structures
 ;   - Suitable for external interactions
 
 ; Onchain Representation (Compact Representation):
-;   - item Used primarily for on-chain data
-;   - item Optimized for L1 storage constraints
-;   - item Represents data in lightweight form
+;   - Used primarily for on-chain data
+;   - Optimized for L1 storage constraints
+;   - Represents data in lightweight form
 
 ; To accommodate the constraints of Cardano L1, where Midgard state resides, 
 ; Non-Fixed-size structures (e.g., arrays, tuples) are represented as Merkle root hashes. 
@@ -32,13 +32,13 @@
 
 state_queue =
   { key: $hash32 / null
-  , next: $hash32/ null
+  , next: $hash32 / null
   , data: block_compact
   }
 
 confirmed_state =
   { key: $hash32 / null
-  , next: $hash32/ null
+  , next: $hash32 / null
   , data: block_compact
   }
 
