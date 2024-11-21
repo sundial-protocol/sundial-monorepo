@@ -8,8 +8,8 @@
 Midgard's L2 ledger consists of a chain of blocks.
 Each block defines a transition from the previous block's set of unspent transaction outputs (utxos) to a new utxo set.
 Unlike Cardano's closed-system L1 ledger, Midgard's open-system L2 ledger allows block transitions to create and destroy utxos in response to exogenous events---namely, deposits and withdrawal requests that occur on the L1 ledger.
-This is in addition to Midgard's endogenous L2 transactions, which work the same as L1 transactions but with reduced functionality (no staking/governance actions).\footnote{Cardano developers concerned about the absence of the "Withdraw~0" action need not worry.
-Midgard's ledger rules permit the "Observe" script purpose defined in \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0112}{CIP-112}, which is a more principled replacement for "Withdraw~0" that is expected to arrive in the next era of Cardano mainnet in 2025.}
+This is in addition to Midgard's endogenous L2 transactions, which work the same as L1 transactions but with reduced functionality (no staking/governance actions).\footnote{Cardano developers concerned about the absence of the ``Withdraw~0'' action need not worry.
+Midgard's ledger rules permit the ``Observe'' script purpose defined in \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0112}{CIP-112}, which is a more principled replacement for ``Withdraw~0'' that is expected to arrive in the next era of Cardano mainnet in 2025.}
 
 The blocks are stored temporarily on Midgard's data availability layer and permanently on Midgard's archival nodes.
 The blocks' headers are committed to Midgard's L1 state queue data structure to establish immutability for the blocks' sequence and contents as part of Midgard's L1 contract-based consensus protocol.

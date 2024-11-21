@@ -50,13 +50,13 @@ Every node utxo has a datum of the \code{NodeDatum} type, which is parametric on
 The \code{key} field indicates the node's key (or \code{None} for the root node).
 \footnote{The key field is redundant, as it is already represented in the node NFT, but we include it in the datum for convenience in onchain scripts and offchain analytics.} It must match the token name of the node's NFT when serialized:\footnote{Prefixing the key when it is serialized to the token name prevents a collision between the root node and a node with an empty key string.
 It also allows more flexibility for minting policies that use the linked list library to atomically mint additional tokens associated with the key but namespaced from the node NFTs.
-Alternatively, if this functionality is not needed, the "Node" prefixes can be removed from the serialization.}
+Alternatively, if this functionality is not needed, the ``Node'' prefixes can be removed from the serialization.}
 \begin{align*}
-    \T{serialize\_key} (\T{None}) &\coloneq \T{"Node"} \\
-    \T{serialize\_key} (\T{Some} (\T{key})) &\coloneq \T{concat("Node", key)} 
+    \T{serialize\_key} (\T{None}) &\coloneq \T{``Node''} \\
+    \T{serialize\_key} (\T{Some} (\T{key})) &\coloneq \T{concat(``Node'', key)} 
 \end{align*}
 
-The root node of a list is the only node with a \code{key} field value of \code{None} in its \code{NodeDatum} and its NFT token name set to \code{"Node"}.
+The root node of a list is the only node with a \code{key} field value of \code{None} in its \code{NodeDatum} and its NFT token name set to \code{``Node''}.
 The root node is created when a list is initialized and must continue to exist until the list is deinitialized.
 This allows an initialized but empty list to be represented by just its root node (and no other nodes).
 The non-root nodes represent the actual keys and data of interest within a non-empty list.
@@ -279,7 +279,7 @@ It enforces the following properties:
             \item The list must be empty after the transaction, as proved by an output \code{root\_node} that holds the minted root node NFT.
                 \begin{equation*}
                     \T{is\_empty\_list}(\T{root\_node})  \land
-                    \T{has\_token}(\T{root\_node}, \T{node\_cs}, \T{"Node"})
+                    \T{has\_token}(\T{root\_node}, \T{node\_cs}, \T{``Node''})
                 \end{equation*}
         \end{enumerate}
         The above conditions imply the following:
@@ -306,7 +306,7 @@ It enforces the following properties:
             \item The list must be empty before the transaction, as proved by an input \code{root\_node} that holds the minted root node NFT.
                 \begin{equation*}
                     \T{is\_empty\_list}(\T{root\_node}) \land
-                    \T{has\_token}(\T{root\_node}, \T{node\_cs}, \T{"Node"})
+                    \T{has\_token}(\T{root\_node}, \T{node\_cs}, \T{``Node''})
                 \end{equation*}
         \end{enumerate}
         The above conditions imply the following:
@@ -584,7 +584,7 @@ The application's onchain code should ensure that root and non-root nodes always
 For keys randomly sampled from an approximately uniform distribution (e.g., cryptographic public keys for wallets), insertion/removal from a key-ordered linked list is parallel to a degree proportional to the list's size, with parallelism increasing as the list grows.
 
 An application may expect highly parallel traffic (e.g., from simultaneous interactions of independent users) before its list grows from its initially small size.
-This can be alleviated by using "separator" nodes in the list, which boost the list's parallelism by virtually occupying specific keys.
+This can be alleviated by using ``separator'' nodes in the list, which boost the list's parallelism by virtually occupying specific keys.
 Ideally, separators should be evenly spaced throughout the key space of the list.
 
 \begin{align*}

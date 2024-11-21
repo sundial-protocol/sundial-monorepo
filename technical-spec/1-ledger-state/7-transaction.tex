@@ -16,8 +16,8 @@ Of course, users can inject information into the utxo set via redeemer arguments
 \label{h:cardano-transaction-types}
 
 Cardano's L1 transaction type (\href{https://github.com/IntersectMBO/cardano-ledger/blob/cardano-ledger-conway-1.17.2.0/eras/conway/impl/src/Cardano/Ledger/Conway/Tx.hs}{Chang 2 hardfork}) served as an initial model for Midgard's L2 transaction type.
-In the following, field types prefixed by a question mark \code{?} are set to appropriate "empty" defaults during deserialization if the serialized transaction omits them:\footnote{In this section, we are mainly concerned with comparing Cardano and Midgard's deserialized data types.
-Serialization formats and conversions are addressed in Midgard's CDDL specifications.} \footnote{For simplicity of exposition, we omit the "era" type parameters, effectively coercing them all to the Conway era.
+In the following, field types prefixed by a question mark \code{?} are set to appropriate ``empty'' defaults during deserialization if the serialized transaction omits them:\footnote{In this section, we are mainly concerned with comparing Cardano and Midgard's deserialized data types.
+Serialization formats and conversions are addressed in Midgard's CDDL specifications.} \footnote{For simplicity of exposition, we omit the ``era'' type parameters, effectively coercing them all to the Conway era.
 We also simplify the script types.}
 \begingroup
 \allowdisplaybreaks
@@ -83,7 +83,7 @@ Midgard's transaction types deviate from Cardano's in the following ways:
       This preserves users' ability to pin metadata content via a hash in Midgard's ledger, but they are expected to store the actual metadata offchain.
     \item[No datum hashes in outputs.] Midgard requires all utxo datums to be inline, which avoids the need to index the datum-hash to datum map from transactions' datum witnesses.
     \item[CIPs 112 and 128.] Midgard has adopted \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0112}{CIP-112} and \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0128}{CIP 128} ahead of Cardano mainnet, which we expect to merge them in 2025.
-      CIP-112 provides a new "Observe" script purpose, a more principled and streamlined alternative to the "Withdraw 0" trick widely used by most Cardano dApps.
+      CIP-112 provides a new ``Observe'' script purpose, a more principled and streamlined alternative to the ``Withdraw 0'' trick widely used by most Cardano dApps.
       It also allows native scripts to conditionally forward their logic to an observer script.
       On the other hand, CIP-128 will significantly improve the execution efficiency achievable in Plutus contracts by preserving the order of inputs in a submitted transaction (instead of ordering them by \code{Outref}).
     \item[Different network ID.] Midgard transactions and utxo addresses use a different network ID to distinguish them from their Cardano mainnet counterparts.
