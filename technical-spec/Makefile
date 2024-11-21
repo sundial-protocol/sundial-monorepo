@@ -25,3 +25,4 @@ nix-build:
 .PHONY: clean
 clean:
 	latexmk -C
+	rm -rf svg-inkscape/
