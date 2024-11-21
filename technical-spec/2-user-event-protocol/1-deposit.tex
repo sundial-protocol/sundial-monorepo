@@ -1,0 +1,58 @@
+\documentclass[../midgard.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\begin{document}
+
+\section{Deposit (L1)}
+\label{h:deposit}
+
+A user deposits funds into Midgard by submitting an L1 transaction that performs the following:
+\begin{enumerate}
+    \item Spend an input \code{l1\_nonce}, which uniquely identifies this deposit transaction.
+    \item Register a staking script credential to witness the deposit.
+      The script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the deposit whenever the credential is \emph{not} registered.\footnote{Cardano's ledger lacks a more direct method to disprove the existence of a utxo to a Plutus script.}
+    \item Mint a deposit auth token to verify the following datum:
+        \begin{equation*}
+        \T{DepositDatum} \coloneq \left\{
+            \begin{array}{ll}
+                \T{event} : & \T{DepositEvent}, \\
+                \T{inclusion\_time} : & \T{PosixTime}, \\
+                \T{witness} : & \T{ScriptHash}, \\
+                \T{refund\_address}: & \T{Address}, \\
+                \T{refund\_datum}: & \T{Option(Data)}
+            \end{array}
+            \right\}
+        \end{equation*}
+    \item Send the user's deposited funds to the Midgard deposit address, along with the deposit auth token and the above datum.
+\end{enumerate}
+
+At the time of the L1 deposit transaction, the deposit's \code{inclusion\_time} is set to the sum of the transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter.
+According to Midgard's ledger rules:
+\begin{description}
+    \item[Deposit inclusion.] A block header must include deposit events with inclusion times falling within the block header's event interval, and it must \emph{not} include any other deposit events.
+\end{description}
+
+Furthermore, the state queue enforces that event intervals are adjacent and non-overlapping.
+Therefore, while operators continue committing valid block headers, every deposit is eventually included in the state queue.
+
+On the other hand, suppose a fraud proof is verified on L1 to prove that a block header in the state queue has violated the deposit inclusion rule.
+When this block header and all its descendants are removed, the state queue enforces that the next committed block header's event interval must contain all of those removed block headers' event intervals.
+Therefore, Midgard's ledger rules require this new block header to include all deposit events that should have been included in the removed block headers.
+
+The deposit's outcome is determined as follows:
+\begin{itemize}
+    \item If the deposit event is included in a settlement queue node, then the deposit utxo can be absorbed into the Midgard reserves or used to pay for withdrawals.
+    \item If the deposit's inclusion time is within the confirmed header's event interval but not within the event interval of any settlement queue node, then the deposit utxo can be refunded to its user according to the \code{refund\_address} and \code{refund\_datum} fields.
+\end{itemize}
+
+The deposit's \code{witness} staking credential must be deregistered when the deposit utxo is spent.
+
+\subsection{Staking script}
+\label{h:deposit-staking-script}
+
+\subsection{Minting policy}
+\label{h:deposit-minting-policy}
+
+\subsection{Spending validator}
+\label{h:deposit-spending-validator}
+
+\end{document}

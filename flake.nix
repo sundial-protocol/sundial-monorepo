@@ -14,7 +14,8 @@
       devShells = forEachSupportedSystem ({ pkgs }: {
         default = pkgs.mkShell {
           packages = with pkgs; [
-            texlive.combined.scheme-full
+            texliveFull
+            inkscape
           ];
         };
       });
