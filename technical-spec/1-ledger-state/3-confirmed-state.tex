@@ -7,7 +7,8 @@
 
 \notebox{Settlement node optimistically resolvable by the current operator (not necessarily the original block's operator)}\todo
 
-When a Midgard block becomes confirmed, a selection of its block header fields is split into two groups (discarding the rest). These groups are used to populate the fields of two record types in Midgard's confirmed state:
+When a Midgard block becomes confirmed, a selection of its block header fields is split into two groups (discarding the rest).
+These groups are used to populate the fields of two record types in Midgard's confirmed state:
 \begingroup
 \allowdisplaybreaks
 \begin{align*}
@@ -33,19 +34,29 @@ When a Midgard block becomes confirmed, a selection of its block header fields i
 \end{align*}
 \endgroup
 
-Midgard only stores the latest confirmed block's \code{ConfirmedHeader} on L1, always overwriting the previous one. By contrast, its \code{SettlementHeader} never overwrites that of the previous block. Instead, the \code{SettlementHeader} spins into a separate settlement node that users and operators can reference to process deposits and withdrawal requests.
+Midgard only stores the latest confirmed block's \code{ConfirmedHeader} on L1, always overwriting the previous one.
+By contrast, its \code{SettlementHeader} never overwrites that of the previous block.
+Instead, the \code{SettlementHeader} spins into a separate settlement node that users and operators can reference to process deposits and withdrawal requests.
 
-When all deposits and withdrawals in a settlement node have been processed, its operator can mark it as optimistically resolved. It stays in this state for a duration set according to Midgard's \code{settlement\_resolution\_duration} protocol parameter, providing an opportunity for fraud proofs to be verified on L1 that disprove the operator's claim that the settlement node is resolved. Afterward, the settlement node is resolved, and the operator can spend it recovering its min-ADA.
+When all deposits and withdrawals in a settlement node have been processed, its operator can mark it as optimistically resolved.
+It stays in this state for a duration set according to Midgard's \code{settlement\_resolution\_duration} protocol parameter, providing an opportunity for fraud proofs to be verified on L1 that disprove the operator's claim that the settlement node is resolved.
+Afterward, the settlement node is resolved, and the operator can spend it recovering its min-ADA.
 
-\notebox{Apply changes to the \nameref{h:operator-directory} (\cref{h:operator-directory}) to ensure that an operator's bond is not released to the operator until all last settlement nodes are resolved. We might need per-operator queues for this.}\todo
+\notebox{Apply changes to the \nameref{h:operator-directory} (\cref{h:operator-directory}) to ensure that an operator's bond is not released to the operator until all last settlement nodes are resolved.
+We might need per-operator queues for this.}\todo
 
-\tipbox{Perhaps resolving a settlement node should also release to the operator the user fees collected for processing the deposits and withdrawals in the node. This would incentivize the operator to promptly resolve settlement nodes.}
+\tipbox{Perhaps resolving a settlement node should also release to the operator the user fees collected for processing the deposits and withdrawals in the node.
+This would incentivize the operator to promptly resolve settlement nodes.}
 
-\tipbox{We're also considering an alternative model where confirmed block headers are not condensed on L1. Instead, they become immutable after confirmation, and we use a pointer to indicate the latest confirmed block header. This has broad implications for Midgard's onchain and offchain architecture.
+\tipbox{We're also considering an alternative model where confirmed block headers are not condensed on L1.
+  Instead, they become immutable after confirmation, and we use a pointer to indicate the latest confirmed block header.
+  This has broad implications for Midgard's onchain and offchain architecture.
 
-The advantage of this approach is that block headers are always available for scripts (including fraud proofs) to access directly on L1. This may simplify the data stored in each block.
+The advantage of this approach is that block headers are always available for scripts (including fraud proofs) to access directly on L1.
+This may simplify the data stored in each block.
 
-The disadvantage is that operators cannot recover the min-ADA deposit for every confirmed block. Furthermore, Midgard increasingly bloats Cardano's utxo set with utxos that are rarely accessed.
+The disadvantage is that operators cannot recover the min-ADA deposit for every confirmed block.
+Furthermore, Midgard increasingly bloats Cardano's utxo set with utxos that are rarely accessed.
 }
 
 \end{document}

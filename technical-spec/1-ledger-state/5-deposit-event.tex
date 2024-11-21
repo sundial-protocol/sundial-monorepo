@@ -15,9 +15,12 @@ A deposit event in a Midgard block acknowledges that a user has created an L1 ut
     \end{array} \right\}
 \end{equation*}
 
-The \code{l1\_nonce} field corresponds to one of the inputs spent by the user in the L1 transaction that created the L1 deposit utxo. This field is needed to identify the L1 deposit utxo, ensure that deposit events are unique, and detect when an operator has fabricated a deposit event without the corresponding deposit utxo existing in the L1 ledger.
+The \code{l1\_nonce} field corresponds to one of the inputs spent by the user in the L1 transaction that created the L1 deposit utxo.
+This field is needed to identify the L1 deposit utxo, ensure that deposit events are unique, and detect when an operator has fabricated a deposit event without the corresponding deposit utxo existing in the L1 ledger.
 
-Suppose a deposit event is permitted by Midgard's ledger rules to be included in a block. In that case, its effect is to add a new L2 utxo to the block's utxo set containing the value from the L1 deposit utxo at the address (\code{l2\_address}) and with the inline datum (\code{l2\_datum}) specified by the user. The L2 output reference of the deposit event is as follows: 
+Suppose a deposit event is permitted by Midgard's ledger rules to be included in a block.
+In that case, its effect is to add a new L2 utxo to the block's utxo set containing the value from the L1 deposit utxo at the address (\code{l2\_address}) and with the inline datum (\code{l2\_datum}) specified by the user.
+The L2 output reference of the deposit event is as follows: 
 \begin{equation*}
     \T{l2\_outref(deposit\_event)} \coloneq \left\{
     \begin{array}{ll}
@@ -26,6 +29,7 @@ Suppose a deposit event is permitted by Midgard's ledger rules to be included in
     \end{array} \right\}
 \end{equation*}
 
-If the block containing the deposit event is confirmed, the corresponding L1 deposit utxo may be absorbed into the Midgard reserves or used to pay for withdrawals. \Cref{h:deposit} describes the lifecycle of a deposit in further detail, including how the deposit event information is validated.
+If the block containing the deposit event is confirmed, the corresponding L1 deposit utxo may be absorbed into the Midgard reserves or used to pay for withdrawals.
+\Cref{h:deposit} describes the lifecycle of a deposit in further detail, including how the deposit event information is validated.
 
 \end{document}

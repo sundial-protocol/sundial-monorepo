@@ -159,7 +159,8 @@ In the following sections the following premises are used:
 \end{split}
 \end{equation*}
 
-\item[Description:] Every valid transaction in the ledger must be included at a timestamp that conforms to the validity range that the transaction prescribes. Whenever the condition \hyperref[sec:INVALID-RANGE]{INVALID-RANGE} is met, that indicates that this property is violated, and the block in question must not be included in the $Ledger$.
+\item[Description:] Every valid transaction in the ledger must be included at a timestamp that conforms to the validity range that the transaction prescribes.
+  Whenever the condition \hyperref[sec:INVALID-RANGE]{INVALID-RANGE} is met, that indicates that this property is violated, and the block in question must not be included in the $Ledger$.
 
 \end{description}
 
@@ -191,7 +192,8 @@ In the following sections the following premises are used:
     \forall t \in Ledger, |inputs(t)| > 0
 \end{equation*}
 
-\item[Description:] Every valid transaction in the ledger must spend at least one UTxO. If the violating condition \hyperref[sec:ZERO-INPUT]{ZERO-INPUT} is satisfied, then this property is broken and the block must be removed.
+\item[Description:] Every valid transaction in the ledger must spend at least one UTxO.
+  If the violating condition \hyperref[sec:ZERO-INPUT]{ZERO-INPUT} is satisfied, then this property is broken and the block must be removed.
 
 \end{description}
 
@@ -223,7 +225,8 @@ In the following sections the following premises are used:
     \forall t \in Ledger, tx\_fee(t) \geq min\_fee(t)
 \end{equation*}
 
-\item[Description:] Every valid transaction in the ledger must pay the fees for inclusion. Proving violating condition \hyperref[sec:MIN-FEE]{MIN-FEE} indicates that this property is broken.
+\item[Description:] Every valid transaction in the ledger must pay the fees for inclusion.
+  Proving violating condition \hyperref[sec:MIN-FEE]{MIN-FEE} indicates that this property is broken.
 
 \item[Calculating the minimum fee:] !!! TODO: ...
 % Same structure as in Cardano L1

@@ -10,10 +10,12 @@ Fraud proof tokens represent fraud proof computations that have successfully con
 \subsection{Minting policy}
 \label{h:fraud-proof-tokens-minting-policy}
 
-The \code{fraud\_proof} minting policy is statically parametrized on the \code{computation\_thread} and \code{hub\_oracle} minting policies. Redeemers:
+The \code{fraud\_proof} minting policy is statically parametrized on the \code{computation\_thread} and \code{hub\_oracle} minting policies.
+Redeemers:
 
 \begin{description}
-    \item[Mint.] Mint a new fraud proof token whenever a fraud proof computation succeeds. Conditions:
+    \item[Mint.] Mint a new fraud proof token whenever a fraud proof computation succeeds.
+      Conditions:
         \begin{enumerate}
             \item The transaction must burn a \code{computation\_thread} token.
             \item The transaction must mint a \code{fraud\_proof} token with the same token name as the \code{computation\_thread} token.
@@ -21,7 +23,8 @@ The \code{fraud\_proof} minting policy is statically parametrized on the \code{c
             \item Let \code{fraud\_proof\_addr} be the policy ID in the corresponding field of the Midgard hub oracle.
             \item The \code{fraud\_proof} token must be sent to the \code{fraud\_proof\_addr} spending validator.
         \end{enumerate}
-    \item[Burn.] Burn a fraud proof token when the corresponding fraudulent block header is no longer in the state queue. Conditions:
+    \item[Burn.] Burn a fraud proof token when the corresponding fraudulent block header is no longer in the state queue.
+      Conditions:
         \begin{enumerate}
             \item The transaction must burn a \code{fraud\_proof} token.
             \item The transaction must include the Midgard hub oracle NFT in a reference input.
@@ -34,6 +37,7 @@ The \code{fraud\_proof} minting policy is statically parametrized on the \code{c
 \subsection{Spending validator}
 \label{h:fraud-proof-tokens-spending-validator}
 
-The spending validator of \code{fraud\_proof\_addr} does \emph{not} allow its utxo to be spent. Midgard fraud proofs last forever.
+The spending validator of \code{fraud\_proof\_addr} does \emph{not} allow its utxo to be spent.
+Midgard fraud proofs last forever.
 
 \end{document}

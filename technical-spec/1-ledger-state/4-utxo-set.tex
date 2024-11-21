@@ -32,7 +32,8 @@ An output is a tuple describing a bundle of tokens, data, and a script that have
     \end{array} \right\}
 \end{equation*}
 
-Within the context of a Midgard block, the utxo set that we are interested in consists of the outputs created by deposits and transactions but not yet spent by transactions and withdrawals, considering all the deposits, transactions, and withdrawals of this block and all its predecessors. This is the utxo set that we transform into an MPT and place into the block body's \code{utxo} field.
+Within the context of a Midgard block, the utxo set that we are interested in consists of the outputs created by deposits and transactions but not yet spent by transactions and withdrawals, considering all the deposits, transactions, and withdrawals of this block and all its predecessors.
+This is the utxo set that we transform into an MPT and place into the block body's \code{utxo} field.
 
 
 \notebox{Midgard requires all L2 datums to be inline.}

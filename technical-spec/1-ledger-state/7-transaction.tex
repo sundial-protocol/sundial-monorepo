@@ -5,14 +5,20 @@
 \section{Transaction}
 \label{h:transaction}
 
-An L2 transaction in a Midgard block is an endogenous event. Its corresponding utxo set transition is validated purely based on the information contained in the utxo set. This contrasts with deposit and withdrawal events, which create and spend utxos (respectively) based on information observed outside the L2 ledger.
+An L2 transaction in a Midgard block is an endogenous event.
+Its corresponding utxo set transition is validated purely based on the information contained in the utxo set.
+This contrasts with deposit and withdrawal events, which create and spend utxos (respectively) based on information observed outside the L2 ledger.
 
-A transaction can only spend a utxo if it satisfies the conditions of the spending validator corresponding to the utxo's payment address, and it can only mint and burn tokens by satisfying the conditions of the corresponding minting policies. Of course, users can inject information into the utxo set via redeemer arguments and output datums set in transactions, but those are still subject to the transaction scripts' conditions.
+A transaction can only spend a utxo if it satisfies the conditions of the spending validator corresponding to the utxo's payment address, and it can only mint and burn tokens by satisfying the conditions of the corresponding minting policies.
+Of course, users can inject information into the utxo set via redeemer arguments and output datums set in transactions, but those are still subject to the transaction scripts' conditions.
 
 \subsection{Cardano transaction types}
 \label{h:cardano-transaction-types}
 
-Cardano's L1 transaction type (\href{https://github.com/IntersectMBO/cardano-ledger/blob/cardano-ledger-conway-1.17.2.0/eras/conway/impl/src/Cardano/Ledger/Conway/Tx.hs}{Chang 2 hardfork}) served as an initial model for Midgard's L2 transaction type. In the following, field types prefixed by a question mark \code{?} are set to appropriate "empty" defaults during deserialization if the serialized transaction omits them:\footnote{In this section, we are mainly concerned with comparing Cardano and Midgard's deserialized data types. Serialization formats and conversions are addressed in Midgard's CDDL specifications.} \footnote{For simplicity of exposition, we omit the "era" type parameters, effectively coercing them all to the Conway era. We also simplify the script types.}
+Cardano's L1 transaction type (\href{https://github.com/IntersectMBO/cardano-ledger/blob/cardano-ledger-conway-1.17.2.0/eras/conway/impl/src/Cardano/Ledger/Conway/Tx.hs}{Chang 2 hardfork}) served as an initial model for Midgard's L2 transaction type.
+In the following, field types prefixed by a question mark \code{?} are set to appropriate "empty" defaults during deserialization if the serialized transaction omits them:\footnote{In this section, we are mainly concerned with comparing Cardano and Midgard's deserialized data types.
+Serialization formats and conversions are addressed in Midgard's CDDL specifications.} \footnote{For simplicity of exposition, we omit the "era" type parameters, effectively coercing them all to the Conway era.
+We also simplify the script types.}
 \begingroup
 \allowdisplaybreaks
 \begin{align*}
@@ -67,20 +73,33 @@ Cardano's L1 transaction type (\href{https://github.com/IntersectMBO/cardano-led
 
 Midgard's transaction types deviate from Cardano's in the following ways:
 \begin{description}
-    \item[No staking or governance actions.] Midgard's consensus protocol is not based on Ouroboros proof-of-stake, and its governance protocol is not based on Cardano's hard-fork-combinator update mechanism. Furthermore, Midgard's L1 scripts cannot authorize arbitrary staking or governance actions on behalf of users. For this reason, staking and governance actions are prohibited in Midgard L2 transactions.
-    \item[No pre-Conway features.] Midgard does not need to maintain backwards compatibility with pre-Conway eras. Midgard deposits and transactions will be prohibited from using bootstrap addresses, and Shelley addresses with Plutus versions older than Plutus V3. Public key hash credentials, native scripts, and Plutus scripts at or above V3 are allowed.
-    \item[No transaction metadata.] Midgard prohibits using metadata in L2 transactions but allows users to set the \code{auxiliary\_data\_hash} to any arbitrary hash, which Midgard's ledger's rules do not require to match the empty transaction metadata field. This preserves users' ability to pin metadata content via a hash in Midgard's ledger, but they are expected to store the actual metadata offchain.
+    \item[No staking or governance actions.] Midgard's consensus protocol is not based on Ouroboros proof-of-stake, and its governance protocol is not based on Cardano's hard-fork-combinator update mechanism.
+      Furthermore, Midgard's L1 scripts cannot authorize arbitrary staking or governance actions on behalf of users.
+      For this reason, staking and governance actions are prohibited in Midgard L2 transactions.
+    \item[No pre-Conway features.] Midgard does not need to maintain backwards compatibility with pre-Conway eras.
+      Midgard deposits and transactions will be prohibited from using bootstrap addresses, and Shelley addresses with Plutus versions older than Plutus V3.
+      Public key hash credentials, native scripts, and Plutus scripts at or above V3 are allowed.
+    \item[No transaction metadata.] Midgard prohibits using metadata in L2 transactions but allows users to set the \code{auxiliary\_data\_hash} to any arbitrary hash, which Midgard's ledger's rules do not require to match the empty transaction metadata field.
+      This preserves users' ability to pin metadata content via a hash in Midgard's ledger, but they are expected to store the actual metadata offchain.
     \item[No datum hashes in outputs.] Midgard requires all utxo datums to be inline, which avoids the need to index the datum-hash to datum map from transactions' datum witnesses.
-    \item[CIPs 112 and 128.] Midgard has adopted \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0112}{CIP-112} and \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0128}{CIP 128} ahead of Cardano mainnet, which we expect to merge them in 2025. CIP-112 provides a new "Observe" script purpose, a more principled and streamlined alternative to the "Withdraw 0" trick widely used by most Cardano dApps. It also allows native scripts to conditionally forward their logic to an observer script. On the other hand, CIP-128 will significantly improve the execution efficiency achievable in Plutus contracts by preserving the order of inputs in a submitted transaction (instead of ordering them by \code{Outref}).
-    \item[Different network ID.] Midgard transactions and utxo addresses use a different network ID to distinguish them from their Cardano mainnet counterparts. Furthermore, we are considering a prefix to minting policy IDs to distinguish tokens deposited from L1 from tokens minted on L2.
-    \item[Replace slots with POSIX timestamps.] Midgard's consensus protocol does not use slots like Ouroboros. Furthermore, the L1 contracts that enforce Midgard's consensus protocol are evaluated in the Plutus script context, where slots are converted to Posix timestamps. For these reasons, Midgard uses POSIX timestamps instead of slots in L2 transactions.
+    \item[CIPs 112 and 128.] Midgard has adopted \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0112}{CIP-112} and \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0128}{CIP 128} ahead of Cardano mainnet, which we expect to merge them in 2025.
+      CIP-112 provides a new "Observe" script purpose, a more principled and streamlined alternative to the "Withdraw 0" trick widely used by most Cardano dApps.
+      It also allows native scripts to conditionally forward their logic to an observer script.
+      On the other hand, CIP-128 will significantly improve the execution efficiency achievable in Plutus contracts by preserving the order of inputs in a submitted transaction (instead of ordering them by \code{Outref}).
+    \item[Different network ID.] Midgard transactions and utxo addresses use a different network ID to distinguish them from their Cardano mainnet counterparts.
+      Furthermore, we are considering a prefix to minting policy IDs to distinguish tokens deposited from L1 from tokens minted on L2.
+    \item[Replace slots with POSIX timestamps.] Midgard's consensus protocol does not use slots like Ouroboros.
+      Furthermore, the L1 contracts that enforce Midgard's consensus protocol are evaluated in the Plutus script context, where slots are converted to Posix timestamps.
+      For these reasons, Midgard uses POSIX timestamps instead of slots in L2 transactions.
     \item[IsValid tag is always True.] Midgard's consensus protocol does not use the IsValid tag, so it is always set to \code{True}.
 \end{description}
 
 \subsection{Midgard simplified transaction types}
 \label{h:midgard-simplified-transaction-types}
 
-Midgard's actual transaction types are complicated by the need to optimize their traversal by Plutus scripts. As an intermediate step towards them, the following simplified types illustrate how the Cardano transaction types (\cref{h:cardano-transaction-types}) are modified by Midgard's deviations (\cref{h:deviations-from-cardano-transaction-types}). We use the empty set symbol \code{$\varnothing$} to indicate fields required to be empty in Midgard transactions and use the star symbol \code{$\star$} to indicate new or modified fields:
+Midgard's actual transaction types are complicated by the need to optimize their traversal by Plutus scripts.
+As an intermediate step towards them, the following simplified types illustrate how the Cardano transaction types (\cref{h:cardano-transaction-types}) are modified by Midgard's deviations (\cref{h:deviations-from-cardano-transaction-types}).
+We use the empty set symbol \code{$\varnothing$} to indicate fields required to be empty in Midgard transactions and use the star symbol \code{$\star$} to indicate new or modified fields:
 \begingroup
 \allowdisplaybreaks
 \begin{align*}

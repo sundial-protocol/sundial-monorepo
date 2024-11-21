@@ -5,20 +5,28 @@
 \section{Scheduler}
 \label{h:scheduler}
 
-The Midgard scheduler is an L1 mechanism that indicates which operator is assigned to the current shift and controls the transitions to the next shift and next operator. Whenever a shift ends, the next operator in key-descending order from the \code{active\_operators} list has the exclusive privilege to advance the scheduler's state to the next shift, assigning it to themself.
+The Midgard scheduler is an L1 mechanism that indicates which operator is assigned to the current shift and controls the transitions to the next shift and next operator.
+Whenever a shift ends, the next operator in key-descending order from the \code{active\_operators} list has the exclusive privilege to advance the scheduler's state to the next shift, assigning it to themself.
 
-When the root node of \code{active\_operators} is reached, the highest-key active operator rewinds the scheduler to start a new cycle. However, the scheduler requires the \code{registered\_operators} queue to be checked to see if any registered operators are eligible to activate. If so, all eligible registered operators must activate before the new cycle can begin.
+When the root node of \code{active\_operators} is reached, the highest-key active operator rewinds the scheduler to start a new cycle.
+However, the scheduler requires the \code{registered\_operators} queue to be checked to see if any registered operators are eligible to activate.
+If so, all eligible registered operators must activate before the new cycle can begin.
 
-Active operators can retire anytime without waiting for the end of the scheduler cycle. The scheduler automatically adjusts to retirement because the next operator is always selected among active operators. However, to minimize disruption, an operator should complete their shift before retiring.
+Active operators can retire anytime without waiting for the end of the scheduler cycle.
+The scheduler automatically adjusts to retirement because the next operator is always selected among active operators.
+However, to minimize disruption, an operator should complete their shift before retiring.
 
 \notebox{We should allow operators to take over for negligent operators.
 
-If a shift's assigned operator neglects their duty to commit blocks regularly to the state queue, the next active operator can take over the shift (without starting the next shift). Similarly, the next operator can advance the scheduler and take over if their predecessor neglects to do so. Midgard's \code{operator\_inactivity\_timeout} protocol parameter controls when this unscheduled takeover can happen.}\todo
+If a shift's assigned operator neglects their duty to commit blocks regularly to the state queue, the next active operator can take over the shift (without starting the next shift).
+Similarly, the next operator can advance the scheduler and take over if their predecessor neglects to do so.
+Midgard's \code{operator\_inactivity\_timeout} protocol parameter controls when this unscheduled takeover can happen.}\todo
 
 \subsection{Utxo representation}
 \label{h:scheduler-utxo-representation}
 
-The scheduler state consists of a single utxo that holds the scheduler NFT, minted when Midgard is initialized and burned when Midgard is deinitialized via the hub oracle. That utxo's datum type is as follows:
+The scheduler state consists of a single utxo that holds the scheduler NFT, minted when Midgard is initialized and burned when Midgard is deinitialized via the hub oracle.
+That utxo's datum type is as follows:
 \begin{equation*}
     \T{SchedulerDatum} \coloneq \left\{
     \begin{array}{ll}
@@ -32,16 +40,20 @@ The shift's inclusive lower bound is \code{shift\_start}, and its exclusive uppe
 \subsection{Minting policy}
 \label{h:scheduler-minting-policy}
 
-The \code{scheduler} minting policy initializes and deinitializes the scheduler state. It is statically parametrized on the \code{hub\_oracle} minting policy. Redeemers:
+The \code{scheduler} minting policy initializes and deinitializes the scheduler state.
+It is statically parametrized on the \code{hub\_oracle} minting policy.
+Redeemers:
 
 \begin{description}
-    \item[Init.] Initialize the \code{scheduler} via the Midgard hub oracle. Conditions:
+    \item[Init.] Initialize the \code{scheduler} via the Midgard hub oracle.
+      Conditions:
         \begin{enumerate}
             \item The transaction must mint the Midgard hub oracle token.
             \item The transaction must mint the \code{scheduler} NFT.
         \end{enumerate}
 
-    \item[Deinit.] Deinitialize the \code{scheduler} via the Midgard hub oracle. Conditions:
+    \item[Deinit.] Deinitialize the \code{scheduler} via the Midgard hub oracle.
+      Conditions:
         \begin{enumerate}
             \item The transaction must burn the Midgard hub oracle token.
             \item The transaction must burn the \code{scheduler} NFT.
@@ -51,14 +63,18 @@ The \code{scheduler} minting policy initializes and deinitializes the scheduler 
 \subsection{Spending validator}
 \label{h:scheduler-spending-validator}
 
-The spending validator of \code{scheduler\_addr} controls the evolution of the scheduler state. It is statically parametrized on the \code{active\_operators} and \code{registered\_operators} minting policies. Redeemers:
+The spending validator of \code{scheduler\_addr} controls the evolution of the scheduler state.
+It is statically parametrized on the \code{active\_operators} and \code{registered\_operators} minting policies.
+Redeemers:
 
 \begin{description}
-    \item[Advance.] The next operator in key-descending order advances the scheduler to the next shift and assigns it to themself. Grouped conditions:
+    \item[Advance.] The next operator in key-descending order advances the scheduler to the next shift and assigns it to themself.
+      Grouped conditions:
         \begin{itemize}
             \item Parse scheduler input and output:
             \begin{enumerate}
-                \item Let \code{scheduler\_datum} be the datum argument for the spending validator being evaluated. It is assumed to belong to the transaction input that holds the scheduler NFT.
+                \item Let \code{scheduler\_datum} be the datum argument for the spending validator being evaluated.
+                  It is assumed to belong to the transaction input that holds the scheduler NFT.
                 \item Let \code{scheduler\_output} be the transaction output that holds the scheduler NFT.
                 \item Let \code{operator} be the \code{operator} field value of \code{scheduler\_output}.
                 \item Let \code{previous\_operator} be the \code{operator} field value of \code{scheduler\_datum}.
@@ -79,17 +95,20 @@ The spending validator of \code{scheduler\_addr} controls the evolution of the s
             
             \item Verify the operator transition:
             \begin{enumerate}[resume]
-                \item The transaction must include a reference input of an \code{active\_operators} node. Let \code{operator\_node} be that node.
+                \item The transaction must include a reference input of an \code{active\_operators} node.
+                  Let \code{operator\_node} be that node.
                 \item The \code{key} of \code{operator\_node} must match \code{operator}.
                 \item The \code{link} of \code{operator\_node} must match or exceed \code{previous\_operator}.\footnote{It will exceed the previous operator if they have retired.}
             \end{enumerate}
         \end{itemize}
 
-       \item[Rewind.] The highest-key operator advances the scheduler to the next shift and assigns it to themself, provided that no registered operators are eligible to activate. Grouped conditions:
+       \item[Rewind.] The highest-key operator advances the scheduler to the next shift and assigns it to themself, provided that no registered operators are eligible to activate.
+         Grouped conditions:
         \begin{itemize}
             \item Parse scheduler input and output:
             \begin{enumerate}
-                \item Let \code{scheduler\_datum} be the datum argument for the spending validator being evaluated. It is assumed to belong to the transaction input that holds the scheduler NFT.
+                \item Let \code{scheduler\_datum} be the datum argument for the spending validator being evaluated.
+                  It is assumed to belong to the transaction input that holds the scheduler NFT.
                 \item Let \code{scheduler\_output} be the transaction output that holds the scheduler NFT.
                 \item Let \code{operator} be the \code{operator} field value of \code{scheduler\_output}.
                 \item Let \code{previous\_operator} be the \code{operator} field value of \code{scheduler\_datum}.
@@ -110,16 +129,20 @@ The spending validator of \code{scheduler\_addr} controls the evolution of the s
             
             \item Rewind to a new operator cycle:
             \begin{enumerate}[resume]
-                \item The transaction must include a reference input of the last \code{active\_operators} node. Let \code{operator\_node} be that node.
-                \item The transaction must include a reference input of the root \code{active\_operators} node. Let \code{root\_node} be that node.
+                \item The transaction must include a reference input of the last \code{active\_operators} node.
+                  Let \code{operator\_node} be that node.
+                \item The transaction must include a reference input of the root \code{active\_operators} node.
+                  Let \code{root\_node} be that node.
                 \item The \code{key} of \code{operator\_node} must match \code{operator}.
                 \item The \code{link} of \code{root\_node} must match or exceed \code{previous\_operator}.
             \end{enumerate}
             
             \item Verify that no registered operator is eligible to activate:
             \begin{enumerate}[resume]
-                \item The transaction must include a reference input of a \code{registered\_operators} node. Let \code{registered\_node} be that node.
-                \item \code{registered\_node} must be the last node of the \code{registered\_operators} queue. This means it corresponds to the \emph{earliest} registrant that hasn't yet activated because new registrants are prepended to the beginning of that queue.
+                \item The transaction must include a reference input of a \code{registered\_operators} node.
+                  Let \code{registered\_node} be that node.
+                \item \code{registered\_node} must be the last node of the \code{registered\_operators} queue.
+                  This means it corresponds to the \emph{earliest} registrant that hasn't yet activated because new registrants are prepended to the beginning of that queue.
                 \item \code{registered\_node} is \emph{not yet} eligible for activation --- the lower bound of the transaction validity interval is smaller than the sum of the \code{registration\_time} of the \code{registered\_node} and the Midgard \code{registration\_duration} protocol parameter.
             \end{enumerate}
         \end{itemize}

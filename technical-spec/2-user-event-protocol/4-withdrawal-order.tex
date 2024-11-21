@@ -5,12 +5,15 @@
 \section{Withdrawal order (L1)}
 \label{h:withdrawal-order}
 
-\notebox{Currently, this withdrawal order design can only handle withdrawing pubkey-based utxos. However, we can modify L2 transactions to produce "withdrawable utxos" that cannot be spent on L2 but can be withdrawn permissionlessly on L1. This will allow L1 withdrawal orders to withdraw these L2 utxos without even requiring any signatures.}
+\notebox{Currently, this withdrawal order design can only handle withdrawing pubkey-based utxos.
+However, we can modify L2 transactions to produce "withdrawable utxos" that cannot be spent on L2 but can be withdrawn permissionlessly on L1.
+This will allow L1 withdrawal orders to withdraw these L2 utxos without even requiring any signatures.}
 
 A user initiates a withdrawal from Midgard by submitting an L1 transaction that performs the following:
 \begin{enumerate}
     \item Spend an input \code{l1\_nonce}, which uniquely identifies this withdrawal order.
-    \item Register a staking script credential to witness the withdrawal order. The staking script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the withdrawal order whenever the credential is \emph{not} registered.
+    \item Register a staking script credential to witness the withdrawal order.
+      The staking script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the withdrawal order whenever the credential is \emph{not} registered.
     \item Mint a withdrawal order token to verify the following datum:
         \begin{equation*}
         \T{WithdrawalOrderDatum} \coloneq \left\{
@@ -26,7 +29,8 @@ A user initiates a withdrawal from Midgard by submitting an L1 transaction that 
     \item Send min-ADA to the Midgard withdrawal order address, along with the withdrawal order token and the above datum.
 \end{enumerate}
 
-At the time of the L1 withdrawal order, its \code{inclusion\_time} is set to the sum of the L1 transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter. According to Midgard's ledger rules:
+At the time of the L1 withdrawal order, its \code{inclusion\_time} is set to the sum of the L1 transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter.
+According to Midgard's ledger rules:
 \begin{description}
     \item[Withdrawal order inclusion.] A block header must include withdrawal orders with inclusion times falling within the block header's event interval, and it must \emph{not} include any other withdrawal orders.
 \end{description}

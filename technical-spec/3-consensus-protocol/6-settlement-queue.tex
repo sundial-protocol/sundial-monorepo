@@ -5,11 +5,14 @@
 \section{Settlement queue}
 \label{h:settlement-queue}
 
-A queue similar to the state queue. Nodes are appended to it for any state queue blocks that are merged into the confirmed state and contain deposit or withdrawal events.
+A queue similar to the state queue.
+Nodes are appended to it for any state queue blocks that are merged into the confirmed state and contain deposit or withdrawal events.
 
-Users refer to state queue nodes to spend the corresponding withdrawal order and deposit utxos, along with any needed reserve utxos, to execute the corresponding deposit and withdrawal events. 
+Users refer to state queue nodes to spend the corresponding withdrawal order and deposit utxos, along with any needed reserve utxos, to execute the corresponding deposit and withdrawal events.
 
-When all deposit and withdrawal events in a settlement node have been executed, the current operator can optimistically mark it as resolved. Once the maturity period elapses for this optimistic claim, the operator can remove the node from the settlement queue and claim fees from the Midgard reserve corresponding to the number of deposits and withdrawals contained in the node. Midgard's protocol is responsible for deducting those fees from the deposits and withdrawals accordingly.
+When all deposit and withdrawal events in a settlement node have been executed, the current operator can optimistically mark it as resolved.
+Once the maturity period elapses for this optimistic claim, the operator can remove the node from the settlement queue and claim fees from the Midgard reserve corresponding to the number of deposits and withdrawals contained in the node.
+Midgard's protocol is responsible for deducting those fees from the deposits and withdrawals accordingly.
 
 The timestamp in the operator's node in the Operator Directory should be updated whenever an operator optimistically resolves a settlement node, in the same way that it is updated when committing a block to the state queue.
 

@@ -5,10 +5,12 @@
 \section{Transaction order (L1)}
 \label{h:transaction-order}
 
-A user who wants to mitigate the risk of censorship by the current operator can submit an L2 transaction as an L1 transaction order. A transaction order is created by an L1 transaction that performs the following:
+A user who wants to mitigate the risk of censorship by the current operator can submit an L2 transaction as an L1 transaction order.
+A transaction order is created by an L1 transaction that performs the following:
 \begin{enumerate}
     \item Spend an input \code{l1\_nonce}, which uniquely identifies this transaction order.
-    \item Register a staking script credential to witness the transaction order. The staking script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the transaction order whenever the credential is \emph{not} registered.
+    \item Register a staking script credential to witness the transaction order.
+      The staking script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the transaction order whenever the credential is \emph{not} registered.
     \item Mint a transaction order token to verify the following datum:
         \begin{equation*}
         \T{TxOrderDatum} \coloneq \left\{
@@ -24,14 +26,17 @@ A user who wants to mitigate the risk of censorship by the current operator can 
     \item Send min-ADA to the Midgard transaction order address, along with the transaction order token and the above datum.
 \end{enumerate}
 
-At the time of the L1 transaction order, its \code{inclusion\_time} is set to the sum of the L1 transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter. According to Midgard's ledger rules:
+At the time of the L1 transaction order, its \code{inclusion\_time} is set to the sum of the L1 transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter.
+According to Midgard's ledger rules:
 \begin{description}
     \item[Transaction order inclusion.] A block header must include transaction orders with inclusion times falling within the block header's event interval, and it must \emph{not} include any other transaction orders.
 \end{description}
 
-Analogously to deposits, transaction orders will eventually be included in the state queue, as long as operators continue committing valid block headers. Furthermore, if any blocks are removed from the state queue, any new committed block must include the transaction orders that should have been included in the removed blocks. 
+Analogously to deposits, transaction orders will eventually be included in the state queue, as long as operators continue committing valid block headers.
+Furthermore, if any blocks are removed from the state queue, any new committed block must include the transaction orders that should have been included in the removed blocks.
 
-The transaction order fulfills its purpose when its inclusion time is within the confirmed header's event interval. Whether or not the outcome of the order's \code{tx} L2 transaction was merged into the confirmed state, nothing more can be achieved with the transaction order, and it can be refunded according to the \code{refund\_address} and \code{refund\_datum}.
+The transaction order fulfills its purpose when its inclusion time is within the confirmed header's event interval.
+Whether or not the outcome of the order's \code{tx} L2 transaction was merged into the confirmed state, nothing more can be achieved with the transaction order, and it can be refunded according to the \code{refund\_address} and \code{refund\_datum}.
 
 The transaction order's \code{witness} staking credential must be deregistered when the deposit utxo is spent.
 
@@ -41,7 +46,8 @@ The transaction order's \code{witness} staking credential must be deregistered w
 \subsection{Minting policy}
 \label{h:transaction-order-minting-policy}
 
-\notebox{The transaction order's \code{inclusion\_time} must be within its \code{tx} L2 transaction's time-validity interval. 
+\notebox{The transaction order's \code{inclusion\_time} must be within its \code{tx} L2 transaction's time-validity interval.
+
 }
 
 \subsection{Spending validator}

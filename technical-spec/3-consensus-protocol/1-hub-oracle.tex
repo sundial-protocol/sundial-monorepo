@@ -5,7 +5,8 @@
 \section{Midgard hub oracle}
 \label{h:midgard-hub-oracle}
 
-This oracle keeps track of minting policy IDs and spending validator addresses for the lists used in the operator directory, state queue, and fraud proof set of the Midgard protocol. It consists of a single utxo holding the hub oracle NFT and a datum of the following type:
+This oracle keeps track of minting policy IDs and spending validator addresses for the lists used in the operator directory, state queue, and fraud proof set of the Midgard protocol.
+It consists of a single utxo holding the hub oracle NFT and a datum of the following type:
 \begin{equation*}
     \T{HubOracleDatum} \coloneq \left\{
     \begin{array}{ll}
@@ -32,9 +33,11 @@ This oracle keeps track of minting policy IDs and spending validator addresses f
 \subsection{Minting policy}
 \label{h:hub-oracle-minting-policy}
 
-The \code{hub\_oracle} minting policy ensures that all Midgard lists are initialized together, sent to their respective spending validator addresses, and deinitialized together. Redeemers:
+The \code{hub\_oracle} minting policy ensures that all Midgard lists are initialized together, sent to their respective spending validator addresses, and deinitialized together.
+Redeemers:
 \begin{description}
-    \item[Init.] Initialize all Midgard lists and send their root nodes to their respective validator addresses. Conditions:
+    \item[Init.] Initialize all Midgard lists and send their root nodes to their respective validator addresses.
+      Conditions:
         \begin{enumerate}
             \item Let \code{nonce\_utxo} be a static parameter of the \code{hub\_oracle} minting policy.
             \item \code{nonce\_utxo} must be spent.
@@ -48,7 +51,8 @@ The \code{hub\_oracle} minting policy ensures that all Midgard lists are initial
         \end{enumerate}
     The nonce utxo proves authority for initialization --- whoever controls it is authorized to initialize the Midgard L1 data structures.
     
-    \item[Burn.] Deinitialize all Midgard lists and burn the hub oracle NFT. Conditions:
+    \item[Burn.] Deinitialize all Midgard lists and burn the hub oracle NFT.
+      Conditions:
         \begin{enumerate}
             \item The transaction must burn the hub oracle NFT.
             \item Let \code{hub\_oracle\_input} be the transaction input that holds the hub oracle NFT.
@@ -61,7 +65,8 @@ The \code{hub\_oracle} minting policy ensures that all Midgard lists are initial
 \subsection{Spending validator}
 \label{h:hub-oracle-spending-validator}
 
-The \code{burn\_everything} validator requires every non-ADA token in the transaction to be burned. Conditions:
+The \code{burn\_everything} validator requires every non-ADA token in the transaction to be burned.
+Conditions:
 \begin{enumerate}
     \item The transaction must have a single output.
     \item The transaction's output must only contain ADA.
