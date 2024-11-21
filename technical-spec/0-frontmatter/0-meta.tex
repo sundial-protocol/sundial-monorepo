@@ -1,7 +1,7 @@
 \newcommand{\midgardtitle}{Midgard L2: Scaling Cardano with Optimistic Rollups}
 \newcommand{\midgardcovertitle}{Midgard L2: Scaling Cardano \\ with Optimistic Rollups\par}
 
-% \newcommand{\midgardversion}{Version 1.0}
+% \newcommand{\midgardversion}{1.0}
 
 \newcommand{\anastasiaLabsEmail}{\href{mailto:info@anastasialabs.com}{info@anastasialabs.com}}
 
@@ -23,3 +23,17 @@
         \contributor{Mark Petruska}{Anastasia Labs}
     \end{contributors}
 }
+
+\hypersetup{
+  pdftitle={\midgardtitle~(DRAFT~\today)},
+  pdfauthor={Philip DiSarro, Jonathan Rodriguez, George Flerovsky},
+  pdfpublisher={Anastasia Labs},
+  pdfcontactemail={\anastasiaLabsEmail}
+  pdfsubject={Cardano blockchain Layer 2 scaling},
+  pdfkeywords={Cardano blockchain L2 scaling Midgard optimistic rollup},
+}
+
+\ifthenelse{\isundefined{\midgardversion}}{}{\hypersetup{
+  pdftitle={\midgardtitle~(v\midgardversion)},
+  pdfversionid = {\midgardversion}
+}}

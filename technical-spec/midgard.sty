@@ -1,20 +1,4 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Silence annoying unavoidable warnings from packages
-\usepackage{silence}
-
-% Warnings from the `subfiles` package
-\WarningFilter{latex}{You have requested package}
-
-% Warnings from the `hyphenat` package
-\WarningFilter{latexfont}{Font shape `T1/cmtt}
-\WarningFilter{latexfont}{Font shape `OT1/cmtt}
-\WarningFilter{latexfont}{Some font shapes were not available}
-\WarningFilter{hyphenat}{***}
-
-% Warnings for TODO margin notes
-\WarningFilter{latex}{Marginpar on page}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Latex macro improvements
 % \usepackage{etoolbox}
 \usepackage{ifthen}
@@ -71,17 +55,15 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Hyphenation
-\usepackage[htt]{hyphenat}
-\renewcommand{\texttt}[1]{%
- \begingroup
- \ttfamily
- \begingroup\lccode`~=`/\lowercase{\endgroup\def~}{/\discretionary{}{}{}}%
- \begingroup\lccode`~=`[\lowercase{\endgroup\def~}{[\discretionary{}{}{}}%
- \begingroup\lccode`~=`.\lowercase{\endgroup\def~}{.\discretionary{}{}{}}%
- \catcode`/=\active\catcode`[=\active\catcode`.=\active
- \scantokens{#1\noexpand}%
- \endgroup
- }
+\usepackage{hyphenat}
+
+% Preserve the old \texttt behaviour
+\DeclareRobustCommand\ttfamily
+        {\not@math@alphabet\ttfamily\mathtt
+         \fontfamily\ttdefault\selectfont\hyphenchar\font=-1\relax}
+
+% Create a new version of \texttt that hyphenates.
+\DeclareTextFontCommand{\mytexttt}{\ttfamily\hyphenchar\font=45\relax}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Arrays and tabular typesetting
@@ -112,7 +94,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Inline code
 % styled with monospaced font in dark red color
-\newcommand{\code}[1]{\textcolor{inline-code-dark-red}{\texttt{#1}}}
+\newcommand{\code}[1]{\textcolor{inline-code-dark-red}{\mytexttt{#1}}}
 \newcommand{\codeNC}[1]{\texttt{#1}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -128,12 +110,21 @@
 % References, hyperlinks, and bibliography
 \usepackage[colon]{natbib}
 
-\usepackage[unicode=true,pdftex,pdfa,colorlinks=true]{hyperref}
+\usepackage[
+  unicode = true,
+  pdftex,
+  pdfa,
+  colorlinks = true
+]{hyperref}
+\usepackage{hyperxmp}
 \hypersetup{
-  breaklinks=true,
-  linkcolor={link-blue},
-  citecolor={link-blue},
-  urlcolor={link-blue},
+  breaklinks = true,
+  linkcolor = {link-blue},
+  citecolor = {link-blue},
+  urlcolor = {link-blue},
+  pdfcreator=pdfLatex,
+  pdfapart = 1,
+  pdfaconformance = B,
 }
 
 \usepackage[capitalise,noabbrev,nameinlink]{cleveref}

@@ -14,7 +14,8 @@
         \vspace{9cm}
         {\Large \uppercase{Technical Specification}}\\[0.5cm]
         {\fontsize{3em}{3.6em}\selectfont \midgardcovertitle}
-        \ifthenelse{\isundefined{\midgardversion}}{}{\vspace{0.5cm}\Large \MakeUppercase{\midgardversion}}
+        \ifthenelse{\isundefined{\midgardversion}}{}{%
+          \vspace{0.5cm}\Large \uppercase{Version} \midgardversion}
         
         \vfill
         
