@@ -43,3 +43,15 @@ pub type StepDatum {
 pub type FraudProofSpendDatum {
   fraud_prover: ByteArray,
 }
+
+pub type RegisteredOperatorData {
+  registration_time: POSIXTime,
+}
+
+pub type ActiveOperatorData {
+  commitment_time: Option<POSIXTime>,
+}
+
+pub type RetiredOperatorData {
+  commitment_time: Option<POSIXTime>,
+}

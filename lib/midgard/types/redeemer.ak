@@ -82,3 +82,12 @@ pub type FraudProofMintRedeemer {
 pub type FraudProofSpendRedeemer {
   fraud_proof_token_asset_name: ByteArray,
 }
+
+pub type RegisteredOperatorsMintRedeemer {
+  ROM_Init { init_utxo_index: Int }
+  ROM_Deinit
+  ROM_Register_Operator
+  ROM_Activate_Operator
+  ROM_Deregister_Operator
+  ROM_Remove_Duplicate_slash_Bond
+}
