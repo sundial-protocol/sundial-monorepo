@@ -42,6 +42,11 @@ pub fn get_link(raw_key_and_link: (Data, Data)) -> NodeKey {
   link
 }
 
+pub fn get_key_and_link(node_output: Output) -> (NodeKey, NodeKey) {
+  let raw = get_raw_key_and_link(node_output)
+  (get_key(raw), get_link(raw))
+}
+
 pub fn serialize_key(key: NodeKey) -> ByteArray {
   when key is {
     Empty -> constants.node_prefix

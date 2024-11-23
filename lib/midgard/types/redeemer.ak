@@ -86,8 +86,21 @@ pub type FraudProofSpendRedeemer {
 pub type RegisteredOperatorsMintRedeemer {
   ROM_Init { init_utxo_index: Int }
   ROM_Deinit
-  ROM_Register_Operator
-  ROM_Activate_Operator
+  ROM_Register_Operator {
+    key_to_prepend: ByteArray,
+    hub_oracle_ref_input_index: Int,
+    active_operator_ref_input_index: Int,
+    active_operator_asset_name: ByteArray,
+    retired_operator_ref_input_index: Int,
+    retired_operator_asset_name: ByteArray,
+    prepended_node_output_index: Int,
+    anchor_node_output_index: Int,
+  }
+  ROM_Activate_Operator {
+    node_to_activate_key: ByteArray,
+    removed_node_input_index: Int,
+    anchor_node_input_index: Int,
+  }
   ROM_Deregister_Operator
   ROM_Remove_Duplicate_slash_Bond
 }
