@@ -130,18 +130,17 @@
 \usepackage[capitalise,noabbrev,nameinlink]{cleveref}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Images
+\usepackage{graphicx}
+\DeclareGraphicsExtensions{.pdf,.png}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Figures and tables
 \usepackage{float}
 \floatstyle{boxed}
 \restylefloat{figure}
 
 \newenvironment{ruledfigure}[1]{\begin{figure}[#1]}{\end{figure}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% SVG image support
-% Setting `inkscapelatex` to false prevents Latex from scaling
-% text inside images, which can screw things up.
-\usepackage[inkscapelatex=false]{svg}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Rotated text

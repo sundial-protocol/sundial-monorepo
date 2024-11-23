@@ -15,7 +15,6 @@
         default = pkgs.mkShell {
           packages = with pkgs; [
             texliveFull
-            inkscape
           ];
         };
       });
