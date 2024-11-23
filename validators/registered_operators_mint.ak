@@ -15,16 +15,17 @@ use midgard/types/datum.{
 }
 use midgard/types/general.{POSIXTime, PubKeyHash}
 use midgard/types/redeemer.{
-  ROM_Activate_Operator, ROM_Deinit, ROM_Deregister_Operator, ROM_Init,
-  ROM_Register_Operator, ROM_Remove_Duplicate_slash_Bond,
-  RegisteredOperatorsMintRedeemer,
+  Active, ROM_Activate_Operator, ROM_Deinit, ROM_Deregister_Operator, ROM_Init,
+  ROM_Register_Operator, ROM_Remove_Duplicate_Slash_Bond, Registered,
+  RegisteredOperatorsMintRedeemer, Retired,
 }
 use midgard/utils
 
 validator registered_operators(
   required_bond: Int,
+  registration_duration: Int,
+  slashing_penalty: Int,
   init_utxo_id: ByteArray,
-  retired_operators_mint_script_hash: PolicyId,
   hub_oracle_script_hash: PolicyId,
   hub_oracle_asset_name: ByteArray,
 ) {
@@ -33,11 +34,10 @@ validator registered_operators(
     policy_id: PolicyId,
     self: Transaction,
   ) {
-    let (common, inputs, outputs, sigs, vrange) =
-      linked_list.make_common(self, policy_id)
+    let common = linked_list.make_common(self, policy_id)
     when redeemer is {
       ROM_Init(init_utxo_index) -> {
-        expect Some(init_input) = list.at(inputs, init_utxo_index)
+        expect Some(init_input) = list.at(self.inputs, init_utxo_index)
         let init_input_utxo_id =
           sha2_256(
             bytearray.push(
@@ -48,12 +48,14 @@ validator registered_operators(
         and {
           //TODO Should we call here linked_list.list_state_transition()?
           init_input_utxo_id == init_utxo_id,
-          init(common, self.mint, hub_oracle_script_hash, init_utxo_id),
+          quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == 1,
+          linked_list.init(common),
         }
       }
-      ROM_Deinit ->
-        //TODO Should we call here linked_list.list_state_transition()?
-        deinit(common, self.mint, hub_oracle_script_hash, init_utxo_id)
+      ROM_Deinit -> and {
+          quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
+          linked_list.deinit(common),
+        }
       ROM_Register_Operator(
         key_to_prepend,
         hub_oracle_ref_input_index,
@@ -90,7 +92,6 @@ validator registered_operators(
         expect registered_operator_data: RegisteredOperatorData =
           parsed_registered_operator_datum.data
         and {
-          //TODO Should we call here linked_list.list_state_transition()?
           linked_list.unordered_prepend(
             Key(key_to_prepend),
             prepended_node_output_index,
@@ -132,27 +133,37 @@ validator registered_operators(
         node_to_activate_key,
         hub_oracle_ref_input_index,
         retired_operator_ref_input_index,
+        retired_operator_asset_name,
         removed_node_input_index,
         anchor_node_input_index,
         active_operators_inserted_node_output_index,
         active_operators_anchor_node_output_index,
       ) -> {
         expect Finite(valid_from) = self.validity_range.lower_bound.bound_type
+        expect Some(hub_oracle_ref_input) =
+          list.at(self.reference_inputs, hub_oracle_ref_input_index)
+        expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
+        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
         expect Some(retired_operator_ref_input) =
           list.at(self.reference_inputs, retired_operator_ref_input_index)
         let retired_operator_raw_key_and_link =
           linked_list_utils.get_raw_key_and_link(
             retired_operator_ref_input.output,
           )
+        expect Some(removed_node_input) =
+          list.at(self.inputs, removed_node_input_index)
+        expect InlineDatum(removed_node_datum) = removed_node_input.output.datum
+        expect parsed_removed_node_datum: NodeDatum = removed_node_datum
+        expect registered_operator_data: RegisteredOperatorData =
+          parsed_removed_node_datum.data
         and {
-          //TODO Should we call here linked_list.list_state_transition()?
           linked_list.remove(
             Key(node_to_activate_key),
             removed_node_input_index,
             anchor_node_input_index,
             common,
           ),
-          valid_from >= registration_time + registration_duration,
+          valid_from >= registered_operator_data.registration_time + registration_duration,
           quantity_of(
             hub_oracle_ref_input.output.value,
             hub_oracle_script_hash,
@@ -176,8 +187,83 @@ validator registered_operators(
           ),
         }
       }
-      ROM_Deregister_Operator -> True
-      ROM_Remove_Duplicate_slash_Bond -> True
+      ROM_Deregister_Operator(
+        node_to_deregister_key,
+        removed_node_input_index,
+        anchor_node_input_index,
+      ) -> and {
+          linked_list.remove(
+            Key(node_to_deregister_key),
+            removed_node_input_index,
+            anchor_node_input_index,
+            common,
+          ),
+          list.has(self.extra_signatories, node_to_deregister_key),
+        }
+
+      ROM_Remove_Duplicate_Slash_Bond(
+        duplicate_node_key,
+        hub_oracle_ref_input_index,
+        duplicate_node_ref_input_index,
+        removed_node_input_index,
+        anchor_node_input_index,
+        witness_status,
+      ) -> and {
+          linked_list.remove(
+            Key(duplicate_node_key),
+            removed_node_input_index,
+            anchor_node_input_index,
+            common,
+          ),
+          self.fee >= slashing_penalty,
+          when witness_status is {
+            Registered -> {
+              expect Some(duplicate_node_ref_input) =
+                list.at(self.reference_inputs, duplicate_node_ref_input_index)
+              let duplicate_node_raw_key_and_link =
+                linked_list_utils.get_raw_key_and_link(
+                  duplicate_node_ref_input.output,
+                )
+              and {
+                belongsToRegisteredList(),
+                linked_list.is_member(
+                  Key(duplicate_node_key),
+                  linked_list_utils.get_key(duplicate_node_raw_key_and_link),
+                ),
+              }
+            }
+            Active -> {
+              expect Some(duplicate_node_ref_input) =
+                list.at(self.reference_inputs, duplicate_node_ref_input_index)
+              let duplicate_node_raw_key_and_link =
+                linked_list_utils.get_raw_key_and_link(
+                  duplicate_node_ref_input.output,
+                )
+              and {
+                belongsToActiveList(),
+                linked_list.is_member(
+                  Key(duplicate_node_key),
+                  linked_list_utils.get_key(duplicate_node_raw_key_and_link),
+                ),
+              }
+            }
+            Retired -> {
+              expect Some(duplicate_node_ref_input) =
+                list.at(self.reference_inputs, duplicate_node_ref_input_index)
+              let duplicate_node_raw_key_and_link =
+                linked_list_utils.get_raw_key_and_link(
+                  duplicate_node_ref_input.output,
+                )
+              and {
+                belongsToRetiredList(),
+                linked_list.is_member(
+                  Key(duplicate_node_key),
+                  linked_list_utils.get_key(duplicate_node_raw_key_and_link),
+                ),
+              }
+            }
+          },
+        }
     }
   }
 
@@ -185,66 +271,3 @@ validator registered_operators(
     fail
   }
 }
-
-fn init(
-  common: Common,
-  mint: Value,
-  hub_oracle_script_hash: ByteArray,
-  init_utxo_id: ByteArray,
-) -> Bool {
-  and {
-    quantity_of(mint, hub_oracle_script_hash, init_utxo_id) == 1,
-    linked_list.init(common),
-  }
-}
-
-fn deinit(
-  common: Common,
-  mint: Value,
-  hub_oracle_script_hash: ByteArray,
-  init_utxo_id: ByteArray,
-) -> Bool {
-  and {
-    quantity_of(mint, hub_oracle_script_hash, init_utxo_id) == -1,
-    linked_list.deinit(common),
-  }
-}
-// fn insert(
-//   common: Common<PublisherDatum>,
-//   insert_key: PubKeyHash,
-//   prev_node_key: PubKeyHash,
-//   validTo: POSIXTime,
-//   min_lovelace_bond: Int,
-// ) -> Bool {
-//   todo
-// }
-
-// fn slash(
-//   common: Common<PublisherDatum>,
-//   prev_node_key: PubKeyHash,
-//   remove_node_key: PubKeyHash,
-//   outputs: List<Output>,
-//   fraud_token_ref_input: Input,
-// ) -> Bool {
-//   todo
-// }
-
-// fn init_refund(
-//   common: Common<PublisherDatum>,
-//   node_to_mark_key: PubKeyHash,
-//   sigs: List<PubKeyHash>,
-//   validTo: POSIXTime,
-// ) -> Bool {
-//   todo
-// }
-
-// fn complete_refund(
-//   common: Common<PublisherDatum>,
-//   prev_node_key: PubKeyHash,
-//   remove_node_key: PubKeyHash,
-//   sigs: List<PubKeyHash>,
-//   validFrom: POSIXTime,
-//   refund_waiting_period: Int,
-// ) -> Bool {
-//   todo
-// }

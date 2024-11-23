@@ -83,6 +83,12 @@ pub type FraudProofSpendRedeemer {
   fraud_proof_token_asset_name: ByteArray,
 }
 
+pub type WitnessStatus {
+  Registered
+  Active
+  Retired
+}
+
 pub type RegisteredOperatorsMintRedeemer {
   ROM_Init { init_utxo_index: Int }
   ROM_Deinit
@@ -100,11 +106,23 @@ pub type RegisteredOperatorsMintRedeemer {
     node_to_activate_key: ByteArray,
     hub_oracle_ref_input_index: Int,
     retired_operator_ref_input_index: Int,
+    retired_operator_asset_name: ByteArray,
     removed_node_input_index: Int,
     anchor_node_input_index: Int,
     active_operators_inserted_node_output_index: Int,
     active_operators_anchor_node_output_index: Int,
   }
-  ROM_Deregister_Operator
-  ROM_Remove_Duplicate_slash_Bond
+  ROM_Deregister_Operator {
+    node_to_deregister_key: ByteArray,
+    removed_node_input_index: Int,
+    anchor_node_input_index: Int,
+  }
+  ROM_Remove_Duplicate_Slash_Bond {
+    duplicate_node_key: ByteArray,
+    hub_oracle_ref_input_index: Int,
+    duplicate_node_ref_input_index: Int,
+    removed_node_input_index: Int,
+    anchor_node_input_index: Int,
+    witness_status: WitnessStatus,
+  }
 }

@@ -1,6 +1,5 @@
 use aiken/collection/dict.{Dict}
 use aiken/collection/list
-use aiken/interval.{Interval}
 use aiken/primitive/bytearray
 use cardano/assets.{AssetName, PolicyId, flatten, quantity_of, tokens}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
@@ -10,20 +9,9 @@ use linked_list/utils.{
   get_key, get_link, get_outputs, get_raw_key_and_link, only_at_node_val,
   serialize_key,
 }
-use midgard/types/general.{POSIXTime, PubKeyHash}
 
-pub fn make_common(
-  transaction: Transaction,
-  own_cs: PolicyId,
-) -> (Common, List<Input>, List<Output>, List<PubKeyHash>, Interval<POSIXTime>) {
-  let Transaction {
-    inputs,
-    outputs,
-    mint,
-    validity_range,
-    extra_signatories,
-    ..
-  } = transaction
+pub fn make_common(transaction: Transaction, own_cs: PolicyId) -> Common {
+  let Transaction { inputs, outputs, mint, .. } = transaction
   let in_outputs = get_outputs(inputs)
   let from_node_val = only_at_node_val(in_outputs, own_cs)
   let to_node_val = only_at_node_val(outputs, own_cs)
@@ -43,15 +31,12 @@ pub fn make_common(
             }
           },
         )
-  let common =
-    Common {
-      node_cs: own_cs,
-      node_mint: tokens(mint, own_cs),
-      node_in_outputs: from_node_val,
-      node_outputs: to_node_val,
-    }
-  //TODO Do we need inputs and outputs here?
-  (common, inputs, outputs, extra_signatories, validity_range)
+  Common {
+    node_cs: own_cs,
+    node_mint: tokens(mint, own_cs),
+    node_in_outputs: from_node_val,
+    node_outputs: to_node_val,
+  }
 }
 
 pub fn list_state_transition(node_mint: Dict<AssetName, Int>) {
