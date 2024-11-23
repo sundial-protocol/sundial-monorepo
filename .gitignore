@@ -6,14 +6,15 @@ build/
 docs/
 
 # Latex aux files
+technical-spec/*.pdf
 technical-spec/**/*.aux
 technical-spec/**/*.fdb_latexmk
 technical-spec/**/*.fls
 technical-spec/**/*.lof
 technical-spec/**/*.log
 technical-spec/**/*.out
-technical-spec/**/*.pdf
 technical-spec/**/*.synctex.gz
 technical-spec/**/*.toc
+technical-spec/svg-inkscape/
 
 .direnv

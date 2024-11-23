@@ -16,13 +16,14 @@ shell:
 
 .PHONY: build
 build:
-	latexmk -pdf -shell-escape -verbose -file-line-error -synctex=1 -interaction=nonstopmode
+	latexmk -pdf -verbose -file-line-error -synctex=1 -interaction=nonstopmode
 
 .PHONY: nix-build
 nix-build:
-	nix develop --command bash -c "latexmk -pdf -shell-escape -verbose -file-line-error -synctex=1 -interaction=nonstopmode"
+	nix develop --command bash -c "latexmk -pdf -verbose -file-line-error -synctex=1 -interaction=nonstopmode"
 
 .PHONY: clean
 clean:
 	latexmk -C
 	rm -rf svg-inkscape/
+	find . -type f -name "*.aux" -exec rm {} \;
