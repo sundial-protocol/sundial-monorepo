@@ -130,10 +130,20 @@ validator registered_operators(
 
       ROM_Activate_Operator(
         node_to_activate_key,
+        hub_oracle_ref_input_index,
+        retired_operator_ref_input_index,
         removed_node_input_index,
         anchor_node_input_index,
+        active_operators_inserted_node_output_index,
+        active_operators_anchor_node_output_index,
       ) -> {
         expect Finite(valid_from) = self.validity_range.lower_bound.bound_type
+        expect Some(retired_operator_ref_input) =
+          list.at(self.reference_inputs, retired_operator_ref_input_index)
+        let retired_operator_raw_key_and_link =
+          linked_list_utils.get_raw_key_and_link(
+            retired_operator_ref_input.output,
+          )
         and {
           //TODO Should we call here linked_list.list_state_transition()?
           linked_list.remove(
@@ -150,8 +160,8 @@ validator registered_operators(
           ) == 1,
           linked_list.ordered_insert(
             Key(node_to_activate_key),
-            inserted_node_output_index,
-            anchor_node_output_index,
+            active_operators_inserted_node_output_index,
+            active_operators_anchor_node_output_index,
             common,
           ),
           quantity_of(
