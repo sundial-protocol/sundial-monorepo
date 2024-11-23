@@ -16,5 +16,6 @@ technical-spec/**/*.out
 technical-spec/**/*.synctex.gz
 technical-spec/**/*.toc
 technical-spec/svg-inkscape/
+technical-spec/gitHeadLocal.gin
 
 .direnv
