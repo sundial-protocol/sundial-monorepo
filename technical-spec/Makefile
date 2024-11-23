@@ -27,3 +27,4 @@ clean:
 	latexmk -C
 	rm -rf svg-inkscape/
 	find . -type f -name "*.aux" -exec rm {} \;
+	rm gitHeadLocal.gin
