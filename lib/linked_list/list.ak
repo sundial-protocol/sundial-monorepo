@@ -1,6 +1,7 @@
 use aiken/collection/dict.{Dict}
 use aiken/collection/list
 use aiken/primitive/bytearray
+use cardano/address.{Address}
 use cardano/assets.{AssetName, PolicyId, flatten, quantity_of, tokens}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use linked_list/constants
@@ -90,31 +91,45 @@ pub fn key_removed(key: NodeKey, node_mint: Dict<AssetName, Int>) {
   }
 }
 
-pub fn is_member(k: NodeKey, node_key: NodeKey) {
-  k == node_key
+pub fn is_member(
+  k: NodeKey,
+  node_key: NodeKey,
+  node_address: Address,
+  linked_list_address: Address,
+) {
+  k == node_key && node_address == linked_list_address
 }
 
-pub fn ordered_is_not_member(k: NodeKey, node_key: NodeKey, node_link: NodeKey) {
-  and {
-    k != Empty,
-    {
-      expect Key(actual_key) = k
-      and {
-        or {
-          is_root_node(node_key),
-          {
-            expect Key(actual_node_key) = node_key
-            bytearray.compare(actual_node_key, actual_key) == Less
+pub fn ordered_is_not_member(
+  k: NodeKey,
+  node_key: NodeKey,
+  node_link: NodeKey,
+  node_address: Address,
+  linked_list_address: Address,
+) {
+  or {
+    node_address != linked_list_address,
+    and {
+      k != Empty,
+      {
+        expect Key(actual_key) = k
+        and {
+          or {
+            is_root_node(node_key),
+            {
+              expect Key(actual_node_key) = node_key
+              bytearray.compare(actual_node_key, actual_key) == Less
+            },
           },
-        },
-        or {
-          is_last_node(node_link),
-          {
-            expect Key(actual_node_link) = node_link
-            bytearray.compare(actual_key, actual_node_link) == Less
+          or {
+            is_last_node(node_link),
+            {
+              expect Key(actual_node_link) = node_link
+              bytearray.compare(actual_key, actual_node_link) == Less
+            },
           },
-        },
-      }
+        }
+      },
     },
   }
 }
@@ -171,13 +186,19 @@ pub fn unordered_prepend(
     list.length(common.node_in_outputs) == 1,
     is_root_node(parsed_anchor_node_input_datum.key),
     list.length(common.node_outputs) == 2,
-    is_member(key_to_prepend, get_key(prepended_node_output_raw_key_and_link)),
+    is_member(
+      key_to_prepend,
+      get_key(prepended_node_output_raw_key_and_link),
+      prepended_node_output.address,
+      anchor_node_input.address,
+    ),
     parsed_anchor_node_input_datum.link == get_link(
       prepended_node_output_raw_key_and_link,
     ),
     anchor_node_input.address == anchor_node_output.address,
     anchor_node_input.value == anchor_node_output.value,
     anchor_node_new_datum == parsed_anchor_node_output_datum,
+    //TODO This is already checked in is_member
     prepended_node_output.address == anchor_node_output.address,
     list.length(flatten(prepended_node_output.value)) == 2,
   }
@@ -193,6 +214,8 @@ pub fn ordered_prepend(
   expect Some(anchor_node_input) = list.head(common.node_in_outputs)
   let anchor_node_input_raw_key_and_link =
     get_raw_key_and_link(anchor_node_input)
+  expect Some(prepended_node_output) =
+    list.at(common.node_outputs, prepended_node_output_index)
   and {
     unordered_prepend(
       key_to_prepend,
@@ -204,6 +227,8 @@ pub fn ordered_prepend(
       key_to_prepend,
       node_key: get_key(anchor_node_input_raw_key_and_link),
       node_link: get_link(anchor_node_input_raw_key_and_link),
+      node_address: prepended_node_output.address,
+      linked_list_address: anchor_node_input.address,
     ),
   }
 }
@@ -238,7 +263,12 @@ pub fn unordered_append(
     list.length(common.node_in_outputs) == 1,
     is_last_node(get_link(anchor_node_raw_key_and_link)),
     list.length(common.node_outputs) == 2,
-    is_member(key_to_append, get_key(appended_node_output_raw_key_and_link)),
+    is_member(
+      key_to_append,
+      get_key(appended_node_output_raw_key_and_link),
+      appended_node_output.address,
+      anchor_node_input.address,
+    ),
     is_last_node(get_link(appended_node_output_raw_key_and_link)),
     get_link(appended_node_output_raw_key_and_link) == key_to_append,
     anchor_node_input.address == anchor_node_output.address,
@@ -259,6 +289,8 @@ pub fn ordered_append(
   expect Some(anchor_node_input) = list.head(common.node_in_outputs)
   let anchor_node_input_raw_key_and_link =
     get_raw_key_and_link(anchor_node_input)
+  expect Some(appended_node_output) =
+    list.at(common.node_outputs, appended_node_output_index)
   and {
     unordered_prepend(
       key_to_append,
@@ -270,6 +302,8 @@ pub fn ordered_append(
       key_to_append,
       node_key: get_key(anchor_node_input_raw_key_and_link),
       node_link: get_link(anchor_node_input_raw_key_and_link),
+      node_address: appended_node_output.address,
+      linked_list_address: anchor_node_input.address,
     ),
   }
 }
@@ -306,9 +340,16 @@ pub fn ordered_insert(
       key_to_insert,
       parsed_anchor_node_input_datum.key,
       parsed_anchor_node_input_datum.link,
+      node_address: inserted_node_output.address,
+      linked_list_address: anchor_node_input.address,
     ),
     list.length(common.node_outputs) == 2,
-    is_member(key_to_insert, get_key(inserted_node_output_raw_key_and_link)),
+    is_member(
+      key_to_insert,
+      get_key(inserted_node_output_raw_key_and_link),
+      inserted_node_output.address,
+      anchor_node_input.address,
+    ),
     parsed_anchor_node_output_datum.link == key_to_insert,
     parsed_anchor_node_input_datum.link == get_link(
       inserted_node_output_raw_key_and_link,
@@ -347,7 +388,12 @@ pub fn remove(
   and {
     key_removed(key_to_remove, common.node_mint),
     list.length(common.node_in_outputs) == 2,
-    is_member(key_to_remove, get_key(removed_node_raw_key_and_link)),
+    is_member(
+      key_to_remove,
+      get_key(removed_node_raw_key_and_link),
+      removed_node_input.address,
+      anchor_node_input.address,
+    ),
     parsed_anchor_node_input_datum.link == key_to_remove,
     list.length(common.node_outputs) == 1,
     anchor_node_input.address == anchor_node_output.address,

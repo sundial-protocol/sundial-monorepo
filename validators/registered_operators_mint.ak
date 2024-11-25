@@ -1,25 +1,18 @@
-use aiken/collection/list.{length}
+use aiken/collection/list
 use aiken/crypto.{sha2_256}
 use aiken/interval.{Finite, Interval}
 use aiken/primitive/bytearray
-use cardano/assets.{PolicyId, Value, flatten, quantity_of}
+use cardano/assets.{PolicyId, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use linked_list/data.{Common, Empty, Key, NodeDatum, NodeKey}
+use linked_list/data.{Key, NodeDatum}
 use linked_list/list as linked_list
 use linked_list/utils as linked_list_utils
-use midgard/constants
-use midgard/types/config.{PublisherSetConfig}
-use midgard/types/datum.{
-  FraudProofValidatorDatum, HubOracleDatum, PublisherDatum,
-  RegisteredOperatorData,
-}
-use midgard/types/general.{POSIXTime, PubKeyHash}
+use midgard/types/datum.{HubOracleDatum, RegisteredOperatorData}
 use midgard/types/redeemer.{
   Active, ROM_Activate_Operator, ROM_Deinit, ROM_Deregister_Operator, ROM_Init,
   ROM_Register_Operator, ROM_Remove_Duplicate_Slash_Bond, Registered,
   RegisteredOperatorsMintRedeemer, Retired,
 }
-use midgard/utils
 
 validator registered_operators(
   required_bond: Int,
@@ -115,6 +108,8 @@ validator registered_operators(
             Key(key_to_prepend),
             linked_list_utils.get_key(active_operator_raw_key_and_link),
             linked_list_utils.get_link(active_operator_raw_key_and_link),
+            registered_node_output.address,
+            active_operator_ref_input.output.address,
           ),
           quantity_of(
             retired_operator_ref_input.output.value,
@@ -125,6 +120,8 @@ validator registered_operators(
             Key(key_to_prepend),
             linked_list_utils.get_key(retired_operator_raw_key_and_link),
             linked_list_utils.get_link(retired_operator_raw_key_and_link),
+            registered_node_output.address,
+            retired_operator_ref_input.output.address,
           ),
         }
       }
@@ -156,6 +153,8 @@ validator registered_operators(
         expect parsed_removed_node_datum: NodeDatum = removed_node_datum
         expect registered_operator_data: RegisteredOperatorData =
           parsed_removed_node_datum.data
+        expect Some(active_operators_inserted_node_output) =
+          list.at(self.outputs, active_operators_inserted_node_output_index)
         and {
           linked_list.remove(
             Key(node_to_activate_key),
@@ -184,6 +183,8 @@ validator registered_operators(
             Key(node_to_activate_key),
             linked_list_utils.get_key(retired_operator_raw_key_and_link),
             linked_list_utils.get_link(retired_operator_raw_key_and_link),
+            active_operators_inserted_node_output.address,
+            retired_operator_ref_input.output.address,
           ),
         }
       }
@@ -208,7 +209,14 @@ validator registered_operators(
         removed_node_input_index,
         anchor_node_input_index,
         witness_status,
-      ) -> and {
+      ) -> {
+        expect Some(hub_oracle_ref_input) =
+          list.at(self.reference_inputs, hub_oracle_ref_input_index)
+        expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
+        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        expect Some(removed_node_input) =
+          list.at(self.inputs, removed_node_input_index)
+        and {
           linked_list.remove(
             Key(duplicate_node_key),
             removed_node_input_index,
@@ -224,13 +232,12 @@ validator registered_operators(
                 linked_list_utils.get_raw_key_and_link(
                   duplicate_node_ref_input.output,
                 )
-              and {
-                belongsToRegisteredList(),
-                linked_list.is_member(
-                  Key(duplicate_node_key),
-                  linked_list_utils.get_key(duplicate_node_raw_key_and_link),
-                ),
-              }
+              linked_list.is_member(
+                Key(duplicate_node_key),
+                linked_list_utils.get_key(duplicate_node_raw_key_and_link),
+                removed_node_input.output.address,
+                parsed_hub_oracle_datum.registered_operators_addr,
+              )
             }
             Active -> {
               expect Some(duplicate_node_ref_input) =
@@ -239,13 +246,12 @@ validator registered_operators(
                 linked_list_utils.get_raw_key_and_link(
                   duplicate_node_ref_input.output,
                 )
-              and {
-                belongsToActiveList(),
-                linked_list.is_member(
-                  Key(duplicate_node_key),
-                  linked_list_utils.get_key(duplicate_node_raw_key_and_link),
-                ),
-              }
+              linked_list.is_member(
+                Key(duplicate_node_key),
+                linked_list_utils.get_key(duplicate_node_raw_key_and_link),
+                removed_node_input.output.address,
+                parsed_hub_oracle_datum.active_operators_addr,
+              )
             }
             Retired -> {
               expect Some(duplicate_node_ref_input) =
@@ -254,16 +260,16 @@ validator registered_operators(
                 linked_list_utils.get_raw_key_and_link(
                   duplicate_node_ref_input.output,
                 )
-              and {
-                belongsToRetiredList(),
-                linked_list.is_member(
-                  Key(duplicate_node_key),
-                  linked_list_utils.get_key(duplicate_node_raw_key_and_link),
-                ),
-              }
+              linked_list.is_member(
+                Key(duplicate_node_key),
+                linked_list_utils.get_key(duplicate_node_raw_key_and_link),
+                removed_node_input.output.address,
+                parsed_hub_oracle_datum.retired_operators_addr,
+              )
             }
           },
         }
+      }
     }
   }
 
