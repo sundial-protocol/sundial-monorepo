@@ -72,7 +72,7 @@ Build steps:
     code technical-spec
     ```
 2. Select the main TeX file (`midgard.tex`)
-3. Click the green play button (top right of file pane) to build the LaTex project (CTRL + ALT + B).
+3. Click the green play button (top right of file pane) to build the LaTeX project (CTRL + ALT + B).
 
 ### Neovim (advanced)
 
@@ -85,3 +85,15 @@ Build steps:
 3. Turn on the continuous build using VimTex's hotkey, by default `<LocalLeader>ll`. Now, it will also rebuild whenever you save changes to a `.tex` file in the directory.
 
 The [Sioyek PDF viewer](https://sioyek.info/) works particularly well with VimTex on Linux (tested on Wayland).
+
+### Emacs
+
+Most Emacs distributions comes with built-in support to build the LaTeX project.
+
+Build steps:
+
+1. Open the midgard.tex file with emacs:
+    ```bash
+    emacs technical-spec/midgard.pdf
+    ```
+2. Invoke the `tex-compile` command (usually `M-x tex-compile`)
