@@ -36,19 +36,10 @@ state_queue =
   , data: block_compact
   }
 
-confirmed_header =
-  { ? header_hash    : $hash32
-  , utxo_root        : $mptr
-  , start_time       : $posix_time
-  , end_time         : $posix_time
-  , protocol_version : uint
-  , utxo_count       : uint
-  }
-
 confirmed_state =
   { key: null
   , next: $hash32 / null
-  , data: block_compact ; different type - see whitepaper 1.3
+  , data: block_compact
   }
 
 ; Block
@@ -130,8 +121,6 @@ transaction =
 transaction_compact =
   { transaction_body_hash: $hash32
   , transaction_witness_set_hash: $hash32
-  , boolean ; is_valid tag
-  , null ; auxiliary_data
   }
 
 ; Transaction Body
@@ -161,7 +150,7 @@ transaction_body =
 ;   4. Withdrawals do not modify the Midgard Ledger state, as staking is not supported. Their only purpose is to utilize the "withdraw zero" pattern.
 ;   5. auxiliary_data_hash represents the Merkle root hash of metadata.
 ;   6. network_id indicates whether the transaction is for Midgard Mainnet (10) or Testnet (11).
-;   7. Fields collateral_inputs (13), collateral_return(16) , total_collateral (17), voting_procedures (19),
+;   7. Fields withdrawals_hash (5), collateral_inputs (13), collateral_return(16) , total_collateral (17), voting_procedures (19),
 ;      [+ proposal_procedure] (20), coin (21), and donation (22) are not relevant to the Midgard Ledger and are ignored.
 ;   8. Indicates observer scripts according to Cardano CIP 112.
 
@@ -175,44 +164,41 @@ transaction_body_compact =
   , 2 : uint           ; fee
   , ? 3 : uint         ; validity_interval_end (ttl)
   , ? 4 : $hash32      ; certificates_hash
-  , ? 5 : $hash32      ; withdrawals_hash
   , ? 7 : $hash32      ; auxiliary_data_hash
   , ? 8 : uint         ; validity_interval_start
   , ? 9 : $hash32      ; mint_hash
-  , ? 11 : $hash32     ; script_data_hash
+  , ? 11 : $hash32     ; script_data_hash / script_integrity_hash
   , ? 14 : $hash32     ; required_signers_hash
   , ? 15 : uint        ; network_id
   , ? 18 : $hash32     ; reference_inputs_hash
   , ? 23 : $hash32     ; required_observers_hash
   }
 
-inputs_set_hash = non_empty_set<transaction_input_compact>
+inputs_set_hash = non_empty_oset<transaction_input_compact>
 inputs_hash = $hash32 ; hash of inputs_set_hash
 
 outputs_list_hash = [* transaction_output_compact]
 outputs_hash = $hash32 ; hash of outputs_list_hash
 
 
+; Implementation Notes
+; - Field bootstrap_witness (2), nonempty_set<plutus_v1_script> (3), nonempty_set<plutus_data> (4),
+;   nonempty_set<plutus_v2_script> (6), are not relevant to the Midgard Ledger and are ignored.
+
 ; Transaction Witness Set
 ; Full Representation
 transaction_witness_set =
   { ? 0 : nonempty_set<vkeywitness>
   , ? 1 : nonempty_set<native_script>
-  , ? 4 : nonempty_set<plutus_data> ; datum hashes
   , ? 5 : redeemers                 ; scripts
   , ? 7 : nonempty_set<plutus_v3_script>
   }
-
-; Implementation Notes
-; - Field bootstrap_witness (2), nonempty_set<plutus_v1_script> (3), 
-;   nonempty_set<plutus_v2_script> (6), are not relevant to the Midgard Ledger and are ignored.
 
 ; Transaction Witness Set
 ; Compact Representation
 transaction_witness_set_compact =
   { ? 0 : $hash32   ; nonempty_set<vkeywitness>
   , ? 1 : $hash32   ; nonempty_set<native_script>
-  , ? 4 : $hash32   ; nonempty_set<plutus_data>
   , ? 5 : $hash32   ; redeemers
   , ? 7 : $hash32   ; nonempty_set<plutus_v3_script>
   }

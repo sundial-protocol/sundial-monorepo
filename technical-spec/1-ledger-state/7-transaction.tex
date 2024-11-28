@@ -31,9 +31,9 @@ We also simplify the script types.}
     \end{array} \right\} \\
     \T{CardanoTxBody} \coloneq\;& \left\{
     \begin{array}{ll}
-        \T{spend\_inputs} : & \T{Set(OutRef)} \\
-        \T{collateral\_inputs} : & \quad?\;\T{Set(OutRef)} \\
-        \T{reference\_inputs} : & \quad?\;\T{Set(OutRef)} \\
+        \T{spend\_inputs} : & \T{Set(OutputRef)} \\
+        \T{collateral\_inputs} : & \quad?\;\T{Set(OutputRef)} \\
+        \T{reference\_inputs} : & \quad?\;\T{Set(OutputRef)} \\
         \T{outputs} : & \T{[Output]} \\
         \T{collateral\_return} : & \quad?\;\T{Output} \\
         \T{total\_collateral} : & \quad?\;\T{Coin} \\
@@ -85,7 +85,7 @@ Midgard's transaction types deviate from Cardano's in the following ways:
     \item[CIPs 112 and 128.] Midgard has adopted \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0112}{CIP-112} and \href{https://github.com/cardano-foundation/CIPs/tree/master/CIP-0128}{CIP 128} ahead of Cardano mainnet, which we expect to merge them in 2025.
       CIP-112 provides a new ``Observe'' script purpose, a more principled and streamlined alternative to the ``Withdraw 0'' trick widely used by most Cardano dApps.
       It also allows native scripts to conditionally forward their logic to an observer script.
-      On the other hand, CIP-128 will significantly improve the execution efficiency achievable in Plutus contracts by preserving the order of inputs in a submitted transaction (instead of ordering them by \code{Outref}).
+      On the other hand, CIP-128 will significantly improve the execution efficiency achievable in Plutus contracts by preserving the order of inputs in a submitted transaction (instead of ordering them by \code{OutputRef}).
     \item[Different network ID.] Midgard transactions and utxo addresses use a different network ID to distinguish them from their Cardano mainnet counterparts.
       Furthermore, we are considering a prefix to minting policy IDs to distinguish tokens deposited from L1 from tokens minted on L2.
     \item[Replace slots with POSIX timestamps.] Midgard's consensus protocol does not use slots like Ouroboros.
@@ -107,21 +107,21 @@ We use the empty set symbol \code{$\varnothing$} to indicate fields required to 
     \begin{array}{ll}
         \T{body} : & \T{MidgardSTxBody} \\
         \T{wits} : & \T{MidgardSTxWits} \\
-        \varnothing\;\T{is\_valid} : & \T{Bool} \\
+        \T{is\_valid} : & \T{Bool} \\
         \varnothing\;\T{auxiliary\_data}: & \quad?\;\T{TxMetadata}
     \end{array} \right\} \\
     \T{MidgardSTxBody} \coloneq\;& \left\{
     \begin{array}{ll}
-        \T{spend\_inputs} : & \T{Set(OutRef)} \\
-        \T{collateral\_inputs} : & \quad?\;\T{Set(OutRef)} \\
-        \T{reference\_inputs} : & \quad?\;\T{Set(OutRef)} \\
+        \T{spend\_inputs} : & \T{Set(OutputRef)} \\
+        \varnothing\;\T{collateral\_inputs} : & \quad?\;\T{Set(OutputRef)} \\
+        \T{reference\_inputs} : & \quad?\;\T{Set(OutputRef)} \\
         \T{outputs} : & \T{[Output]} \\
-        \T{collateral\_return} : & \quad?\;\T{Output} \\
-        \T{total\_collateral} : & \quad?\;\T{Coin} \\
+        \varnothing\;\T{collateral\_return} : & \quad?\;\T{Output} \\
+        \varnothing\;\T{total\_collateral} : & \quad?\;\T{Coin} \\
         \varnothing\;\T{certificates} : & \quad?\;\T{[ Set(Certificate) ]} \\
         \varnothing\;\T{withdrawals} : & \quad?\;\T{Map(RewardAccount, Coin)} \\
         \T{fee} : & \T{Coin} \\
-        \star\;\T{validity\_interval} : & \T{MidgardSValidityInterval} \\
+        \star\;\T{validity\_interval} : & \quad?\;\T{MidgardSValidityInterval} \\
         \star\;\T{required\_observers} : & \quad?\;\T{[MidgardSCredential]} \\
         \T{mint} : & \quad?\;\T{Value} \\
         \T{script\_integrity\_hash} : & \quad?\;\T{Hash} \\
@@ -152,6 +152,44 @@ We use the empty set symbol \code{$\varnothing$} to indicate fields required to 
 \subsection{Midgard transaction types}
 \label{h:midgard-transaction-types}
 
-\notebox{Midgard's transaction types modify the simplified types above mainly by adding counter fields for variable-length fields, along with other changes to facilitate L1 scripts traversing the L2 transaction contents to verify fraud proofs.}\todo
+\notebox{Midgard's transaction types modify the simplified types above mainly by adding counter fields for variable-length fields, along with other changes to facilitate L1 scripts traversing the L2 transaction contents to verify fraud proofs.}
+
+\notebox{
+    The DA layer will be responsible for confirming hashes of lists, sets or other objects.
+    In other words, the mismatched hashes are a form of DA frauds.
+}
+
+\begingroup
+\allowdisplaybreaks
+\begin{align*}
+    \T{MidgardTx} \coloneq\;& \left\{
+    \begin{array}{ll}
+        \T{body} : & \T{Hash(MidgardTxBody)} \\
+        \T{wits} : & \T{Hash(MidgardTxWits)} \\
+        \T{is\_valid} : & \T{Bool} \\
+    \end{array} \right\} \\
+    \T{MidgardTxBody} \coloneq\;& \left\{
+    \begin{array}{ll}
+        \T{spend\_inputs} : & \T{Hash([OutputRef])} \\
+        \T{reference\_inputs} : & \quad?\;\T{Hash([OutputRef])} \\
+        \T{outputs} : & \T{Hash([Output])} \\
+        \T{fee} : & \T{Coin} \\
+        \T{validity\_interval\_start} : & \quad?\;\T{Int} \\
+        \T{validity\_interval\_end} : & \quad?\;\T{Int} \\
+        \T{required\_observers} : & \quad?\;\T{Hash([MidgardSCredential])} \\
+        \T{mint} : & \quad?\;\T{Value} \\
+        \T{script\_integrity\_hash} : & \quad?\;\T{Hash} \\
+        \T{auxiliary\_data\_hash} : & \quad?\;\T{Hash} \\
+        \T{network\_id} : & \quad?\;\T{Network} \\
+        \T{required\_signers} : & \quad?\;\T{Hash(Set(Address))} \\
+    \end{array} \right\}\\
+    \T{MidgardTxWits} \coloneq\;& \left\{
+    \begin{array}{ll}
+        \T{addr\_tx\_wits} : & \quad?\;\T{Hash(Set(VKey, Signature, VKeyHash))} \\
+        \T{script\_tx\_wits} : & \quad?\;\T{Hash(Map(ScriptHash, MidgardSScript))} \\
+        \T{redeemer\_tx\_wits} : & \quad?\;\T{Hash(Redeemers)}
+    \end{array} \right\}\\
+\end{align*}
+\endgroup
 
 \end{document}
