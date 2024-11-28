@@ -6,7 +6,7 @@ help:
 	@echo "Targets:"
 	@echo "  help      -- show this help"
 	@echo "  shell     -- open nix dev shell"
-	@echo "  build     -- generate the whitepaper pdf"
+	@echo "  build     -- build the specification midgard.pdf"
 	@echo "  clean     -- clean up latexmk files"
 	@echo "  nix-build -- open nix shell & build"
 	@echo "  nix-clean -- open nix shell & clean"
