@@ -31,21 +31,22 @@
 ; We use the term Full Representation to refer to the raw data representation and Compact Representation to denote the lightweight, on-chain based representation.
 
 state_queue =
-  { key: $hash32 / null
+  { key: $hash32 / null ; block header hash
   , next: $hash32 / null
   , data: block_compact
   }
 
 confirmed_state =
-  { key: $hash32 / null
+  { key: null
   , next: $hash32 / null
   , data: block_compact
   }
 
 ; Block
 ; Full Representation
-block = 
-  { header
+block =
+  { header_hash
+  , header
   , block_body
   }
 
@@ -57,7 +58,7 @@ block_body =
   , utxos: [* utxo]
   }
 
-header = 
+header =
   { block_number: uint
   , block_hash: $hash32
   , previous_block_hash: $hash32 / null
@@ -71,12 +72,12 @@ header =
 
 ; Block
 ; Compact Representation
-block_compact = 
+block_compact =
   { header_compact
   , block_body_roots
   }
 
-block_body_roots = 
+block_body_roots =
   { previous_utxos_root: $hash32
   , withdraw_events_root: $hash32
   , transactions_root: $hash32
@@ -84,22 +85,22 @@ block_body_roots =
   , utxos_root: $hash32
   }
 
-header_compact = 
+header_compact =
   { block_number: uint
-  , block_hash: $hash32
   , previous_block_hash: $hash32 / null
   , start_time: $posix_time
   , end_time: $posix_time
-  , operator_vkey : $vkey
-  , block_signature: $signature
+  , operator_vkey: $vkey
   , protocol_version: [uint, uint]
   , transaction_count: uint
+  , deposit_count: uint
+  , withdrawal_count: uint
   }
 
 ; Transaction
 ; Full Representation
 
-transaction = 
+transaction =
   [ transaction_body
   , transaction_witness_set
   , boolean ; is_valid tag (see note 1)
@@ -118,11 +119,9 @@ transaction =
 ; Transaction
 ; Compact Representation
 
-transaction_compact = 
+transaction_compact =
   { transaction_body_hash: $hash32
   , transaction_witness_set_hash: $hash32
-  , boolean ; is_valid tag
-  , null ; auxiliary_data
   }
 
 ; Transaction Body
@@ -152,7 +151,7 @@ transaction_body =
 ;   4. Withdrawals do not modify the Midgard Ledger state, as staking is not supported. Their only purpose is to utilize the "withdraw zero" pattern.
 ;   5. auxiliary_data_hash represents the Merkle root hash of metadata.
 ;   6. network_id indicates whether the transaction is for Midgard Mainnet (10) or Testnet (11).
-;   7. Fields collateral_inputs (13), collateral_return(16) , total_collateral (17), voting_procedures (19),
+;   7. Fields certificates (4), withdrawals_hash (5), collateral_inputs (13), collateral_return(16) , total_collateral (17), voting_procedures (19),
 ;      [+ proposal_procedure] (20), coin (21), and donation (22) are not relevant to the Midgard Ledger and are ignored.
 ;   8. Indicates observer scripts according to Cardano CIP 112.
 
@@ -166,7 +165,6 @@ transaction_body_compact =
   , 2 : uint           ; fee
   , ? 3 : uint         ; validity_interval_end (ttl)
   , ? 4 : $hash32      ; certificates_hash
-  , ? 5 : $hash32      ; withdrawals_hash
   , ? 7 : $hash32      ; auxiliary_data_hash
   , ? 8 : uint         ; validity_interval_start
   , ? 9 : $hash32      ; mint_hash
@@ -177,33 +175,31 @@ transaction_body_compact =
   , ? 23 : $hash32     ; required_observers_hash
   }
 
-inputs_set_hash = non_empty_set<transaction_input_compact>
+inputs_set_hash = non_empty_oset<transaction_input_compact>
 inputs_hash = $hash32 ; hash of inputs_set_hash
 
 outputs_list_hash = [* transaction_output_compact]
 outputs_hash = $hash32 ; hash of outputs_list_hash
 
 
-; Transaction Witness Set
-; Full Representation
-transaction_witness_set = 
-  { ? 0 : nonempty_set<vkeywitness>
-  , ? 1 : nonempty_set<native_script>
-  , ? 4 : nonempty_set<plutus_data>
-  , ? 5 : redeemers
-  , ? 7 : nonempty_set<plutus_v3_script>
-  }
-
 ; Implementation Notes
-; - Field bootstrap_witness (2), nonempty_set<plutus_v1_script> (3), 
+; - Field bootstrap_witness (2), nonempty_set<plutus_v1_script> (3), nonempty_set<plutus_data> (4),
 ;   nonempty_set<plutus_v2_script> (6), are not relevant to the Midgard Ledger and are ignored.
 
 ; Transaction Witness Set
+; Full Representation
+transaction_witness_set =
+  { ? 0 : nonempty_set<vkeywitness>
+  , ? 1 : nonempty_set<native_script>
+  , ? 5 : redeemers                 ; scripts
+  , ? 7 : nonempty_set<plutus_v3_script>
+  }
+
+; Transaction Witness Set
 ; Compact Representation
-transaction_witness_set_compact = 
+transaction_witness_set_compact =
   { ? 0 : $hash32   ; nonempty_set<vkeywitness>
   , ? 1 : $hash32   ; nonempty_set<native_script>
-  , ? 4 : $hash32   ; nonempty_set<plutus_data>
   , ? 5 : $hash32   ; redeemers
   , ? 7 : $hash32   ; nonempty_set<plutus_v3_script>
   }
@@ -237,7 +233,7 @@ transaction_output_compact =
 
 ; Value
 ; Full Representation
-value = 
+value =
   coin /
   [ coin
   , multiasset<positive_coin>
@@ -245,7 +241,7 @@ value =
 
 ; Value
 ; Compact Representation
-value_compact = 
+value_compact =
   coin /
   [ coin
   , $hash32 ; hash of multiasset<positive_coin>
@@ -265,7 +261,7 @@ multiasset_compact<a0> =
 
 ; Datum Option
 ; Full Representation
-datum_option = 
+datum_option =
   [ 0
   , $hash32 // 1
   , data
@@ -292,7 +288,7 @@ mint = multiasset<nonZeroInt64>
 
 data = #6.24(bytes .cbor plutus_data)
 
-plutus_data = 
+plutus_data =
     constr<plutus_data>
   / {* plutus_data => plutus_data}
   / [* plutus_data]
@@ -334,6 +330,7 @@ negInt64 = -9223372036854775808 .. -1
 posInt64 = 1 .. 9223372036854775807
 
 ; Hash Types
+
 hash28 = bytes .size 28 ; Fixed 28 bytes (224 bits)
   
 hash32 = bytes .size 32 ; Fixed 32 bytes (256 bits)
@@ -348,5 +345,4 @@ addr_keyhash = $hash28
 
 scripthash = $hash28
 
-
-
+mptr = $hash32 ; Merkle Patricia Tree Root
