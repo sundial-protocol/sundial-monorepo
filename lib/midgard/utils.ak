@@ -1,10 +1,9 @@
-use aiken/builtin
 use aiken/collection/dict.{has_key}
 use aiken/collection/list
 use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray
-use cardano/address.{Address, Credential, Script}
+use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, flatten, to_dict, tokens}
 use cardano/transaction.{
   Input, Output, OutputReference, Redeemer, Transaction, Withdraw,
@@ -167,7 +166,7 @@ pub fn spend_custom(
   withdraw_script_hash: ScriptHash,
   withdraw_redeemer_validator: fn(Redeemer) -> Bool,
   tx: Transaction,
-) -> Bool { 
+) -> Bool {
   let Transaction { redeemers, .. } = tx
 
   let withdraw_script = Script(withdraw_script_hash)

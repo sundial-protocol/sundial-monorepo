@@ -6,7 +6,7 @@ use aiken/primitive/bytearray.{drop}
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/types/general.{LinkedListDatum}
+use midgard/types/general.{Key, LinkedListDatum}
 use midgard/utils.{spend_custom}
 
 // Invalid Input Reference fraud proof: A transaction tx in a proposed block contains an input referencing a nonexistent output.
@@ -85,6 +85,7 @@ validator not_existing_input(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
+        //let's find the assetname fraud token
         expect Some((_, ct_token_asset_name, _)) =
           list.at(flatten(own_input.output.value), 1)
 
@@ -93,6 +94,10 @@ validator not_existing_input(
 
         expect Some(output_to_fraud_prover) =
           list.at(self.outputs, index_output)
+        //The conditions are
+        //- Burn the fraud token
+        //- verify that the output is going to fraud prover address
+        //- send the ada back to the prover
         and {
           self.mint == from_asset(
             policy_id: ct_token_policy_id,
@@ -136,21 +141,22 @@ validator not_existing_input(
         expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
           StateDatum,
         > = frauded_state_queue_node_datum
-        let block_hash =
-          parsed_frauded_state_queue_node_datum.extra_data.block_hash
 
-        // TODO: (2.1) Extract tx_root from block_hash (implementation depends on block header format)
+        //let's extract BLOCKHASH and TX_ROOT from the block in state queue
+        expect Key(block_hash) = parsed_frauded_state_queue_node_datum.key
         let extracted_tx_root =
           parsed_frauded_state_queue_node_datum.extra_data.block_roots.block_tx_root
-        //TODO this is not true, depends on header format
         expect Some(own_input) =
           list.find(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
+
+        //Let's find the assetname
         expect Some((_, ct_token_asset_name, _)) =
           list.at(flatten(own_input.output.value), 1)
 
+        //Let's find if the tx is part of the block in state queue
         let merkleized_logic =
           spend_custom(
             stake_validator,
@@ -173,13 +179,11 @@ validator not_existing_input(
             self,
           )
 
-        //what's the output datum?
+        //let's get the new datum
         expect Some(output_state) = list.at(self.outputs, index_output)
-        //? is it fixed ASK
         expect InlineDatum(datum_output) = output_state.datum
         expect datum_parsed: StepDatum = datum_output
 
-        // (4) Verify the state transition from the previous state to the new state, beside the address, what am I checking? the datum data what should contain?
         expect Script(hash) = output_state.address.payment_credential
         let step1_state =
           InvalidInputSpendStep1State {

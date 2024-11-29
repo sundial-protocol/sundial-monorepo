@@ -6,12 +6,18 @@ use aiken/primitive/bytearray.{drop}
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/types/general.{LinkedListDatum}
+use midgard/types/general.{Key, LinkedListDatum}
 use midgard/utils.{spend_custom}
 
 // Invalid Input Reference fraud proof: A transaction tx in a proposed block contains an input referencing a nonexistent output.
 
-//this step needs to check that the input we are specifying is part of the transaction body
+// tx refers to entire tx that contain:
+// Input UTxOs it's trying to spend
+// Output UTxOs it's creating
+
+//STEP 2
+//The utxo specified is part of the tx 
+
 pub type StepDatum {
   fraud_prover: ByteArray,
   data: Data,
@@ -41,13 +47,13 @@ pub type InvalidInputSpendStep1State {
   merkle_proof: ByteArray,
 }
 
-pub type Step2redeemer {
+pub type Step1redeemer {
   Cancel { index_output: Int }
   Continue {
     frauded_state_queue_node_ref_input_index: Int,
-    tx_body_tx_hash: ByteArray,
-    tx_body_tx_index: Int,
-    input_to_root_proof_path: ByteArray,
+    frauded_state_queue_tx_hash: ByteArray,
+    frauded_state_queue_tx_info_hash: ByteArray,
+    tx_to_root_proof_path: ByteArray,
     index_output: Int,
   }
 }
@@ -59,7 +65,7 @@ validator not_existing_input(
 ) {
   spend(
     maybe_datum: Option<StepDatum>,
-    redeemer: Step2redeemer,
+    redeemer: Step1redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -71,6 +77,7 @@ validator not_existing_input(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
+        //let's find the assetname fraud token
         expect Some((_, ct_token_asset_name, _)) =
           list.at(flatten(own_input.output.value), 1)
 
@@ -79,6 +86,10 @@ validator not_existing_input(
 
         expect Some(output_to_fraud_prover) =
           list.at(self.outputs, index_output)
+        //The conditions are
+        //- Burn the fraud token
+        //- verify that the output is going to fraud prover address
+        //- send the ada back to the prover
         and {
           self.mint == from_asset(
             policy_id: ct_token_policy_id,
@@ -92,11 +103,15 @@ validator not_existing_input(
           quantity_of(output_to_fraud_prover.value, "", "") == lovelace,
         }
       }
-
-      //  ------- Computation Step 2 - Membership Verification of input ------- 
-      // Step - 1: Fraud Prover Input: 
-      // Now I know that the transaction is part of the block, giving out a transaction and a body of it, first make sure the body is correct
-      //second check if the input we want to prove is wrong is actually part of it 
+      //  ------- Computation Step 1 - Membership Verification of tx ------- 
+      // Step - 1: Fraud Prover Input: state_queue_node_ref_input_index, tx_hash, proof_path 
+      // --------- PURPOSE - Continue Redeemer-------------------------------
+      // (1) Reference a state queue block with a block hash matching the last 28 bytes of the computation thread token name
+      // (2) Delegate compute to the merkleized validator to verify the inclusion of tx in the tx_root
+      // (3) The fraud prover field must match between the output state and the input datum
+      // (4) Verify the state transition from the previous state to the new state
+      // (5) The computation thread token must be sent to the next step’s spending validator
+      // (6) Transaction must not mint or burn any other tokens
       // --------------------------------------------------------------------
       Continue {
         frauded_state_queue_node_ref_input_index,
@@ -118,21 +133,22 @@ validator not_existing_input(
         expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
           StateDatum,
         > = frauded_state_queue_node_datum
-        let block_hash =
-          parsed_frauded_state_queue_node_datum.extra_data.block_hash
 
-        // TODO: (2.1) Extract tx_root from block_hash (implementation depends on block header format)
+        //let's extract BLOCKHASH and TX_ROOT from the block in state queue
+        expect Key(block_hash) = parsed_frauded_state_queue_node_datum.key
         let extracted_tx_root =
           parsed_frauded_state_queue_node_datum.extra_data.block_roots.block_tx_root
-        //TODO this is not true, depends on header format
         expect Some(own_input) =
           list.find(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
+
+        //Let's find the assetname
         expect Some((_, ct_token_asset_name, _)) =
           list.at(flatten(own_input.output.value), 1)
 
+        //Let's find if the tx is part of the block in state queue
         let merkleized_logic =
           spend_custom(
             stake_validator,
@@ -155,13 +171,11 @@ validator not_existing_input(
             self,
           )
 
-        //what's the output datum?
+        //let's get the new datum
         expect Some(output_state) = list.at(self.outputs, index_output)
-        //? is it fixed ASK
         expect InlineDatum(datum_output) = output_state.datum
         expect datum_parsed: StepDatum = datum_output
 
-        // (4) Verify the state transition from the previous state to the new state, beside the address, what am I checking? the datum data what should contain?
         expect Script(hash) = output_state.address.payment_credential
         let step1_state =
           InvalidInputSpendStep1State {
