@@ -150,7 +150,7 @@ transaction_body =
 ;   4. Withdrawals do not modify the Midgard Ledger state, as staking is not supported. Their only purpose is to utilize the "withdraw zero" pattern.
 ;   5. auxiliary_data_hash represents the Merkle root hash of metadata.
 ;   6. network_id indicates whether the transaction is for Midgard Mainnet (10) or Testnet (11).
-;   7. Fields withdrawals_hash (5), collateral_inputs (13), collateral_return(16) , total_collateral (17), voting_procedures (19),
+;   7. Fields certificates (4), withdrawals_hash (5), collateral_inputs (13), collateral_return(16) , total_collateral (17), voting_procedures (19),
 ;      [+ proposal_procedure] (20), coin (21), and donation (22) are not relevant to the Midgard Ledger and are ignored.
 ;   8. Indicates observer scripts according to Cardano CIP 112.
 
