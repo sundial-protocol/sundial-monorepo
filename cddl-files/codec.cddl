@@ -167,7 +167,7 @@ transaction_body_compact =
   , ? 7 : $hash32      ; auxiliary_data_hash
   , ? 8 : uint         ; validity_interval_start
   , ? 9 : $hash32      ; mint_hash
-  , ? 11 : $hash32     ; script_data_hash / script_integrity_hash
+  , ? 11 : $hash32     ; script_data_hash
   , ? 14 : $hash32     ; required_signers_hash
   , ? 15 : uint        ; network_id
   , ? 18 : $hash32     ; reference_inputs_hash
