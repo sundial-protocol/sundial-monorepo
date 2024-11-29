@@ -45,7 +45,8 @@ confirmed_state =
 ; Block
 ; Full Representation
 block =
-  { header
+  { header_hash
+  , header
   , block_body
   }
 
