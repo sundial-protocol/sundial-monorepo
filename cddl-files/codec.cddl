@@ -62,10 +62,6 @@ header =
   , prev_header_hash : header_hash / null
   , operator_vkey : $vkey
   , protocol_version : uint
-  , utxos_count : uint
-  , transactions_count : uint
-  , deposits_count : uint
-  , withdrawals_count : uint
   }
 
 ; Deposit event
@@ -76,7 +72,7 @@ deposit_id = output_reference
 
 deposit_info =
   { l2_address : address
-  , l2_datum : data
+  , ? l2_datum : data
   }
 
 ; Deposit event
@@ -85,7 +81,7 @@ deposit_event_compact = [deposit_id, deposit_info_compact]
 
 deposit_info_compact =
   { l2_address : address
-  , l2_datum : $hash32
+  , ? l2_datum : $hash32
   }
 
 ; Withdrawal event
@@ -97,7 +93,7 @@ withdrawal_id = output_reference
 withdrawal_info =
   { l2_outref : output_reference
   , l1_address : address
-  , l1_datum : data
+  , ? l1_datum : data
   }
 
 ; Withdrawal event
@@ -107,7 +103,7 @@ withdrawal_event_compact = [withdrawal_id, withdrawal_info_compact]
 withdrawal_info_compact =
   { l2_outref : output_reference
   , l1_address : address
-  , l1_datum : $hash32
+  , ? l1_datum : $hash32
   }
 
 ; Transaction
@@ -235,7 +231,7 @@ transaction_output =
 transaction_output_compact =
   { 0 : address
   , 1 : value_compact ;
-  , ? 2 : datum_compact ;
+  , ? 2 : $hash32 ; data_hash
   , ? 3 : $hash32 ; script_ref_hash
   }
 
