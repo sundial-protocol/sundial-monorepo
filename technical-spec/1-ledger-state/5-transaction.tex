@@ -152,7 +152,6 @@ We use the empty set symbol \code{$\varnothing$} to indicate fields required to 
         \T{redeemer\_tx\_wits} : & \quad?\;\T{Redeemers}
     \end{array} \right\}\\
     \T{MidgardSValidityInterval} \coloneq\;& (\T{Option(PosixTime), Option(PosixTime)}) \\ 
-                       \mid\;& \T{KeyHashObj(VKeyHash)} \\
     \T{MidgardSScript} \coloneq\;& \T{TimelockScript}(\star\;\T{TimelockObserver}) \\
                           \mid\;& \T{PlutusScript}(\T{MidgardSPlutusVersion},\T{PlutusBinary}) \\
     \T{MidgardSPlutusVersion} \coloneq\;& \T{PlutusV3}
