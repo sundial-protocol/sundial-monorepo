@@ -33,4 +33,3 @@ nix-build:
 .PHONY: nix-clean
 nix-clean:
 	nix develop --command $(MAKE) clean
-
