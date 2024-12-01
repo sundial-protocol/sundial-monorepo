@@ -1,4 +1,4 @@
-use aiken/crypto.{Blake2b_224, Hash, VerificationKey}
+use aiken/crypto.{VerificationKeyHash}
 use cardano/assets.{AssetName, PolicyId}
 
 /// A number of milliseconds since 00:00:00 UTC on 1 January 1970.
@@ -11,4 +11,5 @@ pub type AssetClass {
 }
 
 pub type PubKeyHash =
-  Hash<Blake2b_224, VerificationKey>
+  VerificationKeyHash
+

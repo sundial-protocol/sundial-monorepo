@@ -5,7 +5,7 @@ use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, Value, to_dict}
 use cardano/transaction.{InlineDatum, Input, Output}
 use linked_list/constants
-use linked_list/data.{Empty, Key, NodeKey}
+use linked_list/types.{Empty, Key, NodeKey}
 
 // Checks if a Currency Symbol is held within a Value
 pub fn has_data_cs(cs: PolicyId, value: Value) -> Bool {

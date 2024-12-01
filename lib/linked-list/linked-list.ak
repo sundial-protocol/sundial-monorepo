@@ -5,7 +5,7 @@ use cardano/address.{Address}
 use cardano/assets.{AssetName, PolicyId, flatten, quantity_of, tokens}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use linked_list/constants
-use linked_list/data.{Common, Empty, Key, NodeDatum, NodeKey}
+use linked_list/types.{Common, Empty, Key, NodeDatum, NodeKey}
 use linked_list/utils.{
   get_key, get_link, get_outputs, get_raw_key_and_link, only_at_node_val,
   serialize_key,
