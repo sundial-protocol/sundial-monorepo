@@ -1,12 +1,12 @@
 use cardano/assets.{quantity_of}
 use cardano/transaction.{OutputReference, Transaction}
-use midgard/types/redeemer.{FraudProofSpendRedeemer}
+use midgard/fraud_proof/catalogue.{SpendRedeemer}
 use midgard/utils
 
-validator fraud_proof_spend(fraud_proof_script_hash: ByteArray) {
+validator spend(fraud_proof_script_hash: ByteArray) {
   spend(
     _datumOpt: Option<Data>,
-    redeemer: FraudProofSpendRedeemer,
+    redeemer: SpendRedeemer,
     _input: OutputReference,
     self: Transaction,
   ) {

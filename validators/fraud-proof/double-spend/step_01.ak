@@ -1,14 +1,16 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
+use aiken_design_patterns/merkelized_validator
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{
   InlineDatum, Output, OutputReference, Redeemer, Transaction,
 }
 use midgard/types/datum.{StateDatum, StepDatum}
-use midgard/types/general.{LinkedListDatum}
-use midgard/utils.{spend_custom}
+use midgard/state_queue.{StepDatum}
+use linked_list/types.{NodeDatum}
+use midgard/common/utils.{spend_custom}
 
 // -------- GOAL DEFINITION --------------------------------------
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs who spent the same input UTxO
@@ -125,8 +127,8 @@ validator double_spend_s_1(
           )
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-        expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
-          StateDatum,
+        expect parsed_frauded_state_queue_node_datum: NodeDatum<
+          state_queue.Datum,
         > = frauded_state_queue_node_datum
         let block_hash =
           parsed_frauded_state_queue_node_datum.extra_data.block_hash
@@ -160,25 +162,19 @@ validator double_spend_s_1(
         // They should match the redeemer arguments of the stake validator 
         // Essentially extracting fields from fraud prover data (parameters of the DoubleSpendStep1Redeemer) 
         // and matching them to the arguments expected by the stake validator (withdraw_redeemer)
-        spend_custom(
-          plutarch_merkle_inclusion_validator,
-          fn(withdraw_redeemer: Data) {
-            expect MembershipProofInputs {
-              tx_root,
-              tx1_hash,
-              tx1_info_hash,
-              tx1_to_root_proof_path,
-            } = withdraw_redeemer
-            // Validate match: expected format <-> input_x  
-            and {
-              tx_root == extracted_tx_root,
-              tx1_hash == unverified_frauded_state_queue_tx1_hash,
-              tx1_info_hash == unverified_frauded_state_queue_tx1_info_hash,
-              tx1_to_root_proof_path == unverified_frauded_state_queue_tx1_to_root_proof_path,
-            }
+        merkelized_validator.delegated_validation(
+          function_arg: MembershipProofInputs {
+            tx_root: extracted_tx_root,
+            tx1_hash: unverified_frauded_state_queue_tx1_hash,
+            tx1_info_hash: unverified_frauded_state_queue_tx1_info_hash,
+            tx1_to_root_proof_path: unverified_frauded_state_queue_tx1_to_root_proof_path,
           },
-          // Redeemer list of tx is accessed via self field 
-          self,
+          staking_validator: plutarch_merkle_inclusion_validator,
+          input_data_coercer: fn(withdraw_redeemer: Data) {
+            expect coerced: MembershipProofInputs = withdraw_redeemer
+            coerced
+          }
+          redeemers: tx.redeemers,
         )
 
         // (3) Fraud prover field must match between the output state and the input datum

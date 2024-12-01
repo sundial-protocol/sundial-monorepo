@@ -2,26 +2,24 @@ use aiken/collection/list
 use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use linked_list/data.{Key, NodeDatum}
-use midgard/types/datum.{
-  FraudProofValidatorDatum, HubOracleDatum, StateDatum, StepDatum,
-}
-use midgard/types/redeemer.{
-  CT_Cancel, CT_Mint, CT_Success, ComputationThreadRedeemer,
-}
-use midgard/utils.{is_output_to_sc}
+use linked_list/types.{Key, NodeDatum}
+use midgard/common/utils.{is_output_to_sc}
+use midgard/computation_thread as ct
+use midgard/fraud_proof/catalogue as fpc
+use midgard/hub_oracle
+use midgard/state_queue
 
 validator computation_thread(
   fraud_proof_catalogue_script_hash: ByteArray,
   hub_oracle_script_hash: PolicyId,
 ) {
   mint(
-    redeemer: ComputationThreadRedeemer,
+    redeemer: ct.Redeemer,
     policy_id: PolicyId,
     self: Transaction,
   ) {
     when redeemer is {
-      CT_Mint(
+      ct.Mint(
         fraud_proof_set_node_ref_input_index,
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
@@ -44,14 +42,14 @@ validator computation_thread(
           list.at(self.outputs, output_to_init_step_index)
 
         expect InlineDatum(hub_oracle_datum) = hub_oracle_input.output.datum
-        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         let state_queue_policy_id = parsed_hub_oracle_datum.state_queue
 
         expect InlineDatum(fraud_proof_catalogue_node_datum) =
           fraud_proof_catalogue_node_input.output.datum
         expect parsed_fraud_proof_catalogue_node_datum: NodeDatum =
           fraud_proof_catalogue_node_datum
-        expect parsed_fraud_proof_catalogue_node_app_data: FraudProofValidatorDatum =
+        expect parsed_fraud_proof_catalogue_node_app_data: fpc.ValidatorDatum =
           parsed_fraud_proof_catalogue_node_datum.data
         expect Key(parsed_fraud_proof_catalogue_node_datum_key) =
           parsed_fraud_proof_catalogue_node_datum.key
@@ -59,7 +57,7 @@ validator computation_thread(
           frauded_state_queue_node_input.output.datum
         expect parsed_frauded_state_queue_node_datum: NodeDatum =
           frauded_state_queue_node_datum
-        expect parsed_frauded_state_queue_node_app_data: StateDatum =
+        expect parsed_frauded_state_queue_node_app_data: state_queue.Datum =
           parsed_frauded_state_queue_node_datum.data
 
         let token_to_mint_asset_name =
@@ -94,11 +92,11 @@ validator computation_thread(
           ),
         }
       }
-      CT_Success(token_to_burn_asset_name) -> and {
+      ct.Success(token_to_burn_asset_name) -> and {
           quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
-      CT_Cancel(token_to_burn_asset_name) -> and {
+      ct.Cancel(token_to_burn_asset_name) -> and {
           quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
@@ -154,9 +152,9 @@ fn validate_output_to_initial_fraud_proof_step(
   token_asset_name: ByteArray,
 ) {
   expect InlineDatum(outputDatum) = output_to_init_step.datum
-  expect parsedDatum: StepDatum = outputDatum
+  expect parsedDatum: state_queue.StepDatum = outputDatum
 
-  let newDatum = StepDatum { fraud_prover: fraud_prover_hash, data: None }
+  let newDatum = state_queue.StepDatum { fraud_prover: fraud_prover_hash, data: None }
 
   let correctValue = and {
       quantity_of(output_to_init_step.value, own_hash, token_asset_name) == 1,
