@@ -13,7 +13,7 @@ pub type WitnessStatus {
 pub type MintRedeemer {
   Init { init_utxo_index: Int }
   Deinit
-  RegisterOperator {
+  Register {
     key_to_prepend: ByteArray,
     hub_oracle_ref_input_index: Int,
     active_operator_ref_input_index: Int,
@@ -23,7 +23,7 @@ pub type MintRedeemer {
     prepended_node_output_index: Int,
     anchor_node_output_index: Int,
   }
-  ActivateOperator {
+  Activate {
     node_to_activate_key: ByteArray,
     hub_oracle_ref_input_index: Int,
     retired_operator_ref_input_index: Int,
@@ -33,7 +33,7 @@ pub type MintRedeemer {
     active_operators_inserted_node_output_index: Int,
     active_operators_anchor_node_output_index: Int,
   }
-  DeregisterOperator {
+  Deregister {
     node_to_deregister_key: ByteArray,
     removed_node_input_index: Int,
     anchor_node_input_index: Int,

@@ -1,4 +1,3 @@
-
 //  verifiedInputTx1.id == verifiedInputTx2.id 
 
 // data Step4Outcome = {
@@ -7,4 +6,3 @@
 //   verifiedInputTx1 = TxInput,
 //   verifiedInputTx2 = TxInput,
 //   }
-

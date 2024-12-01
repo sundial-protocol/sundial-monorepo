@@ -6,10 +6,22 @@ name = "aiken-lang/stdlib"
 version = "v2.1.0"
 source = "github"
 
+[[requirements]]
+name = "anastasia-labs/aiken-design-patterns"
+version = "plutus-v3"
+source = "github"
+
 [[packages]]
 name = "aiken-lang/stdlib"
 version = "v2.1.0"
 requirements = []
 source = "github"
 
+[[packages]]
+name = "anastasia-labs/aiken-design-patterns"
+version = "plutus-v3"
+requirements = []
+source = "github"
+
 [etags]
+"anastasia-labs/aiken-design-patterns@plutus-v3" = [{ secs_since_epoch = 1733076130, nanos_since_epoch = 518288942 }, "4cc3d754bb866746140e8b972a3d97c109c0c460c05aab14a722e2aa536bf0c1"]

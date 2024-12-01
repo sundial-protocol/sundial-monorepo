@@ -4,17 +4,35 @@ use aiken/interval.{Finite, Interval}
 use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use linked_list/data.{Key, NodeDatum}
-use linked_list/list as linked_list
+use linked_list/linked_list
+use linked_list/types.{Key, NodeDatum}
 use linked_list/utils as linked_list_utils
-use midgard/types/datum.{HubOracleDatum, RegisteredOperatorData}
-use midgard/types/redeemer.{
-  Active, ROM_Activate_Operator, ROM_Deinit, ROM_Deregister_Operator, ROM_Init,
-  ROM_Register_Operator, ROM_Remove_Duplicate_Slash_Bond, Registered,
-  RegisteredOperatorsMintRedeemer, Retired,
+use midgard/hub_oracle
+use midgard/registered_operators.{
+  Activate, Active, Datum, Deinit, Deregister, Init, MintRedeemer, Register,
+  Registered, RemoveDuplicateSlashBond, Retired, WitnessStatus,
 }
 
-validator registered_operators(
+validator spend(
+  registered_operators_mint_script_hash: ByteArray,
+) {
+  spend(
+    _datum: Option<Data>,
+    _redeemer: Data,
+    _input: OutputReference,
+    self: Transaction,
+  ) {
+    linked_list.list_state_transition(
+      tokens(self.mint, registered_operators_mint_script_hash),
+    )
+  }
+
+  else(_) {
+    fail
+  }
+}
+
+validator mint(
   required_bond: Int,
   registration_duration: Int,
   slashing_penalty: Int,
@@ -22,14 +40,10 @@ validator registered_operators(
   hub_oracle_script_hash: PolicyId,
   hub_oracle_asset_name: ByteArray,
 ) {
-  mint(
-    redeemer: RegisteredOperatorsMintRedeemer,
-    policy_id: PolicyId,
-    self: Transaction,
-  ) {
+  mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
     let common = linked_list.make_common(self, policy_id)
     when redeemer is {
-      ROM_Init(init_utxo_index) -> {
+      Init(init_utxo_index) -> {
         expect Some(init_input) = list.at(self.inputs, init_utxo_index)
         let init_input_utxo_id =
           sha2_256(
@@ -45,11 +59,11 @@ validator registered_operators(
           linked_list.init(common),
         }
       }
-      ROM_Deinit -> and {
+      Deinit -> and {
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
           linked_list.deinit(common),
         }
-      ROM_Register_Operator(
+      Register(
         key_to_prepend,
         hub_oracle_ref_input_index,
         active_operator_ref_input_index,
@@ -63,7 +77,7 @@ validator registered_operators(
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
-        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Some(active_operator_ref_input) =
           list.at(self.reference_inputs, active_operator_ref_input_index)
         let active_operator_raw_key_and_link =
@@ -82,7 +96,7 @@ validator registered_operators(
           registered_node_output.datum
         expect parsed_registered_operator_datum: NodeDatum =
           registered_operator_datum
-        expect registered_operator_data: RegisteredOperatorData =
+        expect registered_operator_data: Datum =
           parsed_registered_operator_datum.data
         and {
           linked_list.unordered_prepend(
@@ -126,7 +140,7 @@ validator registered_operators(
         }
       }
 
-      ROM_Activate_Operator(
+      Activate(
         node_to_activate_key,
         hub_oracle_ref_input_index,
         retired_operator_ref_input_index,
@@ -140,7 +154,7 @@ validator registered_operators(
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
-        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Some(retired_operator_ref_input) =
           list.at(self.reference_inputs, retired_operator_ref_input_index)
         let retired_operator_raw_key_and_link =
@@ -151,8 +165,7 @@ validator registered_operators(
           list.at(self.inputs, removed_node_input_index)
         expect InlineDatum(removed_node_datum) = removed_node_input.output.datum
         expect parsed_removed_node_datum: NodeDatum = removed_node_datum
-        expect registered_operator_data: RegisteredOperatorData =
-          parsed_removed_node_datum.data
+        expect registered_operator_data: Datum = parsed_removed_node_datum.data
         expect Some(active_operators_inserted_node_output) =
           list.at(self.outputs, active_operators_inserted_node_output_index)
         and {
@@ -188,7 +201,7 @@ validator registered_operators(
           ),
         }
       }
-      ROM_Deregister_Operator(
+      Deregister(
         node_to_deregister_key,
         removed_node_input_index,
         anchor_node_input_index,
@@ -202,7 +215,7 @@ validator registered_operators(
           list.has(self.extra_signatories, node_to_deregister_key),
         }
 
-      ROM_Remove_Duplicate_Slash_Bond(
+      RemoveDuplicateSlashBond(
         duplicate_node_key,
         hub_oracle_ref_input_index,
         duplicate_node_ref_input_index,
@@ -213,7 +226,7 @@ validator registered_operators(
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
-        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Some(removed_node_input) =
           list.at(self.inputs, removed_node_input_index)
         and {

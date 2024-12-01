@@ -7,10 +7,10 @@ use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{
   InlineDatum, Output, OutputReference, Redeemer, Transaction,
 }
-use midgard/types/datum.{StateDatum, StepDatum}
-use midgard/state_queue.{StepDatum}
 use linked_list/types.{NodeDatum}
 use midgard/common/utils.{spend_custom}
+use midgard/state_queue.{StepDatum}
+use midgard/types/datum.{StateDatum, StepDatum}
 
 // -------- GOAL DEFINITION --------------------------------------
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs who spent the same input UTxO
@@ -52,7 +52,7 @@ pub type DoubleSpendStep1State {
 validator double_spend_s_1(
   // Script hash of next step (requires backwards compilation)
   double_spend_s_2_validator_script_hash: ScriptHash,
-   // Script hash of stake validator (forwarded logic)
+  // Script hash of stake validator (forwarded logic)
   plutarch_merkle_inclusion_validator: ScriptHash,
   // Computation thread token policy
   ct_token_policy_id: PolicyId,
@@ -106,13 +106,11 @@ validator double_spend_s_1(
       // (4) Verify the state transition from the previous state to the new state
       // (5) The computation thread token must be sent to the next step’s spending validator
       // (6) Transaction must not mint or burn any other tokens
-      
       // -------- PARAMETERS DEFINITION ------------------------------
       // (i) state queue block with a block hash matching the last 28 bytes of the computation thread token name
       // (ii) tx_root, merkle root of transactions in the state queue block
       // (iii) tx_hash, hash of the transaction that is being proven to be in tx_root
       // (iv) proof_path: minimum set of hashes needed to reconstruct the path from the tx to the root
-
       DS_Continue_Step1 {
         frauded_state_queue_node_ref_input_index,
         unverified_frauded_state_queue_tx1_hash,
@@ -145,19 +143,14 @@ validator double_spend_s_1(
         // Until then: Delegate merkle proof verification to a stake validator - call out midgard-merkle endpoint to 
         // verify the inclusion of tx1 in tx_root 
         // midgard-merkle endpoints are assumed to contain stake validator withdraw logic to verify merkle inclusion proofs 
-        
         // TODO: (2.1) Extract tx_root from block_hash (implementation depends on block header format)
         // "data: block_compact" from codec.cddl ?
         // let extracted_tx_root = unwrap block_hash to get tx_root? block_hash.tx_root
-        
         // (2.2) Forward proof logic to a stake validator (plutarch_merkle_inclusion_validator) 
-
         // The plutarch membership proof script will likely have multiple redeemer "endpoints" and we need to ensure that
         // always a specific/intended redeemer is being executed 
-        
         // This function expects the script hash of the membership proof validator written in Plutarch
         // and a function that takes the redeemer format expected by the membership proof validator and outputs a Boolean 
-        
         // Fraud prover inputs `DoubleSpendStep1Redeemer` arguments
         // They should match the redeemer arguments of the stake validator 
         // Essentially extracting fields from fraud prover data (parameters of the DoubleSpendStep1Redeemer) 
@@ -173,7 +166,7 @@ validator double_spend_s_1(
           input_data_coercer: fn(withdraw_redeemer: Data) {
             expect coerced: MembershipProofInputs = withdraw_redeemer
             coerced
-          }
+          },
           redeemers: tx.redeemers,
         )
 

@@ -12,4 +12,3 @@ pub type AssetClass {
 
 pub type PubKeyHash =
   VerificationKeyHash
-

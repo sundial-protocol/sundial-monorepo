@@ -59,9 +59,7 @@ validator double_spend_s_last(ct_token_policy_id: PolicyId) {
       // (1) Mint the fraud token, which will implicitly burn the computation thread token with the Success redeemer. Let output state be that transaction output
       // (2) Fraud prover field must match between the output state and the input datum
       // (3) Output state datum type must be StepDatum(Void)
-
       DS_Continue_Last { frauded_state_queue_node_ref_input_index } -> {
-        
         // (1.1) Mint the fraud token, which will implicitly burn the computation thread token with the Success redeemer. Let output state be that transaction output
         // todo ct_token_burnt,
         // todo fraud_proof_token_minted,

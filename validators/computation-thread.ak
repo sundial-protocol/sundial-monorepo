@@ -13,11 +13,7 @@ validator computation_thread(
   fraud_proof_catalogue_script_hash: ByteArray,
   hub_oracle_script_hash: PolicyId,
 ) {
-  mint(
-    redeemer: ct.Redeemer,
-    policy_id: PolicyId,
-    self: Transaction,
-  ) {
+  mint(redeemer: ct.Redeemer, policy_id: PolicyId, self: Transaction) {
     when redeemer is {
       ct.Mint(
         fraud_proof_set_node_ref_input_index,
@@ -154,7 +150,8 @@ fn validate_output_to_initial_fraud_proof_step(
   expect InlineDatum(outputDatum) = output_to_init_step.datum
   expect parsedDatum: state_queue.StepDatum = outputDatum
 
-  let newDatum = state_queue.StepDatum { fraud_prover: fraud_prover_hash, data: None }
+  let newDatum =
+    state_queue.StepDatum { fraud_prover: fraud_prover_hash, data: None }
 
   let correctValue = and {
       quantity_of(output_to_init_step.value, own_hash, token_asset_name) == 1,

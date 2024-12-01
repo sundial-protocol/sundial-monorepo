@@ -1,9 +1,6 @@
-
-
 // ------- COMPUTATION STEP 2 -------
 // verify Merkle inclusion proof for tx2 (tx2 exists in block with a given tx_root)
 // ----------------------------------
-
 
 // StepDatum contains verified tx1 (state_step1) 
 // verify uniqueness tx2 ≠ tx1 
@@ -26,5 +23,3 @@
 //   verifiedTx1 = TxHash,
 //   verifiedTx2 = TxHash
 //   }
-
-
