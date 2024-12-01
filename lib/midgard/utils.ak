@@ -105,9 +105,8 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
   }
 }
 
-//  As withdraw_amount as a parameter is irrelevant to Midgard, customize the function to avoid further costs on `Transaction` for `withdrawals`
-
 /// Originated from [Aiken Design Patterns - Stake Validator](https://github.com/Anastasia-Labs/aiken-design-patterns)
+//  As withdraw_amount as a parameter is irrelevant to Midgard, customize the function to avoid further costs on `Transaction` for `withdrawals`
 pub fn spend_custom(
   withdraw_script_hash: ScriptHash,
   withdraw_redeemer_validator: fn(Redeemer) -> Bool,
