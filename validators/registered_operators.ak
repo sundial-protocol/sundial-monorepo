@@ -13,9 +13,7 @@ use midgard/registered_operators.{
   Registered, RemoveDuplicateSlashBond, Retired, WitnessStatus,
 }
 
-validator spend(
-  registered_operators_mint_script_hash: ByteArray,
-) {
+validator spend(registered_operators_mint_script_hash: ByteArray) {
   spend(
     _datum: Option<Data>,
     _redeemer: Data,

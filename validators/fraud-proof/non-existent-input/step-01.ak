@@ -3,11 +3,12 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
+use aiken_design_patterns/merkelized_validator
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/types/general.{Key, LinkedListDatum}
-use midgard/utils.{spend_custom}
+use linked_list/types.{Key, NodeDatum}
+use midgar/fraud_proof/catalogue as fpc
 
 // Invalid Input Reference fraud proof: A transaction tx in a proposed block contains an input referencing a nonexistent output.
 
@@ -25,11 +26,6 @@ use midgard/utils.{spend_custom}
 // (ii) tx_root is merkle root of transactions in the state queue block
 // (iii) tx_hash is the hash of the transaction that is being proven to be in tx_root
 // (iv) input is the input inside the tx, that has no reference in the current state queue old_tx_root
-
-pub type StepDatum {
-  fraud_prover: ByteArray,
-  data: Data,
-}
 
 //TODO This should be importend from a library, it's the state queue Datum
 pub type StateDatum {
@@ -50,12 +46,12 @@ pub type MembershipProofInputs {
   proof_path: ByteArray,
 }
 
-pub type InvalidInputSpendStep1State {
+pub type Outcome {
   tx_hash: ByteArray,
   merkle_proof: ByteArray,
 }
 
-pub type Step1redeemer {
+pub type Redeemer {
   Cancel { index_output: Int }
   Continue {
     frauded_state_queue_node_ref_input_index: Int,
@@ -66,14 +62,14 @@ pub type Step1redeemer {
   }
 }
 
-validator not_existing_input(
+validator step_01(
   ct_token_policy_id: PolicyId,
   next_step_spending_validator: ScriptHash,
   stake_validator: ScriptHash,
 ) {
   spend(
-    maybe_datum: Option<StepDatum>,
-    redeemer: Step1redeemer,
+    maybe_datum: Option<fpc.StepDatum>,
+    redeemer: Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -138,7 +134,7 @@ validator not_existing_input(
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
 
-        expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
+        expect parsed_frauded_state_queue_node_datum: NodeDatum<
           StateDatum,
         > = frauded_state_queue_node_datum
 
@@ -158,31 +154,25 @@ validator not_existing_input(
 
         //Let's find if the tx is part of the block in state queue
         let merkleized_logic =
-          spend_custom(
-            stake_validator,
-            fn(withdraw_redeemer: Data) {
-              expect MembershipProofInputs {
-                root,
-                tx_hash,
-                tx_info_hash,
-                proof_path,
-              } = withdraw_redeemer
-              // Validate match: expected format <-> input_x  
-              and {
-                root == extracted_tx_root,
-                tx_hash == frauded_state_queue_tx_hash,
-                tx_info_hash == frauded_state_queue_tx_info_hash,
-                proof_path == tx_to_root_proof_path,
-              }
+          merkelized_validator.delegated_validation(
+            function_arg: MembershipProofInputs {
+              tx_root: extracted_tx_root,
+              tx_hash: frauded_state_queue_tx_hash,
+              tx_info_hash: frauded_state_queue_tx_info_hash,
+              proof_path: tx_to_root_proof_path,
             },
-            // Redeemer list of tx is accessed via self field 
-            self,
+            staking_validator: stake_validator,
+            input_data_coercer: fn(withdraw_redeemer: Data) {
+              expect coerced: MembershipProofInputs = withdraw_redeemer
+              coerced
+            },
+            redeemers: tx.redeemers,
           )
 
         //let's get the new datum
         expect Some(output_state) = list.at(self.outputs, index_output)
         expect InlineDatum(datum_output) = output_state.datum
-        expect datum_parsed: StepDatum = datum_output
+        expect datum_parsed: fpc.StepDatum = datum_output
 
         expect Script(hash) = output_state.address.payment_credential
         let step1_state =
@@ -191,7 +181,7 @@ validator not_existing_input(
             merkle_proof: tx_to_root_proof_path,
           }
         let step_1_datum =
-          StepDatum { fraud_prover: step_datum.fraud_prover, data: step1_state }
+          fpc.StepDatum { fraud_prover: step_datum.fraud_prover, data: step1_state }
         and {
           drop(ct_token_asset_name, n: 28) == block_hash,
           step_1_datum == datum_parsed,

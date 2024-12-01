@@ -8,9 +8,7 @@ use cardano/transaction.{
   InlineDatum, Output, OutputReference, Redeemer, Transaction,
 }
 use linked_list/types.{NodeDatum}
-use midgard/common/utils.{spend_custom}
 use midgard/state_queue.{StepDatum}
-use midgard/types/datum.{StateDatum, StepDatum}
 
 // -------- GOAL DEFINITION --------------------------------------
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs who spent the same input UTxO
@@ -35,9 +33,9 @@ use midgard/types/datum.{StateDatum, StepDatum}
 // -------- EXPECTATIONS ---------------------------------------
 // -- tx_root provided from reference input of block header
 
-pub type DoubleSpendStep1Redeemer {
-  DS_Cancel_Step1
-  DS_Continue_Step1 {
+pub type Redeemer {
+  Cancel
+  Continue {
     frauded_state_queue_node_ref_input_index: Int,
     unverified_frauded_state_queue_tx1_hash: ByteArray,
     unverified_frauded_state_queue_tx1_info_hash: ByteArray,
@@ -49,7 +47,7 @@ pub type DoubleSpendStep1State {
   verified_tx1_hash: ByteArray,
 }
 
-validator double_spend_s_1(
+validator step_01(
   // Script hash of next step (requires backwards compilation)
   double_spend_s_2_validator_script_hash: ScriptHash,
   // Script hash of stake validator (forwarded logic)
@@ -69,7 +67,7 @@ validator double_spend_s_1(
       // (1) Burn the computation thread token 
       // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
-      DS_Cancel_Step1 -> {
+      Cancel -> {
         // (1.1) Get ct token asset name
         expect Some(own_input) =
           list.find(
@@ -111,7 +109,7 @@ validator double_spend_s_1(
       // (ii) tx_root, merkle root of transactions in the state queue block
       // (iii) tx_hash, hash of the transaction that is being proven to be in tx_root
       // (iv) proof_path: minimum set of hashes needed to reconstruct the path from the tx to the root
-      DS_Continue_Step1 {
+      Continue {
         frauded_state_queue_node_ref_input_index,
         unverified_frauded_state_queue_tx1_hash,
         unverified_frauded_state_queue_tx1_info_hash,
