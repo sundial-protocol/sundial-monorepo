@@ -66,13 +66,15 @@ validator active_operators(
             hub_oracle_script_hash,
             hub_oracle_asset_name,
           ) == 1,
-          linked_list.ordered_append(
-            key_to_append,
-            appended_node_output_index,
-            anchor_node_output_index,
-            common,
-          ),
-          state_queue_redeemer.operator == active_node.key,
+          //TODO Add these 2 checks after state queue implementation
+          //   linked_list.ordered_append(
+          //     key_to_append,
+          //     appended_node_output_index,
+          //     anchor_node_output_index,
+          //     common,
+          //   ),
+          //   state_queue_redeemer.operator == active_node_output_datum.key,
+          True,
         }
       }
     }
