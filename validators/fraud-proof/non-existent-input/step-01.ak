@@ -51,7 +51,7 @@ pub type Outcome {
   merkle_proof: ByteArray,
 }
 
-pub type Redeemer {
+pub type Step1redeemer {
   Cancel { index_output: Int }
   Continue {
     frauded_state_queue_node_ref_input_index: Int,
@@ -69,7 +69,7 @@ validator step_01(
 ) {
   spend(
     maybe_datum: Option<fpc.StepDatum>,
-    redeemer: Redeemer,
+    redeemer: Step1redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -134,9 +134,8 @@ validator step_01(
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
 
-        expect parsed_frauded_state_queue_node_datum: NodeDatum<
-          StateDatum,
-        > = frauded_state_queue_node_datum
+        expect parsed_frauded_state_queue_node_datum: NodeDatum<StateDatum> =
+          frauded_state_queue_node_datum
 
         //let's extract BLOCKHASH and TX_ROOT from the block in state queue
         expect Key(block_hash) = parsed_frauded_state_queue_node_datum.key
@@ -181,7 +180,10 @@ validator step_01(
             merkle_proof: tx_to_root_proof_path,
           }
         let step_1_datum =
-          fpc.StepDatum { fraud_prover: step_datum.fraud_prover, data: step1_state }
+          fpc.StepDatum {
+            fraud_prover: step_datum.fraud_prover,
+            data: step1_state,
+          }
         and {
           drop(ct_token_asset_name, n: 28) == block_hash,
           step_1_datum == datum_parsed,

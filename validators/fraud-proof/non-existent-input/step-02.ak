@@ -44,16 +44,22 @@ pub type MembershipProofInputs {
 
 pub type InvalidInputSpendStep1State {
   tx_hash: ByteArray,
-  merkle_proof: ByteArray,
+  proof_path: ByteArray,
 }
 
-pub type Step1redeemer {
+pub type InvalidInputSpendStep2State {
+  tx_hash: ByteArray,
+  input: OutputReference,
+}
+
+//verify that given the array of inputs I get the hash that is actually written inside the Block
+//the input is part of it
+
+pub type Step2redeemer {
   Cancel { index_output: Int }
   Continue {
-    frauded_state_queue_node_ref_input_index: Int,
-    frauded_state_queue_tx_hash: ByteArray,
-    frauded_state_queue_tx_info_hash: ByteArray,
-    tx_to_root_proof_path: ByteArray,
+    frauded_input: OutputReference,
+    input_utxos: List<OutputReference>,
     index_output: Int,
   }
 }
@@ -65,7 +71,7 @@ validator not_existing_input(
 ) {
   spend(
     maybe_datum: Option<StepDatum>,
-    redeemer: Step1redeemer,
+    redeemer: Step2redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -103,41 +109,22 @@ validator not_existing_input(
           quantity_of(output_to_fraud_prover.value, "", "") == lovelace,
         }
       }
-      //  ------- Computation Step 1 - Membership Verification of tx ------- 
-      // Step - 1: Fraud Prover Input: state_queue_node_ref_input_index, tx_hash, proof_path 
-      // --------- PURPOSE - Continue Redeemer-------------------------------
-      // (1) Reference a state queue block with a block hash matching the last 28 bytes of the computation thread token name
-      // (2) Delegate compute to the merkleized validator to verify the inclusion of tx in the tx_root
-      // (3) The fraud prover field must match between the output state and the input datum
-      // (4) Verify the state transition from the previous state to the new state
-      // (5) The computation thread token must be sent to the next step’s spending validator
-      // (6) Transaction must not mint or burn any other tokens
-      // --------------------------------------------------------------------
+
       Continue {
-        frauded_state_queue_node_ref_input_index,
-        frauded_state_queue_tx_hash,
-        frauded_state_queue_tx_info_hash,
-        tx_to_root_proof_path,
+        frauded_input_utxo_hash,
+        frauded_input_utxo_index,
+        input_utxos,
         index_output,
       } -> {
-        // (1) Reference input with block_hash (tx_root) which carries the last 28 bytes of ct token name
-        // --------------------------------------------------------------------
-        expect Some(frauded_state_queue_node_input) =
-          list.at(
-            self.reference_inputs,
-            frauded_state_queue_node_ref_input_index,
-          )
-        expect InlineDatum(frauded_state_queue_node_datum) =
-          frauded_state_queue_node_input.output.datum
+        //we get the previous datum and find the tx_hash that is the one we want to check
+        expect InvalidInputSpendStep1State(data_step_1) = step_datum
+        let tx_hash = data_step_1.tx_hash
+        let tx_evaluated = cbor.serialise(input_utxos)
 
-        expect parsed_frauded_state_queue_node_datum: LinkedListDatum<
-          StateDatum,
-        > = frauded_state_queue_node_datum
+        //let's find the input invalid inside 
+        let flag_input_present = list.has(input_utxos, frauded_input)
 
-        //let's extract BLOCKHASH and TX_ROOT from the block in state queue
-        expect Key(block_hash) = parsed_frauded_state_queue_node_datum.key
-        let extracted_tx_root =
-          parsed_frauded_state_queue_node_datum.extra_data.block_roots.block_tx_root
+        //let's see if the input utxos given hashed gives this hash
         expect Some(own_input) =
           list.find(
             self.inputs,
@@ -148,52 +135,29 @@ validator not_existing_input(
         expect Some((_, ct_token_asset_name, _)) =
           list.at(flatten(own_input.output.value), 1)
 
-        //Let's find if the tx is part of the block in state queue
-        let merkleized_logic =
-          spend_custom(
-            stake_validator,
-            fn(withdraw_redeemer: Data) {
-              expect MembershipProofInputs {
-                root,
-                tx_hash,
-                tx_info_hash,
-                proof_path,
-              } = withdraw_redeemer
-              // Validate match: expected format <-> input_x  
-              and {
-                root == extracted_tx_root,
-                tx_hash == frauded_state_queue_tx_hash,
-                tx_info_hash == frauded_state_queue_tx_info_hash,
-                proof_path == tx_to_root_proof_path,
-              }
-            },
-            // Redeemer list of tx is accessed via self field 
-            self,
-          )
-
         //let's get the new datum
         expect Some(output_state) = list.at(self.outputs, index_output)
         expect InlineDatum(datum_output) = output_state.datum
         expect datum_parsed: StepDatum = datum_output
 
         expect Script(hash) = output_state.address.payment_credential
-        let step1_state =
-          InvalidInputSpendStep1State {
+        let step2_state =
+          InvalidInputSpendStep2State {
             tx_hash: frauded_state_queue_tx_hash,
-            merkle_proof: tx_to_root_proof_path,
+            input: OutputReference,
           }
-        let step_1_datum =
-          StepDatum { fraud_prover: step_datum.fraud_prover, data: step1_state }
+        let step_2_datum =
+          StepDatum { fraud_prover: step_datum.fraud_prover, data: step2_state }
         and {
-          drop(ct_token_asset_name, n: 28) == block_hash,
-          step_1_datum == datum_parsed,
+          tx_hash == tx_evaluated,
+          flag_input_present,
+          step_2_datum == datum_parsed,
           quantity_of(
             output_state.value,
             ct_token_policy_id,
             ct_token_asset_name,
           ) == 1,
           hash == next_step_spending_validator,
-          merkleized_logic,
         }
       }
     }
