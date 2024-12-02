@@ -96,6 +96,13 @@ pub fn get_own_hash(output_reference: OutputReference, txInputs: List<Input>) {
   hash
 }
 
+pub fn get_own_address(output_reference: OutputReference, txInputs: List<Input>) {
+  expect Some(input) =
+    list.find(txInputs, fn(x) { x.output_reference == output_reference })
+
+  input.output.address
+}
+
 pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
   when output.address.payment_credential is {
     Script(hash) -> hash == scHash

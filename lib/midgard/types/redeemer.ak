@@ -126,3 +126,27 @@ pub type RegisteredOperatorsMintRedeemer {
     witness_status: WitnessStatus,
   }
 }
+
+pub type ActiveOperatorsSpendRedeemer {
+  AOSR_List_State_Transition
+  AOSR_Update_Commitment_Time {
+    active_node_input_index: Int,
+    hub_oracle_ref_input_index: Int,
+  }
+}
+
+pub type ActiveOperatorsMintRedeemer {
+  AOMR_Init
+  AOMR_Deinit
+  AOMR_Activate_Operator
+  AOMR_Remove_Operator_Slash_Bond
+  AOMR_Retire_Operator
+}
+
+pub type RetiredOperatorsMintRedeemer {
+  ROMR_Init
+  ROMR_Deinit
+  ROMR_Retire_Operator
+  ROMR_Recover_Operator_Bond
+  ROMR_Remove_Operator_Slash_Bond
+}
