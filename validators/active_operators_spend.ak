@@ -78,7 +78,7 @@ validator active_operators(
             hub_oracle_asset_name,
           ) == 1,
           state_queue_redeemer_pair.1st == Mint(state_queue_cs),
-          linked_list.ordered_append(
+          linked_list.unordered_append(
             Key(state_queue_redeemer.operator),
             state_queue_appended_node_output_index,
             state_queue_anchor_node_output_index,
