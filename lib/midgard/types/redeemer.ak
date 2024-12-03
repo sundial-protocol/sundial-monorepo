@@ -73,6 +73,7 @@ pub type FraudProofMintRedeemer {
   FP_Burn {
     hub_oracle_ref_input_index: Int,
     frauded_state_queue_node_ref_input_index: Int,
+    frauded_state_queue_node_asset_name: ByteArray,
     fraud_proof_token_asset_name: ByteArray,
     hub_oracle_asset_name: ByteArray,
     fraud_proof_spend_input_index: Int,

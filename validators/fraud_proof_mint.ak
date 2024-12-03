@@ -3,6 +3,8 @@ use aiken/primitive/bytearray
 use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
+use linked_list/data.{Key, NodeDatum}
+use linked_list/list as linked_list
 use midgard/types/datum.{FraudProofSpendDatum, HubOracleDatum, StepDatum}
 use midgard/types/redeemer.{FP_Burn, FP_Mint, FraudProofMintRedeemer}
 use midgard/utils
@@ -65,6 +67,7 @@ validator fraud_proof_mint(
       FP_Burn(
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
+        frauded_state_queue_node_asset_name,
         fraud_proof_token_asset_name,
         hub_oracle_asset_name,
         fraud_proof_spend_input_index,
@@ -105,7 +108,9 @@ validator fraud_proof_mint(
           ),
           validate_non_member_state_queue_input(
             frauded_state_queue_node_input,
+            frauded_state_queue_node_asset_name,
             state_queue_policy_id,
+            parsed_hub_oracle_datum.state_queue_addr,
             block_hash,
           ),
           quantity_of(self.mint, policy_id, fraud_proof_token_asset_name) == -1,
@@ -146,11 +151,29 @@ fn validate_fraud_proof_last_step_input(
 }
 
 fn validate_non_member_state_queue_input(
-  frauded_state_queue_node_input,
-  state_queue_policy_id,
-  block_hash,
+  frauded_state_queue_node_input: Input,
+  frauded_state_queue_node_asset_name: ByteArray,
+  state_queue_policy_id: ByteArray,
+  state_queue_addr: Address,
+  block_hash: ByteArray,
 ) {
-  todo
+  expect InlineDatum(state_queue_node_datum) =
+    frauded_state_queue_node_input.output.datum
+  expect parsed_state_queue_node_datum: NodeDatum = state_queue_node_datum
+  and {
+    quantity_of(
+      frauded_state_queue_node_input.output.value,
+      state_queue_policy_id,
+      frauded_state_queue_node_asset_name,
+    ) == 1,
+    linked_list.ordered_is_not_member(
+      Key(block_hash),
+      parsed_state_queue_node_datum.key,
+      parsed_state_queue_node_datum.link,
+      frauded_state_queue_node_input.output.address,
+      state_queue_addr,
+    ),
+  }
 }
 
 fn validate_fraud_proof_spend_input(
