@@ -127,15 +127,37 @@ pub type ActiveOperatorsSpendRedeemer {
 }
 
 pub type ActiveOperatorsMintRedeemer {
-  AOMR_Init
+  AOMR_Init { init_utxo_index: Int }
   AOMR_Deinit
-  AOMR_Activate_Operator
-  AOMR_Remove_Operator_Slash_Bond
-  AOMR_Retire_Operator
+  AOMR_Activate_Operator {
+    new_active_operator_key: ByteArray,
+    hub_oracle_ref_input_index: Int,
+    registered_operator_removed_node_input_index: Int,
+    registered_operator_anchor_node_input_index: Int,
+    active_operator_appended_node_output_index: Int,
+    active_operator_anchor_node_output_index: Int,
+  }
+  AOMR_Remove_Operator_Slash_Bond {
+    slashed_active_operator_key: ByteArray,
+    hub_oracle_ref_input_index: Int,
+    active_operator_slashed_node_input_index: Int,
+    active_operator_anchor_node_input_index: Int,
+    state_queue_redeemer_index: Int,
+    state_queue_removed_node_input_index: Int,
+    state_queue_anchor_node_input_index: Int,
+  }
+  AOMR_Retire_Operator {
+    active_operator_key: ByteArray,
+    hub_oracle_ref_input_index: Int,
+    active_operator_removed_node_input_index: Int,
+    active_operator_anchor_node_input_index: Int,
+    retired_operator_inserted_node_output_index: Int,
+    retired_operators_anchor_node_output_index: Int,
+  }
 }
 
 pub type RetiredOperatorsMintRedeemer {
-  ROMR_Init
+  ROMR_Init { init_utxo_index: Int }
   ROMR_Deinit
   ROMR_Retire_Operator
   ROMR_Recover_Operator_Bond
