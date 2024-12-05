@@ -165,24 +165,24 @@ validator step_01(
         // They should match the redeemer arguments of the stake validator 
         // Essentially extracting fields from fraud prover data (parameters of the Redeemer) 
         // and matching them to the arguments expected by the stake validator (withdraw_redeemer)
-
         // TODO: `extracted_tx_root` was undefined. I've used an empty ByteArray
         // to bypass the compiler.
         let extracted_tx_root = #""
-        expect merkelized_validator.delegated_validation(
-          function_input: MembershipProofInputs {
-            tx_root: extracted_tx_root,
-            tx1_hash: unverified_frauded_state_queue_tx1_hash,
-            tx1_info_hash: unverified_frauded_state_queue_tx1_info_hash,
-            tx1_to_root_proof_path: unverified_frauded_state_queue_tx1_to_root_proof_path,
-          },
-          staking_validator: plutarch_merkle_inclusion_validator,
-          input_data_coercer: fn(withdraw_redeemer: Data) {
-            expect coerced: MembershipProofInputs = withdraw_redeemer
-            coerced
-          },
-          redeemers: self.redeemers,
-        )
+        expect
+          merkelized_validator.delegated_validation(
+            function_input: MembershipProofInputs {
+              tx_root: extracted_tx_root,
+              tx1_hash: unverified_frauded_state_queue_tx1_hash,
+              tx1_info_hash: unverified_frauded_state_queue_tx1_info_hash,
+              tx1_to_root_proof_path: unverified_frauded_state_queue_tx1_to_root_proof_path,
+            },
+            staking_validator: plutarch_merkle_inclusion_validator,
+            input_data_coercer: fn(withdraw_redeemer: Data) {
+              expect coerced: MembershipProofInputs = withdraw_redeemer
+              coerced
+            },
+            redeemers: self.redeemers,
+          )
 
         // (3) Fraud prover field must match between the output state and the input datum
         expect Some(output_to_step_2) = list.at(self.outputs, 0)
@@ -228,7 +228,6 @@ validator step_01(
     fail
   }
 }
-
 // --------- MERKLE VALIDATOR EXAMPLE APPROACH ----------------------------
 // merkle validator example would be:
 // let [has_tx_hash] =

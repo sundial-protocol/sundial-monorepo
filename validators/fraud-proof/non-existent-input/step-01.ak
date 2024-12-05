@@ -153,7 +153,6 @@ validator step_01(
           list.at(flatten(own_input.output.value), 1)
 
         //Let's find if the tx is part of the block in state queue
-
         let merkleized_logic =
           merkelized_validator.delegated_validation(
             function_input: MembershipProofInputs {
