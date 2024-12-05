@@ -16,6 +16,11 @@ version = "v2.1.0"
 source = "github"
 
 [[dependencies]]
+name = "aiken-lang/fuzz"
+version = "2.1.0"
+source = "github"
+
+[[dependencies]]
 name = "anastasia-labs/aiken-design-patterns"
 version = "plutus-v3"
 source = "github"

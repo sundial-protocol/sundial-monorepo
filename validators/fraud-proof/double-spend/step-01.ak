@@ -2,13 +2,13 @@ use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
 use aiken_design_patterns/merkelized_validator
-use cardano/address.{Address, Script, VerificationKey}
-use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
-use cardano/transaction.{
-  InlineDatum, Output, OutputReference, Redeemer, Transaction,
-}
+use cardano/address.{Script}
+use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
+use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use linked_list/types.{NodeDatum}
-use midgard/state_queue.{StepDatum}
+use midgard/fraud_proof/catalogue.{StepDatum}
+use midgard/fraud_proof/double_spend.{validate_output_to_fraud_prover}
+use midgard/state_queue
 
 // -------- GOAL DEFINITION --------------------------------------
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs who spent the same input UTxO
@@ -32,6 +32,18 @@ use midgard/state_queue.{StepDatum}
 
 // -------- EXPECTATIONS ---------------------------------------
 // -- tx_root provided from reference input of block header
+
+// TODO
+pub type Proof =
+  Void
+
+// TODO
+pub type MembershipProofInputs {
+  tx_root: ByteArray,
+  tx1_hash: ByteArray,
+  tx1_info_hash: ByteArray,
+  tx1_to_root_proof_path: Proof,
+}
 
 pub type Redeemer {
   Cancel
@@ -57,7 +69,7 @@ validator step_01(
 ) {
   spend(
     maybe_datum: Option<StepDatum>,
-    redeemer: DoubleSpendStep1Redeemer,
+    redeemer: Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -123,11 +135,11 @@ validator step_01(
           )
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-        expect parsed_frauded_state_queue_node_datum: NodeDatum<
-          state_queue.Datum,
-        > = frauded_state_queue_node_datum
-        let block_hash =
-          parsed_frauded_state_queue_node_datum.extra_data.block_hash
+        expect parsed_frauded_node_datum: NodeDatum =
+          frauded_state_queue_node_datum
+        expect parsed_state_queue_datum: state_queue.Datum =
+          parsed_frauded_node_datum.data
+        let block_hash = parsed_state_queue_datum.block_hash
         // (1.2) Get ct_token_asset_name
         expect Some(own_input) =
           list.find(
@@ -149,12 +161,16 @@ validator step_01(
         // always a specific/intended redeemer is being executed 
         // This function expects the script hash of the membership proof validator written in Plutarch
         // and a function that takes the redeemer format expected by the membership proof validator and outputs a Boolean 
-        // Fraud prover inputs `DoubleSpendStep1Redeemer` arguments
+        // Fraud prover inputs `Redeemer` arguments
         // They should match the redeemer arguments of the stake validator 
-        // Essentially extracting fields from fraud prover data (parameters of the DoubleSpendStep1Redeemer) 
+        // Essentially extracting fields from fraud prover data (parameters of the Redeemer) 
         // and matching them to the arguments expected by the stake validator (withdraw_redeemer)
-        merkelized_validator.delegated_validation(
-          function_arg: MembershipProofInputs {
+
+        // TODO: `extracted_tx_root` was undefined. I've used an empty ByteArray
+        // to bypass the compiler.
+        let extracted_tx_root = #""
+        expect merkelized_validator.delegated_validation(
+          function_input: MembershipProofInputs {
             tx_root: extracted_tx_root,
             tx1_hash: unverified_frauded_state_queue_tx1_hash,
             tx1_info_hash: unverified_frauded_state_queue_tx1_info_hash,
@@ -165,7 +181,7 @@ validator step_01(
             expect coerced: MembershipProofInputs = withdraw_redeemer
             coerced
           },
-          redeemers: tx.redeemers,
+          redeemers: self.redeemers,
         )
 
         // (3) Fraud prover field must match between the output state and the input datum
@@ -213,15 +229,6 @@ validator step_01(
   }
 }
 
-pub fn validate_output_to_fraud_prover(
-  output_to_fraud_prover: Output,
-  prover_hash: ByteArray,
-) {
-  when output_to_fraud_prover.address.payment_credential is {
-    VerificationKey(hash) -> hash == prover_hash
-    _ -> False
-  }
-}
 // --------- MERKLE VALIDATOR EXAMPLE APPROACH ----------------------------
 // merkle validator example would be:
 // let [has_tx_hash] =

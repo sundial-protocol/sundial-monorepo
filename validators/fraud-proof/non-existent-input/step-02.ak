@@ -1,13 +1,11 @@
 // imports 
 // midgard-merkle is used as a library to verify merkle inclusion proofs 
+use aiken/cbor
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
-use aiken/primitive/bytearray.{drop}
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/types/general.{Key, LinkedListDatum}
-use midgard/utils.{spend_custom}
 
 // Invalid Input Reference fraud proof: A transaction tx in a proposed block contains an input referencing a nonexistent output.
 
@@ -59,6 +57,8 @@ pub type Step2redeemer {
   Cancel { index_output: Int }
   Continue {
     frauded_input: OutputReference,
+    // TODO: Should this field be here?
+    frauded_state_queue_tx_hash: ByteArray,
     input_utxos: List<OutputReference>,
     index_output: Int,
   }
@@ -67,7 +67,7 @@ pub type Step2redeemer {
 validator not_existing_input(
   ct_token_policy_id: PolicyId,
   next_step_spending_validator: ScriptHash,
-  stake_validator: ScriptHash,
+  _stake_validator: ScriptHash,
 ) {
   spend(
     maybe_datum: Option<StepDatum>,
@@ -111,14 +111,13 @@ validator not_existing_input(
       }
 
       Continue {
-        frauded_input_utxo_hash,
-        frauded_input_utxo_index,
+        frauded_input,
+        frauded_state_queue_tx_hash,
         input_utxos,
         index_output,
       } -> {
         //we get the previous datum and find the tx_hash that is the one we want to check
-        expect InvalidInputSpendStep1State(data_step_1) = step_datum
-        let tx_hash = data_step_1.tx_hash
+        expect InvalidInputSpendStep1State { tx_hash, .. } = step_datum.data
         let tx_evaluated = cbor.serialise(input_utxos)
 
         //let's find the input invalid inside 
@@ -144,7 +143,8 @@ validator not_existing_input(
         let step2_state =
           InvalidInputSpendStep2State {
             tx_hash: frauded_state_queue_tx_hash,
-            input: OutputReference,
+            // TODO: Is `own_input` correct?
+            input: own_input.output_reference,
           }
         let step_2_datum =
           StepDatum { fraud_prover: step_datum.fraud_prover, data: step2_state }

@@ -8,7 +8,7 @@ use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use linked_list/types.{Key, NodeDatum}
-use midgar/fraud_proof/catalogue as fpc
+use midgard/fraud_proof/catalogue as fpc
 
 // Invalid Input Reference fraud proof: A transaction tx in a proposed block contains an input referencing a nonexistent output.
 
@@ -46,7 +46,7 @@ pub type MembershipProofInputs {
   proof_path: ByteArray,
 }
 
-pub type Outcome {
+pub type InvalidInputSpendStep1State {
   tx_hash: ByteArray,
   merkle_proof: ByteArray,
 }
@@ -134,13 +134,14 @@ validator step_01(
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
 
-        expect parsed_frauded_state_queue_node_datum: NodeDatum<StateDatum> =
-          frauded_state_queue_node_datum
+        expect parsed_node_datum: NodeDatum = frauded_state_queue_node_datum
+        expect parsed_frauded_state_queue_node_datum: StateDatum =
+          parsed_node_datum.data
 
         //let's extract BLOCKHASH and TX_ROOT from the block in state queue
-        expect Key(block_hash) = parsed_frauded_state_queue_node_datum.key
+        expect Key(block_hash) = parsed_node_datum.key
         let extracted_tx_root =
-          parsed_frauded_state_queue_node_datum.extra_data.block_roots.block_tx_root
+          parsed_frauded_state_queue_node_datum.block_roots.block_tx_root
         expect Some(own_input) =
           list.find(
             self.inputs,
@@ -152,10 +153,11 @@ validator step_01(
           list.at(flatten(own_input.output.value), 1)
 
         //Let's find if the tx is part of the block in state queue
+
         let merkleized_logic =
           merkelized_validator.delegated_validation(
-            function_arg: MembershipProofInputs {
-              tx_root: extracted_tx_root,
+            function_input: MembershipProofInputs {
+              root: extracted_tx_root,
               tx_hash: frauded_state_queue_tx_hash,
               tx_info_hash: frauded_state_queue_tx_info_hash,
               proof_path: tx_to_root_proof_path,
@@ -165,7 +167,7 @@ validator step_01(
               expect coerced: MembershipProofInputs = withdraw_redeemer
               coerced
             },
-            redeemers: tx.redeemers,
+            redeemers: self.redeemers,
           )
 
         //let's get the new datum

@@ -1,3 +1,4 @@
+use cardano/transaction.{OutputReference}
 use midgard/common/types.{PubKeyHash}
 
 pub type Config {

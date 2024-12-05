@@ -1,18 +1,20 @@
 use aiken/collection/list
-use aiken/crypto.{ScriptHash}
-use aiken/primitive/bytearray.{drop}
-use cardano/address.{Address, Script, VerificationKey}
-use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
+use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/types/datum.{StepDatum}
+use midgard/fraud_proof/catalogue.{StepDatum}
+use midgard/fraud_proof/double_spend.{validate_output_to_fraud_prover}
 
 pub type DoubleSpendStepLastState {
   data: Void,
 }
 
+// TODO
+pub type Proof =
+  Void
+
 pub type DoubleSpendStepLastRedeemer {
-  DS_Cancel_Last
-  DS_Continue_Last {
+  CancelLast
+  ContinueLast {
     frauded_state_queue_node_ref_input_index: Int,
     unverified_frauded_state_queue_tx1_hash: ByteArray,
     unverified_frauded_state_queue_tx1_info_hash: ByteArray,
@@ -29,7 +31,7 @@ validator double_spend_s_last(ct_token_policy_id: PolicyId) {
   ) {
     expect Some(step_datum) = maybe_datum
     when redeemer is {
-      DS_Cancel_Last -> {
+      CancelLast -> {
         expect Some(own_input) =
           list.find(
             self.inputs,
@@ -59,7 +61,7 @@ validator double_spend_s_last(ct_token_policy_id: PolicyId) {
       // (1) Mint the fraud token, which will implicitly burn the computation thread token with the Success redeemer. Let output state be that transaction output
       // (2) Fraud prover field must match between the output state and the input datum
       // (3) Output state datum type must be StepDatum(Void)
-      DS_Continue_Last { frauded_state_queue_node_ref_input_index } -> {
+      ContinueLast { .. } -> {
         // (1.1) Mint the fraud token, which will implicitly burn the computation thread token with the Success redeemer. Let output state be that transaction output
         // todo ct_token_burnt,
         // todo fraud_proof_token_minted,

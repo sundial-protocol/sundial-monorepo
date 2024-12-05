@@ -148,10 +148,9 @@ fn validate_output_to_initial_fraud_proof_step(
   token_asset_name: ByteArray,
 ) {
   expect InlineDatum(outputDatum) = output_to_init_step.datum
-  expect parsedDatum: state_queue.StepDatum = outputDatum
+  expect parsedDatum: fpc.StepDatum = outputDatum
 
-  let newDatum =
-    state_queue.StepDatum { fraud_prover: fraud_prover_hash, data: None }
+  let newDatum = fpc.StepDatum { fraud_prover: fraud_prover_hash, data: None }
 
   let correctValue = and {
       quantity_of(output_to_init_step.value, own_hash, token_asset_name) == 1,

@@ -6,7 +6,9 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use midgard/common/utils
-use midgard/fraud_proof/catalogue.{Burn, Datum, Mint, SpendRedeemer, StepDatum}
+use midgard/fraud_proof/catalogue.{
+  Burn, Datum, Mint, MintRedeemer, SpendRedeemer, StepDatum,
+}
 use midgard/hub_oracle
 
 validator spend(fraud_proof_script_hash: ByteArray) {
@@ -35,7 +37,7 @@ validator mint(
   computation_thread_script_hash: ByteArray,
   hub_oracle_script_hash: PolicyId,
 ) {
-  mint(redeemer: Datum, policy_id: PolicyId, self: Transaction) {
+  mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
     when redeemer is {
       Mint(
         hub_oracle_ref_input_index,
@@ -112,8 +114,7 @@ validator mint(
 
         expect InlineDatum(fraud_proof_spend_datum) =
           fraud_proof_spend_input.output.datum
-        expect parsed_fraud_proof_spend_datum: Datum =
-          fraud_proof_spend_datum
+        expect parsed_fraud_proof_spend_datum: Datum = fraud_proof_spend_datum
 
         and {
           validate_hub_oracle_input(
@@ -170,11 +171,12 @@ fn validate_fraud_proof_last_step_input(
 }
 
 fn validate_non_member_state_queue_input(
-  frauded_state_queue_node_input,
-  state_queue_policy_id,
-  block_hash,
+  _frauded_state_queue_node_input,
+  _state_queue_policy_id,
+  _block_hash,
 ) {
-  todo
+  // TODO
+  False
 }
 
 fn validate_fraud_proof_spend_input(

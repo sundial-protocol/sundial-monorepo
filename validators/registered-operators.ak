@@ -2,15 +2,17 @@ use aiken/collection/list
 use aiken/crypto.{sha2_256}
 use aiken/interval.{Finite, Interval}
 use aiken/primitive/bytearray
-use cardano/assets.{PolicyId, quantity_of}
-use cardano/transaction.{InlineDatum, Input, Output, Transaction}
+use cardano/assets.{PolicyId, quantity_of, tokens}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Transaction,
+}
 use linked_list/linked_list
 use linked_list/types.{Key, NodeDatum}
 use linked_list/utils as linked_list_utils
 use midgard/hub_oracle
 use midgard/registered_operators.{
   Activate, Active, Datum, Deinit, Deregister, Init, MintRedeemer, Register,
-  Registered, RemoveDuplicateSlashBond, Retired, WitnessStatus,
+  Registered, RemoveDuplicateSlashBond, Retired,
 }
 
 validator spend(registered_operators_mint_script_hash: ByteArray) {

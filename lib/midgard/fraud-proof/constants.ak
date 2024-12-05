@@ -1,1 +1,1 @@
-pub const invalidation_token_name: Bytearray = "Fraud"
+pub const invalidation_token_name: ByteArray = "Fraud"
