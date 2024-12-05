@@ -11,7 +11,7 @@ use midgard/types/datum.{HubOracleDatum, RetiredOperatorData}
 use midgard/types/redeemer.{
   ROMR_Deinit, ROMR_Init, ROMR_Recover_Operator_Bond,
   ROMR_Remove_Operator_Slash_Bond, ROMR_Retire_Operator,
-  RetiredOperatorsMintRedeemer, StateQueueMintRedeemer,
+  RetiredOperatorsMintRedeemer, SQMR_Remove_Fraudolent_Block_Header,
 }
 
 validator retired_operators(
@@ -130,7 +130,7 @@ validator retired_operators(
         let state_queue_common = linked_list.make_common(self, state_queue_cs)
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect state_queue_redeemer: StateQueueMintRedeemer =
+        expect SQMR_Remove_Fraudolent_Block_Header(fraudolent_operator) =
           state_queue_redeemer_pair.2nd
         and {
           quantity_of(
@@ -147,12 +147,12 @@ validator retired_operators(
           self.fee >= slashing_penalty,
           state_queue_redeemer_pair.1st == Mint(state_queue_cs),
           linked_list.remove(
-            Key(state_queue_redeemer.operator),
+            Key(fraudolent_operator),
             state_queue_removed_node_input_index,
             state_queue_anchor_node_input_index,
             state_queue_common,
           ),
-          state_queue_redeemer.operator == slashed_retired_operator_key,
+          fraudolent_operator == slashed_retired_operator_key,
         }
       }
     }

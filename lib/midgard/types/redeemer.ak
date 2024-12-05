@@ -182,5 +182,6 @@ pub type RetiredOperatorsMintRedeemer {
 }
 
 pub type StateQueueMintRedeemer {
+  SQMR_Remove_Fraudolent_Block_Header { fraudolent_operator: ByteArray }
   SQMR_Commit_Block_Header { operator: ByteArray }
 }

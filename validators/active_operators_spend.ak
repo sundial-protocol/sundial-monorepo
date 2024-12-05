@@ -10,7 +10,7 @@ use linked_list/list as linked_list
 use midgard/types/datum.{ActiveOperatorData, HubOracleDatum}
 use midgard/types/redeemer.{
   AOSR_List_State_Transition, AOSR_Update_Commitment_Time,
-  ActiveOperatorsSpendRedeemer, StateQueueMintRedeemer,
+  ActiveOperatorsSpendRedeemer, SQMR_Commit_Block_Header,
 }
 use midgard/utils as utils
 
@@ -22,7 +22,7 @@ validator active_operators(
   spend(
     datumOpt: Option<NodeDatum>,
     redeemer: ActiveOperatorsSpendRedeemer,
-    input: OutputReference,
+    _input: OutputReference,
     self: Transaction,
   ) {
     when redeemer is {
@@ -56,7 +56,7 @@ validator active_operators(
         let state_queue_common = linked_list.make_common(self, state_queue_cs)
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect state_queue_redeemer: StateQueueMintRedeemer =
+        expect SQMR_Commit_Block_Header(operator) =
           state_queue_redeemer_pair.2nd
         and {
           no_active_operators_minted(
@@ -67,7 +67,7 @@ validator active_operators(
             parsed_active_node_output_datum.key,
             active_node_input_datum.key,
             active_node_output.address,
-            utils.get_own_address(input, self.inputs),
+            parsed_hub_oracle_datum.active_operators_addr,
           ),
           //keys are already checked by is_member()
           parsed_active_node_output_datum.link == active_node_input_datum.link,
@@ -79,12 +79,12 @@ validator active_operators(
           ) == 1,
           state_queue_redeemer_pair.1st == Mint(state_queue_cs),
           linked_list.unordered_append(
-            Key(state_queue_redeemer.operator),
+            Key(operator),
             state_queue_appended_node_output_index,
             state_queue_anchor_node_output_index,
             state_queue_common,
           ),
-          Key(state_queue_redeemer.operator) == parsed_active_node_output_datum.key,
+          Key(operator) == parsed_active_node_output_datum.key,
         }
       }
     }

@@ -155,6 +155,11 @@ validator registered_operators(
           parsed_removed_node_datum.data
         expect Some(active_operators_inserted_node_output) =
           list.at(self.outputs, active_operators_inserted_node_output_index)
+        let active_operators_common =
+          linked_list.make_common(
+            self,
+            parsed_hub_oracle_datum.active_operators,
+          )
         and {
           linked_list.remove(
             Key(node_to_activate_key),
@@ -172,13 +177,14 @@ validator registered_operators(
             Key(node_to_activate_key),
             active_operators_inserted_node_output_index,
             active_operators_anchor_node_output_index,
-            common,
+            active_operators_common,
           ),
           quantity_of(
             retired_operator_ref_input.output.value,
             parsed_hub_oracle_datum.retired_operators,
             retired_operator_asset_name,
           ) == 1,
+          parsed_hub_oracle_datum.retired_operators_addr == retired_operator_ref_input.output.address,
           linked_list.ordered_is_not_member(
             Key(node_to_activate_key),
             linked_list_utils.get_key(retired_operator_raw_key_and_link),
