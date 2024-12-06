@@ -35,4 +35,4 @@ requirements = []
 source = "github"
 
 [etags]
-"anastasia-labs/aiken-design-patterns@plutus-v3" = [{ secs_since_epoch = 1733406187, nanos_since_epoch = 644771788 }, "b3e9af7a5f99e0fbb63e01dbe54e93c1a9ae9479edba74e386635e77f8767f89"]
+"anastasia-labs/aiken-design-patterns@plutus-v3" = [{ secs_since_epoch = 1733453474, nanos_since_epoch = 82215548 }, "b3e9af7a5f99e0fbb63e01dbe54e93c1a9ae9479edba74e386635e77f8767f89"]
