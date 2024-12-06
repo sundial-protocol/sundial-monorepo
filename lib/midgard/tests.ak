@@ -1,4 +1,4 @@
-use midgard/utils.{div_ceil}
+use midgard/common/utils.{div_ceil}
 
 // Test Case 1
 // Test when a is divisible by b
