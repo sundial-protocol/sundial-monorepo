@@ -6,8 +6,9 @@ use cardano/assets.{PolicyId, quantity_of, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
-use linked_list/linked_list
+use linked_list/ordered
 use linked_list/types.{Key, NodeDatum}
+use linked_list/unordered
 use linked_list/utils as linked_list_utils
 use midgard/hub_oracle
 use midgard/registered_operators.{
@@ -22,7 +23,7 @@ validator spend(registered_operators_mint_script_hash: ByteArray) {
     _input: OutputReference,
     self: Transaction,
   ) {
-    linked_list.list_state_transition(
+    unordered.list_state_transition(
       tokens(self.mint, registered_operators_mint_script_hash),
     )
   }
@@ -41,7 +42,7 @@ validator mint(
   hub_oracle_asset_name: ByteArray,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
-    let common = linked_list.make_common(self, policy_id)
+    let common = unordered.make_common(self, policy_id)
     when redeemer is {
       Init(init_utxo_index) -> {
         expect Some(init_input) = list.at(self.inputs, init_utxo_index)
@@ -53,15 +54,15 @@ validator mint(
             ),
           )
         and {
-          //TODO Should we call here linked_list.list_state_transition()?
+          //TODO Should we call here unordered.list_state_transition()?
           init_input_utxo_id == init_utxo_id,
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == 1,
-          linked_list.init(common),
+          unordered.init(common),
         }
       }
       Deinit -> and {
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
-          linked_list.deinit(common),
+          unordered.deinit(common),
         }
       Register(
         key_to_prepend,
@@ -99,7 +100,7 @@ validator mint(
         expect registered_operator_data: Datum =
           parsed_registered_operator_datum.data
         and {
-          linked_list.unordered_prepend(
+          unordered.prepend(
             Key(key_to_prepend),
             prepended_node_output_index,
             anchor_node_output_index,
@@ -118,7 +119,7 @@ validator mint(
             parsed_hub_oracle_datum.active_operators,
             active_operator_asset_name,
           ) == 1,
-          linked_list.ordered_is_not_member(
+          ordered.is_not_member(
             Key(key_to_prepend),
             linked_list_utils.get_key(active_operator_raw_key_and_link),
             linked_list_utils.get_link(active_operator_raw_key_and_link),
@@ -130,7 +131,7 @@ validator mint(
             parsed_hub_oracle_datum.retired_operators,
             retired_operator_asset_name,
           ) == 1,
-          linked_list.ordered_is_not_member(
+          ordered.is_not_member(
             Key(key_to_prepend),
             linked_list_utils.get_key(retired_operator_raw_key_and_link),
             linked_list_utils.get_link(retired_operator_raw_key_and_link),
@@ -169,12 +170,9 @@ validator mint(
         expect Some(active_operators_inserted_node_output) =
           list.at(self.outputs, active_operators_inserted_node_output_index)
         let active_operators_common =
-          linked_list.make_common(
-            self,
-            parsed_hub_oracle_datum.active_operators,
-          )
+          unordered.make_common(self, parsed_hub_oracle_datum.active_operators)
         and {
-          linked_list.remove(
+          unordered.remove(
             Key(node_to_activate_key),
             removed_node_input_index,
             anchor_node_input_index,
@@ -186,7 +184,7 @@ validator mint(
             hub_oracle_script_hash,
             hub_oracle_asset_name,
           ) == 1,
-          linked_list.ordered_insert(
+          ordered.insert(
             Key(node_to_activate_key),
             active_operators_inserted_node_output_index,
             active_operators_anchor_node_output_index,
@@ -198,7 +196,7 @@ validator mint(
             retired_operator_asset_name,
           ) == 1,
           parsed_hub_oracle_datum.retired_operators_addr == retired_operator_ref_input.output.address,
-          linked_list.ordered_is_not_member(
+          ordered.is_not_member(
             Key(node_to_activate_key),
             linked_list_utils.get_key(retired_operator_raw_key_and_link),
             linked_list_utils.get_link(retired_operator_raw_key_and_link),
@@ -212,7 +210,7 @@ validator mint(
         removed_node_input_index,
         anchor_node_input_index,
       ) -> and {
-          linked_list.remove(
+          unordered.remove(
             Key(node_to_deregister_key),
             removed_node_input_index,
             anchor_node_input_index,
@@ -236,7 +234,7 @@ validator mint(
         expect Some(removed_node_input) =
           list.at(self.inputs, removed_node_input_index)
         and {
-          linked_list.remove(
+          unordered.remove(
             Key(duplicate_node_key),
             removed_node_input_index,
             anchor_node_input_index,
@@ -251,7 +249,7 @@ validator mint(
                 linked_list_utils.get_raw_key_and_link(
                   duplicate_node_ref_input.output,
                 )
-              linked_list.is_member(
+              unordered.is_member(
                 Key(duplicate_node_key),
                 linked_list_utils.get_key(duplicate_node_raw_key_and_link),
                 removed_node_input.output.address,
@@ -265,7 +263,7 @@ validator mint(
                 linked_list_utils.get_raw_key_and_link(
                   duplicate_node_ref_input.output,
                 )
-              linked_list.is_member(
+              unordered.is_member(
                 Key(duplicate_node_key),
                 linked_list_utils.get_key(duplicate_node_raw_key_and_link),
                 removed_node_input.output.address,
@@ -279,7 +277,7 @@ validator mint(
                 linked_list_utils.get_raw_key_and_link(
                   duplicate_node_ref_input.output,
                 )
-              linked_list.is_member(
+              unordered.is_member(
                 Key(duplicate_node_key),
                 linked_list_utils.get_key(duplicate_node_raw_key_and_link),
                 removed_node_input.output.address,

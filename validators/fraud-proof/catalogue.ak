@@ -5,7 +5,7 @@ use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
-use linked_list/linked_list as linked_list
+use linked_list/ordered
 use linked_list/types.{Key, NodeDatum}
 use midgard/common/utils
 use midgard/fraud_proof/catalogue.{
@@ -191,7 +191,7 @@ fn validate_non_member_state_queue_input(
       state_queue_policy_id,
       frauded_state_queue_node_asset_name,
     ) == 1,
-    linked_list.ordered_is_not_member(
+    ordered.is_not_member(
       Key(block_hash),
       parsed_state_queue_node_datum.key,
       parsed_state_queue_node_datum.link,

@@ -7,7 +7,7 @@ use cardano/assets.{PolicyId, quantity_of, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
-use linked_list/linked_list as linked_list
+use linked_list/ordered
 use linked_list/types.{Key, NodeDatum}
 use midgard/hub_oracle
 use midgard/retired_operators.{
@@ -23,7 +23,7 @@ validator spend(retired_operators_mint_script_hash: ByteArray) {
     _input: OutputReference,
     self: Transaction,
   ) {
-    linked_list.list_state_transition(
+    ordered.list_state_transition(
       tokens(self.mint, retired_operators_mint_script_hash),
     )
   }
@@ -41,7 +41,7 @@ validator mint(
   hub_oracle_asset_name: ByteArray,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
-    let common = linked_list.make_common(self, policy_id)
+    let common = ordered.make_common(self, policy_id)
     when redeemer is {
       Init(init_utxo_index) -> {
         expect Some(init_input) = list.at(self.inputs, init_utxo_index)
@@ -53,15 +53,15 @@ validator mint(
             ),
           )
         and {
-          //TODO Should we call here linked_list.list_state_transition()?
+          //TODO Should we call here ordered.list_state_transition()?
           init_input_utxo_id == init_utxo_id,
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == 1,
-          linked_list.init(common),
+          ordered.init(common),
         }
       }
       Deinit -> and {
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
-          linked_list.deinit(common),
+          ordered.deinit(common),
         }
       Retire_Operator(
         new_retired_operator_key,
@@ -76,23 +76,20 @@ validator mint(
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         let active_operators_common =
-          linked_list.make_common(
-            self,
-            parsed_hub_oracle_datum.active_operators,
-          )
+          ordered.make_common(self, parsed_hub_oracle_datum.active_operators)
         and {
           quantity_of(
             hub_oracle_ref_input.output.value,
             hub_oracle_script_hash,
             hub_oracle_asset_name,
           ) == 1,
-          linked_list.ordered_append(
+          ordered.append(
             Key(new_retired_operator_key),
             retired_operator_appended_node_output_index,
             retired_operator_anchor_node_output_index,
             common,
           ),
-          linked_list.remove(
+          ordered.remove(
             Key(new_retired_operator_key),
             active_operator_removed_node_input_index,
             active_operator_anchor_node_input_index,
@@ -114,7 +111,7 @@ validator mint(
         expect retired_operator_data: RetiredOperatorDatum =
           parsed_retired_operator_datum.data
         and {
-          linked_list.remove(
+          ordered.remove(
             Key(retired_operator_key),
             removed_node_input_index,
             anchor_node_input_index,
@@ -142,7 +139,7 @@ validator mint(
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Script(state_queue_cs) =
           parsed_hub_oracle_datum.state_queue_addr.payment_credential
-        let state_queue_common = linked_list.make_common(self, state_queue_cs)
+        let state_queue_common = ordered.make_common(self, state_queue_cs)
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
         expect Remove_Fraudolent_Block_Header(fraudolent_operator) =
@@ -153,7 +150,7 @@ validator mint(
             hub_oracle_script_hash,
             hub_oracle_asset_name,
           ) == 1,
-          linked_list.remove(
+          ordered.remove(
             Key(slashed_retired_operator_key),
             retired_operator_slashed_node_input_index,
             retired_operator_anchor_node_input_index,
@@ -161,7 +158,7 @@ validator mint(
           ),
           self.fee >= slashing_penalty,
           state_queue_redeemer_pair.1st == Mint(state_queue_cs),
-          linked_list.remove(
+          ordered.remove(
             Key(fraudolent_operator),
             state_queue_removed_node_input_index,
             state_queue_anchor_node_input_index,
