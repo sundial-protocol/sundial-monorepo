@@ -54,12 +54,72 @@ pub fn serialize_key(key: NodeKey) -> ByteArray {
   }
 }
 
-pub fn only_at_node_val(outputs: List<Output>, cs: PolicyId) -> List<Output> {
+pub fn get_node_outputs(
+  outputs: List<Output>,
+  policy_id: PolicyId,
+) -> List<Output> {
   outputs
     |> list.filter(
         fn(output) {
           let Output { value, .. } = output
-          has_data_cs(cs, value)
+          has_data_cs(policy_id, value)
         },
       )
+}
+
+pub fn get_node_in_outputs(
+  inputs: List<Input>,
+  policy_id: PolicyId,
+) -> List<Output> {
+  filter_map_pre(
+    inputs,
+    fn(output) {
+      let Output { value, .. } = output
+      has_data_cs(policy_id, value)
+    },
+    fn(input) {
+      let Input { output, .. } = input
+      output
+    },
+  )
+}
+
+// Adapted from Aiken stdlib.collection.list.filter_map
+// Instead of using (predicate: fn(a) -> Option<a>)
+// We decompose it into two arguments.
+
+// In this variant, we apply the transform before the predicate.
+pub fn filter_map_pre(
+  self: List<a>,
+  predicate: fn(b) -> Bool,
+  transform: fn(a) -> b,
+) -> List<b> {
+  when self is {
+    [] -> []
+    [x, ..xs] -> {
+      let y = transform(x)
+      if predicate(y) {
+        [y, ..filter_map_pre(xs, predicate, transform)]
+      } else {
+        filter_map_pre(xs, predicate, transform)
+      }
+    }
+  }
+}
+
+// In this variant, we apply the transform after the predicate.
+pub fn filter_map_post(
+  self: List<a>,
+  predicate: fn(a) -> Bool,
+  transform: fn(a) -> b,
+) -> List<b> {
+  when self is {
+    [] -> []
+    [x, ..xs] ->
+      if predicate(x) {
+        [transform(x), ..filter_map_post(xs, predicate, transform)]
+      } else {
+        filter_map_post(xs, predicate, transform)
+      }
+  }
 }

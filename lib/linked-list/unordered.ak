@@ -6,15 +6,14 @@ use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use linked_list/constants
 use linked_list/types.{Common, Empty, NodeDatum, NodeKey}
 use linked_list/utils.{
-  get_key, get_link, get_outputs, get_raw_key_and_link, only_at_node_val,
+  get_key, get_link, get_node_in_outputs, get_node_outputs, get_raw_key_and_link,
   serialize_key,
 }
 
 pub fn make_common(transaction: Transaction, own_cs: PolicyId) -> Common {
   let Transaction { inputs, outputs, mint, .. } = transaction
-  let in_outputs = get_outputs(inputs)
-  let from_node_val = only_at_node_val(in_outputs, own_cs)
-  let to_node_val = only_at_node_val(outputs, own_cs)
+  let from_node_val = get_node_in_outputs(inputs, own_cs)
+  let to_node_val = get_node_outputs(outputs, own_cs)
   expect Some(head) = list.head(list.concat(from_node_val, to_node_val))
   let Output { address: node_address, .. } = head
   //Check that all nodes (inputs and outputs) reside in the same address
