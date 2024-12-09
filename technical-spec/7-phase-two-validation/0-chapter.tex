@@ -1,0 +1,44 @@
+\documentclass[../midgard.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\begin{document}
+
+\chapter{Phase Two Validation}
+\label{h:phase-two-validation}
+
+Phase two validation represents the critical stage in Midgard's transaction processing where UPLC script evaluation occurs.
+
+\section{Overview}
+\label{sec:phase-two-overview}
+
+Phase two validation serves several key purposes:
+
+\begin{itemize}
+    \item Validates the execution of UPLC scripts attached to transactions
+    \item Ensures computational bounds are respected
+    \item Maintains verifiable execution traces for fraud proof construction
+    \item Enables efficient dispute resolution through progressive state hashing
+\end{itemize}
+
+The validation process consists of three main components:
+
+\begin{enumerate}
+    \item State representation and management
+    \item Off-chain script decoding and preparation
+    \item Execution validation and fraud proof mechanisms
+\end{enumerate}
+
+Each component is designed to maintain verifiability while optimizing for L2 performance constraints. The following sections detail these components and their interactions within the Midgard protocol.
+
+\subsection{Validation Requirements}
+\label{sec:validation-requirements}
+
+For a transaction to pass phase two validation:
+
+\begin{itemize}
+    \item All scripts must be successfully decoded from their byte representation
+    \item Script execution must complete within specified resource bounds
+    \item All state transitions must be cryptographically verifiable
+    \item Execution traces must enable efficient fraud proof construction
+\end{itemize}
+
+\end{document} 
