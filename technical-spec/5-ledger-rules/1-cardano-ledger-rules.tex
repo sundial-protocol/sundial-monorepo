@@ -1,4 +1,4 @@
-\documentclass[../main.tex]{subfiles}
+\documentclass[../midgard.tex]{subfiles}
 \graphicspath{{\subfix{../images/}}}
 \usepackage{amsmath}
 \begin{document}
@@ -10,10 +10,11 @@ In the following sections the following premises are used:
 
 \begin{equation*}
 \begin{split}
-           b & \in Blocks             \\
-         txs & := transactions(b)     \\
- utxos_{old} & := old\_utxos(b)       \\
-        wtxs & := withdrawn\_utxos(b)
+           b & \in Blocks          \\
+         txs & := transactions(b)  \\
+ utxos_{pre} & := prev\_utxos(b)   \\
+utxos_{post} & := utxos(b)         \\
+        wtxs & := withdrawals(b)
 \end{split}
 \end{equation*}
 
@@ -24,9 +25,9 @@ In the following sections the following premises are used:
 \item[Formal specification:]
 \begin{equation*}
 \begin{split}
-    \forall t \in Ledger, &\forall i \in inputs(t): \\
+    \forall t \in Ledger, &\forall i \in spend\_inputs(t): \\
     &( \exists t_1 \in Ledger, t \neq t_1 \land i \in outputs(t_1) ) \land \\
-    &( \nexists t_2 \in Ledger, t \neq t_2 \land i \in inputs(t_2) )
+    &( \nexists t_2 \in Ledger, t \neq t_2 \land i \in spend\_inputs(t_2) )
 \end{split}
 \end{equation*}
 
@@ -43,8 +44,8 @@ In the following sections the following premises are used:
 \item[Formal specification:]
 \begin{equation*}
 \begin{split}
-    \exists t \in txs, &\exists i \in inputs(t): \\
-    &( i \notin utxos_{old} ) \land  \\
+    \exists t \in txs, &\exists i \in spend\_inputs(t): \\
+    &( i \notin utxos_{prev} ) \land  \\
     &( \nexists t_1 \in txs, t \neq t_1 \land tx\_hash(t_1) = tx\_hash(i) )
 \end{split}
 \end{equation*}
@@ -52,8 +53,8 @@ In the following sections the following premises are used:
 \item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
 \begin{itemize}
     \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
-    \item an input $i$ must be specified such that $i \in inputs(t)$
-    \item a non-membership proof must be created to show that $i$ is not in $utxos_{old}$
+    \item a membership proof for input $i$ must be specified such that $i \in spend\_inputs(t)$
+    \item a non-membership proof must be created to show that $i$ is not in $utxos_{prev}$
     \item a non-membership proof must also be generated that shows that there are no transactions in $txs$ that have id $tx\_hash(i)$
 \end{itemize}
 
@@ -69,7 +70,7 @@ In the following sections the following premises are used:
 \item[Formal specification:]
 \begin{equation*}
 \begin{split}
-    \exists t \in txs, &\exists i \in inputs(t): \\
+    \exists t \in txs, &\exists i \in spend\_inputs(t): \\
     &( \exists t_1 \in txs, tx\_hash(t_1) = tx\_hash(i) \land i \notin outputs(t_1) )
 \end{split}
 \end{equation*}
@@ -77,8 +78,9 @@ In the following sections the following premises are used:
 \item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
 \begin{itemize}
     \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
-    \item an input $i$ must be specified such that $i \in inputs(t)$
-    \item a membership proof must be created to show that $t_1$ is in $txs$ and $t_1$ does not have the required output
+    \item a membership proof must be presented for input $i$ such that $i \in spend\_inputs(t)$
+    \item a membership proof must be created for $t_1$ such that $tx\_hash(t_1) = tx\_hash(i)$
+    \item a DA layer proof must be presented that certifies that $length(outputs(t_1)) < index(i)$ \todo
 \end{itemize}
 
 \item[Rationale:] The items defined above prove that $t$ attempted to spend the input $i$, which did not exist at all.
@@ -92,14 +94,14 @@ In the following sections the following premises are used:
 
 \item[Formal specification:]
 \begin{equation*}
-    \exists t \in txs, \exists i \in inputs(t), \exists wtx \in wtxs, i \in inputs(wtx)
+    \exists t \in txs, \exists i \in spend\_inputs(t), \exists w \in wtxs, i = l2\_outref(wtx)
 \end{equation*}
 
 \item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
 \begin{itemize}
     \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
-    \item an input $i$ must be specified such that $i \in inputs(t)$
-    \item a membership proof must be created to show that $wtx$ is in $w$, which also spends input $i$
+    \item a membership proof must be generated for input $i$ such that $i \in spend\_inputs(t)$
+    \item a membership proof must be created to show that $w$ is in $wtxs$, which also spends input $i$
 \end{itemize}
 
 \item[Rationale:] The items defined above prove that $t$ attempted to spend the input $i$, which was spent in a withdraw transaction.
@@ -113,14 +115,15 @@ In the following sections the following premises are used:
 
 \item[Formal specification:]
 \begin{equation*}
-    \exists t \in txs, \exists i \in inputs(t), \exists t_1 \in tx, t \neq t_1 \land i \in inputs(t_1)
+    \exists t \in txs, \exists i \in spend\_inputs(t), \exists t_1 \in tx, t \neq t_1 \land i \in spend\_inputs(t_1)
 \end{equation*}
 
 \item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
 \begin{itemize}
     \item a membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
-    \item an input $i$ must be specified such that $i \in inputs(t)$
-    \item a membership proof must be created to show that $t_1$ is in $txs$, which also spends input $i$
+    \item a membership proof must be generated for input $i$ such that $i \in spend\_inputs(t)$
+    \item a membership proof must be created to show that $t_1$ is in $txs$
+    \item a membership proof must be given that verifies that $i \in spend\_inputs(t_1)$
 \end{itemize}
 
 \item[Rationale:] The items defined above prove that $t$ attempted to spend the input $i$, which was spent in another transaction.
@@ -134,17 +137,16 @@ In the following sections the following premises are used:
 
 \item[Formal specification:]
 \begin{equation*}
-    \exists w \in wtxs, \exists i \in inputs(w), \exists w_1 \in wtxs, w \neq w_1 \land i \in inputs(w_1)
+    \exists w, w_1 \in wtxs, w \neq w_1 \land l2\_outref(w) = l2\_outref(w_1)
 \end{equation*}
 
 \item[Fraud proof construction:] In order to prove that there exist transactions $t$ that violates this rule:
 \begin{itemize}
     \item a membership proof must be provided for $w$ that shows that the withdraw transaction is included in the block ($w \in wtxs$)
-    \item an input $i$ must be specified such that $i \in inputs(t)$
-    \item a membership proof must be created to show that $w_1$ is in $wtxs$, which also spends input $i$
+    \item a membership proof must be created to show that $w_1$ is in $wtxs$
 \end{itemize}
 
-\item[Rationale:] The items defined above prove that $w$ attempted to spend the input $i$, which was already withdrawn by $w_1$.
+\item[Rationale:] The items defined above prove that $w$ attempted to spend the same input, which was already withdrawn by $w_1$.
 
 \end{description}
 
@@ -153,9 +155,10 @@ In the following sections the following premises are used:
 \begin{description}
 
 \item[Formal specification:]
+\todo
 \begin{equation*}
 \begin{split}
-    \forall t \in Ledger, time\_range(block(t)) \subseteq validity\_range(t)
+    \forall t \in Ledger, time\_range(block(t)) \subseteq validity\_interval(t)
 \end{split}
 \end{equation*}
 
@@ -171,10 +174,10 @@ In the following sections the following premises are used:
 
 \item[Violating condition:]
 \begin{equation*}
-    \exists t \in txs, time\_range(b) \nsubseteq validity\_range(t)
+    \exists t \in txs, time\_range(b) \nsubseteq validity\_interval(t)
 \end{equation*}
 
-\item[Fraud proof construction:] In order to prove that there exists a transaction $tx$ that violates this rule:
+\item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
 \begin{itemize}
     \item a membership proof must be provided that proves that transaction $t$ is included in the block $b$
 \end{itemize}
@@ -189,7 +192,7 @@ In the following sections the following premises are used:
 
 \item[Formal specification:]
 \begin{equation*}
-    \forall t \in Ledger, |inputs(t)| > 0
+    \forall t \in Ledger, |spend\_inputs(t)| > 0
 \end{equation*}
 
 \item[Description:] Every valid transaction in the ledger must spend at least one UTxO.
@@ -204,12 +207,13 @@ In the following sections the following premises are used:
 
 \item[Formal specification:]
 \begin{equation*}
-    \exists t \in txs, |inputs(t)| = 0
+    \exists t \in txs, |spend\_inputs(t)| = 0
 \end{equation*}
 
 \item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
 \begin{itemize}
     \item a membership proof must be provided that shows that the transaction is included in the ledger
+    \item a DA layer proof must be presented that certifies that $length(spend\_inputs(t)) = 0$ \todo
 \end{itemize}
 
 \item[Rationale:] with the provided proof, it can be shown that a transaction $t$ is in the ledger, while $|inputs(t)| = 0$
@@ -228,8 +232,7 @@ In the following sections the following premises are used:
 \item[Description:] Every valid transaction in the ledger must pay the fees for inclusion.
   Proving violating condition \hyperref[sec:MIN-FEE]{MIN-FEE} indicates that this property is broken.
 
-\item[Calculating the minimum fee:] !!! TODO: ...
-% Same structure as in Cardano L1
+\item[Calculating the minimum fee:] The fee calculation algorithm is the same as in Cardano ... \todo
 
 \end{description}
 
@@ -240,7 +243,7 @@ In the following sections the following premises are used:
 
 \item[Formal specification:]
 \begin{equation*}
-    \exists t \in txs, tx_fee(t) < min_fee(t)
+    \exists t \in txs, fee(t) < min\_fee(t)
 \end{equation*}
 
 \item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
@@ -248,17 +251,144 @@ In the following sections the following premises are used:
     \item a membership proof must be provided that shows that the transaction is included in the ledger
 \end{itemize}
 
-\item[Rationale:] with the provided proof, it can be shown that a transaction $t$ is in the ledger, while $tx\_fee(t) < min\_fee(t)$
+\item[Rationale:] with the provided proof, it can be shown that a transaction $t$ is in the ledger, while $fee(t) < min\_fee(t)$
 
 \end{description}
 
 \subsection{Required signatures are correct}
 
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \forall t & \in Ledger, required\_signer\_hashes(t) = \\
+    & \{ \, paymentHK(addr(u)) \, | \, (r, u) \in utxos_{post}, r \in spend\_inputs(t), addr(u) \in Addr^{vkey} \, \}
+\end{split}
+\end{equation*}
+    
+\item[Description:] Every valid transaction in the ledger must correctly show the required signers.
+  Proving the violating condition \hyperref[sec:MISSING-REQ-SIGNER]{MISSING-REQ-SIGNER} or \hyperref[sec:NON-REQ-SIGNER]{NON-REQ-SIGNER} testifies that this property is broken and the block must not be included in the ledger.
+    
+\end{description}
+
+\subsubsection{Violating condition - ``MISSING-REQ-SIGNER''}
+\label{sec:MISSING-REQ-SIGNER}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \exists t & \in txs, \exists r \in spend\_inputs(t), \exists u \in Output, \\
+    & (r, u) \in utxos_{post} \land paymentHK(addr(u)) \notin required\_signer\_hashes(t) \, \land \\
+    & addr(u) \in Addr^{vkey}
+\end{split}
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided that shows that the transaction is included in the ledger
+    \item a DA layer proof must be presented that shows that $r \in spend\_inputs(t)$
+    \item a membership proof must be generated that shows that $(r, u) \in utxos_{post}$
+    \item a DA layer proof must be shown that proves that \\ $paymentHK(addr(u)) \notin required\_signer\_hashes(t)$
+\end{itemize}
+
+\item[Rationale:] with the provided proof, it can be shown that a transaction $t$ is in the ledger and it violates the "Required signatures" property.
+
+\end{description}
+
+\subsubsection{Violating condition - ``NON-REQ-SIGNER''}
+\label{sec:NON-REQ-SIGNER}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \exists t & \in txs, \exists vkey \in required\_signer\_hashes(t), \nexists (r, u) \in utxos_{post}, \\
+    & r \in spend\_inputs(t) \land paymentHK(addr(u)) = vkey \land addr(u) \in Addr^{vkey}
+\end{split}
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided that shows that the transaction $t$ is included in the ledger
+    \item a DA layer proof must be presented that shows that for a specified $vkey$ there is no utxo $u \in utxos_{post}$, such that the address of $u$ corresponds to $vkey$ and $t$ spends $u$
+\end{itemize}
+
+\item[Rationale:] with the provided proof, it can be shown that a transaction $t$ is in the ledger and it violates the "Required signatures" property.
+
+\end{description}
+
 \subsection{Signatures are valid}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \forall t \in Ledger, \forall (v, s, h) \in addr\_tx\_wits(t), is\_valid\_signature(v, s, h)
+\end{equation*}
+        
+\item[Description:] Every provided signature must be valid.
+  Proving the violating condition indicates that this property is broken, and thus the block must not be allowed in the ledger.
+        
+\end{description}
+
+\subsubsection{Violating condition - ``INVALID-SIGNATURE''}
+\label{sec:INVALID-SIGNATURE}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \exists t \in txs, \exists (v, s, h) \in addr\_tx\_wits(t), \lnot is\_valid\_signature(v, s, h)
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided that shows that the transaction $t$ is included in the ledger
+    \item a membership proof must be shown that states that $(v, s, h) \in addr\_tx\_wits(t)$
+\end{itemize}
+
+\item[Rationale:] with the provided proof it can be shown that there exists an invalid signature for transaction $t$ (if indeed the signature $(v, s, h)$ is not valid).
+
+\end{description}
 
 \subsection{Every needed signature is provided}
 
-\subsection{Metadata is empty}
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \forall t \in Ledger, \forall h \in required\_signer\_hashes(t), \exists (v, s, h) \in addr\_tx\_wits(t)
+\end{equation*}
+        
+\item[Description:] Every requires signature is provided.
+  Proving the violating condition indicates that this property is broken, and thus the block must not be allowed in the ledger.
+
+\end{description}
+
+\subsubsection{Violating condition - ``MISSING-SIGNATURE''}
+\label{sec:MISSING-SIGNATURE}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \exists t \in txs, \exists h \in required\_signer\_hashes(t), h \notin \{ h_p \, | \, (v, s, h_p) \in addr\_tx\_wits(t) \}
+\end{equation*}
+
+\item[Fraud proof construction:] In order to prove that there exists a transaction $t$ that violates this rule:
+\begin{itemize}
+    \item a membership proof must be provided that shows that the transaction $t$ is included in the ledger
+    \item a DA layer proof must be shown that states that $h \in required\_signer\_hashes(t)$
+    \item a DA layer proof must be presented that shows that a signature with $h$ does not exist
+\end{itemize}
+
+\item[Rationale:] with the provided proof it can be shown that a required signature, corresponding to $h$ is missing.
+
+\end{description}
 
 \subsection{Multisig scripts are available}
 
@@ -266,9 +396,40 @@ In the following sections the following premises are used:
 
 \subsection{Value preservation}
 
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+\begin{split}
+    \forall t & \in Ledger, \\
+    & mint(t) + \sum_{i \, \in \, spend\_inputs(t)} value(i) = fee(t) + \sum_{o \, \in \, outputs(t)} value(o)
+\end{split}
+\end{equation*}
+        
+\item[Description:] The total value must be preserved.
+  Proving the violating condition indicates that this property is broken, and thus the block must not be allowed in the ledger.
+
+\end{description}
+
+% !!! TODO: violating conditions
+
 \subsection{No Ada minted}
 
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \forall t \in Ledger, lovelaces(mint(t)) = 0
+\end{equation*}
+            
+\item[Description:] Ada must not be minted.
+  Proving the violating condition indicates that this property is broken, and thus the block must not be allowed in the ledger.
+    
+\end{description}
+
 \subsection{Maximum transaction size}
+
+!!! TODO: is this relevant?
 
 \subsection{Maximum reference script size}
 
@@ -276,7 +437,23 @@ In the following sections the following premises are used:
 
 \subsection{Maximum value size}
 
+!!! TODO: ...
+
 \subsection{No negative value}
+
+\begin{description}
+
+\item[Formal specification:]
+\begin{equation*}
+    \forall t \in Ledger, mint(t) \geq \mathbf{0} \, \land fee(t) \geq 0 \land \forall o \in outputs(t), \, value(o) \geq \mathbf{0}
+\end{equation*}
+                
+\item[Description:] All values must be greater or equal to zero.
+  Proving the violating condition indicates that this property is broken, and thus the block must not be allowed in the ledger.
+        
+\end{description}
+
+% !!! TODO: violating conditions
 
 \subsection{Minimum UTxO value}
 % Same structure as in Cardano L1
@@ -295,7 +472,7 @@ In the following sections the following premises are used:
 
 \subsection{All reference inputs must be valid}
 
-% TODO: maybe also include $inputs \cap reference_inputs = \varnothing$
+% TODO: maybe also include $inputs \cap reference\_inputs = \varnothing$
 
 \subsection{Validator scripts are available}
 
