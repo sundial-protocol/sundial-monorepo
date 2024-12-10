@@ -1,0 +1,57 @@
+\documentclass[../midgard.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\begin{document}
+
+\section{Withdrawal order (L1)}
+\label{h:withdrawal-order}
+
+\notebox{Currently, this withdrawal order design can only handle withdrawing pubkey-based utxos.
+However, we can modify L2 transactions to produce ``withdrawable utxos'' that cannot be spent on L2 but can be withdrawn permissionlessly on L1.
+This will allow L1 withdrawal orders to withdraw these L2 utxos without even requiring any signatures.}
+
+A user initiates a withdrawal from Midgard by submitting an L1 transaction that performs the following:
+\begin{enumerate}
+    \item Spend an input \code{l1\_nonce}, which uniquely identifies this withdrawal order.
+    \item Register a staking script credential to witness the withdrawal order.
+      The staking script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the withdrawal order whenever the credential is \emph{not} registered.
+    \item Mint a withdrawal order token to verify the following datum:
+        \begin{equation*}
+        \T{WithdrawalOrderDatum} \coloneq \left\{
+            \begin{array}{ll}
+                \T{event} : & \T{WithdrawalEvent}, \\
+                \T{inclusion\_time} : & \T{PosixTime}, \\
+                \T{witness} : & \T{ScriptHash}, \\
+                \T{refund\_address}: & \T{Address}, \\
+                \T{refund\_datum}: & \T{Option(Data)}
+            \end{array}
+            \right\}
+        \end{equation*}
+    \item Send min-ADA to the Midgard withdrawal order address, along with the withdrawal order token and the above datum.
+\end{enumerate}
+
+At the time of the L1 withdrawal order, its \code{inclusion\_time} is set to the sum of the L1 transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter.
+According to Midgard's ledger rules:
+\begin{description}
+    \item[Withdrawal order inclusion.] A block header must include withdrawal orders with inclusion times falling within the block header's event interval, and it must \emph{not} include any other withdrawal orders.
+\end{description}
+
+The withdrawal order's outcome is determined as follows:
+\begin{itemize}
+    \item If the withdrawal event is included in a settlement queue node, then utxos from the Midgard reserve and confirmed deposits can be used to pay for the creation of an L1 utxo according to the withdrawal event.
+    \item If the withdrawal order's inclusion time is within the confirmed header's event interval but not within the event interval of any settlement queue node, then the withdrawal order utxo can be refunded to its user according to the \code{refund\_address} and \code{refund\_datum} fields.
+\end{itemize}
+
+The withdrawal order's \code{witness} staking credential must be deregistered when the withdrawal order utxo is spent.
+
+\subsection{Staking script}
+\label{h:withdrawal-order-staking-script}
+
+\subsection{Minting policy}
+\label{h:withdrawal-order-minting-policy}
+
+\notebox{The transaction must be signed by the pubkey corresponding to the withdrawal event's \code{l2\_outref} payment credential.}
+
+\subsection{Spending validator}
+\label{h:withdrawal-order-spending-validator}
+
+\end{document}

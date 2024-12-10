@@ -1,0 +1,351 @@
+; Midgard Codec Standard
+
+; Midgard Codec Standard
+; Midgard blocks and transactions follow the Conway Cardano era CDDL specifications with minor deviations, 
+; the key difference being that Midgard does not include a staking mechanism or governance actions.
+
+; Notational Convention
+; Midgard follows the notational convention of RFC 7049, similar to Cardano, in order to provide an agnostic 
+; way to express data formats and protocol messages for CBOR and JSON standards.
+
+; Comparison to Cardano CDDL
+; In contrast to Cardano CDDL, Midgard aims to minimize the transaction information as much as possible. 
+; Therefore, some transaction fields may be enforced to either be null or to have a compressed value.
+
+; Data Representation
+; Midgard employs two distinct data representations to balance external interactions with on-chain constraints on Cardano L1:
+
+; Full Representation:
+;   - Contains complete data structures
+;   - Suitable for external interactions
+
+; Onchain Representation (Compact Representation):
+;   - Used primarily for on-chain data
+;   - Optimized for L1 storage constraints
+;   - Represents data in lightweight form
+
+; To accommodate the constraints of Cardano L1, where Midgard state resides, 
+; Non-Fixed-size structures (e.g., arrays, tuples) are represented as Merkle root hashes. 
+; Fixed-size structures (e.g., objects, uints, hashes) retain their standard form, as their size is predetermined. 
+
+; We use the term Full Representation to refer to the raw data representation and Compact Representation to denote the lightweight, on-chain based representation.
+
+; Block
+; Full Representation
+block =
+  { header_hash : header_hash
+  , header : header
+  , block_body : block_body
+  }
+
+; Block Body
+; Full Representation only!
+; Compact Representation is already included in the header
+block_body =
+  { utxos : map<output_reference, transaction_output>
+  , transactions : map<transaction_id, transaction>
+  , deposits : map<deposit_id, deposit_info>
+  , withdrawals : map<withdrawal_id, withdrawal_info>
+  }
+
+; Block Header
+; Full Representation (same as Compact Representation)
+header =
+  { prev_utxos_root : mptr
+  , utxos_root : mptr
+  , transactions_root : mptr
+  , deposits_root : mptr
+  , withdrawals_root : mptr
+  , start_time : $posix_time
+  , event_start_time : $posix_time
+  , end_time : $posix_time
+  , prev_header_hash : header_hash / null
+  , operator_vkey : $vkey
+  , protocol_version : uint
+  }
+
+; Deposit event
+; Full Representation
+deposit_event = [deposit_id, deposit_info]
+
+deposit_id = output_reference
+
+deposit_info =
+  { l2_address : address
+  , ? l2_datum : data
+  }
+
+; Deposit event
+; Compact Representation
+deposit_event_compact = [deposit_id, deposit_info_compact]
+
+deposit_info_compact =
+  { l2_address : address
+  , ? l2_datum : $hash32
+  }
+
+; Withdrawal event
+; Full Representation
+withdrawal_event = [withdrawal_id, withdrawal_info]
+
+withdrawal_id = output_reference
+
+withdrawal_info =
+  { l2_outref : output_reference
+  , l1_address : address
+  , ? l1_datum : data
+  }
+
+; Withdrawal event
+; Compact Representation
+withdrawal_event_compact = [withdrawal_id, withdrawal_info_compact]
+
+withdrawal_info_compact =
+  { l2_outref : output_reference
+  , l1_address : address
+  , ? l1_datum : $hash32
+  }
+
+; Transaction
+; Full Representation
+
+transaction =
+  [ transaction_body
+  , transaction_witness_set
+  , boolean ; is_valid tag (see note 1)
+  , null ; auxiliary_data (see note 2)
+  ]
+
+; Notes: 
+; 1. The boolean validation tag is_valid indicates the expected outcome for Plutus script validation:
+;     - If true, all Plutus scripts in the transaction are expected to validate, allowing full ledger updates.
+;     - If false, no state changes occur, except for collateral collection, which seizes collateral from inputs.
+;     - Even if a script fails validation, the UTxO rule still applies:
+;         - This rule verifies the is_valid tag and handles collateral appropriately, ensuring no unintended state changes affect the ledger.
+; 2. Auxiliary data (metadata) is forbidden:
+;     -  The auxiliary_data field is enforced to be null, as the Midgard ledger does not store metadata information.
+
+; Transaction
+; Compact Representation
+
+transaction_compact =
+  { transaction_body_hash : $hash32
+  , transaction_witness_set_hash : $hash32
+  , boolean ; is_valid tag (see note 1)
+  }
+
+; Transaction Body
+; Full Representation
+
+transaction_body =
+  { 0 : nonempty_oset<transaction_input>    ; inputs (see note 1)
+  , 1 : [* transaction_output]
+  , 2 : coin                                ; fee
+  , ? 3 : uint                              ; time to live (see note 2)
+  , ? 7 : auxiliary_data_hash               ; (see note 5)
+  , ? 8 : uint                              ; validity_interval_start (see note 2)
+  , ? 9 : mint
+  , ? 11 : script_data_hash
+  , ? 14 : required_signers
+  , ? 15 : network_id                       ; (see note 6)
+  , ? 18 : nonempty_oset<transaction_input> ; reference inputs (see note 1)
+  , ? 23 : required_observers               ; Script credentials
+  }
+
+; Implementation Notes
+;   1. The order of inputs is preserved according to Cardano CIP 128.
+;   2. The validity_interval_start and ttl (time to live) values are inherited from Cardano L1.
+;   5. auxiliary_data_hash represents the Merkle root hash of metadata.
+;   6. network_id indicates whether the transaction is for Midgard Mainnet (10) or Testnet (11).
+;   7. Fields certificates (4), withdrawals_hash (5), collateral_inputs (13), collateral_return(16) , total_collateral (17), voting_procedures (19),
+;      [+ proposal_procedure] (20), coin (21), and donation (22) are not relevant to the Midgard Ledger and are ignored.
+;   8. Indicates observer scripts according to Cardano CIP 112.
+
+
+; Transaction Body
+; Compact Representation
+
+transaction_body_compact =
+  { 0 : inputs_hash    ; inputs_hash
+  , 1 : outputs_hash   ; outputs_hash
+  , 2 : uint           ; fee
+  , ? 3 : uint         ; validity_interval_end (ttl)
+  , ? 7 : $hash32      ; auxiliary_data_hash
+  , ? 8 : uint         ; validity_interval_start
+  , ? 9 : $hash32      ; mint_hash
+  , ? 11 : $hash32     ; script_data_hash
+  , ? 14 : $hash32     ; required_signers_hash
+  , ? 15 : uint        ; network_id
+  , ? 18 : $hash32     ; reference_inputs_hash
+  , ? 23 : $hash32     ; required_observers_hash
+  }
+
+inputs_hash = $hash32 ; hash of inputs_set
+
+outputs_list_compact = [* transaction_output_compact]
+outputs_hash = $hash32 ; hash of outputs_list_compact
+
+
+; Implementation Notes
+; - Field bootstrap_witness (2), nonempty_set<plutus_v1_script> (3), nonempty_set<plutus_data> (4),
+;   nonempty_set<plutus_v2_script> (6), are not relevant to the Midgard Ledger and are ignored.
+
+; Transaction Witness Set
+; Full Representation
+transaction_witness_set =
+  { ? 0 : nonempty_set<vkeywitness>
+  , ? 1 : nonempty_set<native_script>
+  , ? 5 : redeemers                 ; scripts
+  , ? 7 : nonempty_set<plutus_v3_script>
+  }
+
+; Transaction Witness Set
+; Compact Representation
+transaction_witness_set_compact =
+  { ? 0 : $hash32   ; nonempty_set<vkeywitness>
+  , ? 1 : $hash32   ; nonempty_set<native_script>
+  , ? 5 : $hash32   ; redeemers
+  , ? 7 : $hash32   ; nonempty_set<plutus_v3_script>
+  }
+
+; Transaction Input
+; Full Representation (same as Compact Representation)
+transaction_input = output_reference
+
+output_reference = [transaction_id : transaction_id, index : uint .size 2]
+
+transaction_id = $hash32
+
+; Transaction Output
+; Full Representation
+transaction_output =
+  { 0 : address
+  , 1 : value
+  , ? 2 : data
+  , ? 3 : script_ref
+  }
+; Note: Midgard only uses post_alonzo_transaction_output
+
+; Transaction Output
+; Compact Representation
+transaction_output_compact =
+  { 0 : address
+  , 1 : value_compact ;
+  , ? 2 : $hash32 ; data_hash
+  , ? 3 : $hash32 ; script_ref_hash
+  }
+
+; Value
+; Full Representation
+value =
+  coin /
+  [ coin
+  , multiasset<positive_coin>
+  ]
+
+; Value
+; Compact Representation
+value_compact =
+  coin /
+  [ coin
+  , $hash32 ; hash of multiasset<positive_coin>
+  ]
+
+; Multiasset
+; Full Representation
+multiasset<a0> =
+  { + policy_id => 
+    { + asset_name => a0 }
+  }
+
+; Multiasset
+; Compact Representation
+multiasset_compact<a0> =
+  { + policy_id => $hash32 } ; hash of { asset_name => a0 } 
+
+reward_account = h'E090000000000000000000000000000000000000000000000000000000'
+                  / h'F0A0000000000000000000000000000000000000000000000000000000'
+
+required_signers = nonempty_set<addr_keyhash>
+
+credential =
+  [  0, addr_keyhash
+  // 1, scripthash
+  ]
+
+mint = multiasset<nonZeroInt64>
+
+; Defined Types
+
+; Data
+
+data = #6.24(bytes .cbor plutus_data)
+
+plutus_data =
+    constr<plutus_data>
+  / {* plutus_data => plutus_data}
+  / [* plutus_data]
+  / big_int
+  / bounded_bytes
+
+bounded_bytes = bytes .size (0 .. 64)
+
+constr<a0> =
+    #6.121([* a0])
+  / #6.122([* a0])
+  / #6.123([* a0])
+  / #6.124([* a0])
+  / #6.125([* a0])
+  / #6.126([* a0])
+  / #6.127([* a0])
+  / #6.102([uint, [* a0]])
+
+; Sets
+; Conway specification 2.0 requires label 258 for all set types
+
+; Unordered collection of elements
+; Duplicate elements are not allowed
+; Order of elements is implementation-specific (i.e Ledger)
+set<a> = #6.258([* a])
+
+nonempty_set<a> = #6.258([+ a]) ; Identical to basic set, but must contain at least one element
+
+nonempty_oset<a> = #6.258([+ a]) ; Element order is preserved
+
+; Maps
+
+; Unordered collection of elements identified by unique keys
+; Duplicate keys are not allowed
+; Order of elements is ascending by key
+map<a,b> = #5([* [a,b]])
+
+; Numeric Types
+
+positive_int = 1 .. 18446744073709551615 ; Positive Integer only, Range: [1, 2^{64} - 1]
+
+nonZeroInt64 = negInt64 / posInt64
+
+negInt64 = -9223372036854775808 .. -1
+
+posInt64 = 1 .. 9223372036854775807
+
+; Hash Types
+
+hash28 = bytes .size 28 ; Fixed 28 bytes (224 bits)
+  
+hash32 = bytes .size 32 ; Fixed 32 bytes (256 bits)
+
+; Cryptographic Types
+
+signature = bytes .size 64 ; Fixed 64 bytes (512 bits)
+
+vkey = bytes .size 32 ; Fixed 32 bytes (256 bits)
+
+addr_keyhash = $hash28
+
+scripthash = $hash28
+
+mptr = $hash32 ; Merkle Patricia Tree Root
+
+header_hash = $hash32
+
