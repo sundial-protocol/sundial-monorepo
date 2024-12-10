@@ -9,7 +9,8 @@ use cardano/transaction.{
 use linked_list/ordered
 use linked_list/types.{Key, NodeDatum}
 use linked_list/unordered
-use linked_list/utils as linked_list_utils
+use linked_list/utils.{get_node_in_outputs,
+  get_node_outputs} as linked_list_utils
 use midgard/hub_oracle
 use midgard/registered_operators.{
   Activate, Active, Datum, Deinit, Deregister, Init, MintRedeemer, Register,
@@ -42,7 +43,9 @@ validator mint(
   hub_oracle_asset_name: ByteArray,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
-    let common = unordered.make_common(self, policy_id)
+    let node_in_outputs = get_node_in_outputs(self.inputs, policy_id)
+    let node_outputs = get_node_outputs(self.outputs, policy_id)
+    let node_mint = tokens(self.mint, policy_id)
     when redeemer is {
       Init(init_utxo_index) -> {
         expect Some(init_input) = list.at(self.inputs, init_utxo_index)
@@ -57,12 +60,12 @@ validator mint(
           //TODO Should we call here unordered.list_state_transition()?
           init_input_utxo_id == init_utxo_id,
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == 1,
-          unordered.init(common),
+          unordered.init(node_in_outputs, node_mint, policy_id),
         }
       }
       Deinit -> and {
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
-          unordered.deinit(common),
+          unordered.deinit(node_outputs, node_mint, policy_id),
         }
       Register(
         key_to_prepend,
@@ -104,7 +107,9 @@ validator mint(
             Key(key_to_prepend),
             prepended_node_output_index,
             anchor_node_output_index,
-            common,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           ),
           list.has(self.extra_signatories, key_to_prepend),
           registered_operator_data.registration_time == valid_to,
@@ -169,14 +174,27 @@ validator mint(
         expect registered_operator_data: Datum = parsed_removed_node_datum.data
         expect Some(active_operators_inserted_node_output) =
           list.at(self.outputs, active_operators_inserted_node_output_index)
-        let active_operators_common =
-          unordered.make_common(self, parsed_hub_oracle_datum.active_operators)
+        let active_operators_node_in_outputs =
+          get_node_in_outputs(
+            self.inputs,
+            parsed_hub_oracle_datum.active_operators,
+          )
+        let active_operators_node_outputs =
+          get_node_outputs(
+            self.outputs,
+            parsed_hub_oracle_datum.active_operators,
+          )
+        let active_operators_node_mint =
+          tokens(self.mint, parsed_hub_oracle_datum.active_operators)
+
         and {
           unordered.remove(
             Key(node_to_activate_key),
             removed_node_input_index,
             anchor_node_input_index,
-            common,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           ),
           valid_from >= registered_operator_data.registration_time + registration_duration,
           quantity_of(
@@ -188,7 +206,9 @@ validator mint(
             Key(node_to_activate_key),
             active_operators_inserted_node_output_index,
             active_operators_anchor_node_output_index,
-            active_operators_common,
+            active_operators_node_in_outputs,
+            active_operators_node_outputs,
+            active_operators_node_mint,
           ),
           quantity_of(
             retired_operator_ref_input.output.value,
@@ -214,7 +234,9 @@ validator mint(
             Key(node_to_deregister_key),
             removed_node_input_index,
             anchor_node_input_index,
-            common,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           ),
           list.has(self.extra_signatories, node_to_deregister_key),
         }
@@ -238,7 +260,9 @@ validator mint(
             Key(duplicate_node_key),
             removed_node_input_index,
             anchor_node_input_index,
-            common,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           ),
           self.fee >= slashing_penalty,
           when witness_status is {

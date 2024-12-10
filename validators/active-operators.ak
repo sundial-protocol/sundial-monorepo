@@ -10,6 +10,8 @@ use cardano/transaction.{
 use linked_list/ordered
 use linked_list/types.{Key, NodeDatum}
 use linked_list/unordered
+use linked_list/utils.{get_node_in_outputs,
+  get_node_outputs} as linked_list_utils
 use midgard/active_operators.{
   Activate_Operator, Datum, Deinit, Init, List_State_Transition, MintRedeemer,
   Remove_Operator_Slash_Bond, Retire_Operator, SpendRedeemer,
@@ -59,7 +61,11 @@ validator spend(
 
         expect Script(state_queue_cs) =
           parsed_hub_oracle_datum.state_queue_addr.payment_credential
-        let state_queue_common = ordered.make_common(self, state_queue_cs)
+        let state_queue_node_in_outputs =
+          get_node_in_outputs(self.inputs, state_queue_cs)
+        let state_queue_node_outputs =
+          get_node_outputs(self.outputs, state_queue_cs)
+        let state_queue_node_mint = tokens(self.mint, state_queue_cs)
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
         expect Commit_Block_Header(operator) = state_queue_redeemer_pair.2nd
@@ -87,7 +93,9 @@ validator spend(
             Key(operator),
             state_queue_appended_node_output_index,
             state_queue_anchor_node_output_index,
-            state_queue_common,
+            state_queue_node_in_outputs,
+            state_queue_node_outputs,
+            state_queue_node_mint,
           ),
           Key(operator) == parsed_active_node_output_datum.key,
         }
@@ -107,7 +115,9 @@ validator mint(
   hub_oracle_asset_name: ByteArray,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
-    let common = ordered.make_common(self, policy_id)
+    let node_in_outputs = get_node_in_outputs(self.inputs, policy_id)
+    let node_outputs = get_node_outputs(self.outputs, policy_id)
+    let node_mint = tokens(self.mint, policy_id)
     when redeemer is {
       Init(init_utxo_index) -> {
         expect Some(init_input) = list.at(self.inputs, init_utxo_index)
@@ -122,12 +132,12 @@ validator mint(
           //TODO Should we call here ordered.list_state_transition()?
           init_input_utxo_id == init_utxo_id,
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == 1,
-          ordered.init(common),
+          ordered.init(node_outputs, node_mint, policy_id),
         }
       }
       Deinit -> and {
           quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
-          ordered.deinit(common),
+          ordered.deinit(node_in_outputs, node_mint, policy_id),
         }
       Activate_Operator(
         new_active_operator_key,
@@ -146,11 +156,19 @@ validator mint(
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
-        let registered_operators_common =
-          ordered.make_common(
-            self,
+        let registered_operators_node_in_outputs =
+          get_node_in_outputs(
+            self.inputs,
             parsed_hub_oracle_datum.registered_operators,
           )
+        let registered_operators_node_outputs =
+          get_node_outputs(
+            self.outputs,
+            parsed_hub_oracle_datum.registered_operators,
+          )
+        let registered_operators_node_mint =
+          tokens(self.mint, parsed_hub_oracle_datum.registered_operators)
+
         and {
           quantity_of(
             hub_oracle_ref_input.output.value,
@@ -161,14 +179,18 @@ validator mint(
             Key(new_active_operator_key),
             active_operator_appended_node_output_index,
             active_operator_anchor_node_output_index,
-            common,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           ),
           active_operator_data.commitment_time == None,
           ordered.remove(
             Key(new_active_operator_key),
             registered_operator_removed_node_input_index,
             registered_operator_anchor_node_input_index,
-            registered_operators_common,
+            registered_operators_node_in_outputs,
+            registered_operators_node_outputs,
+            registered_operators_node_mint,
           ),
         }
       }
@@ -187,7 +209,11 @@ validator mint(
         expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
         expect Script(state_queue_cs) =
           parsed_hub_oracle_datum.state_queue_addr.payment_credential
-        let state_queue_common = ordered.make_common(self, state_queue_cs)
+        let state_queue_node_in_outputs =
+          get_node_in_outputs(self.inputs, state_queue_cs)
+        let state_queue_node_outputs =
+          get_node_outputs(self.outputs, state_queue_cs)
+        let state_queue_node_mint = tokens(self.mint, state_queue_cs)
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
         expect Remove_Fraudolent_Block_Header(fraudolent_operator) =
@@ -202,7 +228,9 @@ validator mint(
             Key(slashed_active_operator_key),
             active_operator_slashed_node_input_index,
             active_operator_anchor_node_input_index,
-            common,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           ),
           self.fee >= slashing_penalty,
           state_queue_redeemer_pair.1st == Mint(state_queue_cs),
@@ -210,7 +238,9 @@ validator mint(
             Key(fraudolent_operator),
             state_queue_removed_node_input_index,
             state_queue_anchor_node_input_index,
-            state_queue_common,
+            state_queue_node_in_outputs,
+            state_queue_node_outputs,
+            state_queue_node_mint,
           ),
           fraudolent_operator == slashed_active_operator_key,
         }
@@ -240,8 +270,18 @@ validator mint(
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
-        let retired_operators_common =
-          ordered.make_common(self, parsed_hub_oracle_datum.retired_operators)
+        let retired_operators_node_in_outputs =
+          get_node_in_outputs(
+            self.inputs,
+            parsed_hub_oracle_datum.retired_operators,
+          )
+        let retired_operators_node_outputs =
+          get_node_outputs(
+            self.outputs,
+            parsed_hub_oracle_datum.retired_operators,
+          )
+        let retired_operators_node_mint =
+          tokens(self.mint, parsed_hub_oracle_datum.retired_operators)
         and {
           quantity_of(
             hub_oracle_ref_input.output.value,
@@ -252,13 +292,17 @@ validator mint(
             Key(active_operator_key),
             active_operator_removed_node_input_index,
             active_operator_anchor_node_input_index,
-            common,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           ),
           ordered.insert(
             Key(active_operator_key),
             retired_operator_inserted_node_output_index,
             retired_operators_anchor_node_output_index,
-            retired_operators_common,
+            retired_operators_node_in_outputs,
+            retired_operators_node_outputs,
+            retired_operators_node_mint,
           ),
           active_operator_data.commitment_time == retired_operator_data.commitment_time,
         }
