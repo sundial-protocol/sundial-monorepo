@@ -16,3 +16,5 @@ jobs:
       - run: aiken fmt --check
       - run: aiken check -D
       - run: aiken build
+      - run: git diff --name-only --exit-code aiken.lock
+      - run: git diff --name-only --exit-code plutus.json
