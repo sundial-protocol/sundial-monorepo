@@ -94,14 +94,14 @@ Applications are free to use these as they wish.
 The state integrity rules distinguish between transactions that apply linked list state transitions and transactions that merely modify the \code{data} field or non-node-NFT value of a node utxo.
 
 \begin{description}
-    \item[ListStateTransition.]
+    \item[List State Transition.]
     This rule allows a node utxo to be spent in any transaction that applies a state transition to the list.
     Conditions:
     \begin{enumerate}
         \item Tokens of the list's minting policy must be minted or burned.
     \end{enumerate}
     
-    \item[ModifyData.]
+    \item[Modify Data.]
     This rule ensures that the node NFT, the \code{key} field, and the \code{link} field remain unchanged in any transaction that does not apply a state transition to the list.
     It achieves it as follows:
 
