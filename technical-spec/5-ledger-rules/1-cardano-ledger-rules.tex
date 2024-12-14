@@ -4,7 +4,7 @@
 \begin{document}
 
 \section{Midgard Ledger Rules and Fraud Proofs}
-\label{sec:ledger-rules-fraud-proofs}
+\label{h:ledger-rules-fraud-proofs}
 
 In the following sections the following premises are used:
 
@@ -19,6 +19,7 @@ utxos_{post} & := utxos(b)         \\
 \end{equation*}
 
 \subsection{All inputs must be valid}
+\label{rule:all-inputs-must-be-valid}
 
 \begin{description}
 
@@ -32,12 +33,12 @@ utxos_{post} & := utxos(b)         \\
 \end{equation*}
 
 \item[Description:] A transaction cannot spend a non-existing (or an already spent) UTxO.
-\item[Violating conditions:] If any of the following conditions are met (\hyperref[sec:NO-INPUT]{NO-INPUT}, \hyperref[sec:INPUT-NO-IDX]{INPUT-NO-IDX}, \hyperref[sec:WITHDRAWN-INPUT]{WITHDRAWN-INPUT}, \hyperref[sec:DOUBLE-SPEND]{DOUBLE-SPEND} or \hyperref[sec:DOUBLE-WITHDRAW]{DOUBLE-WITHDRAW}), then this property is broken, the new block must be eliminated.
+\item[Violating conditions:] If any of the following conditions are met (\hyperref[violation:NO-INPUT]{NO-INPUT}, \hyperref[violation:INPUT-NO-IDX]{INPUT-NO-IDX}, \hyperref[violation:WITHDRAWN-INPUT]{WITHDRAWN-INPUT}, \hyperref[violation:DOUBLE-SPEND]{DOUBLE-SPEND} or \hyperref[violation:DOUBLE-WITHDRAW]{DOUBLE-WITHDRAW}), then this property is broken, the new block must be eliminated.
 
 \end{description}
 
-\subsubsection{Violating condition - ``NO-INPUT''}
-\label{sec:NO-INPUT}
+\subsubsection{NO-INPUT violation}
+\label{violation:NO-INPUT}
 
 \begin{description}
 
@@ -62,8 +63,8 @@ utxos_{post} & := utxos(b)         \\
 
 \end{description}
 
-\subsubsection{Violating condition - ``INPUT-NO-IDX''}
-\label{sec:INPUT-NO-IDX}
+\subsubsection{INPUT-NO-IDX violation}
+\label{violation:INPUT-NO-IDX}
 
 \begin{description}
 
@@ -87,8 +88,8 @@ utxos_{post} & := utxos(b)         \\
 
 \end{description}
 
-\subsubsection{Violating condition - ``WITHDRAWN-INPUT''}
-\label{sec:WITHDRAWN-INPUT}
+\subsubsection{WITHDRAWN-INPUT violation}
+\label{violation:WITHDRAWN-INPUT}
 
 \begin{description}
 
@@ -108,8 +109,8 @@ utxos_{post} & := utxos(b)         \\
 
 \end{description}
 
-\subsubsection{Violating condition - ``DOUBLE-SPEND''}
-\label{sec:DOUBLE-SPEND}
+\subsubsection{DOUBLE-SPEND violation}
+\label{violation:DOUBLE-SPEND}
 
 \begin{description}
 
@@ -130,8 +131,8 @@ utxos_{post} & := utxos(b)         \\
 
 \end{description}
 
-\subsubsection{Violating condition - ``DOUBLE-WITHDRAW''}
-\label{sec:DOUBLE-WITHDRAW}
+\subsubsection{DOUBLE-WITHDRAW violation}
+\label{violation:DOUBLE-WITHDRAW}
 
 \begin{description}
 
@@ -151,6 +152,7 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{Transaction validity range}
+\label{rule:transaction-validity-range}
 
 \begin{description}
 
@@ -163,12 +165,12 @@ utxos_{post} & := utxos(b)         \\
 \end{equation*}
 
 \item[Description:] Every valid transaction in the ledger must be included at a timestamp that conforms to the validity range that the transaction prescribes.
-  Whenever the condition \hyperref[sec:INVALID-RANGE]{INVALID-RANGE} is met, that indicates that this property is violated, and the block in question must not be included in the $Ledger$.
+  Whenever the condition \hyperref[violation:INVALID-RANGE]{INVALID-RANGE} is met, that indicates that this property is violated, and the block in question must not be included in the $Ledger$.
 
 \end{description}
 
-\subsubsection{Violating condition - ``INVALID-RANGE''}
-\label{sec:INVALID-RANGE}
+\subsubsection{INVALID-RANGE violation}
+\label{violation:INVALID-RANGE}
 
 \begin{description}
 
@@ -187,6 +189,7 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{At least one input}
+\label{rule:at-least-one-input}
 
 \begin{description}
 
@@ -196,12 +199,12 @@ utxos_{post} & := utxos(b)         \\
 \end{equation*}
 
 \item[Description:] Every valid transaction in the ledger must spend at least one UTxO.
-  If the violating condition \hyperref[sec:ZERO-INPUT]{ZERO-INPUT} is satisfied, then this property is broken and the block must be removed.
+  If the violating condition \hyperref[violation:ZERO-INPUT]{ZERO-INPUT} is satisfied, then this property is broken and the block must be removed.
 
 \end{description}
 
-\subsubsection{Violating condition - ``ZERO-INPUT''}
-\label{sec:ZERO-INPUT}
+\subsubsection{ZERO-INPUT violation}
+\label{violation:ZERO-INPUT}
 
 \begin{description}
 
@@ -221,6 +224,7 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{Minimum fee}
+\label{rule:minimum-fee}
 
 \begin{description}
 
@@ -230,14 +234,14 @@ utxos_{post} & := utxos(b)         \\
 \end{equation*}
 
 \item[Description:] Every valid transaction in the ledger must pay the fees for inclusion.
-  Proving violating condition \hyperref[sec:MIN-FEE]{MIN-FEE} indicates that this property is broken.
+  Proving violating condition \hyperref[violation:MIN-FEE]{MIN-FEE} indicates that this property is broken.
 
 \item[Calculating the minimum fee:] The fee calculation algorithm is the same as in Cardano ... \todo
 
 \end{description}
 
-\subsubsection{Violating condition - ``MIN-FEE''}
-\label{sec:MIN-FEE}
+\subsubsection{MIN-FEE violation}
+\label{violation:MIN-FEE}
 
 \begin{description}
 
@@ -256,6 +260,7 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{Required signatures are correct}
+\label{rule:required-signatures-are-correct}
 
 \begin{description}
 
@@ -268,12 +273,12 @@ utxos_{post} & := utxos(b)         \\
 \end{equation*}
     
 \item[Description:] Every valid transaction in the ledger must correctly show the required signers.
-  Proving the violating condition \hyperref[sec:MISSING-REQ-SIGNER]{MISSING-REQ-SIGNER} or \hyperref[sec:NON-REQ-SIGNER]{NON-REQ-SIGNER} testifies that this property is broken and the block must not be included in the ledger.
+  Proving the violating condition \hyperref[violation:MISSING-REQ-SIGNER]{MISSING-REQ-SIGNER} or \hyperref[violation:NON-REQ-SIGNER]{NON-REQ-SIGNER} testifies that this property is broken and the block must not be included in the ledger.
     
 \end{description}
 
-\subsubsection{Violating condition - ``MISSING-REQ-SIGNER''}
-\label{sec:MISSING-REQ-SIGNER}
+\subsubsection{MISSING-REQ-SIGNER violation}
+\label{violation:MISSING-REQ-SIGNER}
 
 \begin{description}
 
@@ -298,8 +303,8 @@ utxos_{post} & := utxos(b)         \\
 
 \end{description}
 
-\subsubsection{Violating condition - ``NON-REQ-SIGNER''}
-\label{sec:NON-REQ-SIGNER}
+\subsubsection{NON-REQ-SIGNER violation}
+\label{violation:NON-REQ-SIGNER}
 
 \begin{description}
 
@@ -322,6 +327,7 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{Signatures are valid}
+\label{rule:signatures-are-valid}
 
 \begin{description}
 
@@ -335,8 +341,8 @@ utxos_{post} & := utxos(b)         \\
         
 \end{description}
 
-\subsubsection{Violating condition - ``INVALID-SIGNATURE''}
-\label{sec:INVALID-SIGNATURE}
+\subsubsection{INVALID-SIGNATURE violation}
+\label{violation:INVALID-SIGNATURE}
 
 \begin{description}
 
@@ -356,6 +362,7 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{Every needed signature is provided}
+\label{rule:every-needed-signature-is-provided}
 
 \begin{description}
 
@@ -369,8 +376,8 @@ utxos_{post} & := utxos(b)         \\
 
 \end{description}
 
-\subsubsection{Violating condition - ``MISSING-SIGNATURE''}
-\label{sec:MISSING-SIGNATURE}
+\subsubsection{MISSING-SIGNATURE violation}
+\label{violation:MISSING-SIGNATURE}
 
 \begin{description}
 
@@ -391,10 +398,13 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{Multisig scripts are available}
+\label{rule:multisig-scripts-are-available}
 
 \subsection{Multisig scripts validated}
+\label{rule:multisig-scripts-validated}
 
 \subsection{Value preservation}
+\label{rule:value-preservation}
 
 \begin{description}
 
@@ -414,6 +424,7 @@ utxos_{post} & := utxos(b)         \\
 % !!! TODO: violating conditions
 
 \subsection{No Ada minted}
+\label{rule:no-ada-minted}
 
 \begin{description}
 
@@ -428,18 +439,22 @@ utxos_{post} & := utxos(b)         \\
 \end{description}
 
 \subsection{Maximum transaction size}
+\label{rule:maximum-transaction-size}
 
 !!! TODO: is this relevant?
 
 \subsection{Maximum reference script size}
+\label{rule:maximum-reference-script-size}
 
 !!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 
 \subsection{Maximum value size}
+\label{rule:maximum-value-size}
 
 !!! TODO: ...
 
 \subsection{No negative value}
+\label{rule:no-negative-value}
 
 \begin{description}
 
@@ -456,38 +471,49 @@ utxos_{post} & := utxos(b)         \\
 % !!! TODO: violating conditions
 
 \subsection{Minimum UTxO value}
+\label{rule:minimum-utxo-value}
 % Same structure as in Cardano L1
 
 \subsection{Network id of inputs}
+\label{rule:network-id-of-inputs}
 
 \subsection{Network id of reference inputs}
+\label{rule:network-id-of-reference-inputs}
 
 % Reference inputs are needed
 
 \subsection{Network id of outputs}
+\label{rule:network-id-of-outputs}
 
 \subsection{Network id of withdrawals}
+\label{rule:network-id-of-withdrawals}
 
 \subsection{Network id of transaction}
+\label{rule:network-id-of-transaction}
 
 \subsection{All reference inputs must be valid}
+\label{rule:all-reference-inputs-must-be-valid}
 
 % TODO: maybe also include $inputs \cap reference\_inputs = \varnothing$
 
 \subsection{Validator scripts are available}
+\label{rule:validator-scripts-are-available}
 
 !!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 
 \subsection{Validator scripts adhere to execution limits}
+\label{rule:validator-scripts-adhere-to-execution-limits}
 
 !!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 
 \subsection{Validator scripts accept transaction}
+\label{rule:validator-scripts-accept-transaction}
 
 !!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 % Maybe separate out staking and minting scripts in a separate rule
 
 \subsection{Maximum number of collateral inputs}
+\label{rule:maximum-number-of-collateral-inputs}
 
 !!! TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 
