@@ -109,7 +109,8 @@ The state integrity rules distinguish between transactions that apply linked lis
         \item Tokens of the list's minting policy must \emph{not} be minted or burned.
         \item Let \code{own\_input} be the node utxo input for which this rule is being evaluated.
         \item Let \code{own\_output} be an output of the transaction indicated by a redeemer argument of the spending validator.
-        \item The same node NFT of the list must be present in both \code{own\_input} and \code{own\_output}.
+        \item The node NFT of the list must be present in \code{own\_input}.
+        \item The value must match in \code{own\_input} and \code{own\_output}.
         \item The \code{key} and \code{link} fields must match in \code{own\_input} and \code{own\_output}.
     \end{enumerate}
     
@@ -271,7 +272,7 @@ It enforces the following properties:
     \item[Init.] Initialize an empty list.
       Conditions:
         \begin{enumerate}
-            \item The sole effect of the transaction on the list is to add the root key.
+            \item The transaction's sole effect on the list is to add the root key.
                 \begin{equation*}
                     \T{key\_added}(\T{None}, \T{node\_cs}, \T{node\_mint})
                 \end{equation*}
@@ -281,6 +282,7 @@ It enforces the following properties:
                     \T{is\_empty\_list}(\T{root\_node})  \land
                     \T{has\_token}(\T{root\_node}, \T{node\_cs}, \T{``Node''})
                 \end{equation*}
+            \item The \code{root\_node} must not contain any other non-ADA tokens.
         \end{enumerate}
         The above conditions imply the following:
         \begin{itemize}
@@ -298,7 +300,7 @@ It enforces the following properties:
     \item[Deinit.] Deinitialize an empty list.
       Conditions:
         \begin{enumerate}
-            \item The sole effect of the transaction on the list is to remove the root key.
+            \item The transaction's sole effect on the list is to remove the root key.
                 \begin{equation*}
                     \T{key\_removed}(\T{None}, \T{node\_cs}, \T{node\_mint})
                 \end{equation*}
@@ -323,7 +325,7 @@ It enforces the following properties:
             \item Verify the mint: 
             \begin{enumerate}
                 \item Let \code{key\_to\_prepend} be the key being prepended.
-                \item The sole effect of the transaction on the list is to add \code{key\_to\_prepend}.
+                \item The transaction's sole effect on the list is to add \code{key\_to\_prepend}.
                     \begin{equation*}
                         \T{key\_added}(\T{key\_to\_prepend}, \T{node\_cs}, \T{node\_mint})
                     \end{equation*}
@@ -350,12 +352,13 @@ It enforces the following properties:
                 \item \code{anchor\_node\_input} and \code{prepended\_node} must match on the \code{link} field.
                   In other words, they must both link to the same key.
                 \item \code{anchor\_node\_output} must link to \code{key\_to\_prepend}.
+                \item \code{prepended\_node} must not contain any other non-ADA tokens.
             \end{enumerate}
             
             \item Verify immutable data:
             \begin{enumerate}[resume]
                 \item \code{anchor\_node\_input} must match \code{anchor\_node\_output} on address, value, and datum except for the \code{link} field.
-                \item \code{prepended\_node} must match \code{anchor\_node\_out} on address.
+                \item \code{prepended\_node} must match \code{anchor\_node\_output} on address.
             \end{enumerate}
         \end{itemize}
     
@@ -371,7 +374,7 @@ It enforces the following properties:
             \begin{enumerate}
                 \item Let \code{key\_to\_append} be the key being appended.
                 
-                \item The sole effect of the transaction on the list is to add \code{key\_to\_append}.
+                \item The transaction's sole effect on the list is to add \code{key\_to\_append}.
                     \begin{equation*}
                         \T{key\_added}(\T{key\_to\_append}, \T{node\_cs}, \T{node\_mint})
                     \end{equation*}
@@ -396,14 +399,14 @@ It enforces the following properties:
                         \T{is\_member} (\T{key\_to\_append}, \T{appended\_node})
                     \end{equation*}
                 \item \code{appended\_node} must be the last node of the list after the transaction.
-    
                 \item \code{anchor\_node\_output} must link to \code{key\_to\_append}.
+                \item \code{appended\_node} must not contain any other non-ADA tokens.
             \end{enumerate}
             
             \item Verify immutable data:
             \begin{enumerate}[resume]
                 \item \code{anchor\_node\_input} must match \code{anchor\_node\_output} on address, value, and datum except for the \code{link} field.
-                \item \code{appended\_node} must match \code{anchor\_node\_out} on address.
+                \item \code{appended\_node} must match \code{anchor\_node\_output} on address.
             \end{enumerate}
         \end{itemize}
 
@@ -418,7 +421,7 @@ It enforces the following properties:
             \item Verify the mint:
             \begin{enumerate}
                 \item Let \code{key\_to\_remove} be the key being removed.
-                \item The sole effect of the transaction on the list is to remove \code{key\_to\_remove}.
+                \item The transaction's sole effect on the list is to remove \code{key\_to\_remove}.
                     \begin{equation*}
                         \T{key\_removed}(\T{key\_to\_remove}, \T{node\_cs}, \T{node\_mint})
                     \end{equation*}
@@ -499,7 +502,7 @@ It enforces the following properties:
             \item Verify mint:
             \begin{enumerate}
                 \item Let \code{key\_to\_insert} be the key being inserted.
-                \item The sole effect of the transaction on the list is to add \code{key\_to\_insert}.
+                \item The transaction's sole effect on the list is to add \code{key\_to\_insert}.
                     \begin{equation*}
                         \T{key\_added}(\T{key\_to\_insert}, \T{node\_cs}, \T{node\_mint})
                     \end{equation*}
@@ -529,12 +532,13 @@ It enforces the following properties:
                 \item \code{anchor\_node\_output} must link to \code{key\_to\_insert}.
                 \item \code{anchor\_node\_input} and \code{inserted\_node} must match on the \code{link} field.
                   In other words, they must both link to the same key.
+                \item \code{inserted\_node} must not contain any other non-ADA tokens.
             \end{enumerate}
             
             \item Verify immutable data:
             \begin{enumerate}[resume]
                 \item \code{anchor\_node\_input} must match \code{anchor\_node\_output} on address, value, and datum except for the \code{link} field.
-                \item \code{inserted\_node} must match \code{anchor\_node\_out} on address.
+                \item \code{inserted\_node} must match \code{anchor\_node\_output} on address.
             \end{enumerate}
         \end{itemize}
         
