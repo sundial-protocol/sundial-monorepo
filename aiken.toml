@@ -21,7 +21,7 @@ source = "github"
 
 [[dependencies]]
 name = "anastasia-labs/aiken-design-patterns"
-version = "plutus-v3"
+version = "v1.0.0"
 source = "github"
 
 [config]
