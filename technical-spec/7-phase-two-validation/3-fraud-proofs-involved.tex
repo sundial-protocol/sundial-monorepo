@@ -1,0 +1,95 @@
+\documentclass[../midgard.tex]{subfiles}
+\graphicspath{{\subfix{../images/}}}
+\begin{document}
+
+\section{Fraud Proofs in UPLC Evaluation}
+\label{s:phase-two-fraud-proofs}
+
+This section details the fraud proofs involved in UPLC evaluation, focusing on single-step verification of state transitions.
+
+\subsection{Types of Fraud Proofs}
+
+The system supports these categories of fraud proofs:
+
+\begin{description}
+    \item[Decoding Fraud] Proofs of invalid script byte decoding:
+        \begin{itemize}
+            \item Invalid byte format
+            \item Size limit violations
+            \item Reference resolution failures
+        \end{itemize}
+    
+    \item[Execution Fraud] Proofs of invalid UPLC execution:
+        \begin{itemize}
+            \item Resource limit violations
+            \item Invalid state transitions
+            \item Incorrect execution results
+        \end{itemize}
+    
+\end{description}
+
+\subsection{Single-Step Verification}
+
+The fraud proof system verifies individual state transitions:
+
+\begin{equation*}
+\begin{split}
+    \forall s_1, s_2 \in \text{CEKState}: & \text{ claimed\_transition}(s_1 \rightarrow s_2) \text{ valid } \iff \\
+    & \text{compute\_next\_state}(s_1) = s_2
+\end{split}
+\end{equation*}
+
+To prove a violation:
+\begin{itemize}
+    \item The operator provides the claimed before state ($s_1$) and after state ($s_2$)
+    \item The challenger computes the actual next state from $s_1$
+    \item If the computed state differs from $s_2$, the transition is invalid
+    \item No additional trace information is required
+\end{itemize}
+
+\subsection{Proof Data Structure}
+
+The fraud proof structure is minimal:
+
+\begin{equation*}
+    \text{FraudProof} \coloneq \left\{
+    \begin{array}{ll}
+        \text{step\_number} : & \mathbb{N} \\
+        \text{before\_state} : & \text{CEKState} \\
+        \text{claimed\_after\_state} : & \text{CEKState} \\
+        \text{actual\_after\_state} : & \text{CEKState}
+    \end{array} \right\}
+\end{equation*}
+
+\subsection{Verification Process}
+
+The verification process is straightforward:
+
+\begin{enumerate}
+    \item Verify the before state matches the operator's claim
+    \item Compute one step from the before state
+    \item Compare computed result with operator's claimed after state
+    \item If they differ, the fraud proof is valid
+\end{enumerate}
+
+\subsection{Security Considerations}
+
+The single-step verification approach provides several benefits:
+
+\begin{itemize}
+    \item Minimal proof size
+    \item Constant-time verification
+    \item No complex challenge periods needed
+    \item Deterministic outcomes
+\end{itemize}
+
+Security guarantees include:
+
+\begin{itemize}
+    \item No false positives (valid transitions cannot be proven invalid)
+    \item No trace reconstruction required
+    \item Immediate verification of claims
+    \item Protection against computational waste attacks
+\end{itemize}
+
+\end{document}
