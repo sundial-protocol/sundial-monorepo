@@ -1,10 +1,5 @@
 use midgard/common/types.{POSIXTime}
 
-pub type StepDatum {
-  fraud_prover: ByteArray,
-  data: Data,
-}
-
 pub type Datum {
   fraud_prover: ByteArray,
 }
