@@ -1,8 +1,7 @@
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/primitive/bytearray
 use cardano/address.{Address, Script}
-use cardano/assets.{PolicyId, Value, flatten, tokens}
+use cardano/assets.{PolicyId, Value, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
 use midgard/common/constants.{posix_time_none}
 use midgard/common/types.{POSIXTime}
