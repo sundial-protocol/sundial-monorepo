@@ -181,10 +181,7 @@ validator step_01(
             merkle_proof: tx_to_root_proof_path,
           }
         let step_1_datum =
-          StepDatum {
-            fraud_prover: step_datum.fraud_prover,
-            data: step1_state,
-          }
+          StepDatum { fraud_prover: step_datum.fraud_prover, data: step1_state }
         and {
           drop(ct_token_asset_name, n: 28) == block_hash,
           step_1_datum == datum_parsed,

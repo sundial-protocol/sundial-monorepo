@@ -5,10 +5,10 @@ use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use linked_list/types.{Key, NodeDatum}
 use midgard/common/utils.{is_output_to_sc}
 use midgard/computation_thread as ct
+use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/token as fpc
 use midgard/hub_oracle
 use midgard/state_queue
-use midgard/computation_thread.{StepDatum}
 
 validator computation_thread_policy(
   fraud_proof_catalogue_script_hash: ByteArray,

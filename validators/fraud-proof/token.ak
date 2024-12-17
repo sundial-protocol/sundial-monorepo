@@ -6,10 +6,8 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
 use midgard/common/utils
-use midgard/fraud_proof/token.{
-  Burn, Datum, Mint, MintRedeemer, SpendRedeemer,
-}
 use midgard/computation_thread.{StepDatum}
+use midgard/fraud_proof/token.{Burn, Datum, Mint, MintRedeemer, SpendRedeemer}
 use midgard/hub_oracle
 
 validator spend(fraud_proof_script_hash: ByteArray) {
