@@ -5,4 +5,42 @@
 \section{Data availability layer}
 \label{h:data-availability-layer}
 
+The data availability layer is critical to Midgard's security because every committed block needs to be publicly available in its entirety for the whole maturity period, so that watchers can detect and prove fraud before invalid blocks are merged.
+
+We are considering three solutions for the data availability layer (in decreasing preference):
+\begin{enumerate}
+  \item Cardano Leios blobs (the ideal solution)
+  \item Multi-signature committees
+\end{enumerate}
+
+\subsection{Data availability via Leios blobs}
+\label{h:data-availability-leios}
+
+The ideal data availability solution for Midgard is based on Cardano Leios blobs, which are a proposed feature in Cardano that will support large-scale transient data storage secured via L1 consensus.
+
+The contents of these blobs do not have to be verified by Cardano's Ouroboros consensus protocol and they only have to be stored for up to 30 days.
+This means that a large amount of data can be stored in these blobs sustainability for a low cost, which we expect to be several orders of magnitude lower than Cardano's cost for transaction metadata (which is stored permanently).
+
+Leios blobs are a natural intermediate point on Leios' multi-year roadmap toward full input-endorser capabilities.
+We believe that they are achievable before Midgard's planned deployment on mainnet, and we will support the Leios team to help bring them to Cardano sooner.
+
+In the Leios-based data availability solution for Midgard, operators will pay to store their full non-Merkelized blocks inside Leios blobs for the full maturity period.
+Leios itself will provide timestamps and (non-Merkle) hashes for the blobs and ensure that the blob contents are accessible.
+Midgard's L1 smart contracts will be able to directly access the timestamps and non-Merkle hashes of blobs.
+
+The block data inside each Leios blob will be sufficient to be converted offchain into the Merkelized representation of Midgard blocks that is necessary to construct fraud proofs.
+The correspondence between the non-Merkelized block data stored in the Leios blob and the Merkle root hash declared in the block header will be verifiable via a special fraud proof verification procedure.
+This procedure will calculate the Merkle root hash in a streaming fashion over the block data and compare it to the declared Merkle root hash in the block header.
+
+\notebox{We hope to further streamline this Merkle root hash verification procedure by collaborating with the Cardano Leios and Plutus teams to make it a Plutus builtin operation.
+  This builtin can be costed much higher than typical Plutus builtins and Migard fraud provers will be happy to pay the cost because the stakes of DA fraud and the reward for proving it are much higher.
+  Nonetheless, this will not impose an ongoing cost burden on Midgard because this verification procedure will not need to be invoked during normal operation with honest blocks, and invalid blocks will be a rare occurrence.
+}
+
+Operators' costs for storing blocks in Leios will be offset by the revenue they collect from Midgard transaction, deposit, and withdrawal fees.
+Furthermore, the Leios blob storage fees will become an additional source of revenue for Cardano L1 block producing nodes, further boosting the economic security of Cardano L1 on which Midgard depends.
+
+\subsection{Data availability via multi-signature committee}
+\label{h:data-availability-multisig}
+
 \end{document}
