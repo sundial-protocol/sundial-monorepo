@@ -50,8 +50,8 @@ Midgard does not use the Ouroboros consensus protocol, so it does not need to se
 \section{Midgard ledger parameters}
 \label{h:midgard-ledger-parameters}
 
-Midgard's L2 transactions transition its ledger similarly to Cardano's ledger, but with the exceptions defined in \cref{h:deviations-from-cardano-transaction-types}.
-Consequently, Midgard's uses the same ledger-associated protocol parameters as Cardano, but omits certain parameters as follows:
+Midgard's L2 transactions transition its ledger similarly to Cardano's ledger but with the exceptions defined in \cref{h:deviations-from-cardano-transaction-types}.
+Consequently, Midgard uses the same ledger-associated protocol parameters as Cardano but omits certain parameters as follows:
 \begin{itemize}
   \item No staking or governance parameters.
   \item No parameters for obsolete pre-Conway features.
@@ -79,7 +79,7 @@ Technically, Midgard operator nodes do not need to communicate with each for con
 Instead, they participate in the consensus protocol by interacting with Midgard's smart contracts on L1.
 
 However, in practice, an offchain peer-to-peer gossip network between operators may help them run things a bit more smoothly for users.
-If so, then there may be associated protocol parameters to help peers discover the network topology and communicate with other peers.
+If so, there may be associated protocol parameters to help peers discover the network topology and communicate with other peers.
 
 \end{document}
 
