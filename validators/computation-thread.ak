@@ -6,7 +6,7 @@ use linked_list/types.{Key, NodeDatum}
 use midgard/common/utils.{is_output_to_sc}
 use midgard/computation_thread as ct
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proof/token as fpc
+use midgard/fraud_proof/catalogue as fpc
 use midgard/hub_oracle
 use midgard/state_queue
 
@@ -46,7 +46,7 @@ validator computation_thread_policy(
           fraud_proof_catalogue_node_input.output.datum
         expect parsed_fraud_proof_catalogue_node_datum: NodeDatum =
           fraud_proof_catalogue_node_datum
-        expect parsed_fraud_proof_catalogue_node_app_data: fpc.ValidatorDatum =
+        expect parsed_fraud_proof_catalogue_node_app_data: fpc.Datum =
           parsed_fraud_proof_catalogue_node_datum.data
         expect Key(parsed_fraud_proof_catalogue_node_datum_key) =
           parsed_fraud_proof_catalogue_node_datum.key
