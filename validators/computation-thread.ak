@@ -5,11 +5,12 @@ use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use linked_list/types.{Key, NodeDatum}
 use midgard/common/utils.{is_output_to_sc}
 use midgard/computation_thread as ct
+use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/catalogue as fpc
 use midgard/hub_oracle
 use midgard/state_queue
 
-validator computation_thread(
+validator computation_thread_policy(
   fraud_proof_catalogue_script_hash: ByteArray,
   hub_oracle_script_hash: PolicyId,
 ) {
@@ -45,7 +46,7 @@ validator computation_thread(
           fraud_proof_catalogue_node_input.output.datum
         expect parsed_fraud_proof_catalogue_node_datum: NodeDatum =
           fraud_proof_catalogue_node_datum
-        expect parsed_fraud_proof_catalogue_node_app_data: fpc.ValidatorDatum =
+        expect parsed_fraud_proof_catalogue_node_app_data: fpc.Datum =
           parsed_fraud_proof_catalogue_node_datum.data
         expect Key(parsed_fraud_proof_catalogue_node_datum_key) =
           parsed_fraud_proof_catalogue_node_datum.key
@@ -148,9 +149,9 @@ fn validate_output_to_initial_fraud_proof_step(
   token_asset_name: ByteArray,
 ) {
   expect InlineDatum(outputDatum) = output_to_init_step.datum
-  expect parsedDatum: fpc.StepDatum = outputDatum
+  expect parsedDatum: StepDatum = outputDatum
 
-  let newDatum = fpc.StepDatum { fraud_prover: fraud_prover_hash, data: None }
+  let newDatum = StepDatum { fraud_prover: fraud_prover_hash, data: None }
 
   let correctValue = and {
       quantity_of(output_to_init_step.value, own_hash, token_asset_name) == 1,
