@@ -23,15 +23,6 @@ Redeemers:
             \item Let \code{fraud\_proof\_addr} be the policy ID in the corresponding field of the Midgard hub oracle.
             \item The \code{fraud\_proof} token must be sent to the \code{fraud\_proof\_addr} spending validator.
         \end{enumerate}
-    \item[Burn.] Burn a fraud proof token when the corresponding fraudulent block header is no longer in the state queue.
-      Conditions:
-        \begin{enumerate}
-            \item The transaction must burn a \code{fraud\_proof} token.
-            \item The transaction must include the Midgard hub oracle NFT in a reference input.
-            \item Let \code{state\_queue} be the policy ID in the corresponding field of the Midgard hub oracle.
-            \item The transaction must reference a \code{state\_queue} node that proves non-membership for a key matching the last 28 bytes of the \code{fraud\_proof} token.
-            \item The transaction must return the ADA from the fraud proof utxo to the fraud prover pub-key defined in the input datum.
-        \end{enumerate}
 \end{description}
 
 \subsection{Spending validator}

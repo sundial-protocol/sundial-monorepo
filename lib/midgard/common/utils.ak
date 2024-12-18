@@ -1,8 +1,7 @@
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/primitive/bytearray
 use cardano/address.{Address, Script}
-use cardano/assets.{PolicyId, Value, flatten, tokens}
+use cardano/assets.{PolicyId, Value, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
 use midgard/common/constants.{posix_time_none}
 use midgard/common/types.{POSIXTime}
@@ -15,42 +14,6 @@ pub fn validate_mint(
 ) -> Bool {
   let mints_policy = dict.to_pairs(tokens(mints, expected_minting_policy))
   mints_policy == [Pair(expected_minting_name, expected_minting_amt)]
-}
-
-pub fn div_ceil(a, b: Int) -> Int {
-  let div = a / b
-  let rem = a % b
-  when rem is {
-    0 -> div
-    _ -> div + 1
-  }
-}
-
-pub fn find_cs_by_token_prefix(
-  value: Value,
-  prefix: ByteArray,
-) -> List<PolicyId> {
-  value
-    |> flatten
-    |> list.filter_map(
-        fn(input: (PolicyId, ByteArray, Int)) -> Option<PolicyId> {
-          let (cs, tn, _amt) = input
-          if is_prefix_of(prefix, tn) {
-            Some(cs)
-          } else {
-            None
-          }
-        },
-      )
-}
-
-pub fn is_prefix_of(prefix: ByteArray, src: ByteArray) -> Bool {
-  let prefix_length = bytearray.length(prefix)
-  let src_length = bytearray.length(src)
-  when prefix_length <= src_length is {
-    True -> bytearray.take(src, prefix_length) == prefix
-    False -> False
-  }
 }
 
 pub fn safe_list_last(elems: List<a>) -> a {
