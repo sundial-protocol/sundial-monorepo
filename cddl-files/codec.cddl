@@ -347,5 +347,5 @@ scripthash = $hash28
 
 mptr = $hash32 ; Merkle Patricia Tree Root
 
-header_hash = $hash32
+header_hash = $hash28
 

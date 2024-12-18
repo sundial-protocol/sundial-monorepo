@@ -103,8 +103,11 @@ The \code{transactions\_root} is formed by concatenating and hashing its childre
 \label{h:block-header}
 
 A block header is a record with fixed-size fields: integers, hashes, and fixed-size bytestrings.
+A block header hash is 28 bytes in size and calculated via the Blake2b-224.
 \begin{equation*}
-    \T{Header} \coloneq \left\{
+\begin{split}
+  \T{HeaderHash} &\coloneq \mathcal{H}_\T{Blake2b-224}(\T{Header}) \\
+  \T{Header} &\coloneq \left\{
     \begin{array}{ll}
         \T{prev\_utxos\_root} : & \T{RootHash} \\
         \T{utxos\_root} : & \T{RootHash} \\
@@ -117,6 +120,7 @@ A block header is a record with fixed-size fields: integers, hashes, and fixed-s
         \T{operator\_vkey} : & \T{VerificationKey} \\
         \T{protocol\_version} : & \T{Int} \\
     \end{array} \right\}
+\end{split}
 \end{equation*}
 
 These header fields are interpreted as follows:
@@ -124,9 +128,10 @@ These header fields are interpreted as follows:
     \item The \code{*\_root} fields are the MPT root hashes of the corresponding sets in the block body.
     \item The \code{prev\_utxos\_root} is a copy of the \code{utxos\_root} from the previous block, included for convenience in the fraud proof verification procedures.
     \item The \code{start\_time} and \code{end\_time} fields are the block's event interval bounds (see \cref{h:time-model}).
-    \item The \code{prev\_header\_hash} field is a hash of the previous block header. For the genesis block, this field is set to 32 \code{0x00} bytes.
+    \item The \code{prev\_header\_hash} field is a hash of the previous block header. For the genesis block, this field is set to 28 \code{0x00} bytes.
     \item The \code{operator\_vkey} field is the cryptographic verification key for signatures of the operator who committed the block header to the L1 state queue.
     \item The \code{protocol\_version} is the Midgard protocol version that applies to this block.
 \end{itemize}
+
 
 \end{document}
