@@ -9,6 +9,8 @@ pub type Datum {
   state_queue: PolicyId,
   fraud_proof_catalogue: PolicyId,
   fraud_proof: PolicyId,
+  deposit_settlement: PolicyId,
+  withdrawal_settlement: PolicyId,
   registered_operators_addr: Address,
   active_operators_addr: Address,
   retired_operators_addr: Address,
@@ -16,4 +18,5 @@ pub type Datum {
   state_queue_addr: Address,
   fraud_proof_catalogue_addr: Address,
   fraud_proof_addr: Address,
+  reserve: Address,
 }
