@@ -21,7 +21,7 @@ source = "github"
 
 [[dependencies]]
 name = "anastasia-labs/aiken-design-patterns"
-version = "v1.0.0"
+version = "develop"
 source = "github"
 
 [config]

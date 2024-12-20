@@ -1,7 +1,8 @@
 use aiken/collection/dict
 use aiken/collection/list
+use aiken/crypto.{ScriptHash}
 use cardano/address.{Address, Script}
-use cardano/assets.{PolicyId, Value, tokens}
+use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
 use midgard/common/constants.{posix_time_none}
 use midgard/common/types.{POSIXTime}
@@ -53,4 +54,73 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
     Script(hash) -> hash == scHash
     _ -> False
   }
+}
+
+/// This functions assumes the "first" asset is ADA.
+pub fn get_single_asset_from_value_apart_from_ada(
+  v: Value,
+) -> (PolicyId, AssetName, Int) {
+  // Exactly two assets are expected.
+  expect [_,
+    triplet] =
+    v
+      |> assets.flatten
+  triplet
+}
+
+/// For beacon UTxOs with specific policy IDs at a given address.
+pub fn get_authentic_input_with_policy_at_address(
+  inputs: List<Input>,
+  address: Address,
+  nft_policy_id: PolicyId,
+  nft_token_name: ByteArray,
+  input_index: Int,
+) -> Input {
+  expect Some(
+    Input { output: Output { address: input_addr, value: input_value, .. }, .. } as found_input,
+  ) = list.at(inputs, input_index)
+
+  let (input_nft_policy, input_nft_token_name, input_nft_qty) =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect and {
+      input_addr == address,
+      input_nft_policy == nft_policy_id,
+      input_nft_token_name == nft_token_name,
+      input_nft_qty == 1,
+    }?
+
+  found_input
+}
+
+/// For beacon UTxOs of validators which their NFTs has a policy ID equal to
+/// their payment credential.
+pub fn get_authentic_input_of_at(
+  inputs: List<Input>,
+  address_script_hash: ScriptHash,
+  nft_token_name: ByteArray,
+  input_index: Int,
+) -> Input {
+  expect Some(
+    Input {
+      output: Output {
+        address: Address { payment_credential: Script(refs_script_hash), .. },
+        value: refs_value,
+        ..
+      },
+      ..
+    } as found_ref_input,
+  ) = list.at(inputs, input_index)
+
+  let (refs_nft_policy, refs_nft_token_name, refs_nft_qty) =
+    get_single_asset_from_value_apart_from_ada(refs_value)
+
+  expect and {
+      refs_script_hash == address_script_hash,
+      refs_nft_policy == address_script_hash,
+      refs_nft_token_name == nft_token_name,
+      refs_nft_qty == 1,
+    }?
+
+  found_ref_input
 }

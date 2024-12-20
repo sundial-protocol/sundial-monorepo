@@ -133,13 +133,17 @@ validator step_01(
             self.reference_inputs,
             frauded_state_queue_node_ref_input_index,
           )
-        expect InlineDatum(frauded_state_queue_node_datum) =
+        expect InlineDatum(frauded_state_queue_datum_data) =
           frauded_state_queue_node_input.output.datum
-        expect parsed_frauded_node_datum: NodeDatum =
-          frauded_state_queue_node_datum
-        expect parsed_state_queue_datum: state_queue.Datum =
-          parsed_frauded_node_datum.data
-        let block_hash = parsed_state_queue_datum.block_hash
+        expect state_queue.StateQueue {
+          node_datum: frauded_state_queue_node_datum,
+        }: state_queue.Datum = frauded_state_queue_datum_data
+        expect parsed_frauded_state_queue_node_app_data: state_queue.Block =
+          frauded_state_queue_node_datum.data
+        // TODO? Originally:
+        // let block_hash = parsed_state_queue_datum.block_hash
+        // Now:
+        let block_hash = parsed_frauded_state_queue_node_app_data.header_hash
         // (1.2) Get ct_token_asset_name
         expect Some(own_input) =
           list.find(
