@@ -1,5 +1,14 @@
+use cardano/assets.{AssetName}
 use cardano/transaction.{OutputReference}
 use midgard/common/types.{POSIXTime, PubKeyHash}
+
+/// TODO?
+
+/// > [!NOTE]
+/// > Keep in mind that validators are depending on the lexicographic ordering
+/// > between `confirmed_token_name` and `block_token_name`.
+pub const confirmed_token_name: AssetName = "CONFIRMED_STATE"
+pub const block_token_name: AssetName = #""
 
 pub type Config {
   init_utxo: OutputReference,
