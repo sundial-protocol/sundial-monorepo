@@ -25,7 +25,8 @@ pub type SpendPurpose {
 }
 
 pub type SpendRedeemer {
-  mpf_utxo: OutputReference,
+  hub_ref_input_index: Int,
+  mpf_ref_input_index: Int,
   membership_proof: mpf.Proof,
   purpose: SpendPurpose,
 }

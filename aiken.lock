@@ -13,7 +13,12 @@ source = "github"
 
 [[requirements]]
 name = "anastasia-labs/aiken-design-patterns"
-version = "v1.0.0"
+version = "develop"
+source = "github"
+
+[[requirements]]
+name = "aiken-lang/merkle-patricia-forestry"
+version = "2.0.0"
 source = "github"
 
 [[packages]]
@@ -30,8 +35,15 @@ source = "github"
 
 [[packages]]
 name = "anastasia-labs/aiken-design-patterns"
-version = "v1.0.0"
+version = "develop"
+requirements = []
+source = "github"
+
+[[packages]]
+name = "aiken-lang/merkle-patricia-forestry"
+version = "2.0.0"
 requirements = []
 source = "github"
 
 [etags]
+"anastasia-labs/aiken-design-patterns@develop" = [{ secs_since_epoch = 1734654447, nanos_since_epoch = 829763442 }, "b382940eb113f7b79a0c0afe53b0d4b04de692dddf2d0556e4a532848c6405dd"]

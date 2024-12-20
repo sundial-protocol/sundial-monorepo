@@ -2,12 +2,14 @@ use aiken/cbor
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{Blake2b_224, Hash, ScriptHash, blake2b_224}
+use aiken_design_patterns/merkelized_validator.{delegated_validation}
 use aiken_design_patterns/parameter_validation as pv
 use cardano/address.{Address, Credential}
 use cardano/assets.{PolicyId}
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{Input, OutputReference, Redeemer, Transaction}
 use midgard/common/utils
+use midgard/hub_oracle as hub
 use midgard/user_events/deposit.{
   AuthenticateDeposit, BurnDepositNFT, Datum, Event, MintRedeemer,
   ObserverRedeemer, SpendRedeemer,
@@ -17,6 +19,7 @@ validator main(
   observer_script: ScriptHash,
   hub_oracle: ScriptHash,
   midgard_reserve: Address,
+  mpf_validator: ScriptHash,
   unapplied_witness_script_prefix: ByteArray,
 ) {
   spend(
@@ -25,7 +28,25 @@ validator main(
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
+    let Transaction { inputs, reference_inputs, .. } = tx
     expect Some(deposit_datum) = datum
+    let Datum { event, inclusion_time, witness, refund_address, refund_datum } =
+      deposit_datum
+    let SpendRedeemer {
+      hub_ref_input_index,
+      mpf_ref_input_index,
+      membership_proof,
+      purpose,
+    } = redeemer
+    let hub.Datum { deposit_settlement, reserve_addr, .. } =
+      hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+    let Input { .. } =
+      utils.get_authentic_input_of_at(
+        reference_inputs,
+        deposit_settlement,
+        #"",
+        mpf_ref_input_index,
+      )
     todo
   }
 
