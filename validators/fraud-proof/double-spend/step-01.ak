@@ -135,15 +135,14 @@ validator step_01(
           )
         expect InlineDatum(frauded_state_queue_datum_data) =
           frauded_state_queue_node_input.output.datum
-        expect state_queue.StateQueue {
-          node_datum: frauded_state_queue_node_datum,
-        }: state_queue.Datum = frauded_state_queue_datum_data
-        expect parsed_frauded_state_queue_node_app_data: state_queue.Block =
+        expect frauded_state_queue_node_datum: state_queue.Datum =
+          frauded_state_queue_datum_data
+        expect parsed_state_queue_datum: state_queue.Header =
           frauded_state_queue_node_datum.data
-        // TODO? Originally:
+        // TODO: `Header` does not contain the block hash. Which one should
+        // change?
         // let block_hash = parsed_state_queue_datum.block_hash
-        // Now:
-        let block_hash = parsed_frauded_state_queue_node_app_data.header_hash
+        let block_hash = parsed_state_queue_datum.utxos_root
         // (1.2) Get ct_token_asset_name
         expect Some(own_input) =
           list.find(

@@ -50,19 +50,20 @@ validator computation_thread_policy(
           parsed_fraud_proof_catalogue_node_datum.data
         expect Key(parsed_fraud_proof_catalogue_node_datum_key) =
           parsed_fraud_proof_catalogue_node_datum.key
-        expect InlineDatum(frauded_state_queue_datum_data) =
+        expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-        expect state_queue.StateQueue {
-          node_datum: frauded_state_queue_node_datum,
-        }: state_queue.Datum = frauded_state_queue_datum_data
-        expect parsed_frauded_state_queue_node_app_data: state_queue.Block =
-          frauded_state_queue_node_datum.data
+        expect parsed_frauded_state_queue_node_datum: state_queue.Datum =
+          frauded_state_queue_node_datum
+        expect parsed_frauded_state_queue_node_app_data: state_queue.Header =
+          parsed_frauded_state_queue_node_datum.data
 
         let token_to_mint_asset_name =
           bytearray.concat(
             parsed_fraud_proof_catalogue_node_datum_key,
-            // TODO? Used `header_hash` instead of `block_hash`.
-            parsed_frauded_state_queue_node_app_data.header_hash,
+            // TODO: `Header` does not contain the block hash. Which one should
+            // change?
+            // parsed_frauded_state_queue_node_app_data.block_hash,
+            parsed_frauded_state_queue_node_app_data.utxos_root,
           )
         and {
           quantity_of(self.mint, policy_id, token_to_mint_asset_name) == 1,

@@ -13,5 +13,5 @@ pub type AssetClass {
 pub type PubKeyHash =
   VerificationKeyHash
 
-pub type RootHash =
+pub type MerkleRoot =
   Hash<Blake2b_256, ByteArray>

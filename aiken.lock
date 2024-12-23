@@ -13,7 +13,7 @@ source = "github"
 
 [[requirements]]
 name = "anastasia-labs/aiken-design-patterns"
-version = "develop"
+version = "95d873af00a3b6423f705774ffd399c226af8e5e"
 source = "github"
 
 [[packages]]
@@ -30,9 +30,8 @@ source = "github"
 
 [[packages]]
 name = "anastasia-labs/aiken-design-patterns"
-version = "develop"
+version = "95d873af00a3b6423f705774ffd399c226af8e5e"
 requirements = []
 source = "github"
 
 [etags]
-"anastasia-labs/aiken-design-patterns@develop" = [{ secs_since_epoch = 1734789467, nanos_since_epoch = 558394245 }, "0a299bf78021a49ab1bd39fed5cdd8df142791d2b80e311223218ab7eea72cad"]
