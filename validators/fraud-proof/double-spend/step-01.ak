@@ -8,6 +8,7 @@ use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use linked_list/types.{NodeDatum}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/double_spend.{validate_output_to_fraud_prover}
+use midgard/ledger_state
 use midgard/state_queue
 
 // -------- GOAL DEFINITION --------------------------------------
@@ -137,7 +138,7 @@ validator step_01(
           frauded_state_queue_node_input.output.datum
         expect frauded_state_queue_node_datum: state_queue.Datum =
           frauded_state_queue_datum_data
-        expect parsed_state_queue_datum: state_queue.Header =
+        expect parsed_state_queue_datum: ledger_state.Header =
           frauded_state_queue_node_datum.data
         // TODO: `Header` does not contain the block hash. Which one should
         // change?
