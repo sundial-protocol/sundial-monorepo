@@ -31,7 +31,7 @@ pub fn get_datum(
   hub_ref_input_index: Int,
 ) -> Datum {
   expect Input { output: Output { datum: InlineDatum(hub_datum_data), .. }, .. } =
-    utils.get_authentic_input_of_at(
+    utils.get_authentic_input_of(
       reference_inputs,
       hub_oracle_script_hash,
       asset_name,

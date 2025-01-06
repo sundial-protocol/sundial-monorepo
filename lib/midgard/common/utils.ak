@@ -91,9 +91,9 @@ pub fn get_authentic_input_with_policy_at_address(
   found_input
 }
 
-/// For beacon UTxOs of validators which their NFTs has a policy ID equal to
-/// their payment credential.
-pub fn get_authentic_input_of_at(
+/// For beacon UTxOs of validators which their NFTs have policy IDs equal to
+/// their payment credentials.
+pub fn get_authentic_input_of(
   inputs: List<Input>,
   address_script_hash: ScriptHash,
   nft_token_name: ByteArray,
