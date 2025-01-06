@@ -56,16 +56,16 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
   }
 }
 
-/// This functions assumes the "first" asset is ADA.
 pub fn get_single_asset_from_value_apart_from_ada(
   v: Value,
 ) -> (PolicyId, AssetName, Int) {
-  // Exactly two assets are expected.
-  expect [_,
-    triplet] =
+  expect [Pair(sym, tn_qty_pairs)] =
     v
-      |> assets.flatten
-  triplet
+      |> assets.to_dict
+      |> dict.delete(assets.ada_policy_id)
+      |> dict.to_pairs
+  expect [Pair(tn, qty)] = tn_qty_pairs |> dict.to_pairs
+  (sym, tn, qty)
 }
 
 /// For beacon UTxOs with specific policy IDs at a given address.
@@ -80,15 +80,13 @@ pub fn get_authentic_input_with_policy_at_address(
     Input { output: Output { address: input_addr, value: input_value, .. }, .. } as found_input,
   ) = list.at(inputs, input_index)
 
-  let (input_nft_policy, input_nft_token_name, input_nft_qty) =
+  let input_nft_triplet =
     get_single_asset_from_value_apart_from_ada(input_value)
 
   expect and {
       input_addr == address,
-      input_nft_policy == nft_policy_id,
-      input_nft_token_name == nft_token_name,
-      input_nft_qty == 1,
-    }?
+      input_nft_triplet == (nft_policy_id, nft_token_name, 1),
+    }
 
   found_input
 }
@@ -112,15 +110,12 @@ pub fn get_authentic_input_of_at(
     } as found_ref_input,
   ) = list.at(inputs, input_index)
 
-  let (refs_nft_policy, refs_nft_token_name, refs_nft_qty) =
-    get_single_asset_from_value_apart_from_ada(refs_value)
+  let refs_nft_triplet = get_single_asset_from_value_apart_from_ada(refs_value)
 
   expect and {
       refs_script_hash == address_script_hash,
-      refs_nft_policy == address_script_hash,
-      refs_nft_token_name == nft_token_name,
-      refs_nft_qty == 1,
-    }?
+      refs_nft_triplet == (address_script_hash, nft_token_name, 1),
+    }
 
   found_ref_input
 }

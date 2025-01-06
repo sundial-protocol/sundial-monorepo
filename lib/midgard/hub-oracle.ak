@@ -4,7 +4,7 @@ use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{InlineDatum, Input, Output}
 use midgard/common/utils
 
-pub const token_name: AssetName = #""
+pub const asset_name: AssetName = #""
 
 pub type Datum {
   registered_operators: PolicyId,
@@ -37,7 +37,7 @@ pub fn get_datum(
     utils.get_authentic_input_of_at(
       reference_inputs,
       hub_oracle_script_hash,
-      token_name,
+      asset_name,
       hub_ref_input_index,
     )
   expect hub_datum: Datum = hub_datum_data

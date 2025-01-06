@@ -1,7 +1,9 @@
+use midgard/common/types.{PubKeyHash}
+
 pub type Datum {
   mpf_root: ByteArray,
   processed: Bool,
-  publisher_key: ByteArray,
+  operator_vkey: PubKeyHash,
 }
 
 pub type SpendRedeemer {

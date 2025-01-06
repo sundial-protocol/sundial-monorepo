@@ -9,6 +9,7 @@ use cardano/transaction.{
 }
 use midgard/common/utils
 use midgard/hub_oracle as hub
+use midgard/ledger_state
 use midgard/settlement/deposit.{
   BurnNFT, Datum, MintNFT, MintRedeemer, SpendRedeemer,
 }
@@ -23,7 +24,7 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
   ) {
     let Transaction { inputs, reference_inputs, outputs, .. } = tx
     expect Some(datum) = m_datum
-    let Datum { mpf_root, processed, publisher_key } = datum
+    let Datum { mpf_root, processed, operator_vkey } = datum
     let SpendRedeemer {
       input_index,
       output_index,
@@ -69,11 +70,11 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
             inputs,
             state_queue_addr,
             state_queue,
-            state_queue.block_token_name,
+            state_queue.block_asset_name,
             state_queue_input_index,
           )
-        expect state_queue.Datum { publisher_key, .. } =
-          state_commitment_datum_data
+        expect block_datum: state_queue.Datum = block_datum_data
+        expect ledger_state.Header { operator_vkey, .. } = block_datum.data
 
         // Only 1 UTxO must be produced at own script address. Staking part is
         // not validated (TODO?).
