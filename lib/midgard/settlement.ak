@@ -4,6 +4,12 @@ pub type Datum {
   mpf_root: ByteArray,
   processed: Bool,
   operator_vkey: PubKeyHash,
+  tree_content: TreeContent,
+}
+
+pub type TreeContent {
+  Deposits
+  Withdrawals
 }
 
 pub type SpendRedeemer {
@@ -20,6 +26,6 @@ pub type Purpose {
 }
 
 pub type MintRedeemer {
-  MintNFT { state_queue_input_index: Int, hub_ref_input_index: Int }
-  BurnNFT
+  MintNFTs { state_queue_input_index: Int, hub_ref_input_index: Int }
+  BurnNFTs
 }

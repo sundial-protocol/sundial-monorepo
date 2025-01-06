@@ -11,7 +11,7 @@ use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement/deposit.{
-  BurnNFT, Datum, MintNFT, MintRedeemer, SpendRedeemer,
+  BurnNFTs, Datum, MintNFTs, MintRedeemer, SpendRedeemer,
 }
 use midgard/state_queue
 
@@ -24,7 +24,7 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
   ) {
     let Transaction { inputs, reference_inputs, outputs, .. } = tx
     expect Some(datum) = m_datum
-    let Datum { mpf_root, processed, operator_vkey } = datum
+    let Datum { mpf_root, processed, operator_vkey, tree_content } = datum
     let SpendRedeemer {
       input_index,
       output_index,
@@ -49,7 +49,7 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
 
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
     when redeemer is {
-      MintNFT { state_queue_input_index, hub_ref_input_index } -> {
+      MintNFTs { state_queue_input_index, hub_ref_input_index } -> {
         let Transaction { inputs, reference_inputs, outputs, redeemers, .. } =
           tx
         let hub.Datum { state_queue, state_queue_addr, deposit_settlement, .. } =
@@ -97,7 +97,7 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
               )
         todo
       }
-      BurnNFT -> {
+      BurnNFTs -> {
         expect [Input { .. }] =
           tx.inputs
             |> list.filter(
