@@ -1,3 +1,4 @@
+use aiken/collection/dict
 use aiken/collection/list
 use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
@@ -10,9 +11,7 @@ use cardano/transaction.{
 use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/settlement/deposit.{
-  BurnNFTs, Datum, MintNFTs, MintRedeemer, SpendRedeemer,
-}
+use midgard/settlement.{BurnNFTs, Datum, MintNFTs, MintRedeemer, SpendRedeemer}
 use midgard/state_queue
 
 validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
@@ -31,7 +30,7 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
       hub_ref_input_index,
       purpose,
     } = redeemer
-    let hub.Datum { deposit_settlement, .. } =
+    let hub.Datum { settlement, .. } =
       hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
     singular_utxo_indexer.spend(
       fn(in_ix, input, spend_purpose, out_ix, output) {
@@ -49,10 +48,20 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
 
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
     when redeemer is {
-      MintNFTs { state_queue_input_index, hub_ref_input_index } -> {
-        let Transaction { inputs, reference_inputs, outputs, redeemers, .. } =
-          tx
-        let hub.Datum { state_queue, state_queue_addr, deposit_settlement, .. } =
+      MintNFTs {
+        state_queue_input_index,
+        hub_ref_input_index,
+        confirmed_state_output_index,
+      } -> {
+        let Transaction {
+          inputs,
+          reference_inputs,
+          outputs,
+          mint,
+          redeemers,
+          ..
+        } = tx
+        let hub.Datum { state_queue, state_queue_addr, .. } =
           hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         // Ensure merge endpoint of state queue is present in the tx.
@@ -60,28 +69,30 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
           redeemers |> pairs.get_first(Mint(state_queue))
         expect state_queue.Merge { .. } = state_queue_redeemer_data
 
-        // Fetch the state commitment UTxO that's being spent in order to be
-        // merged into the canonical state.
-        expect Input {
-          output: Output { datum: InlineDatum(block_datum_data), .. },
+        // Grab the header hash of the new confirmed state to use as the asset
+        // name of the settlement authentication NFTs.
+        expect Some(Output {
+          datum: InlineDatum(confirmed_state_datum_data),
           ..
-        } =
-          utils.get_authentic_input_with_policy_at_address(
-            inputs,
-            state_queue_addr,
-            state_queue,
-            state_queue.block_asset_name,
-            state_queue_input_index,
-          )
-        expect block_datum: state_queue.Datum = block_datum_data
-        expect ledger_state.Header { operator_vkey, .. } = block_datum.data
+        }) = outputs |> list.at(confirmed_state_output_index)
+        expect ledger_state.ConfirmedState {
+          header_hash: confirmed_state_header_hash,
+          ..
+        } = confirmed_state_datum_data
 
-        // Only 1 UTxO must be produced at own script address. Staking part is
-        // not validated (TODO?).
+        // Only 2 UTxOs must be produced at own script address. It is expected
+        // that the deposits UTxO is produced at the smaller output index.
+        // Staking parts are not validated (TODO?).
         expect [
           Output {
-            value: produced_value,
-            datum: InlineDatum(produced_datum_data),
+            value: produced_deposits_value,
+            datum: InlineDatum(produced_deposits_datum_data),
+            reference_script: None,
+            ..
+          },
+          Output {
+            value: produced_withdrawals_value,
+            datum: InlineDatum(produced_withdrawals_datum_data),
             reference_script: None,
             ..
           },
@@ -95,6 +106,73 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
                   }
                 },
               )
+
+        // Validate produced UTxOs contain authentication NFTs.
+        let produced_deposits_nft_triplet =
+          utils.get_single_asset_from_value_apart_from_ada(
+            produced_deposits_value,
+          )
+        let produced_withdrawals_nft_triplet =
+          utils.get_single_asset_from_value_apart_from_ada(
+            produced_withdrawals_value,
+          )
+        expect and {
+            produced_deposits_nft_triplet == (
+              own_policy,
+              confirmed_state_header_hash,
+              1,
+            ),
+            produced_withdrawals_nft_triplet == produced_deposits_nft_triplet,
+          }
+
+        // Ensure the two NFTs are minted.
+        expect [Pair(minted_name, minted_qty)] =
+          mint |> assets.tokens(own_policy) |> dict.to_pairs
+        expect and {
+            minted_name == confirmed_state_header_hash,
+            minted_qty == 2,
+          }
+
+        // Fetch the state commitment UTxO that's being spent in order to be
+        // merged into the confirmed state.
+        expect Input {
+          output: Output { datum: InlineDatum(block_datum_data), .. },
+          ..
+        } =
+          utils.get_authentic_input_with_policy_at_address(
+            inputs,
+            state_queue_addr,
+            state_queue,
+            state_queue.block_asset_name,
+            state_queue_input_index,
+          )
+        expect block_datum: state_queue.Datum = block_datum_data
+        expect ledger_state.Header {
+          operator_vkey,
+          deposits_root,
+          withdrawals_root,
+          ..
+        } = block_datum.data
+
+        // Validate the produced output datums.
+        let expected_produced_deposits_datum_data: Data =
+          Datum {
+            mpf_root: deposits_root,
+            processed: False,
+            operator_vkey,
+            tree_content: settlement.Deposits,
+          }
+        let expected_produced_withdrawals_datum_data: Data =
+          Datum {
+            mpf_root: withdrawals_root,
+            processed: False,
+            operator_vkey,
+            tree_content: settlement.Withdrawals,
+          }
+        expect and {
+            produced_deposits_datum_data == expected_produced_deposits_datum_data,
+            produced_withdrawals_datum_data == expected_produced_withdrawals_datum_data,
+          }
         todo
       }
       BurnNFTs -> {

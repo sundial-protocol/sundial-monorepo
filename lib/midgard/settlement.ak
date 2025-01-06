@@ -26,6 +26,10 @@ pub type Purpose {
 }
 
 pub type MintRedeemer {
-  MintNFTs { state_queue_input_index: Int, hub_ref_input_index: Int }
+  MintNFTs {
+    state_queue_input_index: Int,
+    hub_ref_input_index: Int,
+    confirmed_state_output_index: Int,
+  }
   BurnNFTs
 }
