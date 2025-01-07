@@ -1,10 +1,13 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
+use aiken_design_patterns/validity_range_normalization as vrn
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
-use cardano/transaction.{Input, Output, OutputReference}
-use midgard/common/constants.{posix_time_none}
+use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
+use midgard/common/constants.{
+  max_validity_range_for_current_time, posix_time_none,
+}
 use midgard/common/types.{POSIXTime}
 
 pub fn validate_mint(
@@ -53,6 +56,16 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
   when output.address.payment_credential is {
     Script(hash) -> hash == scHash
     _ -> False
+  }
+}
+
+pub fn get_current_time(validity_range: ValidityRange) -> POSIXTime {
+  when vrn.normalize_time_range(validity_range) is {
+    vrn.ClosedRange { lower, upper } -> {
+      expect upper - lower <= max_validity_range_for_current_time
+      upper
+    }
+    _ -> fail @"Unexpected validity range provided."
   }
 }
 
