@@ -169,11 +169,10 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
             operator_vkey,
             tree_content: settlement.Withdrawals,
           }
-        expect and {
-            produced_deposits_datum_data == expected_produced_deposits_datum_data,
-            produced_withdrawals_datum_data == expected_produced_withdrawals_datum_data,
-          }
-        todo
+        and {
+          produced_deposits_datum_data == expected_produced_deposits_datum_data,
+          produced_withdrawals_datum_data == expected_produced_withdrawals_datum_data,
+        }
       }
       BurnNFTs -> {
         expect [Input { .. }] =
