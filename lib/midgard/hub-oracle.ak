@@ -14,6 +14,8 @@ pub type Datum {
   state_queue: PolicyId,
   fraud_proof_catalogue: PolicyId,
   fraud_proof: PolicyId,
+  deposit: PolicyId,
+  withdrawal: PolicyId,
   settlement: PolicyId,
   registered_operators_addr: Address,
   active_operators_addr: Address,

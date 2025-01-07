@@ -24,8 +24,14 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    let Transaction { inputs, reference_inputs, outputs, extra_signatories, .. } =
-      tx
+    let Transaction {
+      inputs,
+      reference_inputs,
+      outputs,
+      extra_signatories,
+      validity_range,
+      ..
+    } = tx
     expect Some(datum) = m_datum
     let Datum {
       mpf_root,
@@ -39,16 +45,73 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
       hub_ref_input_index,
       purpose,
     } = redeemer
-    let hub.Datum { settlement, .. } =
+    let hub.Datum { deposit, withdrawal, settlement, state_queue_addr, .. } =
       hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
     singular_utxo_indexer.spend(
       fn(in_ix, input, spend_purpose, out_ix, output) {
         // Prevent double satisfaction.
         expect in_ix == out_ix
-        when purpose is {
-          ClaimAsProcessed ->
-            operator_vkey |> utils.has_signed(extra_signatories)
-          RevokeProcessedFlag -> todo
+
+        when spend_purpose is {
+          ClaimAsProcessed -> {
+            // Operator must have signed this claim.
+            expect operator_vkey |> utils.has_signed(extra_signatories)
+
+            // The UTxO must not have been claimed as processed prior to this
+            // transaction.
+            expect None = time_of_claimed_as_processed
+
+            let Input {
+              output: Output { address: input_address, value: input_value, .. },
+              ..
+            } = input
+            expect Output {
+              address: cont_output_address,
+              value: cont_output_value,
+              datum: InlineDatum(cont_output_datum_data),
+              ..
+            } = output
+
+            // Make sure the UTxO is reproduced at own address.
+            expect input_address == cont_output_address
+
+            // Spent value must be reproduced unchange.
+            expect input_value == cont_output_value
+
+            // Only change in the updated time must be the addition of current
+            // time as the moment of claim.
+            let expected_cont_output_datum_data: Data =
+              Datum {
+                mpf_root,
+                time_of_claimed_as_processed: Some(
+                  utils.get_current_time(validity_range),
+                ),
+                operator_vkey,
+                tree_content,
+              }
+            cont_output_datum_data == expected_cont_output_datum_data
+          }
+          RevokeProcessedFlag {
+            unprocessed_event_ref_input_index,
+            unprocessed_event_asset_name,
+            event_type,
+            membership_proof,
+          } -> {
+            expect Input {
+              output: Output { datum: InlineDatum(event_datum_data), .. },
+              ..
+            } =
+              utils.get_authentic_input_of(
+                reference_inputs,
+                when event_type is {
+                  settlement.Deposit -> deposit
+                  settlement.Withdrawal -> withdrawal
+                },
+                unprocessed_event_asset_name,
+                unprocessed_event_ref_input_index,
+              )
+            todo
+          }
           ConcludeSettlement -> todo
         }
       },
@@ -174,14 +237,14 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
             mpf_root: deposits_root,
             time_of_claimed_as_processed: None,
             operator_vkey,
-            tree_content: settlement.Deposits,
+            tree_content: settlement.Deposit,
           }
         let expected_produced_withdrawals_datum_data: Data =
           Datum {
             mpf_root: withdrawals_root,
             time_of_claimed_as_processed: None,
             operator_vkey,
-            tree_content: settlement.Withdrawals,
+            tree_content: settlement.Withdrawal,
           }
         and {
           produced_deposits_datum_data == expected_produced_deposits_datum_data,

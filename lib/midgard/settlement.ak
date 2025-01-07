@@ -1,15 +1,17 @@
+use aiken/merkle_patricia_forestry as mpf
+use cardano/assets.{AssetName}
 use midgard/common/types.{POSIXTime, PubKeyHash}
 
 pub type Datum {
   mpf_root: ByteArray,
   time_of_claimed_as_processed: Option<POSIXTime>,
   operator_vkey: PubKeyHash,
-  tree_content: TreeContent,
+  tree_content: EventType,
 }
 
-pub type TreeContent {
-  Deposits
-  Withdrawals
+pub type EventType {
+  Deposit
+  Withdrawal
 }
 
 pub type SpendRedeemer {
@@ -21,7 +23,12 @@ pub type SpendRedeemer {
 
 pub type Purpose {
   ClaimAsProcessed
-  RevokeProcessedFlag
+  RevokeProcessedFlag {
+    unprocessed_event_ref_input_index: Int,
+    unprocessed_event_asset_name: AssetName,
+    event_type: EventType,
+    membership_proof: mpf.Proof,
+  }
   ConcludeSettlement
 }
 
