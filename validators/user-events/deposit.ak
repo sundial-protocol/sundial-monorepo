@@ -41,7 +41,7 @@ validator main(
     let hub.Datum { settlement, reserve_addr, .. } =
       hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
     let Input { .. } =
-      utils.get_authentic_input_of_at(
+      utils.get_authentic_input_of(
         reference_inputs,
         settlement,
         #"",

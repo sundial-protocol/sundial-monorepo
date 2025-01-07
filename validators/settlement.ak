@@ -11,7 +11,10 @@ use cardano/transaction.{
 use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/settlement.{BurnNFTs, Datum, MintNFTs, MintRedeemer, SpendRedeemer}
+use midgard/settlement.{
+  BurnNFTs, ClaimAsProcessed, ConcludeSettlement, Datum, MintNFTs, MintRedeemer,
+  RevokeProcessedFlag, SpendRedeemer,
+}
 use midgard/state_queue
 
 validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
@@ -36,7 +39,11 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
       fn(in_ix, input, spend_purpose, out_ix, output) {
         // Prevent double satisfaction.
         expect in_ix == out_ix
-        todo
+        when purpose is {
+          ClaimAsProcessed -> todo
+          RevokeProcessedFlag -> todo
+          ConcludeSettlement -> todo
+        }
       },
       purpose,
       input_index,
