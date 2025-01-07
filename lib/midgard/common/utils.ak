@@ -1,6 +1,6 @@
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/crypto.{ScriptHash}
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{Input, Output, OutputReference}
@@ -54,6 +54,13 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
     Script(hash) -> hash == scHash
     _ -> False
   }
+}
+
+pub fn has_signed(
+  signer: VerificationKeyHash,
+  extra_signatories: List<VerificationKeyHash>,
+) -> Bool {
+  extra_signatories |> list.has(signer)
 }
 
 pub fn get_single_asset_from_value_apart_from_ada(
