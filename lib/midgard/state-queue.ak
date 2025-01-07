@@ -13,6 +13,6 @@ pub type Datum {
 }
 
 pub type MintRedeemer {
-  Remove_Fraudolent_Block_Header { fraudolent_operator: ByteArray }
-  Commit_Block_Header { operator: ByteArray }
+  RemoveFraudolentBlockHeader { fraudolent_operator: ByteArray }
+  CommitBlockHeader { operator: ByteArray }
 }

@@ -1,7 +1,5 @@
 use aiken/collection/list
-use aiken/crypto.{sha2_256}
 use aiken/interval.{Finite, Interval}
-use aiken/primitive/bytearray
 use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId, quantity_of, tokens}
 use cardano/transaction.{
@@ -11,12 +9,13 @@ use linked_list/ordered
 use linked_list/types.{Key, NodeDatum}
 use linked_list/utils.{get_node_in_outputs,
   get_node_outputs} as linked_list_utils
+use midgard/active_operators
 use midgard/hub_oracle
 use midgard/retired_operators.{
-  Datum as RetiredOperatorDatum, Deinit, Init, MintRedeemer,
-  Recover_Operator_Bond, Remove_Operator_Slash_Bond, Retire_Operator,
+  Datum as RetiredOperatorDatum, Deinit, Init, MintRedeemer, RecoverOperatorBond,
+  RemoveOperatorSlashBond, RetireOperator,
 }
-use midgard/state_queue.{Remove_Fraudolent_Block_Header}
+use midgard/state_queue.{RemoveFraudolentBlockHeader}
 
 validator spend(retired_operators_mint_script_hash: ByteArray) {
   spend(
@@ -38,7 +37,6 @@ validator spend(retired_operators_mint_script_hash: ByteArray) {
 validator mint(
   maturity_duration: Int,
   slashing_penalty: Int,
-  init_utxo_id: ByteArray,
   hub_oracle_script_hash: PolicyId,
   hub_oracle_asset_name: ByteArray,
 ) {
@@ -47,50 +45,32 @@ validator mint(
     let node_outputs = get_node_outputs(self.outputs, policy_id)
     let node_mint = tokens(self.mint, policy_id)
     when redeemer is {
-      Init(init_utxo_index) -> {
-        expect Some(init_input) = list.at(self.inputs, init_utxo_index)
-        let init_input_utxo_id =
-          sha2_256(
-            bytearray.push(
-              init_input.output_reference.transaction_id,
-              init_input.output_reference.output_index,
-            ),
-          )
-        and {
-          //TODO Should we call here ordered.list_state_transition()?
-          init_input_utxo_id == init_utxo_id,
-          quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == 1,
+      Init -> and {
+          quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == 1,
           ordered.init(node_outputs, node_mint, policy_id),
         }
-      }
       Deinit -> and {
-          quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
+          quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == -1,
           ordered.deinit(node_in_outputs, node_mint, policy_id),
         }
-      Retire_Operator(
+      RetireOperator(
         new_retired_operator_key,
         hub_oracle_ref_input_index,
-        active_operator_removed_node_input_index,
-        active_operator_anchor_node_input_index,
         retired_operator_appended_node_output_index,
         retired_operator_anchor_node_output_index,
+        active_operators_redeemer_index,
       ) -> {
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
-        let active_operators_node_in_outputs =
-          get_node_in_outputs(
-            self.inputs,
-            parsed_hub_oracle_datum.active_operators,
-          )
-        let active_operators_node_outputs =
-          get_node_outputs(
-            self.outputs,
-            parsed_hub_oracle_datum.active_operators,
-          )
-        let active_operators_node_mint =
-          tokens(self.mint, parsed_hub_oracle_datum.active_operators)
+        expect Script(active_operators_cs) =
+          parsed_hub_oracle_datum.active_operators_addr.payment_credential
+        expect Some(active_operators_redeemer_pair) =
+          list.at(self.redeemers, active_operators_redeemer_index)
+        expect active_operators.RetireOperator { active_operator_key, .. } =
+          active_operators_redeemer_pair.2nd
+
         and {
           quantity_of(
             hub_oracle_ref_input.output.value,
@@ -105,17 +85,11 @@ validator mint(
             node_outputs,
             node_mint,
           ),
-          ordered.remove(
-            Key(new_retired_operator_key),
-            active_operator_removed_node_input_index,
-            active_operator_anchor_node_input_index,
-            active_operators_node_in_outputs,
-            active_operators_node_outputs,
-            active_operators_node_mint,
-          ),
+          active_operators_redeemer_pair.1st == Mint(active_operators_cs),
+          active_operator_key == new_retired_operator_key,
         }
       }
-      Recover_Operator_Bond(
+      RecoverOperatorBond(
         retired_operator_key,
         removed_node_input_index,
         anchor_node_input_index,
@@ -144,14 +118,12 @@ validator mint(
           },
         }
       }
-      Remove_Operator_Slash_Bond(
+      RemoveOperatorSlashBond(
         slashed_retired_operator_key,
         hub_oracle_ref_input_index,
         retired_operator_slashed_node_input_index,
         retired_operator_anchor_node_input_index,
         state_queue_redeemer_index,
-        state_queue_removed_node_input_index,
-        state_queue_anchor_node_input_index,
       ) -> {
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
@@ -159,14 +131,9 @@ validator mint(
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Script(state_queue_cs) =
           parsed_hub_oracle_datum.state_queue_addr.payment_credential
-        let state_queue_node_in_outputs =
-          get_node_in_outputs(self.inputs, state_queue_cs)
-        let state_queue_node_outputs =
-          get_node_outputs(self.outputs, state_queue_cs)
-        let state_queue_node_mint = tokens(self.mint, state_queue_cs)
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect Remove_Fraudolent_Block_Header(fraudolent_operator) =
+        expect RemoveFraudolentBlockHeader(fraudolent_operator) =
           state_queue_redeemer_pair.2nd
         and {
           quantity_of(
@@ -184,14 +151,6 @@ validator mint(
           ),
           self.fee >= slashing_penalty,
           state_queue_redeemer_pair.1st == Mint(state_queue_cs),
-          ordered.remove(
-            Key(fraudolent_operator),
-            state_queue_removed_node_input_index,
-            state_queue_anchor_node_input_index,
-            state_queue_node_in_outputs,
-            state_queue_node_outputs,
-            state_queue_node_mint,
-          ),
           fraudolent_operator == slashed_retired_operator_key,
         }
       }

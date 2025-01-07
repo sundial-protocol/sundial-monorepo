@@ -1,7 +1,5 @@
 use aiken/collection/list
-use aiken/crypto.{sha2_256}
 use aiken/interval.{Finite, Interval}
-use aiken/primitive/bytearray
 use cardano/assets.{PolicyId, quantity_of, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
@@ -14,7 +12,7 @@ use linked_list/utils.{get_node_in_outputs,
 use midgard/hub_oracle
 use midgard/registered_operators.{
   Activate, Active, Datum, Deinit, Deregister, Init, MintRedeemer, Register,
-  Registered, Remove_Duplicate_Slash_Bond, Retired,
+  Registered, RemoveDuplicateSlashBond, Retired,
 }
 
 validator spend(registered_operators_mint_script_hash: ByteArray) {
@@ -38,7 +36,6 @@ validator mint(
   required_bond: Int,
   registration_duration: Int,
   slashing_penalty: Int,
-  init_utxo_id: ByteArray,
   hub_oracle_script_hash: PolicyId,
   hub_oracle_asset_name: ByteArray,
 ) {
@@ -47,24 +44,12 @@ validator mint(
     let node_outputs = get_node_outputs(self.outputs, policy_id)
     let node_mint = tokens(self.mint, policy_id)
     when redeemer is {
-      Init(init_utxo_index) -> {
-        expect Some(init_input) = list.at(self.inputs, init_utxo_index)
-        let init_input_utxo_id =
-          sha2_256(
-            bytearray.push(
-              init_input.output_reference.transaction_id,
-              init_input.output_reference.output_index,
-            ),
-          )
-        and {
-          //TODO Should we call here unordered.list_state_transition()?
-          init_input_utxo_id == init_utxo_id,
-          quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == 1,
+      Init -> and {
+          quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == 1,
           unordered.init(node_in_outputs, node_mint, policy_id),
         }
-      }
       Deinit -> and {
-          quantity_of(self.mint, hub_oracle_script_hash, init_utxo_id) == -1,
+          quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == -1,
           unordered.deinit(node_outputs, node_mint, policy_id),
         }
       Register(
@@ -241,7 +226,7 @@ validator mint(
           list.has(self.extra_signatories, node_to_deregister_key),
         }
 
-      Remove_Duplicate_Slash_Bond(
+      RemoveDuplicateSlashBond(
         duplicate_node_key,
         hub_oracle_ref_input_index,
         duplicate_node_ref_input_index,
