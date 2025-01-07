@@ -12,7 +12,7 @@ use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement.{
-  BurnNFTs, ClaimAsProcessed, ConcludeSettlement, Datum, MintNFTs, MintRedeemer,
+  BurnNFT, ClaimAsProcessed, ConcludeSettlement, Datum, MintNFTs, MintRedeemer,
   RevokeProcessedFlag, SpendRedeemer,
 }
 use midgard/state_queue
@@ -24,9 +24,15 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    let Transaction { inputs, reference_inputs, outputs, .. } = tx
+    let Transaction { inputs, reference_inputs, outputs, extra_signatories, .. } =
+      tx
     expect Some(datum) = m_datum
-    let Datum { mpf_root, processed, operator_vkey, tree_content } = datum
+    let Datum {
+      mpf_root,
+      time_of_claimed_as_processed,
+      operator_vkey,
+      tree_content,
+    } = datum
     let SpendRedeemer {
       input_index,
       output_index,
@@ -40,7 +46,8 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
         // Prevent double satisfaction.
         expect in_ix == out_ix
         when purpose is {
-          ClaimAsProcessed -> todo
+          ClaimAsProcessed ->
+            operator_vkey |> utils.has_signed(extra_signatories)
           RevokeProcessedFlag -> todo
           ConcludeSettlement -> todo
         }
@@ -165,14 +172,14 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
         let expected_produced_deposits_datum_data: Data =
           Datum {
             mpf_root: deposits_root,
-            processed: False,
+            time_of_claimed_as_processed: None,
             operator_vkey,
             tree_content: settlement.Deposits,
           }
         let expected_produced_withdrawals_datum_data: Data =
           Datum {
             mpf_root: withdrawals_root,
-            processed: False,
+            time_of_claimed_as_processed: None,
             operator_vkey,
             tree_content: settlement.Withdrawals,
           }
@@ -181,7 +188,7 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
           produced_withdrawals_datum_data == expected_produced_withdrawals_datum_data,
         }
       }
-      BurnNFTs -> {
+      BurnNFT -> {
         expect [Input { .. }] =
           tx.inputs
             |> list.filter(

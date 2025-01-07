@@ -1,8 +1,8 @@
-use midgard/common/types.{PubKeyHash}
+use midgard/common/types.{POSIXTime, PubKeyHash}
 
 pub type Datum {
   mpf_root: ByteArray,
-  processed: Bool,
+  time_of_claimed_as_processed: Option<POSIXTime>,
   operator_vkey: PubKeyHash,
   tree_content: TreeContent,
 }
@@ -31,5 +31,5 @@ pub type MintRedeemer {
     hub_ref_input_index: Int,
     confirmed_state_output_index: Int,
   }
-  BurnNFTs
+  BurnNFT
 }
