@@ -77,7 +77,7 @@ Fraud proof construction:
   \item A membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
   \item A membership proof must be presented for input $i$ such that $i \in spend\_inputs(t)$
   \item A membership proof must be created for $t_1$ such that $tx\_hash(t_1) = tx\_hash(i)$
-  \item A DA layer proof must be presented that certifies that $length(outputs(t_1)) < index(i)$ \todo
+  \item A DA layer proof must be presented that certifies that $length(outputs(t_1)) < index(i)$
 \end{enumerate}
 
 \subsubsection{WITHDRAWN-INPUT violation}
@@ -132,7 +132,6 @@ Fraud proof construction:
 \label{rule:transaction-validity-range}
 Every valid transaction in the ledger must be included at a timestamp that conforms to the validity range that the transaction prescribes.
 Formal specification:
-\todo
 \begin{equation*}
 \begin{split}
     \forall t \in Ledger, time\_range(block(t)) \subseteq validity\_interval(t)
@@ -148,7 +147,6 @@ This ledger rule is violated if any of the following violations occur:
 \label{violation:INVALID-RANGE}
 A transaction $t$ has a time-validity range that does not overlap with its block's event interval. 
 Formal specification:
-\todo
 \begin{equation*}
     \exists t \in txs, time\_range(b) \nsubseteq validity\_interval(t)
 \end{equation*}
@@ -184,7 +182,7 @@ Fraud proof construction:
 \begin{enumerate}
   \item Let $t$ be the transaction alleged to violate the ledger rule. 
   \item A membership proof must be provided that shows that the transaction is included in the ledger
-  \item A DA layer proof must be presented that certifies that $length(spend\_inputs(t)) = 0$ \todo
+  \item A DA layer proof must be presented that certifies that $length(spend\_inputs(t)) = 0$
 \end{enumerate}
 
 \subsection{Rule: Minimum fee}
@@ -239,7 +237,7 @@ A transaction $t$ is in the ledger and it violates the "Required signatures" pro
 Formal specification:
 \begin{equation*}
 \begin{split}
-    \exists t & \in txs, \exists r \in spend\_inputs(t), \exists u \in Output, \\
+    \exists t & \in txs, \exists r \in spend\_inputs(t), \exists u \in output(t), \\
     & (r, u) \in utxos_{post} \land paymentHK(addr(u)) \notin required\_signer\_hashes(t) \, \land \\
     & addr(u) \in Addr^{vkey}
 \end{split}
@@ -331,9 +329,76 @@ Fraud proof construction:
 
 \subsection{Rule: Multisig scripts are available}
 \label{rule:multisig-scripts-are-available}
+All multisig scripts are provided.
+Formal specification:
+\begin{equation*}
+\begin{split}
+  \forall t \in txs, & \forall u \in output(t), addr(u) \in Addr^{script} \rightarrow \\
+  & \exists (h, s) \in script\_tx\_wits(t), script\_hash(addr(u)) = h
+\end{split}
+\end{equation*}
+
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:MISSING-MULTISIG-SCRIPT]{MISSING-MULTISIG-SCRIPT}
+\end{itemize-multi}
+
+\subsubsection{MISSING-MULTISIG-SCRIPT violation}
+\label{violation:MISSING-MULTISIG-SCRIPT}
+A required script, corresponding to $h$ is missing.
+Formal specification:
+\begin{equation*}
+\begin{split}
+  \exists t \in txs, & \exists u \in output(t), addr(u) \in Addr^{script} \land \\
+  & \nexists (h, s) \in script\_tx\_wits(t), script\_hash(addr(u)) = h
+\end{split}
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule. 
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item A membership proof must be generated that proves that $u$ is in $outputs(t)$.
+  \item A DA layer proof must be shown that certifies that there is no $(h, s)$ curresponding to \break
+        $script\_hash(addr(u)) = h$ in $script\_tx\_wits(t)$.
+\end{enumerate}
 
 \subsection{Rule: Multisig scripts validated}
 \label{rule:multisig-scripts-validated}
+
+All multisig scripts validations pass.
+Formal specification:
+\begin{equation*}
+\begin{split}
+  \forall t \in txs, \forall (h, s) \in script\_tx\_wits(t), multisig\_validation\_succeeds(s, t)
+\end{split}
+\end{equation*}
+
+% TODO: clarify validation logic
+\todo
+
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:MULTISIG-INVALID]{MULTISIG-INVALID}
+\end{itemize-multi}
+
+\subsubsection{MULTISIG-INVALID violation}
+\label{violation:MULTISIG-INVALID}
+A multisig script $s$ validation fails.
+Formal specification:
+\begin{equation*}
+\begin{split}
+  \exists t \in txs, \exists (h, s) \in script\_tx\_wits(t), \lnot multisig\_validation\_succeeds(s, t)
+\end{split}
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule. 
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item A DA layer proof must be shown that certifies that $(h, s)$ exists in $script\_tx\_wits(t)$.
+  \item The $multisig\_validation\_succeeds(s, t)$ fails.
+\end{enumerate}
 
 \subsection{Rule: Value preservation}
 \label{rule:value-preservation}
@@ -341,12 +406,35 @@ The total value must be preserved.
 Formal specification:
 \begin{equation*}
 \begin{split}
-    \forall t & \in Ledger, \\
+    \forall t \in Ledger &, \\
     & mint(t) + \sum_{i \, \in \, spend\_inputs(t)} value(i) = fee(t) + \sum_{o \, \in \, outputs(t)} value(o)
 \end{split}
 \end{equation*}
         
-% TODO: violating conditions
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:VALUE-NOT-PRESERVED]{VALUE-NOT-PRESERVED}
+\end{itemize-multi}
+
+\subsubsection{VALUE-NOT-PRESERVED violation}
+\label{violation:VALUE-NOT-PRESERVED}
+Value is not preserved in transaction $t$.
+Formal specification:
+\begin{equation*}
+  \begin{split}
+      \exists t \in Ledger &, \\
+      & mint(t) + \sum_{i \, \in \, spend\_inputs(t)} value(i) \neq fee(t) + \sum_{o \, \in \, outputs(t)} value(o)
+  \end{split}
+  \end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule. 
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item A DA layer proof must be shown that certifies the value of $sum(spend_inputs(t))$.
+  \item A DA layer proof must be created that states the value of $sum(outputs(t))$.
+  \item The sums in the calculation must show discrepancy.
+\end{enumerate}
 
 \subsection{Rule: No Ada minted}
 \label{rule:no-ada-minted}
@@ -355,21 +443,35 @@ Formal specification:
 \begin{equation*}
     \forall t \in Ledger, lovelaces(mint(t)) = 0
 \end{equation*}
-            
-\subsection{Rule: Maximum transaction size}
-\label{rule:maximum-transaction-size}
 
-% TODO: is this relevant?
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:ADA-MINTED]{ADA-MINTED}
+\end{itemize-multi}
 
-\subsection{Rule: Maximum reference script size}
-\label{rule:maximum-reference-script-size}
+\subsubsection{ADA-MINTED violation}
+\label{violation:ADA-MINTED}
+Ada is minted in transaction $t$.
+Formal specification:
+\begin{equation*}
+  \exists t \in Ledger, lovelaces(mint(t)) \neq 0
+\end{equation*}
 
-% TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item $lovelaces(mint(t)) \neq 0$
+\end{enumerate}
 
-\subsection{Rule: Maximum value size}
-\label{rule:maximum-value-size}
+% \subsection{Rule: Maximum transaction size}
+% \label{rule:maximum-transaction-size}
 
-% TODO: ...
+% \subsection{Rule: Maximum reference script size}
+% \label{rule:maximum-reference-script-size}
+
+% \subsection{Rule: Maximum value size}
+% \label{rule:maximum-value-size}
 
 \subsection{Rule: No negative value}
 \label{rule:no-negative-value}
@@ -378,8 +480,59 @@ Formal specification:
 \begin{equation*}
     \forall t \in Ledger, mint(t) \geq \mathbf{0} \, \land fee(t) \geq 0 \land \forall o \in outputs(t), \, value(o) \geq \mathbf{0}
 \end{equation*}
-                
-% TODO: violating conditions
+
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:NEGATIVE-MINT]{NEGATIVE-MINT}
+  \item \hyperref[violation:NEGATIVE-FEE]{NEGATIVE-FEE}
+  \item \hyperref[violation:NEGATIVE-OUTPUT-VALUE]{NEGATIVE-OUTPUT-VALUE}
+\end{itemize-multi}
+
+\subsubsection{NEGATIVE-MINT violation}
+\label{violation:NEGATIVE-MINT}
+Ada is minted in transaction $t$.
+Formal specification:
+\begin{equation*}
+  \exists t \in Ledger, \exists m \in Policy, \exists tn \in TokenName, asset(mint(t), m, tn) < 0
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item A minting policy id $m$ and a token name $tn$ must be shown, such that $asset(mint(t), m, tn) < 0$
+\end{enumerate}
+
+\subsubsection{NEGATIVE-FEE violation}
+\label{violation:NEGATIVE-FEE}
+Ada is minted in transaction $t$.
+Formal specification:
+\begin{equation*}
+  \exists t \in Ledger, fee(t) < 0
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item $fee(t)$ must be negative.
+\end{enumerate}
+
+\subsubsection{NEGATIVE-OUTPUT-VALUE violation}
+\label{violation:NEGATIVE-OUTPUT-VALUE}
+Ada is minted in transaction $t$.
+Formal specification:
+\begin{equation*}
+  \exists t \in Ledger, \exists o \in outputs(t), \exists m \in Policy, \exists tn \in TokenName, asset(value(o), m, tn) < 0
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item A membership proof must be generated that states that $o \in outputs(t)$.
+  \item A minting policy id $m$ and a token name $tn$ must be shown, such that $asset(value(o), m, tn) < 0$
+\end{enumerate}
 
 \subsection{Rule: Minimum UTxO value}
 \label{rule:minimum-utxo-value}
