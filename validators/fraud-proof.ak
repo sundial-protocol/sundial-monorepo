@@ -1,12 +1,11 @@
 use aiken/collection/list
 use aiken/primitive/bytearray
+use aiken_design_patterns/linked_list/ordered.{Key}
 use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction,
 }
-use linked_list/ordered
-use linked_list/types.{Key, NodeDatum}
 use midgard/common/utils
 use midgard/fraud_proof/catalogue.{
   Burn, Datum, Mint, MintRedeemer, SpendRedeemer, StepDatum,
@@ -93,7 +92,6 @@ validator mint(
       Burn(
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
-        frauded_state_queue_node_asset_name,
         fraud_proof_token_asset_name,
         hub_oracle_asset_name,
         fraud_proof_spend_input_index,
@@ -133,9 +131,7 @@ validator mint(
           ),
           validate_non_member_state_queue_input(
             frauded_state_queue_node_input,
-            frauded_state_queue_node_asset_name,
             state_queue_policy_id,
-            parsed_hub_oracle_datum.state_queue_addr,
             block_hash,
           ),
           quantity_of(self.mint, policy_id, fraud_proof_token_asset_name) == -1,
@@ -177,28 +173,14 @@ fn validate_fraud_proof_last_step_input(
 
 fn validate_non_member_state_queue_input(
   frauded_state_queue_node_input: Input,
-  frauded_state_queue_node_asset_name: ByteArray,
   state_queue_policy_id: ByteArray,
-  state_queue_addr: Address,
   block_hash: ByteArray,
 ) {
-  expect InlineDatum(state_queue_node_datum) =
-    frauded_state_queue_node_input.output.datum
-  expect parsed_state_queue_node_datum: NodeDatum = state_queue_node_datum
-  and {
-    quantity_of(
-      frauded_state_queue_node_input.output.value,
-      state_queue_policy_id,
-      frauded_state_queue_node_asset_name,
-    ) == 1,
-    ordered.is_not_member(
-      Key(block_hash),
-      parsed_state_queue_node_datum.key,
-      parsed_state_queue_node_datum.link,
-      frauded_state_queue_node_input.output.address,
-      state_queue_addr,
-    ),
-  }
+  ordered.prove_is_not_member(
+    state_queue_policy_id,
+    Key(block_hash),
+    frauded_state_queue_node_input.output,
+  )
 }
 
 fn validate_fraud_proof_spend_input(

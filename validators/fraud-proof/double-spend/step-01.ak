@@ -1,11 +1,11 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
+use aiken_design_patterns/linked_list/ordered.{NodeDatum}
 use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script}
 use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use linked_list/types.{NodeDatum}
 use midgard/fraud_proof/catalogue.{StepDatum}
 use midgard/fraud_proof/double_spend.{validate_output_to_fraud_prover}
 use midgard/state_queue

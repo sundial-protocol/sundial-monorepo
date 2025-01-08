@@ -1,14 +1,12 @@
 use aiken/collection/list
 use aiken/interval.{Finite, Interval}
-use cardano/address.{Address, Script}
+use aiken_design_patterns/linked_list/ordered.{
+  Key, NodeDatum, get_node_inputs, get_node_outputs,
+}
 use cardano/assets.{PolicyId, Value, quantity_of, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
-use linked_list/ordered
-use linked_list/types.{Key, NodeDatum}
-use linked_list/utils.{get_node_in_outputs,
-  get_node_outputs} as linked_list_utils
 use midgard/active_operators.{
   ActivateOperator, Datum, Deinit, Init, ListStateTransition, MintRedeemer,
   RemoveOperatorSlashBond, RetireOperator, SpendRedeemer, UpdateCommitmentTime,
@@ -37,12 +35,14 @@ validator spend(
         )
       UpdateCommitmentTime(
         active_node_output_index,
+        prev_active_node_ref_input_index,
         hub_oracle_ref_input_index,
         state_queue_redeemer_index,
       ) -> {
         expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
         expect Some(active_node_input_datum) = datumOpt
-        expect Key(active_node_input_datum_key) = active_node_input_datum.key
+        expect Some(prev_active_node_ref_input) =
+          list.at(self.reference_inputs, prev_active_node_ref_input_index)
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
@@ -55,9 +55,6 @@ validator spend(
         expect active_node_operator_output_data: Datum =
           parsed_active_node_output_datum.data
 
-        expect Script(state_queue_cs) =
-          parsed_hub_oracle_datum.state_queue_addr.payment_credential
-
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
         expect CommitBlockHeader(operator) = state_queue_redeemer_pair.2nd
@@ -66,19 +63,12 @@ validator spend(
             self.mint,
             active_operators_mint_script_hash,
           ),
-          ordered.is_member(
-            parsed_active_node_output_datum.key,
-            active_node_input_datum.key,
-            active_node_output.address,
-            parsed_hub_oracle_datum.active_operators_addr,
-          ),
-          //active_node_output must hold the correct active_operators token
-          quantity_of(
-            active_node_output.value,
+          ordered.prove_is_member(
             active_operators_mint_script_hash,
-            active_node_input_datum_key,
-          ) > 0,
-          //keys are already checked by is_member()
+            parsed_active_node_output_datum.key,
+            prev_active_node_ref_input.output,
+          ),
+          //keys are already checked by prove_is_member()
           parsed_active_node_output_datum.link == active_node_input_datum.link,
           Some(valid_to) == active_node_operator_output_data.commitment_time,
           quantity_of(
@@ -86,7 +76,9 @@ validator spend(
             hub_oracle_script_hash,
             hub_oracle_asset_name,
           ) == 1,
-          state_queue_redeemer_pair.1st == Mint(state_queue_cs),
+          state_queue_redeemer_pair.1st == Mint(
+            parsed_hub_oracle_datum.state_queue,
+          ),
           Key(operator) == parsed_active_node_output_datum.key,
         }
       }
@@ -104,7 +96,7 @@ validator mint(
   hub_oracle_asset_name: ByteArray,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
-    let node_in_outputs = get_node_in_outputs(self.inputs, policy_id)
+    let node_in_outputs = get_node_inputs(self.inputs, policy_id)
     let node_outputs = get_node_outputs(self.outputs, policy_id)
     let node_mint = tokens(self.mint, policy_id)
     when redeemer is {
@@ -132,8 +124,6 @@ validator mint(
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
-        expect Script(registered_operators_cs) =
-          parsed_hub_oracle_datum.registered_operators_addr.payment_credential
         expect Some(registered_operators_redeemer_pair) =
           list.at(self.redeemers, registered_operators_redeemer_index)
         expect registered_operators.Activate { node_to_activate_key, .. } =
@@ -155,7 +145,7 @@ validator mint(
           ),
           active_operator_data.commitment_time == None,
           registered_operators_redeemer_pair.1st == Mint(
-            registered_operators_cs,
+            parsed_hub_oracle_datum.registered_operators,
           ),
           node_to_activate_key == new_active_operator_key,
         }
@@ -171,8 +161,6 @@ validator mint(
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
-        expect Script(state_queue_cs) =
-          parsed_hub_oracle_datum.state_queue_addr.payment_credential
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
         expect RemoveFraudolentBlockHeader(fraudolent_operator) =
@@ -192,7 +180,9 @@ validator mint(
             node_mint,
           ),
           self.fee >= slashing_penalty,
-          state_queue_redeemer_pair.1st == Mint(state_queue_cs),
+          state_queue_redeemer_pair.1st == Mint(
+            parsed_hub_oracle_datum.state_queue,
+          ),
           fraudolent_operator == slashed_active_operator_key,
         }
       }
@@ -221,8 +211,6 @@ validator mint(
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
-        expect Script(retired_operators_cs) =
-          parsed_hub_oracle_datum.retired_operators_addr.payment_credential
         expect Some(retired_operators_redeemer_pair) =
           list.at(self.redeemers, retired_operators_redeemer_index)
         expect retired_operators.RetireOperator { new_retire_operator_key, .. } =
@@ -241,7 +229,9 @@ validator mint(
             node_outputs,
             node_mint,
           ),
-          retired_operators_redeemer_pair.1st == Mint(retired_operators_cs),
+          retired_operators_redeemer_pair.1st == Mint(
+            parsed_hub_oracle_datum.retired_operators,
+          ),
           new_retire_operator_key == active_operator_key,
           active_operator_data.commitment_time == retired_operator_data.commitment_time,
         }
