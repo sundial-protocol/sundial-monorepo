@@ -1,3 +1,8 @@
+pub type StepDatum {
+  fraud_prover: ByteArray,
+  data: Data,
+}
+
 pub type Redeemer {
   Mint {
     fraud_proof_set_node_ref_input_index: Int,

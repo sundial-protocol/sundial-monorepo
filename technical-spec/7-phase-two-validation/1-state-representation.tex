@@ -11,18 +11,16 @@ This section describes how the state is represented during phase two validation,
 
 The UPLC Term representation uses progressive hashing to maintain compact state while preserving verifiability:
 
-\begin{equation*}
-    \text{Term} \coloneq \left\{
-    \begin{array}{ll}
-        \text{Variable} : & \text{Name} \\
-        \text{Lambda} : & (\text{Name}, \text{Hash}) \\
-        \text{Apply} : & (\text{Hash}, \text{Hash}) \\
-        \text{Constant} : & \text{Hash} \\
-        \text{Force} : & \text{Hash} \\
-        \text{Delay} : & \text{Hash} \\
-        \text{Builtin} : & \text{BuiltinFunction}
-    \end{array} \right\}
-\end{equation*}
+\begin{align*}
+    \text{Term} \coloneq&\;
+        \text{Variable} (\text{Name}) \\\mid&\;
+        \text{Lambda} (\text{Name}, \text{Hash}) \\\mid&\;
+        \text{Apply} (\text{Hash}, \text{Hash}) \\\mid&\;
+        \text{Constant} (\text{Hash}) \\\mid&\;
+        \text{Force} (\text{Hash}) \\\mid&\;
+        \text{Delay} (\text{Hash}) \\\mid&\;
+        \text{Builtin} (\text{BuiltinFunction})
+\end{align*}
 
 Each \text{Hash} in the Term representation refers to another Term that has been previously processed and hashed. This creates a directed acyclic graph (DAG) of Term components where larger structures are decomposed into their constituent parts.
 
@@ -35,7 +33,21 @@ For example, a lambda expression like \(\lambda x.\lambda y.[y x]\) would be rep
     \item Where \(h_4\) is the hash of a Variable node containing \(x\)
 \end{itemize}
 
-\subsection{Execution State}
+\subsection{Decoding Steps}
+
+The conversion from flat-encoded script bytes to the final Term follows a sequence of BytesToTermSteps:
+
+\begin{equation*}
+    \text{BytesToTermStep} \coloneq \left\{
+    \begin{array}{ll}
+        \text{remaining\_bytes} : & \text{ScriptBytes} \\
+        \text{partial\_term} : & \text{Term}
+    \end{array} \right\}
+\end{equation*}
+
+Each step represents an atomic transformation in the decoding process, with the \text{decoding\_step\_proof} enabling independent verification of that specific step.
+
+\subsection{Execution Steps}
 
 The execution state during UPLC evaluation is represented by the CEK machine state:
 
@@ -44,7 +56,7 @@ The execution state during UPLC evaluation is represented by the CEK machine sta
     \begin{array}{ll}
         \text{term\_hash} : & \text{Hash} \\
         \text{env} : & \text{Environment} \\
-        \text{kontinuation} : & \text{Kontinuation}
+        \text{continuation} : & \text{Continuation}
     \end{array} \right\}
 \end{equation*}
 
@@ -59,30 +71,16 @@ Each execution step produces a new CEK state and tracks execution units consumed
     \end{array} \right\}
 \end{equation*}
 
-\subsection{Transformation Steps}
-
-The conversion from flat-encoded script bytes to the final Term follows a sequence of BytesToTermSteps:
-
-\begin{equation*}
-    \text{BytesToTermStep} \coloneq \left\{
-    \begin{array}{ll}
-        \text{remaining\_bytes} : & \text{ScriptBytes} \\
-        \text{partial\_term} : & \text{Term}
-    \end{array} \right\}
-\end{equation*}
-
-Each step represents an atomic transformation in the decoding process, with the \text{transformation\_proof} enabling independent verification of that specific step.
-
 \subsection{Execution Trace}
 
-The complete execution trace combines the bytes-to-term conversion and CEK machine evaluation:
+The complete execution trace combines the bytes-to-term conversion and CEK machine evaluation. In the following, we use the notation $\mathcal{RH}$ to indicate a root hash of a Merkle-Patricia tree. 
 
 \begin{equation*}
     \text{ExecutionTrace} \coloneq \left\{
     \begin{array}{ll}
-        \text{bytes\_to\_term\_steps} : & \mathcal{H}(\text{[BytesToTermStep]}) \\
+        \text{bytes\_to\_term\_steps} : & \mathcal{RH}(\text{[BytesToTermStep]}) \\
         \text{initial\_state} : & \text{CEKState} \\
-        \text{steps} : & \mathcal{H}(\text{[ExecutionStep]})
+        \text{steps} : & \mathcal{RH}(\text{[ExecutionStep]})
     \end{array} \right\}
 \end{equation*}
 
@@ -92,7 +90,7 @@ The execution trace is stored in transaction witness sets:
     \text{MidgardTxWits} \coloneq \left\{
     \begin{array}{ll}
         ... \\
-        \text{execution\_traces} : & \quad?\;\mathcal{H}(\text{Map(RdmrPtr, ExecutionTrace)})
+        \text{execution\_traces} : & \quad?\;\mathcal{RH}(\text{Map(RdmrPtr, ExecutionTrace)})
     \end{array} \right\}
 \end{equation*}
 

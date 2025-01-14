@@ -4,13 +4,14 @@
 
 \section*{Introduction}
 \label{h:introduction}
+\addcontentsline{toc}{chapter}{Introduction}
 
 Midgard is a Layer 2 (L2) scaling solution for the Cardano blockchain.
 It employs optimistic rollup technology to enhance Cardano's capacity to process transactions and host more complex applications, delivering a richer user experience at a more competitive cost.
 As Cardano continues to grow in usage and demand, scaling solutions like Midgard are critical for maintaining high performance and low transaction costs.
 This whitepaper describes the architecture and technical design of the Midgard protocol, detailing how it integrates with Cardano's Layer 1 (L1) to deliver secure and efficient transaction processing.
 
-Optimistic rollups process blocks of transactions off-chain and commit the hash summaries of those blocks onchain to the L1 ledger.
+Optimistic rollups process blocks of transactions off-chain and commit those blocks' headers onchain to the L1 ledger.
 Each block is committed by a Midgard operator who guarantees the block's validity.
 The block then waits in a queue for at least a fixed duration to be merged into the confirmed state of the optimistic rollup on L1.
 The operator must collateralize their guarantee with a bond deposit and publish the full contents of the block on the publicly accessible data availability (DA) layer.
@@ -42,15 +43,29 @@ The deterministic nature of Cardano transactions allows Midgard fraud proofs to 
 This keeps fraud proofs and their onchain validation procedures small and efficient, which reduces the time and cost needed to submit fraud proofs when invalid blocks are detected, which makes it feasible for a wider group of people to police Midgard's blocks.
 In this way, Midgard significantly reduces fraud proof size relative to optimistic rollups used in Ethereum and other account-based blockchain ecosystems, where a much larger part of the global blockchain state needs to be inspected when constructing and verifying a fraud proof.
 
-\subsection*{Fallback mechanisms on L1}
+\subsection*{Censorship resistance and fallback mechanisms}
 
-\notebox{Midgard's L1 architecture includes the deposit, withdrawal, mailbox, and escape-hatch contracts to allow users to force deposits and withdrawal requests to be processed within a reasonable timeframe, even if all operators stop participating in the protocol.}\todo
+On its own, the optimistic rollup mechanism described above ensures a high-level of assurance for the validity of block headers committed to the state queue and merged to Midgard's confirmed state.
+However, it does not prevent operators from censoring users' deposits, withdrawals, and L2 transactions.
+Consequently, Midgard's consensus protocol includes additional smart contract mechanisms to provide censorship resistance for these events.
+
+Midgard deposits and withdrawals are initiated via L1 smart contracts that assign definite inclusion times to them.
+An operator block is invalid if it contains these inclusion times in its event interval but fails to include the associated deposit or withdrawal events.
+This ensures that if operators continue committing blocks to Midgard's state queue, then they cannot ignore deposit and withdrawal events.
+
+Midgard L2 transaction requests are typically submitted to operators via a publicly accessible API, and they can be ignored by operators.
+However, any user can escalate his L2 transaction request by posting a transaction order on L1.
+Similar to Midgard deposits and withdrawals, an L1 transaction order is assigned an inclusion time that guarantees its inclusion in a subsequent valid block.
+
+If Midgard operators stop committing blocks at all to the state queue, then the inclusion times on their own cannot guarantee that deposits, withdrawals, and L2 transactions will be processed in a timely manner.
+However, for this extreme case, Midgard's consensus protocol includes the escape hatch mechanism, which allows a special non-optimistic block to be appended to the state queue by a non-operator.
+This block can include any deposits, withdrawals, and L2 transactions that are verified on L1 to comply with Midgard's ledger rules.
+This ensures that user funds cannot be stranded on Midgard even if its operators entirely stop committing blocks.
 
 \subsection*{Feedback and contributions welcome!}
 \label{h:feedback-and-contributions-welcome}
 
 This document specifies the ledger, onchain contracts, and offchain components of the Midgard architecture.
-These components interact to form a cohesive system that scales Cardano while preserving its security guarantees.
 We detail the roles of users, operators, and watchers, how blocks are committed and merged on L1, and how fraud proofs are handled.
 
 We invite developers, validators, and the broader community to engage with this document and offer feedback and contributions to help refine and enhance the protocol.

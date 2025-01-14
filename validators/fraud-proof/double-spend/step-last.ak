@@ -1,7 +1,7 @@
 use aiken/collection/list
 use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/fraud_proof/catalogue.{StepDatum}
+use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/double_spend.{validate_output_to_fraud_prover}
 
 pub type DoubleSpendStepLastState {
