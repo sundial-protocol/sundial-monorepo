@@ -8,7 +8,7 @@ use aiken_design_patterns/merkelized_validator
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{PolicyId, Value, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/fraud_proof/catalogue as fpc
+use midgard/computation_thread.{StepDatum}
 
 // Invalid Input Reference fraud proof: A transaction tx in a proposed block contains an input referencing a nonexistent output.
 
@@ -68,7 +68,7 @@ validator step_01(
   stake_validator: ScriptHash,
 ) {
   spend(
-    maybe_datum: Option<fpc.StepDatum>,
+    maybe_datum: Option<StepDatum>,
     redeemer: Step1redeemer,
     input: OutputReference,
     self: Transaction,
@@ -172,7 +172,7 @@ validator step_01(
         //let's get the new datum
         expect Some(output_state) = list.at(self.outputs, index_output)
         expect InlineDatum(datum_output) = output_state.datum
-        expect datum_parsed: fpc.StepDatum = datum_output
+        expect datum_parsed: StepDatum = datum_output
 
         expect Script(hash) = output_state.address.payment_credential
         let step1_state =
@@ -181,10 +181,7 @@ validator step_01(
             merkle_proof: tx_to_root_proof_path,
           }
         let step_1_datum =
-          fpc.StepDatum {
-            fraud_prover: step_datum.fraud_prover,
-            data: step1_state,
-          }
+          StepDatum { fraud_prover: step_datum.fraud_prover, data: step1_state }
         and {
           drop(ct_token_asset_name, n: 28) == block_hash,
           step_1_datum == datum_parsed,

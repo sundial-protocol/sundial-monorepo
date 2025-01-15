@@ -1,10 +1,13 @@
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/primitive/bytearray
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
+use aiken_design_patterns/validity_range_normalization as vrn
 use cardano/address.{Address, Script}
-use cardano/assets.{PolicyId, Value, flatten, tokens}
-use cardano/transaction.{Input, Output, OutputReference}
-use midgard/common/constants.{posix_time_none}
+use cardano/assets.{AssetName, PolicyId, Value, tokens}
+use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
+use midgard/common/constants.{
+  max_validity_range_for_current_time, posix_time_none,
+}
 use midgard/common/types.{POSIXTime}
 
 pub fn validate_mint(
@@ -15,42 +18,6 @@ pub fn validate_mint(
 ) -> Bool {
   let mints_policy = dict.to_pairs(tokens(mints, expected_minting_policy))
   mints_policy == [Pair(expected_minting_name, expected_minting_amt)]
-}
-
-pub fn div_ceil(a, b: Int) -> Int {
-  let div = a / b
-  let rem = a % b
-  when rem is {
-    0 -> div
-    _ -> div + 1
-  }
-}
-
-pub fn find_cs_by_token_prefix(
-  value: Value,
-  prefix: ByteArray,
-) -> List<PolicyId> {
-  value
-    |> flatten
-    |> list.filter_map(
-        fn(input: (PolicyId, ByteArray, Int)) -> Option<PolicyId> {
-          let (cs, tn, _amt) = input
-          if is_prefix_of(prefix, tn) {
-            Some(cs)
-          } else {
-            None
-          }
-        },
-      )
-}
-
-pub fn is_prefix_of(prefix: ByteArray, src: ByteArray) -> Bool {
-  let prefix_length = bytearray.length(prefix)
-  let src_length = bytearray.length(src)
-  when prefix_length <= src_length is {
-    True -> bytearray.take(src, prefix_length) == prefix
-    False -> False
-  }
 }
 
 pub fn safe_list_last(elems: List<a>) -> a {
@@ -97,4 +64,85 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
     Script(hash) -> hash == scHash
     _ -> False
   }
+}
+
+pub fn get_current_time(validity_range: ValidityRange) -> POSIXTime {
+  when vrn.normalize_time_range(validity_range) is {
+    vrn.ClosedRange { lower, upper } -> {
+      expect upper - lower <= max_validity_range_for_current_time
+      upper
+    }
+    _ -> fail @"Unexpected validity range provided."
+  }
+}
+
+pub fn has_signed(
+  signer: VerificationKeyHash,
+  extra_signatories: List<VerificationKeyHash>,
+) -> Bool {
+  extra_signatories |> list.has(signer)
+}
+
+pub fn get_single_asset_from_value_apart_from_ada(
+  v: Value,
+) -> (PolicyId, AssetName, Int) {
+  expect [Pair(sym, tn_qty_pairs)] =
+    v
+      |> assets.to_dict
+      |> dict.delete(assets.ada_policy_id)
+      |> dict.to_pairs
+  expect [Pair(tn, qty)] = tn_qty_pairs |> dict.to_pairs
+  (sym, tn, qty)
+}
+
+/// For beacon UTxOs with specific policy IDs at a given address.
+pub fn get_authentic_input_with_policy_at_address(
+  inputs: List<Input>,
+  address: Address,
+  nft_policy_id: PolicyId,
+  nft_token_name: ByteArray,
+  input_index: Int,
+) -> Input {
+  expect Some(
+    Input { output: Output { address: input_addr, value: input_value, .. }, .. } as found_input,
+  ) = list.at(inputs, input_index)
+
+  let input_nft_triplet =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect and {
+      input_addr == address,
+      input_nft_triplet == (nft_policy_id, nft_token_name, 1),
+    }
+
+  found_input
+}
+
+/// For beacon UTxOs of validators which their NFTs have policy IDs equal to
+/// their payment credentials.
+pub fn get_authentic_input_of(
+  inputs: List<Input>,
+  address_script_hash: ScriptHash,
+  nft_token_name: ByteArray,
+  input_index: Int,
+) -> Input {
+  expect Some(
+    Input {
+      output: Output {
+        address: Address { payment_credential: Script(refs_script_hash), .. },
+        value: refs_value,
+        ..
+      },
+      ..
+    } as found_ref_input,
+  ) = list.at(inputs, input_index)
+
+  let refs_nft_triplet = get_single_asset_from_value_apart_from_ada(refs_value)
+
+  expect and {
+      refs_script_hash == address_script_hash,
+      refs_nft_triplet == (address_script_hash, nft_token_name, 1),
+    }
+
+  found_ref_input
 }
