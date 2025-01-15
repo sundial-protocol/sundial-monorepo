@@ -1,8 +1,8 @@
 use aiken/collection/list
 use aiken/primitive/bytearray
+use aiken_design_patterns/linked_list/ordered.{Key, NodeDatum}
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use linked_list/types.{Key, NodeDatum}
 use midgard/common/utils.{is_output_to_sc}
 use midgard/computation_thread as ct
 use midgard/computation_thread.{StepDatum}
