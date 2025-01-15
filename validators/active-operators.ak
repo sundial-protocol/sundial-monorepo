@@ -15,7 +15,7 @@ use midgard/common/utils as utils
 use midgard/hub_oracle.{Datum as HubOracleDatum}
 use midgard/registered_operators
 use midgard/retired_operators.{Datum as RetiredOperatorData}
-use midgard/state_queue.{CommitBlockHeader, RemoveFraudolentBlockHeader}
+use midgard/state_queue.{CommitBlockHeader, RemoveFraudulentBlockHeader}
 
 validator spend(
   active_operators_mint_script_hash: ByteArray,
@@ -163,7 +163,7 @@ validator mint(
         expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect RemoveFraudolentBlockHeader(fraudolent_operator) =
+        expect RemoveFraudulentBlockHeader(fraudulent_operator) =
           state_queue_redeemer_pair.2nd
         and {
           quantity_of(
@@ -183,7 +183,7 @@ validator mint(
           state_queue_redeemer_pair.1st == Mint(
             parsed_hub_oracle_datum.state_queue,
           ),
-          fraudolent_operator == slashed_active_operator_key,
+          fraudulent_operator == slashed_active_operator_key,
         }
       }
       RetireOperator(

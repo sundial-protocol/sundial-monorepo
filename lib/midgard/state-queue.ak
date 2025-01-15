@@ -19,6 +19,6 @@ pub type Datum =
   NodeDatum
 
 pub type MintRedeemer {
-  RemoveFraudolentBlockHeader { fraudolent_operator: ByteArray }
+  RemoveFraudulentBlockHeader { fraudulent_operator: ByteArray }
   CommitBlockHeader { operator: ByteArray }
 }

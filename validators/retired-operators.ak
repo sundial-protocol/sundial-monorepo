@@ -13,7 +13,7 @@ use midgard/retired_operators.{
   Datum as RetiredOperatorDatum, Deinit, Init, MintRedeemer, RecoverOperatorBond,
   RemoveOperatorSlashBond, RetireOperator,
 }
-use midgard/state_queue.{RemoveFraudolentBlockHeader}
+use midgard/state_queue.{RemoveFraudulentBlockHeader}
 
 validator spend(retired_operators_mint_script_hash: ByteArray) {
   spend(
@@ -129,7 +129,7 @@ validator mint(
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect RemoveFraudolentBlockHeader(fraudolent_operator) =
+        expect RemoveFraudulentBlockHeader(fraudulent_operator) =
           state_queue_redeemer_pair.2nd
         and {
           quantity_of(
@@ -149,7 +149,7 @@ validator mint(
           state_queue_redeemer_pair.1st == Mint(
             parsed_hub_oracle_datum.state_queue,
           ),
-          fraudolent_operator == slashed_retired_operator_key,
+          fraudulent_operator == slashed_retired_operator_key,
         }
       }
     }
