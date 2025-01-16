@@ -333,7 +333,7 @@ All multisig scripts are provided.
 Formal specification:
 \begin{equation*}
 \begin{split}
-  \forall t \in txs, & \forall u \in output(t), addr(u) \in Addr^{script} \rightarrow \\
+  \forall t \in Ledger, & \forall u \in output(t), addr(u) \in Addr^{script} \rightarrow \\
   & \exists (h, s) \in script\_tx\_wits(t), script\_hash(addr(u)) = h
 \end{split}
 \end{equation*}
@@ -370,7 +370,7 @@ All multisig scripts validations pass.
 Formal specification:
 \begin{equation*}
 \begin{split}
-  \forall t \in txs, \forall (h, s) \in script\_tx\_wits(t), multisig\_validation\_succeeds(s, t)
+  \forall t \in Ledger, \forall (h, s) \in script\_tx\_wits(t), multisig\_validation\_succeeds(s, t)
 \end{split}
 \end{equation*}
 
@@ -422,7 +422,7 @@ Value is not preserved in transaction $t$.
 Formal specification:
 \begin{equation*}
   \begin{split}
-      \exists t \in Ledger &, \\
+      \exists t \in txs &, \\
       & mint(t) + \sum_{i \, \in \, spend\_inputs(t)} value(i) \neq fee(t) + \sum_{o \, \in \, outputs(t)} value(o)
   \end{split}
   \end{equation*}
@@ -454,7 +454,7 @@ This ledger rule is violated if any of the following violations occur:
 Ada is minted in transaction $t$.
 Formal specification:
 \begin{equation*}
-  \exists t \in Ledger, lovelaces(mint(t)) \neq 0
+  \exists t \in txs, lovelaces(mint(t)) \neq 0
 \end{equation*}
 
 Fraud proof construction:
@@ -478,13 +478,12 @@ Fraud proof construction:
 All values must be greater or equal to zero.
 Formal specification:
 \begin{equation*}
-    \forall t \in Ledger, mint(t) \geq \mathbf{0} \, \land fee(t) \geq 0 \land \forall o \in outputs(t), \, value(o) \geq \mathbf{0}
+    \forall t \in Ledger, mint(t) \geq \mathbf{0} \, \land \forall o \in outputs(t), \, value(o) \geq \mathbf{0}
 \end{equation*}
 
 This ledger rule is violated if any of the following violations occur:
 \begin{itemize-multi}
   \item \hyperref[violation:NEGATIVE-MINT]{NEGATIVE-MINT}
-  \item \hyperref[violation:NEGATIVE-FEE]{NEGATIVE-FEE}
   \item \hyperref[violation:NEGATIVE-OUTPUT-VALUE]{NEGATIVE-OUTPUT-VALUE}
 \end{itemize-multi}
 
@@ -493,7 +492,7 @@ This ledger rule is violated if any of the following violations occur:
 Ada is minted in transaction $t$.
 Formal specification:
 \begin{equation*}
-  \exists t \in Ledger, \exists m \in Policy, \exists tn \in TokenName, asset(mint(t), m, tn) < 0
+  \exists t \in txs, \exists m \in Policy, \exists tn \in TokenName, asset(mint(t), m, tn) < 0
 \end{equation*}
 
 Fraud proof construction:
@@ -503,27 +502,12 @@ Fraud proof construction:
   \item A minting policy id $m$ and a token name $tn$ must be shown, such that $asset(mint(t), m, tn) < 0$
 \end{enumerate}
 
-\subsubsection{NEGATIVE-FEE violation}
-\label{violation:NEGATIVE-FEE}
-Ada is minted in transaction $t$.
-Formal specification:
-\begin{equation*}
-  \exists t \in Ledger, fee(t) < 0
-\end{equation*}
-
-Fraud proof construction:
-\begin{enumerate}
-  \item Let $t$ be the transaction alleged to violate the ledger rule.
-  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
-  \item $fee(t)$ must be negative.
-\end{enumerate}
-
 \subsubsection{NEGATIVE-OUTPUT-VALUE violation}
 \label{violation:NEGATIVE-OUTPUT-VALUE}
 Ada is minted in transaction $t$.
 Formal specification:
 \begin{equation*}
-  \exists t \in Ledger, \exists o \in outputs(t), \exists m \in Policy, \exists tn \in TokenName, asset(value(o), m, tn) < 0
+  \exists t \in txs, \exists o \in outputs(t), \exists m \in Policy, \exists tn \in TokenName, asset(value(o), m, tn) < 0
 \end{equation*}
 
 Fraud proof construction:
@@ -536,49 +520,178 @@ Fraud proof construction:
 
 \subsection{Rule: Minimum UTxO value}
 \label{rule:minimum-utxo-value}
-% Same structure as in Cardano L1
+All output values must adhere to the same minimum ada value requirements that exists on Cardano.
+Formal specification:
+\begin{equation*}
+    \forall t \in Ledger, \forall o \in outputs(t), lovelaces(value(o)) \geq min\_ada\_value(o)
+\end{equation*}
 
-\subsection{Rule: Network id of inputs}
-\label{rule:network-id-of-inputs}
+\todo
 
-\subsection{Rule: Network id of reference inputs}
-\label{rule:network-id-of-reference-inputs}
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:MIN-ADA-RESTRICTION]{MIN-ADA-RESTRICTION}
+\end{itemize-multi}
 
-% Reference inputs are needed
+\subsubsection{MIN-ADA-RESTRICTION violation}
+\label{violation:MIN-ADA-RESTRICTION}
+A UTxO $u$ does not satisfy the minimum Ada value requirement.
+Formal specification:
+\begin{equation*}
+  \exists u \in utxos_{post}, lovelaces(value(u)) < min\_ada\_value(u)
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $u$ be the transaction alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that the transaction $u$ is included in the ledger.
+  \item $lovelaces(value(u)) < min\_ada\_value(u)$ must hold.
+\end{enumerate}
 
 \subsection{Rule: Network id of outputs}
 \label{rule:network-id-of-outputs}
+All output addresses must have the correct network id.
+Formal specification:
+\begin{equation*}
+    \forall t \in Ledger, \forall o \in outputs(t), network\_id(addr(o)) = network\_id_{Midgard}
+\end{equation*}
 
-\subsection{Rule: Network id of withdrawals}
-\label{rule:network-id-of-withdrawals}
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:OUTPUT-NETWORK]{OUTPUT-NETWORK}
+\end{itemize-multi}
+
+\subsubsection{OUTPUT-NETWORK violation}
+\label{violation:OUTPUT-NETWORK}
+A UTxO $u$ address has a wrong network id.
+Formal specification:
+\begin{equation*}
+  \exists u \in utxos_{post}, network\_id(addr(o)) \neq network\_id_{Midgard}
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $u$ be the transaction alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that the transaction $u$ is included in the ledger.
+  \item $network\_id(addr(o)) \neq network\_id_{Midgard}$ must hold.
+\end{enumerate}
+
+\subsection{Rule: Network id of deposits}
+\label{rule:network-id-of-deposits}
+All deposit output addresses must have the correct network id.
+Formal specification:
+\begin{equation*}
+    \forall t \in Deposit, \forall o \in outputs(t), network\_id(addr(o)) = network\_id_{Midgard}
+\end{equation*}
+
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:OUTPUT-NETWORK]{OUTPUT-NETWORK}
+\end{itemize-multi}
 
 \subsection{Rule: Network id of transaction}
 \label{rule:network-id-of-transaction}
+All transactions must have the correct network id.
+Formal specification:
+\begin{equation*}
+    \forall t \in Ledger, network\_id(t) = network\_id_{Midgard}
+\end{equation*}
+
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:TRANSACTION-NETWORK]{TRANSACTION-NETWORK}
+\end{itemize-multi}
+
+\subsubsection{TRANSACTION-NETWORK violation}
+\label{violation:TRANSACTION-NETWORK}
+A UTxO $u$ address has a wrong network id.
+Formal specification:
+\begin{equation*}
+  \exists t \in txs, network\_id(t) \neq network\_id_{Midgard}
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item $network\_id(t) \neq network\_id_{Midgard}$ must hold.
+\end{enumerate}
 
 \subsection{Rule: All reference inputs must be valid}
 \label{rule:all-reference-inputs-must-be-valid}
 
+A transaction cannot reference a non-existing (or an already spent) UTxO. Formal specification:
+\begin{equation*}
+\begin{split}
+    \forall t \in Ledger, &\forall i \in reference\_inputs(t): \\
+    &( \exists t_1 \in Ledger, t \neq t_1 \land i \in outputs(t_1) ) \land \\
+    &( \nexists t_2 \in Ledger, t \neq t_2 \land block\_number(t_2) < block\_number(t) \land i \in spend\_inputs(t_2) )
+\end{split}
+\end{equation*}
+
+This ledger rule is violated if any of the following violations occur:
+\begin{itemize-multi}
+  \item \hyperref[violation:NO-REFERENCE-INPUT]{NO-REFERENCE-INPUT}
+  \item \hyperref[violation:REFERENCE-INPUT-NO-IDX]{REFERENCE-INPUT-NO-IDX}
+\end{itemize-multi}
+
+\subsubsection{NO-REFERENCE-INPUT violation}
+\label{violation:NO-REFERENCE-INPUT}
+A transaction $t$ attempted to spend the UTxO $i$ that does not exist or was spent in a previous block.
+Formal specification:
+\begin{equation*}
+\begin{split}
+    \exists t \in txs, &\exists i \in reference\_inputs(t): \\
+    &( i \notin utxos_{prev} ) \land  \\
+    &( \nexists t_1 \in txs, t \neq t_1 \land tx\_hash(t_1) = tx\_hash(i) )
+\end{split}
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule. 
+  \item A membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$).
+  \item A membership proof for input $i$ must be specified such that $i \in reference\_inputs(t)$.
+  \item A non-membership proof must be created to show that $i$ is not in $utxos_{prev}$.
+  \item A non-membership proof must also be generated that shows that there are no transactions in $txs$ that have id $tx\_hash(i)$.
+\end{enumerate}
+
+\subsubsection{REFERENCE-INPUT-NO-IDX violation}
+\label{violation:REFERENCE-INPUT-NO-IDX}
+A transaction $t$ attempted to spend the input $i$, which did not exist at all.
+Formal specification:
+\begin{equation*}
+\begin{split}
+    \exists t \in txs, &\exists i \in reference\_inputs(t): \\
+    &( \exists t_1 \in txs, tx\_hash(t_1) = tx\_hash(i) \land i \notin outputs(t_1) )
+\end{split}
+\end{equation*}
+
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $t$ be the transaction alleged to violate the ledger rule. 
+  \item A membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$)
+  \item A membership proof must be presented for input $i$ such that $i \in reference\_inputs(t)$
+  \item A membership proof must be created for $t_1$ such that $tx\_hash(t_1) = tx\_hash(i)$
+  \item A DA layer proof must be presented that certifies that $length(outputs(t_1)) < index(i)$
+\end{enumerate}
+
 % TODO: maybe also include $inputs \cap reference\_inputs = \varnothing$
 
-\subsection{Rule: Validator scripts are available}
-\label{rule:validator-scripts-are-available}
+% \subsection{Rule: Validator scripts are available}
+% \label{rule:validator-scripts-are-available}
 
 % TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 
-\subsection{Rule: Validator scripts adhere to execution limits}
-\label{rule:validator-scripts-adhere-to-execution-limits}
+% \subsection{Rule: Validator scripts adhere to execution limits}
+% \label{rule:validator-scripts-adhere-to-execution-limits}
 
 % TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 
-\subsection{Rule: Validator scripts accept transaction}
-\label{rule:validator-scripts-accept-transaction}
+% \subsection{Rule: Validator scripts accept transaction}
+% \label{rule:validator-scripts-accept-transaction}
 
 % TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 % Maybe separate out staking and minting scripts in a separate rule
-
-\subsection{Rule: Maximum number of collateral inputs}
-\label{rule:maximum-number-of-collateral-inputs}
-
-% TODO: This is a placeholder, it will only be relevant once Midgard implements phase 2 validations (smart contracts).
 
 \end{document}
