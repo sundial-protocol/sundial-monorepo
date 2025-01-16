@@ -9,9 +9,9 @@ use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
-use midgard/fraud_proof/double_spend/step_01.{Step1State}
+use midgard/fraud_proof/double_spend/step_01.{StepState as Step1State}
 use midgard/fraud_proof/double_spend/step_02.{
-  Cancel, Continue, Step2Redeemer, Step2State,
+  Cancel, Continue, StepRedeemer as Step2Redeemer, StepState as Step2State,
 }
 use midgard/ledger_state
 use midgard/state_queue

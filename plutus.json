@@ -193,7 +193,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_01~1Step1Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_01~1StepRedeemer"
         }
       },
       "parameters": [
@@ -258,7 +258,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_02~1Step2Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_02~1StepRedeemer"
         }
       },
       "parameters": [
@@ -323,7 +323,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_03~1Step3Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_03~1StepRedeemer"
         }
       },
       "parameters": [
@@ -376,7 +376,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_04~1Step4Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_04~1StepRedeemer"
         }
       },
       "parameters": [
@@ -1354,8 +1354,8 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/step_01/Step1Redeemer": {
-      "title": "Step1Redeemer",
+    "midgard/fraud_proof/double_spend/step_01/StepRedeemer": {
+      "title": "StepRedeemer",
       "anyOf": [
         {
           "title": "Cancel",
@@ -1397,8 +1397,8 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/step_02/Step2Redeemer": {
-      "title": "Step2Redeemer",
+    "midgard/fraud_proof/double_spend/step_02/StepRedeemer": {
+      "title": "StepRedeemer",
       "anyOf": [
         {
           "title": "Cancel",
@@ -1440,8 +1440,8 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/step_03/Step3Redeemer": {
-      "title": "Step3Redeemer",
+    "midgard/fraud_proof/double_spend/step_03/StepRedeemer": {
+      "title": "StepRedeemer",
       "anyOf": [
         {
           "title": "Cancel",
@@ -1495,8 +1495,8 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/step_04/Step4Redeemer": {
-      "title": "Step4Redeemer",
+    "midgard/fraud_proof/double_spend/step_04/StepRedeemer": {
+      "title": "StepRedeemer",
       "anyOf": [
         {
           "title": "Cancel",

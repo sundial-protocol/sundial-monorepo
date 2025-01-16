@@ -8,9 +8,9 @@ use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MidgardTx, MidgardTxBody}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
-use midgard/fraud_proof/double_spend/step_02.{Step2State}
+use midgard/fraud_proof/double_spend/step_02.{StepState as Step2State}
 use midgard/fraud_proof/double_spend/step_03.{
-  Cancel, Continue, Step3Redeemer, Step3State,
+  Cancel, Continue, StepRedeemer as Step3Redeemer, StepState as Step3State,
 }
 
 validator main(

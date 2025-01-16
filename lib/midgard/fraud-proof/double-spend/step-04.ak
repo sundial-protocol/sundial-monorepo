@@ -1,4 +1,4 @@
-pub type Step4Redeemer {
+pub type StepRedeemer {
   Cancel { index_output: Int }
   Continue { index_output: Int }
 }

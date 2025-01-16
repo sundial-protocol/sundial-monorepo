@@ -1,6 +1,6 @@
 use midgard/fraud_proof/common/types.{Proof}
 
-pub type Step1Redeemer {
+pub type StepRedeemer {
   Cancel { index_output: Int }
   Continue {
     frauded_state_queue_node_ref_input_index: Int,
@@ -11,6 +11,6 @@ pub type Step1Redeemer {
   }
 }
 
-pub type Step1State {
+pub type StepState {
   verified_tx1_hash: ByteArray,
 }

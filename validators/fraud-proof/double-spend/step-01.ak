@@ -10,7 +10,7 @@ use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
 use midgard/fraud_proof/double_spend/step_01.{
-  Cancel, Continue, Step1Redeemer, Step1State,
+  Cancel, Continue, StepRedeemer as Step1Redeemer, StepState as Step1State,
 }
 use midgard/ledger_state
 use midgard/state_queue
