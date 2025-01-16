@@ -9,14 +9,14 @@ use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
-use midgard/fraud_proof/double_spend.{
-  Cancel_2, Continue_2, DoubleSpendStep1State, DoubleSpendStep2State,
-  Step02Redeemer,
+use midgard/fraud_proof/double_spend/step_01.{Step1State}
+use midgard/fraud_proof/double_spend/step_02.{
+  Cancel, Continue, Step2Redeemer, Step2State,
 }
 use midgard/ledger_state
 use midgard/state_queue
 
-validator double_spend_step_02(
+validator main(
   // Script hash of next step (backwards compilation order of step validators required)
   double_spend_step_03_validator_script_hash: ScriptHash,
   // Script hash of stake validator (forwarded merkle proof logic)
@@ -26,7 +26,7 @@ validator double_spend_step_02(
 ) {
   spend(
     a_datum: Option<StepDatum>,
-    redeemer: Step02Redeemer,
+    redeemer: Step2Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -37,7 +37,7 @@ validator double_spend_step_02(
       // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
       // --------------------------------------------------
-      Cancel_2 { index_output } -> {
+      Cancel { index_output } -> {
         // (1.1)
         expect Some(own_input) =
           list.find(
@@ -74,7 +74,7 @@ validator double_spend_step_02(
         True
       }
 
-      Continue_2 {
+      Continue {
         frauded_state_queue_node_ref_input_index,
         frauded_tx2_hash,
         frauded_tx2_info_hash,
@@ -83,8 +83,7 @@ validator double_spend_step_02(
       } -> {
         // Check for membership tx_2 in the fraudulent blocks extracted tx_root from previous step output state
         // we get the previous datum and find the tx_hash that is the one we want to check
-        expect DoubleSpendStep1State { verified_tx1_hash }: DoubleSpendStep1State =
-          step_datum.data
+        expect Step1State { verified_tx1_hash }: Step1State = step_datum.data
         // Check for tx hash uniqueness
         expect frauded_tx2_hash != verified_tx1_hash
 
@@ -149,10 +148,7 @@ validator double_spend_step_02(
         // (4) Verify the state transition from the previous state to the new state
         // (4.1) Define state transition (input -> output)    
         let step2_state =
-          DoubleSpendStep2State {
-            verified_tx1_hash,
-            verified_tx2_hash: frauded_tx2_hash,
-          }
+          Step2State { verified_tx1_hash, verified_tx2_hash: frauded_tx2_hash }
         let step_2_datum =
           StepDatum {
             fraud_prover: parsed_output_to_step_3_datum.fraud_prover,

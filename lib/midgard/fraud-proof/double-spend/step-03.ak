@@ -1,0 +1,22 @@
+use cardano/transaction.{OutputReference}
+use midgard/fraud_proof/common/types.{MidgardTx, MidgardTxBody}
+
+pub type Step3Redeemer {
+  Cancel { index_output: Int }
+  Continue {
+    frauded_input: Data,
+    tx1_input_utxos: ByteArray,
+    tx1_body: MidgardTxBody,
+    tx2_input_utxos: ByteArray,
+    tx2_body: MidgardTxBody,
+    tx1: MidgardTx,
+    tx2: MidgardTx,
+    index_output: Int,
+  }
+}
+
+pub type Step3State {
+  verified_tx1_hash: ByteArray,
+  verified_tx2_hash: ByteArray,
+  verified_common_input: OutputReference,
+}

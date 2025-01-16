@@ -183,7 +183,7 @@
       "hash": "7943adcaf8b3d6cabb1b8d0f2dac725642078dd06f061cffa4e3e6f6"
     },
     {
-      "title": "fraud_proof/double_spend/step_01.double_spend_step_01.spend",
+      "title": "fraud_proof/double_spend/step_01.main.spend",
       "datum": {
         "title": "a_datum",
         "schema": {
@@ -193,7 +193,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1Step01Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_01~1Step1Redeemer"
         }
       },
       "parameters": [
@@ -220,7 +220,7 @@
       "hash": "3ed7c731f047326d97044d737ceff086584e7c7db6d73edcebd17d59"
     },
     {
-      "title": "fraud_proof/double_spend/step_01.double_spend_step_01.else",
+      "title": "fraud_proof/double_spend/step_01.main.else",
       "redeemer": {
         "schema": {}
       },
@@ -248,7 +248,7 @@
       "hash": "3ed7c731f047326d97044d737ceff086584e7c7db6d73edcebd17d59"
     },
     {
-      "title": "fraud_proof/double_spend/step_02.double_spend_step_02.spend",
+      "title": "fraud_proof/double_spend/step_02.main.spend",
       "datum": {
         "title": "a_datum",
         "schema": {
@@ -258,7 +258,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1Step02Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_02~1Step2Redeemer"
         }
       },
       "parameters": [
@@ -285,7 +285,7 @@
       "hash": "2d4c48974850d1434606d31b2fec228cf843c249648c42faa0dc60b5"
     },
     {
-      "title": "fraud_proof/double_spend/step_02.double_spend_step_02.else",
+      "title": "fraud_proof/double_spend/step_02.main.else",
       "redeemer": {
         "schema": {}
       },
@@ -313,7 +313,7 @@
       "hash": "2d4c48974850d1434606d31b2fec228cf843c249648c42faa0dc60b5"
     },
     {
-      "title": "fraud_proof/double_spend/step_03.double_spend_step_03.spend",
+      "title": "fraud_proof/double_spend/step_03.main.spend",
       "datum": {
         "title": "a_datum",
         "schema": {
@@ -323,7 +323,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1Step03Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_03~1Step3Redeemer"
         }
       },
       "parameters": [
@@ -344,7 +344,7 @@
       "hash": "8cba6e960ef2c25e5854f50d42633bf206d5713765941aca5eb51112"
     },
     {
-      "title": "fraud_proof/double_spend/step_03.double_spend_step_03.else",
+      "title": "fraud_proof/double_spend/step_03.main.else",
       "redeemer": {
         "schema": {}
       },
@@ -366,7 +366,7 @@
       "hash": "8cba6e960ef2c25e5854f50d42633bf206d5713765941aca5eb51112"
     },
     {
-      "title": "fraud_proof/double_spend/step_04.double_spend_step_04.spend",
+      "title": "fraud_proof/double_spend/step_04.main.spend",
       "datum": {
         "title": "a_datum",
         "schema": {
@@ -376,7 +376,7 @@
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1Step04Redeemer"
+          "$ref": "#/definitions/midgard~1fraud_proof~1double_spend~1step_04~1Step4Redeemer"
         }
       },
       "parameters": [
@@ -397,7 +397,7 @@
       "hash": "ab4243189f6bb52f5b92ea01d8165f51721bd455b5998b34576e0022"
     },
     {
-      "title": "fraud_proof/double_spend/step_04.double_spend_step_04.else",
+      "title": "fraud_proof/double_spend/step_04.main.else",
       "redeemer": {
         "schema": {}
       },
@@ -1354,11 +1354,11 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/Step01Redeemer": {
-      "title": "Step01Redeemer",
+    "midgard/fraud_proof/double_spend/step_01/Step1Redeemer": {
+      "title": "Step1Redeemer",
       "anyOf": [
         {
-          "title": "Cancel_1",
+          "title": "Cancel",
           "dataType": "constructor",
           "index": 0,
           "fields": [
@@ -1369,7 +1369,7 @@
           ]
         },
         {
-          "title": "Continue_1",
+          "title": "Continue",
           "dataType": "constructor",
           "index": 1,
           "fields": [
@@ -1397,11 +1397,11 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/Step02Redeemer": {
-      "title": "Step02Redeemer",
+    "midgard/fraud_proof/double_spend/step_02/Step2Redeemer": {
+      "title": "Step2Redeemer",
       "anyOf": [
         {
-          "title": "Cancel_2",
+          "title": "Cancel",
           "dataType": "constructor",
           "index": 0,
           "fields": [
@@ -1412,7 +1412,7 @@
           ]
         },
         {
-          "title": "Continue_2",
+          "title": "Continue",
           "dataType": "constructor",
           "index": 1,
           "fields": [
@@ -1440,11 +1440,11 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/Step03Redeemer": {
-      "title": "Step03Redeemer",
+    "midgard/fraud_proof/double_spend/step_03/Step3Redeemer": {
+      "title": "Step3Redeemer",
       "anyOf": [
         {
-          "title": "Cancel_3",
+          "title": "Cancel",
           "dataType": "constructor",
           "index": 0,
           "fields": [
@@ -1455,7 +1455,7 @@
           ]
         },
         {
-          "title": "Continue_3",
+          "title": "Continue",
           "dataType": "constructor",
           "index": 1,
           "fields": [
@@ -1495,11 +1495,11 @@
         }
       ]
     },
-    "midgard/fraud_proof/double_spend/Step04Redeemer": {
-      "title": "Step04Redeemer",
+    "midgard/fraud_proof/double_spend/step_04/Step4Redeemer": {
+      "title": "Step4Redeemer",
       "anyOf": [
         {
-          "title": "Cancel_4",
+          "title": "Cancel",
           "dataType": "constructor",
           "index": 0,
           "fields": [
@@ -1510,7 +1510,7 @@
           ]
         },
         {
-          "title": "Continue_4",
+          "title": "Continue",
           "dataType": "constructor",
           "index": 1,
           "fields": [

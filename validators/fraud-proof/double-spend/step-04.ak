@@ -3,21 +3,21 @@ use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
-use midgard/fraud_proof/double_spend.{Cancel_4, Continue_4, Step04Redeemer}
+use midgard/fraud_proof/double_spend/step_04.{Cancel, Continue, Step4Redeemer}
 
-validator double_spend_step_04(
+validator main(
   fraud_proof_token_policy: PolicyId,
   ct_token_policy_id: PolicyId,
 ) {
   spend(
     a_datum: Option<StepDatum>,
-    redeemer: Step04Redeemer,
+    redeemer: Step4Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
     expect Some(step_datum) = a_datum
     when redeemer is {
-      Cancel_4 { index_output } -> {
+      Cancel { index_output } -> {
         // (1.1)
         expect Some(own_input) =
           list.find(
@@ -56,7 +56,7 @@ validator double_spend_step_04(
       // 1) State transition to Void
       // 2) Maintaining fraud_prover field
       // 3) Verifying fraud proof token minting with correct asset name (computation thread token)
-      Continue_4 { index_output } -> {
+      Continue { index_output } -> {
         // 1) Verify state transition to Void while maintaining fraud_prover
         expect Some(output_to_next_step) = list.at(self.outputs, index_output)
         expect InlineDatum(output_to_next_step_datum) =

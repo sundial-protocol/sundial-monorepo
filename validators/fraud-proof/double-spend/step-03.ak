@@ -8,24 +8,24 @@ use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MidgardTx, MidgardTxBody}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
-use midgard/fraud_proof/double_spend.{
-  Cancel_3, Continue_3, DoubleSpendStep2State, DoubleSpendStep3State,
-  Step03Redeemer,
+use midgard/fraud_proof/double_spend/step_02.{Step2State}
+use midgard/fraud_proof/double_spend/step_03.{
+  Cancel, Continue, Step3Redeemer, Step3State,
 }
 
-validator double_spend_step_03(
+validator main(
   double_spend_step_04_validator_script_hash: ScriptHash,
   ct_token_policy_id: PolicyId,
 ) {
   spend(
     a_datum: Option<StepDatum>,
-    redeemer: Step03Redeemer,
+    redeemer: Step3Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
     expect Some(step_datum) = a_datum
     when redeemer is {
-      Cancel_3 { index_output } -> {
+      Cancel { index_output } -> {
         // (1.1)
         expect Some(own_input) =
           list.find(
@@ -60,7 +60,7 @@ validator double_spend_step_03(
         expect quantity_of(output_to_fraud_prover.value, "", "") == lovelace
         True
       }
-      Continue_3 {
+      Continue {
         frauded_input,
         tx1_input_utxos,
         tx1_body,
@@ -71,7 +71,7 @@ validator double_spend_step_03(
         index_output,
       } -> {
         // get previously verified tx hashes, that are known to be members of the fraudulent block
-        expect DoubleSpendStep2State { verified_tx1_hash, verified_tx2_hash }: DoubleSpendStep2State =
+        expect Step2State { verified_tx1_hash, verified_tx2_hash }: Step2State =
           step_datum.data
 
         // fraud prover provides a list of output references that are known to be part of the fraudulent block as the tx1, and tx2 full transactions,
@@ -114,7 +114,7 @@ validator double_spend_step_03(
         // Verify the state transition from the previous state to the new state
         // (i) Define state transition (input -> output)    
         let step_3_state =
-          DoubleSpendStep3State {
+          Step3State {
             verified_tx1_hash,
             verified_tx2_hash,
             verified_common_input: parsed_frauded_input,

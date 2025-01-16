@@ -9,8 +9,8 @@ use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
-use midgard/fraud_proof/double_spend.{
-  Cancel_1, Continue_1, DoubleSpendStep1State, Step01Redeemer,
+use midgard/fraud_proof/double_spend/step_01.{
+  Cancel, Continue, Step1Redeemer, Step1State,
 }
 use midgard/ledger_state
 use midgard/state_queue
@@ -35,7 +35,7 @@ use midgard/state_queue
 // (iii) tx_hash, hash of the transaction that is being proven to be in tx_root
 // (iv) proof_path: minimum set of hashes needed to reconstruct the path from the tx to the root
 
-validator double_spend_step_01(
+validator main(
   // Script hash of next step (backwards compilation order of step validators required)
   double_spend_step_02_validator_script_hash: ScriptHash,
   // Script hash of stake validator (forwarded merkle proof logic)
@@ -45,7 +45,7 @@ validator double_spend_step_01(
 ) {
   spend(
     a_datum: Option<StepDatum>,
-    redeemer: Step01Redeemer,
+    redeemer: Step1Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -56,7 +56,7 @@ validator double_spend_step_01(
       // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
       // --------------------------------------------------
-      Cancel_1 { index_output } -> {
+      Cancel { index_output } -> {
         // (1.1)
         expect Some(own_input) =
           list.find(
@@ -101,7 +101,7 @@ validator double_spend_step_01(
       // (5) The computation thread token must be sent to the next step’s spending validator
       // (6) Transaction must not mint or burn any other tokens
       // ---------------------------------------------------
-      Continue_1 {
+      Continue {
         frauded_state_queue_node_ref_input_index,
         frauded_tx1_hash,
         frauded_tx1_info_hash,
@@ -170,8 +170,7 @@ validator double_spend_step_01(
         // (4) Verify the state transition from the previous state to the new state
         // At this point, tx1_hash inclusion proof is verified by the plutarch_midgard_merkle_validator -- tx_1 is a member of the block we are running the fraud proof on    
         // (4.1) Define state transition (input -> output)    
-        let step1_state =
-          DoubleSpendStep1State { verified_tx1_hash: frauded_tx1_hash }
+        let step1_state = Step1State { verified_tx1_hash: frauded_tx1_hash }
         let step_1_datum =
           StepDatum {
             fraud_prover: parsed_output_to_step_2_datum.fraud_prover,
