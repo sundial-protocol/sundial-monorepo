@@ -1,7 +1,6 @@
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName}
 use cardano/transaction.{OutputReference}
-use midgard/common/types.{PubKeyHash}
 
 /// TODO?
 /// > [!NOTE]
@@ -19,29 +18,10 @@ pub type Config {
 pub type Datum =
   NodeDatum
 
-pub type Redeemer {
+pub type MintRedeemer {
   Init
   Deinit
-  Append {
-    prev_node_key: PubKeyHash,
-    publisher_key: PubKeyHash,
-    publisher_ref_input_index: Int,
-  }
-  Merge { root_node_key: PubKeyHash, mergeable_node_key: PubKeyHash }
-  RemoveFraudChild {
-    prev_node_key: PubKeyHash,
-    remove_node_key: PubKeyHash,
-    publisher_set_prev_node_key: PubKeyHash,
-    publisher_set_remove_node_key: PubKeyHash,
-    fraud_token_ref_input_index: Int,
-    node_input_index: Int,
-  }
-  RemoveFraudNode {
-    prev_valid_node_key: ByteArray,
-    remove_node_key: ByteArray,
-    publisher_set_prev_node_key: PubKeyHash,
-    publisher_set_remove_node_key: PubKeyHash,
-    fraud_token_input_index: Int,
-    node_input_index: Int,
-  }
+  CommitBlockHeader { operator: ByteArray }
+  MergeToConfirmedState
+  RemoveFraudulentBlockHeader { fraudulent_operator: ByteArray }
 }
