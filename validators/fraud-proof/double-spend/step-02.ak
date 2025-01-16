@@ -1,47 +1,20 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
+use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script}
 use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proof/double_spend.{validate_output_to_fraud_prover}
+use midgard/fraud_proof/common/types.{MembershipProofInputs}
+use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
+use midgard/fraud_proof/double_spend.{
+  Cancel_2, Continue_2, DoubleSpendStep1State, DoubleSpendStep2State,
+  Step02Redeemer,
+}
 use midgard/ledger_state
 use midgard/state_queue
-
-// TODO
-pub type Proof =
-  Void
-
-// TODO
-pub type MembershipProofInputs {
-  tx_root: ByteArray,
-  tx2_hash: ByteArray,
-  tx2_info_hash: ByteArray,
-  tx2_to_root_proof_path: Proof,
-}
-
-pub type Redeemer {
-  Cancel { index_output: Int }
-  Continue {
-    frauded_state_queue_node_ref_input_index: Int,
-    frauded_tx2_hash: ByteArray,
-    frauded_tx2_info_hash: ByteArray,
-    tx2_to_root_proof_path: Proof,
-    index_output: Int,
-  }
-}
-
-pub type DoubleSpendStep1State {
-  verified_tx1_hash: ByteArray,
-}
-
-pub type DoubleSpendStep2State {
-  verified_tx1_hash: ByteArray,
-  verified_tx2_hash: ByteArray,
-}
 
 validator double_spend_step_02(
   // Script hash of next step (backwards compilation order of step validators required)
@@ -53,7 +26,7 @@ validator double_spend_step_02(
 ) {
   spend(
     a_datum: Option<StepDatum>,
-    redeemer: Redeemer,
+    redeemer: Step02Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
@@ -64,7 +37,7 @@ validator double_spend_step_02(
       // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
       // --------------------------------------------------
-      Cancel { index_output } -> {
+      Cancel_2 { index_output } -> {
         // (1.1)
         expect Some(own_input) =
           list.find(
@@ -101,7 +74,7 @@ validator double_spend_step_02(
         True
       }
 
-      Continue {
+      Continue_2 {
         frauded_state_queue_node_ref_input_index,
         frauded_tx2_hash,
         frauded_tx2_info_hash,
@@ -110,7 +83,8 @@ validator double_spend_step_02(
       } -> {
         // Check for membership tx_2 in the fraudulent blocks extracted tx_root from previous step output state
         // we get the previous datum and find the tx_hash that is the one we want to check
-        expect DoubleSpendStep1State { verified_tx1_hash } = step_datum.data
+        expect DoubleSpendStep1State { verified_tx1_hash }: DoubleSpendStep1State =
+          step_datum.data
         // Check for tx hash uniqueness
         expect frauded_tx2_hash != verified_tx1_hash
 
@@ -151,9 +125,9 @@ validator double_spend_step_02(
           merkelized_validator.delegated_validation(
             function_input: MembershipProofInputs {
               tx_root: extracted_tx_root,
-              tx2_hash: frauded_tx2_hash,
-              tx2_info_hash: frauded_tx2_info_hash,
-              tx2_to_root_proof_path,
+              tx_hash: frauded_tx2_hash,
+              tx_info_hash: frauded_tx2_info_hash,
+              tx_to_root_proof_path: tx2_to_root_proof_path,
             },
             staking_validator: plutarch_midgard_merkle_validator,
             input_data_coercer: fn(withdraw_redeemer: Data) {
@@ -206,11 +180,4 @@ validator double_spend_step_02(
   else(_) {
     fail
   }
-}
-
-test a1() {
-  let a = 1
-  let b = 2
-  let c = a + b
-  c == 3
 }

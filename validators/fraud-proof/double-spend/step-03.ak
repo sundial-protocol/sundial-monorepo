@@ -6,53 +6,11 @@ use cardano/address.{Script}
 use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proof/double_spend.{validate_output_to_fraud_prover}
-
-
-// Some helper types for handling transaction inputs in the fraud proof
-// pub type TxInput =
-//   Data
-
-// pub type TxInputs =
-//   List<TxInput>
-
-pub type MidgardTx {
-  body: ByteArray,
-  wits: ByteArray,
-  is_valid: Bool,
-}
-
-pub type MidgardTxBody {
-  spend_inputs: ByteArray,
-  // ... other fields
-}
-
-
-pub type Redeemer {
-  Cancel { index_output: Int }
-  Continue {
-    frauded_input: Data,
-    tx1_input_utxos: ByteArray,
-    tx1_body: MidgardTxBody,
-    tx2_input_utxos: ByteArray,
-    tx2_body: MidgardTxBody,
-    tx1: MidgardTx, 
-    tx2: MidgardTx, 
-    index_output: Int,
-  }
-}
-
-// redeemer specifies the output index of the fraud proof UTxO thats relevant to the step, not hardcoded output index to create better interoperability with other scripts / business logic, a dApp protocol wants to conduct a fraud proof, in which case their scripts will be executed, one benefit is, if you hardcode the output poisiton to be 0, then you cant have another script executing in the same transaction that also expects their UTxO to be in position 0
-
-pub type DoubleSpendStep2State {
-  verified_tx1_hash: ByteArray,
-  verified_tx2_hash: ByteArray,
-}
-
-pub type DoubleSpendStep3State {
-  verified_tx1_hash: ByteArray,
-  verified_tx2_hash: ByteArray,
-  verified_common_input: OutputReference,
+use midgard/fraud_proof/common/types.{MidgardTx, MidgardTxBody}
+use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
+use midgard/fraud_proof/double_spend.{
+  Cancel_3, Continue_3, DoubleSpendStep2State, DoubleSpendStep3State,
+  Step03Redeemer,
 }
 
 validator double_spend_step_03(
@@ -61,13 +19,13 @@ validator double_spend_step_03(
 ) {
   spend(
     a_datum: Option<StepDatum>,
-    redeemer: Redeemer,
+    redeemer: Step03Redeemer,
     input: OutputReference,
     self: Transaction,
   ) {
     expect Some(step_datum) = a_datum
     when redeemer is {
-      Cancel { index_output } -> {
+      Cancel_3 { index_output } -> {
         // (1.1)
         expect Some(own_input) =
           list.find(
@@ -102,10 +60,9 @@ validator double_spend_step_03(
         expect quantity_of(output_to_fraud_prover.value, "", "") == lovelace
         True
       }
-
-      Continue {
+      Continue_3 {
         frauded_input,
-        tx1_input_utxos, 
+        tx1_input_utxos,
         tx1_body,
         tx2_input_utxos,
         tx2_body,
@@ -114,19 +71,18 @@ validator double_spend_step_03(
         index_output,
       } -> {
         // get previously verified tx hashes, that are known to be members of the fraudulent block
-        expect DoubleSpendStep2State { verified_tx1_hash, verified_tx2_hash } =
+        expect DoubleSpendStep2State { verified_tx1_hash, verified_tx2_hash }: DoubleSpendStep2State =
           step_datum.data
-        // ------- ALTERNATIVE 1 -------
-        // fraud prover provides a list of output references that are known to be part of the fraudulent block
-        // fraud proof step has to check that this list of all output references hashes to the hash that was declared in the transaction body.
-        
-        // inputted transactions, once hashed, match verified hashes from previous step
+
+        // fraud prover provides a list of output references that are known to be part of the fraudulent block as the tx1, and tx2 full transactions,
+        // once serialized and hashed match the verified_tx1_hash and verified_tx2_hash hashes we have verified to be a part of the supposedly 
+        // "fraudulent" block in previous steps.
         // serialise(self: Data) -> ByteArray
         // blake2b_256(bytes: ByteArray) -> Hash<Blake2b_256, a>
         expect blake2b_256(cbor.serialise(tx1)) == verified_tx1_hash
         expect blake2b_256(cbor.serialise(tx2)) == verified_tx2_hash
 
-        // tx bodies, once hashed, are part of the inputted transactions
+        // tx bodies provided by fraud prover, once serialized and hashed, match the hashed body field part of the inputted transactions
         expect blake2b_256(cbor.serialise(tx1_body)) == tx1.body
         expect blake2b_256(cbor.serialise(tx2_body)) == tx2.body
 
@@ -139,28 +95,6 @@ validator double_spend_step_03(
         expect list.has(builtin.un_list_data(tx1_input_utxos), frauded_input)
         expect list.has(builtin.un_list_data(tx2_input_utxos), frauded_input)
         expect parsed_frauded_input: OutputReference = frauded_input
-        // --------------------------------
-        
-        // ------- ALTERNATIVE 2 -------
-        // transaction hashes match previous step
-        // expect tx1 == verified_tx1_hash
-        // expect tx2 == verified_tx2_hash
-
-        // tx body hashes are part of these transactions
-        // This ensures the body hash belongs to the verified transaction
-        // expect tx1_body == tx1.body
-        // expect tx2_body == tx2.body
-
-        // input lists match spend_inputs hashes in tx bodies
-        // expect blake2b_256(tx1_serialized_inputs) == tx1_body_serialized.spend_inputs
-        // expect blake2b_256(tx2_serialized_inputs) == tx2_body_serialized.spend_inputs
-
-        // deserialize input lists to check for frauded input
-        // let tx1_inputs = builtin.un_list_data(tx1_serialized_inputs)
-        // let tx2_inputs = builtin.un_list_data(tx2_serialized_inputs)
-        // expect list.has(tx1_inputs, frauded_input)
-        // expect list.has(tx2_inputs, frauded_input)
-        // --------------------------------
 
         expect Some(own_input) =
           list.find(
@@ -212,11 +146,4 @@ validator double_spend_step_03(
   else(_) {
     fail
   }
-}
-
-test a1() {
-  let a = 1
-  let b = 2
-  let c = a + b
-  c == 3
 }
