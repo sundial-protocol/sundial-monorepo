@@ -15,10 +15,13 @@ pub type EventType {
 }
 
 pub type SpendRedeemer {
-  input_index: Int,
-  output_index: Int,
-  hub_ref_input_index: Int,
-  purpose: Purpose,
+  UpdateProcessedFlag {
+    input_index: Int,
+    output_index: Int,
+    hub_ref_input_index: Int,
+    purpose: Purpose,
+  }
+  ConcludeSettlement
 }
 
 pub type Purpose {
@@ -29,7 +32,6 @@ pub type Purpose {
     event_type: EventType,
     membership_proof: mpf.Proof,
   }
-  ConcludeSettlement
 }
 
 pub type MintRedeemer {

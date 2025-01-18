@@ -3,9 +3,12 @@ use aiken/merkle_patricia_forestry as mpf
 use cardano/address.{Address}
 use cardano/transaction.{OutputReference}
 use midgard/common/types.{POSIXTime}
+use midgard/user_events
 
-pub type Event {
-  id: OutputReference,
+pub type Event =
+  user_events.Event<Info>
+
+pub type Info {
   l2_address: Address,
   l2_datum: Option<Data>,
 }

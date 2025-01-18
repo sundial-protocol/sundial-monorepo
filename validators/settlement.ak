@@ -1,7 +1,9 @@
+use aiken/builtin
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
+use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/address.{Script}
 use cardano/assets.{PolicyId}
@@ -13,58 +15,51 @@ use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement.{
   BurnNFT, ClaimAsProcessed, ConcludeSettlement, Datum, MintNFTs, MintRedeemer,
-  RevokeProcessedFlag, SpendRedeemer,
+  RevokeProcessedFlag, SpendRedeemer, UpdateProcessedFlag,
 }
 use midgard/state_queue
+use midgard/user_events
 
-validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
+validator main(
+  hub_oracle: ScriptHash,
+  plutarch_phas_validator_hash: ScriptHash,
+) {
   spend(
     m_datum: Option<Datum>,
     redeemer: SpendRedeemer,
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    let Transaction {
-      inputs,
-      reference_inputs,
-      outputs,
-      extra_signatories,
-      validity_range,
-      ..
-    } = tx
     expect Some(datum) = m_datum
     let Datum {
       mpf_root,
       time_of_claimed_as_processed,
       operator_vkey,
-      tree_content,
+      ..
     } = datum
-    let SpendRedeemer {
-      input_index,
-      output_index,
-      hub_ref_input_index,
-      purpose,
-    } = redeemer
-    let hub.Datum { deposit, withdrawal, settlement, state_queue_addr, .. } =
-      hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
-    singular_utxo_indexer.spend(
-      fn(in_ix, input, spend_purpose, out_ix, output) {
-        // Prevent double satisfaction.
-        expect in_ix == out_ix
 
-        when spend_purpose is {
-          ClaimAsProcessed -> {
-            // Operator must have signed this claim.
-            expect operator_vkey |> utils.has_signed(extra_signatories)
+    when redeemer is {
+      UpdateProcessedFlag { input_index, output_index, hub_ref_input_index, purpose } -> {
+        let Transaction {
+          reference_inputs,
+          redeemers,
+          extra_signatories,
+          validity_range,
+          ..
+        } = tx
+        let hub.Datum { deposit: deposit_script_hash, withdrawal: withdrawal_script_hash, .. } =
+          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-            // The UTxO must not have been claimed as processed prior to this
-            // transaction.
-            expect None = time_of_claimed_as_processed
+        singular_utxo_indexer.spend(
+          fn(in_ix, input, spend_purpose, out_ix, output) {
+            // 1. Prevent double satisfaction.
+            expect in_ix == out_ix
 
             let Input {
               output: Output { address: input_address, value: input_value, .. },
               ..
             } = input
+
             expect Output {
               address: cont_output_address,
               value: cont_output_value,
@@ -72,55 +67,103 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
               ..
             } = output
 
-            // Make sure the UTxO is reproduced at own address.
+            // 2. Make sure the UTxO is reproduced at own address.
             expect input_address == cont_output_address
 
-            // Spent value must be reproduced unchange.
+            // 3. Spent value must be reproduced unchanged.
             expect input_value == cont_output_value
 
-            // Only change in the updated time must be the addition of current
-            // time as the moment of claim.
-            let expected_cont_output_datum_data: Data =
-              Datum {
-                mpf_root,
-                time_of_claimed_as_processed: Some(
-                  utils.get_current_time(validity_range),
-                ),
-                operator_vkey,
-                tree_content,
+            when spend_purpose is {
+              ClaimAsProcessed -> {
+                // 4. Operator must have signed this claim.
+                expect operator_vkey |> utils.has_signed(extra_signatories)
+
+                // 5. The UTxO must not have been claimed as processed prior to this
+                //    transaction.
+                expect time_of_claimed_as_processed == None
+
+                // 6. The only change in the updated time must be the addition of
+                //    current time as the moment of claim.
+                let expected_cont_output_datum_data: Data =
+                  Datum {
+                    ..datum,
+                    time_of_claimed_as_processed: Some(
+                      utils.get_current_time(validity_range),
+                    ),
+                  }
+                cont_output_datum_data == expected_cont_output_datum_data
               }
-            cont_output_datum_data == expected_cont_output_datum_data
-          }
-          RevokeProcessedFlag {
-            unprocessed_event_ref_input_index,
-            unprocessed_event_asset_name,
-            event_type,
-            membership_proof,
-          } -> {
-            expect Input {
-              output: Output { datum: InlineDatum(event_datum_data), .. },
-              ..
-            } =
-              utils.get_authentic_input_of(
-                reference_inputs,
-                when event_type is {
-                  settlement.Deposit -> deposit
-                  settlement.Withdrawal -> withdrawal
-                },
-                unprocessed_event_asset_name,
+              RevokeProcessedFlag {
                 unprocessed_event_ref_input_index,
-              )
-            todo
-          }
-          ConcludeSettlement -> todo
-        }
-      },
-      purpose,
-      input_index,
-      output_index,
-      own_out_ref,
-      tx,
-    )
+                unprocessed_event_asset_name,
+                event_type,
+                membership_proof,
+              } -> {
+                // 2. Find the specified (via its token name) event UTxO as a ref.
+                //    input at given index. Its NFT must have the same policy as its
+                //    address script hash.
+                expect Input {
+                  output: Output { datum: InlineDatum(event_datum_data), .. },
+                  ..
+                } =
+                  utils.get_authentic_input_of(
+                    reference_inputs,
+                    when event_type is {
+                      settlement.Deposit -> deposit_script_hash
+                      settlement.Withdrawal -> withdrawal_script_hash
+                    },
+                    unprocessed_event_asset_name,
+                    unprocessed_event_ref_input_index,
+                  )
+
+                // Unsafe coercion is fine here as we have already validated the
+                // authenticity of the UTxO.
+                let Pair(event_key, event_value) =
+                  user_events.unsafe_to_key_value_pair(event_datum_data)
+
+                // 3. The specified deposit event must be present in the stored tree
+                //    of the settlement datum that's been flagged as fully processed
+                //    by its operator.
+                expect
+                  merkelized_validator.generic_delegated_validation(
+                    staking_validator: plutarch_phas_validator_hash,
+                    withdraw_redeemer_validator: fn(
+                      membership_validator_redeemer: Data,
+                    ) -> Bool {
+                      expect [
+                        input_root_data, input_key_data, input_value_data,
+                        input_proof_data,
+                        ..
+                      ] = builtin.unconstr_fields(membership_validator_redeemer)
+                      let mpf_root_data: Data = mpf_root
+                      let proof_data: Data = membership_proof
+                      and {
+                        mpf_root_data == input_root_data,
+                        event_key == input_key_data,
+                        event_value == input_value_data,
+                        proof_data == input_proof_data,
+                      }
+                    },
+                    redeemers: redeemers,
+                  )
+
+                // 6. The only change in the datum should be removal of the claim.
+                let expected_cont_output_datum_data: Data =
+                  Datum { ..datum, time_of_claimed_as_processed: None }
+                cont_output_datum_data == expected_cont_output_datum_data
+              }
+            }
+          },
+          purpose,
+          input_index,
+          output_index,
+          own_out_ref,
+          tx,
+        )
+      }
+      ConcludeSettlement -> todo
+    }
+
   }
 
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
@@ -144,7 +187,8 @@ validator main(hub_oracle: ScriptHash, mpf_validator: ScriptHash) {
         // Ensure merge endpoint of state queue is present in the tx.
         expect Some(state_queue_redeemer_data) =
           redeemers |> pairs.get_first(Mint(state_queue))
-        expect state_queue.Merge { .. } = state_queue_redeemer_data
+        expect state_queue.MergeToConfirmedState: state_queue.MintRedeemer =
+          state_queue_redeemer_data
 
         // Grab the header hash of the new confirmed state to use as the asset
         // name of the settlement authentication NFTs.
