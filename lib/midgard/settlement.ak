@@ -25,7 +25,10 @@ pub type SpendRedeemer {
 }
 
 pub type Purpose {
-  ClaimAsProcessed
+  ClaimAsProcessed {
+    active_operators_node_input_index: Int,
+    active_operators_spend_redeemer_index: Int,
+  }
   RevokeProcessedFlag {
     unprocessed_event_ref_input_index: Int,
     unprocessed_event_asset_name: AssetName,

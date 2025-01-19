@@ -33,13 +33,21 @@ validator spend(
         ordered.list_state_transition(
           tokens(self.mint, active_operators_mint_script_hash),
         )
-      UpdateCommitmentTime(
+      UpdateCommitmentTime {
         active_node_output_index,
         prev_active_node_ref_input_index,
         hub_oracle_ref_input_index,
         state_queue_redeemer_index,
-      ) -> {
+        new_commitment_time,
+      } -> {
         expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
+
+        // Used by the settlement contract. With this value included in the
+        // redeemer, the `ClaimAsProcessed` endpoint of settlement doesn't need
+        // to find the upper bound of the validity range again, and can simply
+        // read it from this endpoint's redeemer..
+        expect new_commitment_time == valid_to
+
         expect Some(active_node_input_datum) = datumOpt
         expect Some(prev_active_node_ref_input) =
           list.at(self.reference_inputs, prev_active_node_ref_input_index)

@@ -1,15 +1,18 @@
 use aiken/builtin
+use aiken/interval.{Finite}
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
+use aiken_design_patterns/linked_list/ordered.{NodeDatum, Key}
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/address.{Script}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
 }
+use midgard/active_operators
 use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
@@ -31,24 +34,31 @@ validator main(
     tx: Transaction,
   ) {
     expect Some(datum) = m_datum
-    let Datum {
-      mpf_root,
-      time_of_claimed_as_processed,
-      operator_vkey,
-      ..
-    } = datum
+    let Datum { mpf_root, time_of_claimed_as_processed, operator_vkey, .. } =
+      datum
 
     when redeemer is {
-      UpdateProcessedFlag { input_index, output_index, hub_ref_input_index, purpose } -> {
+      UpdateProcessedFlag {
+        input_index,
+        output_index,
+        hub_ref_input_index,
+        purpose,
+      } -> {
         let Transaction {
+          inputs,
           reference_inputs,
           redeemers,
           extra_signatories,
           validity_range,
           ..
         } = tx
-        let hub.Datum { deposit: deposit_script_hash, withdrawal: withdrawal_script_hash, .. } =
-          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+        let hub.Datum {
+          deposit: deposit_script_hash,
+          withdrawal: withdrawal_script_hash,
+          active_operators: active_operators_policy,
+          active_operators_addr,
+          ..
+        } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         singular_utxo_indexer.spend(
           fn(in_ix, input, spend_purpose, out_ix, output) {
@@ -74,7 +84,10 @@ validator main(
             expect input_value == cont_output_value
 
             when spend_purpose is {
-              ClaimAsProcessed -> {
+              ClaimAsProcessed {
+                active_operators_node_input_index,
+                active_operators_spend_redeemer_index,
+              } -> {
                 // 4. Operator must have signed this claim.
                 expect operator_vkey |> utils.has_signed(extra_signatories)
 
@@ -82,16 +95,56 @@ validator main(
                 //    transaction.
                 expect time_of_claimed_as_processed == None
 
-                // 6. The only change in the updated time must be the addition of
-                //    current time as the moment of claim.
+                // 6. Expect a spend redeemer at the specified redeemer index.
+                expect Some(
+                  Pair(Spend(_active_operators_spend_purpose_out_ref),
+                  active_operators_spend_redeemer_data),
+                ) = list.at(redeemers, active_operators_spend_redeemer_index)
+
+                // 7. Found redeemer data must have the same structure as
+                //    active operator's update commitment time redeemer.
+                expect active_operators.UpdateCommitmentTime{
+                  active_node_output_index,
+                  new_commitment_time,
+                  ..
+                }: active_operators.SpendRedeemer =
+                  active_operators_spend_redeemer_data
+
+                // 8. The only change in the updated time must be the addition
+                //    of "current time" as the moment of claim.
                 let expected_cont_output_datum_data: Data =
                   Datum {
                     ..datum,
-                    time_of_claimed_as_processed: Some(
-                      utils.get_current_time(validity_range),
-                    ),
+                    time_of_claimed_as_processed: Some(new_commitment_time),
                   }
-                cont_output_datum_data == expected_cont_output_datum_data
+                expect cont_output_datum_data == expected_cont_output_datum_data
+
+                expect Some(Input {
+                  output: Output {
+                    address: active_operators_node_address,
+                    datum: InlineDatum(active_operators_node_datum_data),
+                    ..
+                  },
+                  output_reference: _active_operators_out_ref
+                }) = list.at(inputs, active_operators_node_input_index)
+
+                // TODO: Is it needed to validate the out refs as well?
+                // expect _active_operators_spend_purpose_out_ref == _active_operators_out_ref
+
+                // 9. Provided input index of an active operator node must come
+                //    from the address found from the hub oracle.
+                expect active_operators_node_address == active_operators_addr
+
+                expect NodeDatum {
+                  key: Key(active_operators_node_key),
+                  data: active_operators_data,
+                  ..
+                }: NodeDatum = active_operators_node_datum_data
+
+                // 10. The key of the node must be the same as current
+                //     settlement's recorded operator validation key hash.
+                expect active_operators_node_key == operator_vkey
+                todo
               }
               RevokeProcessedFlag {
                 unprocessed_event_ref_input_index,
@@ -163,7 +216,6 @@ validator main(
       }
       ConcludeSettlement -> todo
     }
-
   }
 
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
