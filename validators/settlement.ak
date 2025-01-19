@@ -1,10 +1,10 @@
 use aiken/builtin
-use aiken/interval.{Finite}
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
-use aiken_design_patterns/linked_list/ordered.{NodeDatum, Key}
+use aiken/interval.{Finite}
+use aiken_design_patterns/linked_list/ordered.{Key, NodeDatum}
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/address.{Script}
@@ -46,16 +46,15 @@ validator main(
       } -> {
         let Transaction {
           inputs,
+          outputs,
           reference_inputs,
           redeemers,
           extra_signatories,
-          validity_range,
           ..
         } = tx
         let hub.Datum {
           deposit: deposit_script_hash,
           withdrawal: withdrawal_script_hash,
-          active_operators: active_operators_policy,
           active_operators_addr,
           ..
         } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
@@ -97,54 +96,66 @@ validator main(
 
                 // 6. Expect a spend redeemer at the specified redeemer index.
                 expect Some(
-                  Pair(Spend(_active_operators_spend_purpose_out_ref),
+                  Pair(Spend(active_operators_spend_purpose_out_ref),
                   active_operators_spend_redeemer_data),
                 ) = list.at(redeemers, active_operators_spend_redeemer_index)
 
                 // 7. Found redeemer data must have the same structure as
                 //    active operator's update commitment time redeemer.
-                expect active_operators.UpdateCommitmentTime{
+                expect active_operators.UpdateCommitmentTime {
                   active_node_output_index,
-                  new_commitment_time,
                   ..
                 }: active_operators.SpendRedeemer =
                   active_operators_spend_redeemer_data
 
-                // 8. The only change in the updated time must be the addition
-                //    of "current time" as the moment of claim.
-                let expected_cont_output_datum_data: Data =
-                  Datum {
-                    ..datum,
-                    time_of_claimed_as_processed: Some(new_commitment_time),
-                  }
-                expect cont_output_datum_data == expected_cont_output_datum_data
-
+                // Grab the active operators contract's input UTxO to validate
+                // its address, and also to make sure the output reference here
+                // matches the one from the `redeemers`.
                 expect Some(Input {
-                  output: Output {
-                    address: active_operators_node_address,
-                    datum: InlineDatum(active_operators_node_datum_data),
-                    ..
-                  },
-                  output_reference: _active_operators_out_ref
+                  output: Output { address: active_operators_node_address, .. },
+                  output_reference: active_operators_out_ref,
                 }) = list.at(inputs, active_operators_node_input_index)
 
-                // TODO: Is it needed to validate the out refs as well?
-                // expect _active_operators_spend_purpose_out_ref == _active_operators_out_ref
+                // 8. The picked active operators contract redeemer must point
+                //    to the same input found based on the settlement's
+                //    redeemer.
+                expect
+                  active_operators_out_ref == active_operators_spend_purpose_out_ref
 
                 // 9. Provided input index of an active operator node must come
                 //    from the address found from the hub oracle.
                 expect active_operators_node_address == active_operators_addr
 
+                // Grab the continued output of the active operators contract.
+                expect Some(Output {
+                  datum: InlineDatum(cont_active_operators_node_datum_data),
+                  ..
+                }) = list.at(outputs, active_node_output_index)
+
                 expect NodeDatum {
                   key: Key(active_operators_node_key),
                   data: active_operators_data,
                   ..
-                }: NodeDatum = active_operators_node_datum_data
+                }: NodeDatum = cont_active_operators_node_datum_data
 
                 // 10. The key of the node must be the same as current
                 //     settlement's recorded operator validation key hash.
                 expect active_operators_node_key == operator_vkey
-                todo
+
+                // 11. Active operator's updated datum is expected to record the
+                //     new commitment time.
+                expect active_operators.Datum{commitment_time: Some(
+                  new_commitment_time,
+                )}: active_operators.Datum = active_operators_data
+
+                // 12. The only change in the updated time must be the addition
+                //     of "current time" as the moment of claim.
+                let expected_cont_output_datum_data: Data =
+                  Datum {
+                    ..datum,
+                    time_of_claimed_as_processed: Some(new_commitment_time),
+                  }
+                cont_output_datum_data == expected_cont_output_datum_data
               }
               RevokeProcessedFlag {
                 unprocessed_event_ref_input_index,

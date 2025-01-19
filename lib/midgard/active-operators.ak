@@ -11,7 +11,6 @@ pub type SpendRedeemer {
     prev_active_node_ref_input_index: Int,
     hub_oracle_ref_input_index: Int,
     state_queue_redeemer_index: Int,
-    new_commitment_time: POSIXTime,
   }
 }
 
