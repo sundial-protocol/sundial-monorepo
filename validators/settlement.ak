@@ -34,7 +34,7 @@ validator main(
     tx: Transaction,
   ) {
     expect Some(datum) = m_datum
-    let Datum { mpf_root, time_of_claimed_as_processed, operator_vkey, .. } =
+    let Datum { mpf_root, time_of_claimed_as_processed, operator, .. } =
       datum
 
     when redeemer is {
@@ -87,20 +87,24 @@ validator main(
                 active_operators_node_input_index,
                 active_operators_spend_redeemer_index,
               } -> {
-                // 4. Operator must have signed this claim.
+                // 4. The UTxO must not have been subject to fraudulent activity
+                //    before.
+                expect Some(operator_vkey) = operator
+
+                // 5. Operator must have signed this claim.
                 expect operator_vkey |> utils.has_signed(extra_signatories)
 
-                // 5. The UTxO must not have been claimed as processed prior to this
+                // 6. The UTxO must not have been claimed as processed prior to this
                 //    transaction.
                 expect time_of_claimed_as_processed == None
 
-                // 6. Expect a spend redeemer at the specified redeemer index.
+                // 7. Expect a spend redeemer at the specified redeemer index.
                 expect Some(
                   Pair(Spend(active_operators_spend_purpose_out_ref),
                   active_operators_spend_redeemer_data),
                 ) = list.at(redeemers, active_operators_spend_redeemer_index)
 
-                // 7. Found redeemer data must have the same structure as
+                // 8. Found redeemer data must have the same structure as
                 //    active operator's update commitment time redeemer.
                 expect active_operators.UpdateCommitmentTime {
                   active_node_output_index,
@@ -116,13 +120,13 @@ validator main(
                   output_reference: active_operators_out_ref,
                 }) = list.at(inputs, active_operators_node_input_index)
 
-                // 8. The picked active operators contract redeemer must point
+                // 9. The picked active operators contract redeemer must point
                 //    to the same input found based on the settlement's
                 //    redeemer.
                 expect
                   active_operators_out_ref == active_operators_spend_purpose_out_ref
 
-                // 9. Provided input index of an active operator node must come
+                // 10. Provided input index of an active operator node must come
                 //    from the address found from the hub oracle.
                 expect active_operators_node_address == active_operators_addr
 
@@ -138,17 +142,17 @@ validator main(
                   ..
                 }: NodeDatum = cont_active_operators_node_datum_data
 
-                // 10. The key of the node must be the same as current
+                // 11. The key of the node must be the same as current
                 //     settlement's recorded operator validation key hash.
                 expect active_operators_node_key == operator_vkey
 
-                // 11. Active operator's updated datum is expected to record the
+                // 12. Active operator's updated datum is expected to record the
                 //     new commitment time.
                 expect active_operators.Datum{commitment_time: Some(
                   new_commitment_time,
                 )}: active_operators.Datum = active_operators_data
 
-                // 12. The only change in the updated time must be the addition
+                // 13. The only change in the updated time must be the addition
                 //     of "current time" as the moment of claim.
                 let expected_cont_output_datum_data: Data =
                   Datum {
@@ -210,6 +214,12 @@ validator main(
                     },
                     redeemers: redeemers,
                   )
+
+                // 4. Expect a spend redeemer at the specified redeemer index.
+                expect Some(
+                  Pair(Spend(active_operators_spend_purpose_out_ref),
+                  active_operators_spend_redeemer_data),
+                ) = list.at(redeemers, active_operators_spend_redeemer_index)
 
                 // 6. The only change in the datum should be removal of the claim.
                 let expected_cont_output_datum_data: Data =

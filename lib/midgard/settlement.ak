@@ -2,10 +2,11 @@ use aiken/merkle_patricia_forestry as mpf
 use cardano/assets.{AssetName}
 use midgard/common/types.{POSIXTime, PubKeyHash}
 
+/// The `operator_vkey` is optional to model UTxOs subject to fraudulent claims.
 pub type Datum {
   mpf_root: ByteArray,
   time_of_claimed_as_processed: Option<POSIXTime>,
-  operator_vkey: PubKeyHash,
+  operator: Option<PubKeyHash>,
   tree_content: EventType,
 }
 
