@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { chalk, logAbort, logInfo } from "./utils.js";
-import { run } from "./commands/run.js";
+import { chalk, logInfo } from "./utils.js";
+import { listen } from "./commands/listen.js";
 import * as packageJson from "../package.json";
 
 const VERSION = packageJson.default.version;
@@ -46,12 +46,12 @@ program.version(VERSION).description(
 );
 
 program
-  .command("run")
+  .command("listen")
   .option("-p, --port <number>", "Port to listen on", "8080")
+  .option("--db-file-path <string>", "Path to SQLite DB file", "db")
   .action((options) => {
     logInfo(`Listening on port ${options.port}`);
-    run();
-    process.exit(1);
+    listen();
   });
 
 program.parse(process.argv);
