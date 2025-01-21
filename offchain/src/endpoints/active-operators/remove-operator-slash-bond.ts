@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type RemoveParams = {};
 
 /**
  * Removes an operator's slash bond.
- * 
+ *
  * @param lucid - The LucidEvolution instance.
  * @param params - The parameters for the removal.
  * @returns A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const remove = (
 
 /**
  * The program to remove an operator's slash bond.
- * 
+ *
  * @param lucid - The LucidEvolution instance.
  * @param params - The parameters for the removal.
  * @returns An Effect that yields a TxSignBuilder or a TransactionError.

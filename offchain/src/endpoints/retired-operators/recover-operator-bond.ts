@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type RecoverOperatorParams = {};
 
 /**
  * Recovers the operator bond.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {RecoverOperatorParams} params - The parameters for recovering the operator.
  * @returns {Promise<TxSignBuilder>} - A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const recoverOperator = (
 
 /**
  * The program to recover the operator bond.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {RecoverOperatorParams} params - The parameters for recovering the operator.
  * @returns {Effect.Effect<TxSignBuilder, TransactionError, never>} - The effect to recover the operator bond.

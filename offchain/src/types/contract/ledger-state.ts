@@ -1,7 +1,13 @@
 import { Data } from "@lucid-evolution/lucid";
-import { MerkleRootSchema, POSIXTimeSchema, PubKeyHashSchema } from "./common";
+import {
+  MerkleRootSchema,
+  POSIXTimeSchema,
+  PubKeyHashSchema,
+} from "./common.js";
 
 export const HeaderHashSchema = Data.Bytes({ minLength: 28, maxLength: 28 });
+export type HeaderHash = Data.Static<typeof HeaderHashSchema>;
+export const HeaderHash = HeaderHashSchema as unknown as HeaderHash;
 
 export const HeaderSchema = Data.Object({
   prevUtxosRoot: MerkleRootSchema,

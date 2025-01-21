@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type BurnParams = {};
 
 /**
  * Burns tokens using the LucidEvolution instance.
- * 
+ *
  * @param lucid - The LucidEvolution instance.
  * @param params - The parameters for the burn operation.
  * @returns A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const burn = (
 
 /**
  * The program that performs the burn operation.
- * 
+ *
  * @param lucid - The LucidEvolution instance.
  * @param params - The parameters for the burn operation.
  * @returns An Effect that yields a TxSignBuilder or a TransactionError.

@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type CancelParams = {};
 
 /**
  * Cancels a transaction using the provided LucidEvolution instance and parameters.
- * 
+ *
  * @param lucid - The LucidEvolution instance to use for the transaction.
  * @param params - The parameters for the cancellation.
  * @returns A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const cancel = (
 
 /**
  * The program that performs the cancellation of a transaction.
- * 
+ *
  * @param lucid - The LucidEvolution instance to use for the transaction.
  * @param params - The parameters for the cancellation.
  * @returns An Effect that yields a TxSignBuilder or a TransactionError.

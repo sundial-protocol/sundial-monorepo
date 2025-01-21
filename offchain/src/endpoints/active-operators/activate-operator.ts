@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type ActivateParams = {};
 
 /**
  * Activates an operator using the provided LucidEvolution instance and parameters.
- * 
+ *
  * @param lucid - The LucidEvolution instance to use for the activation.
  * @param params - The parameters required for activation.
  * @returns A promise that resolves to a TxSignBuilder instance.
@@ -24,7 +24,7 @@ export const activate = (
 
 /**
  * The program that performs the activation of an operator.
- * 
+ *
  * @param lucid - The LucidEvolution instance to use for the activation.
  * @param params - The parameters required for activation.
  * @returns An Effect that yields a TxSignBuilder instance or a TransactionError.

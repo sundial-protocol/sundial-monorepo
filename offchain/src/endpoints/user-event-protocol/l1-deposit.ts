@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type DepositParams = {};
 
 /**
  * Initiates a deposit transaction.
- * 
+ *
  * @param lucid - An instance of LucidEvolution.
  * @param params - Parameters for the deposit.
  * @returns A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const deposit = (
 
 /**
  * Defines the deposit program logic.
- * 
+ *
  * @param lucid - An instance of LucidEvolution.
  * @param params - Parameters for the deposit.
  * @returns An Effect that yields a TxSignBuilder or a TransactionError.

@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type DeregisterParams = {};
 
 /**
  * Deregisters an operator.
- * 
+ *
  * @param lucid - The LucidEvolution instance.
  * @param params - The parameters for deregistration.
  * @returns A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const deregister = (
 
 /**
  * The deregistration program.
- * 
+ *
  * @param lucid - The LucidEvolution instance.
  * @param params - The parameters for deregistration.
  * @returns An Effect that yields a TxSignBuilder or a TransactionError.

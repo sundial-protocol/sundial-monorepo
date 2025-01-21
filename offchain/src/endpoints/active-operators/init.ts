@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type InitParams = {};
 
 /**
  * Initializes a transaction signing builder.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {InitParams} params - The initialization parameters.
  * @returns {Promise<TxSignBuilder>} - A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const init = (
 
 /**
  * Creates an effect to initialize a transaction signing builder.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {InitParams} params - The initialization parameters.
  * @returns {Effect.Effect<TxSignBuilder, TransactionError, never>} - The effect to initialize the transaction signing builder.

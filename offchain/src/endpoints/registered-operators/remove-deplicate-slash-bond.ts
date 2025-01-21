@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type RemoveDeplicateParams = {};
 
 /**
  * Removes duplicate entries.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {RemoveDeplicateParams} params - The parameters for removing duplicates.
  * @returns {Promise<TxSignBuilder>} - A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const removeDeplicate = (
 
 /**
  * Program to remove duplicate entries.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {RemoveDeplicateParams} params - The parameters for removing duplicates.
  * @returns {Effect.Effect<TxSignBuilder, TransactionError, never>} - An effect that resolves to a TxSignBuilder or a TransactionError.

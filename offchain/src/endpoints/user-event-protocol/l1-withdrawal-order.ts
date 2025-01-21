@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type WithdrawOrderParams = {};
 
 /**
  * Initiates a withdrawal order.
- * 
+ *
  * @param lucid - An instance of LucidEvolution.
  * @param params - Parameters for the withdrawal order.
  * @returns A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const withdrawOrder = (
 
 /**
  * Program to handle the withdrawal order logic.
- * 
+ *
  * @param lucid - An instance of LucidEvolution.
  * @param params - Parameters for the withdrawal order.
  * @returns An Effect that yields a TxSignBuilder or a TransactionError.

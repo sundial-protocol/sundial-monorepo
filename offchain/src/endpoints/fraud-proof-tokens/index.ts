@@ -1,2 +1,2 @@
-export * from "./burn";
-export * from "./mint";
+export * from "./burn.js";
+export * from "./mint.js";

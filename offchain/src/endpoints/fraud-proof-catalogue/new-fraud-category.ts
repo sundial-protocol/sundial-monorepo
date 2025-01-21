@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type NewCategoryParams = {};
 
 /**
  * Creates a new fraud category.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {NewCategoryParams} params - The parameters for the new fraud category.
  * @returns {Promise<TxSignBuilder>} - A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const newCategory = (
 
 /**
  * Creates an effect to create a new fraud category.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {NewCategoryParams} params - The parameters for the new fraud category.
  * @returns {Effect.Effect<TxSignBuilder, TransactionError, never>} - The effect to create the new fraud category.

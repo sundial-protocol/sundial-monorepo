@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type AdvanceParams = {};
 
 /**
  * Advances the state of the LucidEvolution instance.
- * 
+ *
  * @param lucid - The LucidEvolution instance to advance.
  * @param params - The parameters for advancing the state.
  * @returns A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const advance = (
 
 /**
  * The program that defines the advancement logic for the LucidEvolution instance.
- * 
+ *
  * @param lucid - The LucidEvolution instance to advance.
  * @param params - The parameters for advancing the state.
  * @returns An Effect that yields a TxSignBuilder or a TransactionError.

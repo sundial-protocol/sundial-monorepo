@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type DeinitParams = {};
 
 /**
  * Deinitializes a transaction signing builder.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {DeinitParams} params - The deinitialization parameters.
  * @returns {Promise<TxSignBuilder>} - A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const deinit = (
 
 /**
  * Creates an effect to deinitialize a transaction signing builder.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {DeinitParams} params - The deinitialization parameters.
  * @returns {Effect.Effect<TxSignBuilder, TransactionError, never>} - The effect to deinitialize the transaction signing builder.

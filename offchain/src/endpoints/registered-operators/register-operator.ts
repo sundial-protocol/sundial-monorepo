@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type RegisterParams = {};
 
 /**
  * Registers an operator using the provided LucidEvolution instance and parameters.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance to use for the registration.
  * @param {RegisterParams} params - The parameters for the registration.
  * @returns {Promise<TxSignBuilder>} A promise that resolves to a TxSignBuilder instance.
@@ -24,7 +24,7 @@ export const register = (
 
 /**
  * The program that handles the registration logic.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance to use for the registration.
  * @param {RegisterParams} params - The parameters for the registration.
  * @returns {Effect.Effect<TxSignBuilder, TransactionError, never>} An Effect that resolves to a TxSignBuilder instance.

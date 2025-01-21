@@ -1,4 +1,4 @@
-import { makeReturn } from "@/core";
+import { makeReturn } from "../../core.js";
 import {
   LucidEvolution,
   TransactionError,
@@ -10,7 +10,7 @@ export type RemoveParams = {};
 
 /**
  * Removes a fraudulent block header.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {RemoveParams} params - The remove parameters.
  * @returns {Promise<TxSignBuilder>} - A promise that resolves to a TxSignBuilder.
@@ -24,7 +24,7 @@ export const remove = (
 
 /**
  * Creates an effect to remove a fraudulent block header.
- * 
+ *
  * @param {LucidEvolution} lucid - The LucidEvolution instance.
  * @param {RemoveParams} params - The remove parameters.
  * @returns {Effect.Effect<TxSignBuilder, TransactionError, never>} - The effect to remove the fraudulent block header.
