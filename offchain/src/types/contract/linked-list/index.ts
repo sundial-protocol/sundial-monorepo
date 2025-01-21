@@ -8,13 +8,13 @@ export const NodeKeySchema = Data.Enum([
 export type NodeKey = Data.Static<typeof NodeKeySchema>;
 export const NodeKey = NodeKeySchema as unknown as NodeKey;
 
-export const DatumSchema = Data.Object({
+export const NodeDatumSchema = Data.Object({
   key: NodeKeySchema,
   next: NodeKeySchema,
   data: Data.Any(),
 });
-export type Datum = Data.Static<typeof DatumSchema>;
-export const Datum = DatumSchema as unknown as Datum;
+export type NodeDatum = Data.Static<typeof NodeDatumSchema>;
+export const NodeDatum = NodeDatumSchema as unknown as NodeDatum;
 
 export const CommonSchema = Data.Object({
   ownCS: Data.Bytes(),
