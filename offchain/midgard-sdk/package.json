@@ -1,5 +1,5 @@
 {
-  "name": "@al-ft/midgard-offchain",
+  "name": "@al-ft/midgard-sdk",
   "version": "0.1.0",
   "description": "https://docs.github.com/en/packages/quickstart",
   "main": "./dist/index.js",
