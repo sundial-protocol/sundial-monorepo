@@ -1,24 +1,57 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { chalk } from "./utils.js";
-import * as packageJson from "../package.json" with {type: "json"};
+import { chalk, logAbort, logInfo } from "./utils.js";
+import { run } from "./commands/run.js";
+import * as packageJson from "../package.json";
 
-// @ts-ignore
-const VERSION = packageJson.version;
-
-// @ts-ignore
-const DESCRIPTION = packageJson.description;
+const VERSION = packageJson.default.version;
 
 const program = new Command();
 
+program.version(VERSION).description(
+  `
+  ${chalk.red(
+    `                        @#
+                         @@%#
+                        %@@@%#
+                       %%%%%%##
+                      %%%%%%%%%#
+                     %%%%%%%%%%%#
+                    %%%%%%%%%%####
+                   %%%%%%%%%#######
+                  %%%%%%%%  ########
+                 %%%%%%%%%  #########
+                %%%%%%%%%%  ##########
+               %%%%%%%%%%    ##########
+              %%%%%%%%%%      ##########
+             %%%%%%%%%%        ##########
+            %%%%%%%%%%          ##########
+           %%%%%%%%%%            ##########
+          ###%%%%%%%              ##########
+         #########                  #########
+  
+   ${chalk.bgGray(
+     "    " +
+       chalk.bold(
+         chalk.whiteBright("A  N  A  S  T  A  S  I  A") +
+           "     " +
+           chalk.redBright("L  A  B  S")
+       ) +
+       "    "
+   )}
+  `
+  )}
+          ${"Midgard Node – Demo CLI Application"}`
+);
+
 program
-  .version(VERSION)
-  .description(DESCRIPTION)
-  .option("-n, --name <name>", "Your name")
+  .command("run")
+  .option("-p, --port <number>", "Port to listen on", "8080")
   .action((options) => {
-    const name = options.name || "World";
-    console.log(chalk.green(`Hello, ${name}!`));
+    logInfo(`Listening on port ${options.port}`);
+    run();
+    process.exit(1);
   });
 
 program.parse(process.argv);

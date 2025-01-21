@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "NodeNext",
-    "rootDir": "./src",
+    "rootDirs": ["./src", "./package.json"],
     "moduleResolution": "nodenext",
     "resolveJsonModule": true,
     "declaration": true,
