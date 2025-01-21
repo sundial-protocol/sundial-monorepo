@@ -47,11 +47,10 @@ program.version(VERSION).description(
 
 program
   .command("listen")
-  .option("-p, --port <number>", "Port to listen on", "8080")
+  .option("-p, --port <number>", "Port to listen on", "3000")
   .option("--db-file-path <string>", "Path to SQLite DB file", "db")
   .action((options) => {
-    logInfo(`Listening on port ${options.port}`);
-    listen();
+    listen(options.port);
   });
 
 program.parse(process.argv);

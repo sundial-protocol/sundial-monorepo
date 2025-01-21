@@ -25,10 +25,12 @@
     "@aiken-lang/merkle-patricia-forestry": "^1.2.0",
     "@lucid-evolution/lucid": "^0.4.20",
     "chalk": "^5.4.1",
-    "commander": "^13.0.0"
+    "commander": "^13.0.0",
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.0.0",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.10.7",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3"

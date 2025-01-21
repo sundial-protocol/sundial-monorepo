@@ -4,6 +4,5 @@
 
 ```sh
 pnpm install
-pnpm run build
-node dist/index.js
+pnpm run listen
 ```
