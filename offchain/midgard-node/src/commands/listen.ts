@@ -1,6 +1,7 @@
 import {
   Result,
   errorToString,
+  fail,
   isHexString,
   logInfo,
   logWarning,
@@ -9,7 +10,7 @@ import {
 } from "../utils.js";
 import * as MPF from "@aiken-lang/merkle-patricia-forestry";
 import * as SDK from "@al-ft/midgard-sdk";
-import { LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
+import { Data, LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
 import express from "express";
 
 // TODO: Placehoder, must be imported from SDK.
@@ -22,6 +23,30 @@ const fetchLatestBlock = async (
     address: "",
     assets: {},
   });
+};
+
+// TODO: Placehoder, must be imported from SDK.
+const fetchConfirmedState = async (
+  _lucid: LucidEvolution
+): Promise<Result<UTxO>> => {
+  return ok({
+    txHash: "",
+    outputIndex: 0,
+    address: "",
+    assets: {},
+  });
+};
+
+const readEndTimeOfConfirmedState = (utxo: UTxO): Result<number> => {
+  if (utxo.datum) {
+    const confirmedState = Data.from(
+      utxo.datum,
+      SDK.LedgerState.ConfirmedState
+    );
+    return ok(Number(confirmedState.endTime));
+  } else {
+    return fail("Missing datum of the confirmed state.");
+  }
 };
 
 const utxoToOutRef = (utxo: UTxO): OutRef => ({
@@ -39,7 +64,8 @@ const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
 export const listen = (
   lucid: LucidEvolution,
   port: number,
-  pollingInterval: number
+  pollingInterval: number,
+  confirmedStatePollingInterval: number
 ) => {
   const app = express();
   app.get("/", (req, res) => {
@@ -59,9 +85,11 @@ export const listen = (
 const monitorStateQueue = (lucid: LucidEvolution, pollingInterval: number) => {
   let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
   setInterval(async () => {
-    let latestBlockOutRefRes = await fetchLatestBlock(lucid);
+    const latestBlockOutRefRes = await fetchLatestBlock(lucid);
     if (latestBlockOutRefRes.type === "ok") {
-      if (!outRefsAreEqual(latestBlockOutRef, latestBlockOutRefRes.data)) {
+      const fetchedBlocksOutRef = utxoToOutRef(latestBlockOutRefRes.data);
+      if (!outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
+        latestBlockOutRef = fetchedBlocksOutRef;
         await submitBlock(lucid, latestBlockOutRefRes.data);
       }
     } else {
@@ -79,6 +107,13 @@ const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
   logWarning("submitBlock: TODO");
 };
 
-const mergeOldestBlock = () => {
+const clearMempool = async () => {
+  logWarning("clearMempool: TODO");
+};
+
+const monitorConfirmedState = (
+  lucid: LucidEvolution,
+  pollingInterval: number
+) => {
   logWarning("mergeOldestBlock: TODO");
 };

@@ -14,6 +14,13 @@ export function ok<T>(x: T): Result<T> {
   };
 }
 
+export function fail<T>(e: string): Result<T> {
+  return {
+    type: "error",
+    error: new Error(e),
+  };
+}
+
 export type ProviderName = "Blockfrost" | "Koios" | "Kupmios" | "Maestro";
 
 export const errorToString = (error: any): string => {
