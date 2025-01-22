@@ -3,7 +3,14 @@
 ## How to Run
 
 ```sh
+# Optional
 nix develop
+
+cd ../midgard-sdk
+pnpm install
+pnpm run repack
+
+cd ../midgard-node
 pnpm install
 pnpm run listen
 ```
