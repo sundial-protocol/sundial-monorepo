@@ -1,6 +1,6 @@
 import { Data } from "@lucid-evolution/lucid";
-import { OutputReferenceSchema, POSIXTimeSchema } from "./common";
-import { NodeDatumSchema } from "./linked-list";
+import { OutputReferenceSchema, POSIXTimeSchema } from "./common.js";
+import { NodeDatumSchema } from "./linked-list/index.js";
 
 export const ConfigSchema = Data.Object({
   initUTxO: OutputReferenceSchema,

@@ -1,5 +1,5 @@
 import { Data } from "@lucid-evolution/lucid";
-import { AddressSchema, PolicyIdSchema } from "./common";
+import { AddressSchema, PolicyIdSchema } from "./common.js";
 
 export const DatumSchema = Data.Object({
   registeredOperators: PolicyIdSchema,

@@ -1,5 +1,5 @@
 import { Data } from "@lucid-evolution/lucid";
-import { POSIXTimeSchema } from "../common";
+import { POSIXTimeSchema } from "../common.js";
 
 export const DatumSchema = Data.Object({
   insertTime: POSIXTimeSchema,

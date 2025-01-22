@@ -1,4 +1,4 @@
-import { HeaderHash } from "../types/contract/ledger-state.js";
+import { HeaderHash } from "../types/contracts/ledger-state.js";
 import { Trie } from "@aiken-lang/merkle-patricia-forestry";
 import { Effect } from "effect";
 
