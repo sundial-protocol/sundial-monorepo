@@ -11,6 +11,9 @@ importers:
       '@aiken-lang/merkle-patricia-forestry':
         specifier: ^1.2.0
         version: 1.2.0
+      '@al-ft/midgard-sdk':
+        specifier: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz
+        version: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
       '@lucid-evolution/lucid':
         specifier: ^0.4.20
         version: 0.4.20(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
@@ -44,6 +47,10 @@ packages:
 
   '@aiken-lang/merkle-patricia-forestry@1.2.0':
     resolution: {integrity: sha512-yEie4HFRoQS+ShbEYGNcVEQKFvnClXHFEysYT7lqoL1FGVxwvWWTBsctsEXolUIvusslztzrnJyUG67KGljBKw==}
+
+  '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
+    resolution: {integrity: sha512-mz10VTz15KlxfNli8ll39fF4xAlBZK00n7KhtV6IuNTnWKJJCTvh/wamAXlpPGVip+fuFKheeYu0MZOTrQQkjg==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    version: 0.1.0
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2':
     resolution: {integrity: sha512-sSPPjO1Zye82YVqrUGIKrli/Zt2pPkZkQd/jv9k6AzjIZdNPD3hvuB2yH6RHeZUO8+K57bu9r7Rlyf7VGbhhTQ==}
@@ -1197,6 +1204,18 @@ snapshots:
     dependencies:
       blake2b: 2.1.4
       level: 8.0.1
+
+  '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)':
+    dependencies:
+      '@aiken-lang/merkle-patricia-forestry': 1.2.0
+      '@lucid-evolution/lucid': 0.4.20(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
+      effect: 3.12.5
+    transitivePeerDependencies:
+      - '@harmoniclabs/bytestring'
+      - '@harmoniclabs/cbor'
+      - '@harmoniclabs/crypto'
+      - '@harmoniclabs/pair'
+      - fast-check
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2': {}
 
