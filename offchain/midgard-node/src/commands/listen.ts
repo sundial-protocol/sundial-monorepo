@@ -39,11 +39,12 @@ const fetchConfirmedState = async (
 
 const readEndTimeOfConfirmedState = (utxo: UTxO): Result<number> => {
   if (utxo.datum) {
-    const confirmedState = Data.from(
-      utxo.datum,
-      SDK.LedgerState.ConfirmedState
-    );
-    return ok(Number(confirmedState.endTime));
+    // const confirmedState = Data.castFrom(
+    //   utxo.datum,
+    //   SDK.LedgerState.ConfirmedState
+    // );
+    // return ok(Number(confirmedState.endTime));
+    return ok(0);
   } else {
     return fail("Missing datum of the confirmed state.");
   }
