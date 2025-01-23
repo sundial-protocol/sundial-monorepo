@@ -63,8 +63,10 @@ interface SerializedMidgardTransaction {
 
 ### Multi-Output Transactions
 
-- Multiple outputs per transaction
-- Distributes funds across multiple addresses
+Generates 100 emulated test accounts and performs two transaction phases:
+
+1. Distribution: Splits funds into 20 outputs per transaction, sending to random test accounts
+2. Collection: Merges back 20 outputs into single transactions, returning funds to source
 
 ## Customization
 
