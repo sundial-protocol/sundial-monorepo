@@ -103,7 +103,7 @@ ${errorToString(latestBlockOutRefRes.error)}`);
   }, pollingInterval);
 };
 
-const storeTx = (lucid: LucidEvolution, db: sqlite3.Database, tx: string) => {
+export const storeTx = (lucid: LucidEvolution, db: sqlite3.Database, tx: string) => {
   const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES (?, ?)`;
   const txHash = lucid.fromTx(tx).toHash();
   db.run(query, [txHash, tx], function (err) {
@@ -114,6 +114,7 @@ const storeTx = (lucid: LucidEvolution, db: sqlite3.Database, tx: string) => {
     }
   });
 };
+
 const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
   logWarning("submitBlock: TODO");
 };

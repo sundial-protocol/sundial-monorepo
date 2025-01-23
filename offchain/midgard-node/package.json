@@ -28,7 +28,8 @@
     "chalk": "^5.4.1",
     "commander": "^13.0.0",
     "express": "^4.21.2",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "vitest": "^3.0.3"
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.0.0",
