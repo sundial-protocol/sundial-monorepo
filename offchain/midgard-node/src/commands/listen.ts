@@ -119,8 +119,15 @@ const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
   logWarning("submitBlock: TODO");
 };
 
-const clearMempool = async () => {
-  logWarning("clearMempool: TODO");
+export const clearMempool = async (db: sqlite3.Database) => {
+  const query = `DELETE FROM mempool;`;
+  db.run(query, function (err) {
+    if (err) {
+      logAbort(`Error inserting transaction: ${err.message}`);
+    } else {
+      logInfo(`Transaction stored successfully with rowid ${this.lastID}`);
+    }
+  })
 };
 
 const monitorConfirmedState = (
