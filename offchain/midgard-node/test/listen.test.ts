@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import sqlite3 from 'sqlite3';
 import { clearMempool, initializeDb, storeTx } from "../src/commands/listen.js"
-import { LucidEvolution } from "@lucid-evolution/lucid";
+import { CML, LucidEvolution } from "@lucid-evolution/lucid";
 
 describe('mempool database', () => {
   let db: sqlite3.Database;
@@ -22,7 +22,7 @@ describe('mempool database', () => {
   it('should store a valid transaction', async () => {
     storeTx(lucid as unknown as LucidEvolution, db, tx);
 
-    db.get('SELECT * FROM mempool WHERE tx_hash = ?', [`hash-of-${tx}`], (err, row : MempoolRow) => {
+    db.get('SELECT * FROM mempool WHERE tx_hash = ?', [lucid.fromTx(tx).toHash()], (err, row : MempoolRow) => {
       expect(err).toBeNull();
       expect(row.tx_cbor).toBe(tx);
     });
@@ -50,8 +50,9 @@ describe('mempool database', () => {
 
 class MockLucid {
     fromTx(tx: string) {
+      const tx_body = CML.Transaction.from_cbor_hex(tx).body();
       return {
-        toHash: () => `hash-of-${tx}`,
+        toHash: () => CML.hash_transaction(tx_body).to_hex(),
       };
     }
 }
