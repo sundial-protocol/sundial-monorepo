@@ -147,7 +147,7 @@ export async function initializeDb(dbFilePath : string) {
     });
   await db.exec(
     `CREATE TABLE IF NOT EXISTS mempool (
-      tx_hash TEXT NOT NULL UNIQUE,
+      tx_hash TEXT(64) NOT NULL UNIQUE,
       tx_cbor BLOB NOT NULL,
       PRIMARY KEY (tx_hash)
     );`
