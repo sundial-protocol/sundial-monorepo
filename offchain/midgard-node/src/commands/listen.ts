@@ -103,7 +103,11 @@ ${errorToString(latestBlockOutRefRes.error)}`);
   }, pollingInterval);
 };
 
-export const storeTx = (lucid: LucidEvolution, db: sqlite3.Database, tx: string) => {
+export const storeTx = (
+  lucid: LucidEvolution,
+  db: sqlite3.Database,
+  tx: string
+) => {
   const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES (?, ?)`;
   const txHash = lucid.fromTx(tx).toHash();
   db.run(query, [txHash, tx], function (err) {
@@ -127,7 +131,7 @@ export const clearMempool = async (db: sqlite3.Database) => {
     } else {
       logInfo(`Transaction stored successfully with rowid ${this.lastID}`);
     }
-  })
+  });
 };
 
 const monitorConfirmedState = (
@@ -137,14 +141,14 @@ const monitorConfirmedState = (
   logWarning("mergeOldestBlock: TODO");
 };
 
-export async function initializeDb(dbFilePath : string) {
+export async function initializeDb(dbFilePath: string) {
   const db = new sqlite3.Database(dbFilePath, (err) => {
-      if (err) {
-        logAbort(`Error opening database: ${err.message}`);
-      } else {
-        logInfo("Connected to the SQLite database.");
-      }
-    });
+    if (err) {
+      logAbort(`Error opening database: ${err.message}`);
+    } else {
+      logInfo("Connected to the SQLite database.");
+    }
+  });
   await db.exec(
     `CREATE TABLE IF NOT EXISTS mempool (
       tx_hash TEXT(64) NOT NULL UNIQUE,
@@ -154,4 +158,3 @@ export async function initializeDb(dbFilePath : string) {
   );
   return db;
 }
-
