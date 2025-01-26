@@ -7,8 +7,8 @@ import {
   UTxO,
 } from "@lucid-evolution/lucid";
 import { utxosAtByNFTPolicyId } from "@/utils/helpers.js";
-import { NodeKey } from "@/types/contracts/linked-list/index.js";
 import { Datum } from "@/types/contracts/state-queue.js";
+import { ConfirmedState } from "@/types/contracts/ledger-state.js";
 import { makeReturn } from "@/core.js";
 
 export type Config = {
@@ -16,14 +16,19 @@ export type Config = {
   stateQueuePolicyId: PolicyId;
 };
 
-const getLinkFromBlockUTxO = (
+const getConfirmedStateFromBlockUTxO = (
   blockUTxO: UTxO
-): Either.Either<NodeKey, string> => {
+): Either.Either<ConfirmedState, string> => {
   const datumCBOR = blockUTxO.datum;
   if (datumCBOR) {
     try {
       const nodeDatum = Data.from(datumCBOR, Datum);
-      return Either.right(nodeDatum.next);
+      if (nodeDatum.key === "Empty") {
+        const confirmedState = Data.castFrom(nodeDatum.data, ConfirmedState);
+        return Either.right(confirmedState);
+      } else {
+        return Either.left("Given UTxO is not root");
+      }
     } catch {
       return Either.left("Could not coerce to a node datum");
     }
@@ -32,7 +37,7 @@ const getLinkFromBlockUTxO = (
   }
 };
 
-export const fetchLatestBlockProgram = (
+export const fetchConfirmedStateProgram = (
   lucid: LucidEvolution,
   config: Config
 ): Effect.Effect<UTxO, string> =>
@@ -43,9 +48,9 @@ export const fetchLatestBlockProgram = (
       config.stateQueuePolicyId
     );
     const filtered = allBlocks.filter((u: UTxO) => {
-      const eithNodeKey = getLinkFromBlockUTxO(u);
-      if (Either.isRight(eithNodeKey) && eithNodeKey.right === "Empty") {
-        return Option.some(u);
+      const eithConfirmedState = getConfirmedStateFromBlockUTxO(u);
+      if (Either.isRight(eithConfirmedState)) {
+        return Option.some(eithConfirmedState.right);
       } else {
         return Option.none();
       }
@@ -53,9 +58,9 @@ export const fetchLatestBlockProgram = (
     if (filtered.length === 1) {
       return filtered[0];
     } else {
-      return yield* Effect.fail("Latest block not found");
+      return yield* Effect.fail("Confirmed state not found");
     }
   });
 
-export const fetchLatestBlock = (lucid: LucidEvolution, config: Config) =>
-  makeReturn(fetchLatestBlockProgram(lucid, config)).unsafeRun();
+export const fetchConfirmedState = (lucid: LucidEvolution, config: Config) =>
+  makeReturn(fetchConfirmedStateProgram(lucid, config)).unsafeRun();

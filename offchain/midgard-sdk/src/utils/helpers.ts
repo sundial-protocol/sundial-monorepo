@@ -1,5 +1,13 @@
-import { Either } from "effect";
-import { Assets, PolicyId, fromUnit } from "@lucid-evolution/lucid";
+import { Effect, Either, Option } from "effect";
+import {
+  Address,
+  Assets,
+  Credential,
+  LucidEvolution,
+  PolicyId,
+  UTxO,
+  fromUnit,
+} from "@lucid-evolution/lucid";
 
 export const getSingleAssetApartFromAda = (
   assets: Assets
@@ -19,3 +27,34 @@ export const getSingleAssetApartFromAda = (
     return Either.left("Operation failed");
   }
 };
+
+export const utxosAtByNFTPolicyId = (
+  lucid: LucidEvolution,
+  addressOrCred: Address | Credential,
+  policyId: PolicyId
+): Effect.Effect<UTxO[], string> =>
+  Effect.gen(function* () {
+    const allUTxOs = yield* Effect.tryPromise({
+      try: () => lucid.utxosAt(addressOrCred),
+      catch: (_) => "Failed to fetch state queue UTxOs",
+    });
+    const nftEithers: Either.Either<UTxO, string>[] =
+      allUTxOs.map((u: UTxO) => {
+        const nfts = getSingleAssetApartFromAda(u.assets);
+        return Either.andThen(
+          nfts,
+          ([sym, _tn, qty]): Either.Either<UTxO, string> => {
+            if (sym === policyId && qty === 1n) {
+              return Either.right(u);
+            } else {
+              return Either.left("UTxO without expected NFT collection");
+            }
+          }
+        );
+      });
+    const authenticUTxOs = yield* Effect.filterMap(
+      nftEithers,
+      Option.some
+    );
+    return authenticUTxOs;
+  });
