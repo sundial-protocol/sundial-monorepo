@@ -2,7 +2,7 @@
 
 import { Command } from "commander";
 import { ENV_VARS_GUIDE, chalk, logInfo, setupLucid } from "./utils.js";
-import { listen } from "./commands/listen.js";
+import { initializeDb, listen } from "./commands/listen.js";
 import * as packageJson from "../package.json";
 
 const VERSION = packageJson.default.version;
@@ -64,8 +64,10 @@ program
   .option("--provider <string>", "Cardano provider", "Kupmios")
   .action(async (options) => {
     const lucid = await setupLucid(options.network, options.provider);
+    const db = await initializeDb(options.dbFilePath)
     listen(
       lucid,
+      db,
       options.port,
       options.pollingInterval,
       options.confirmedStatePollingInterval

@@ -3,6 +3,7 @@ import {
   errorToString,
   fail,
   isHexString,
+  logAbort,
   logInfo,
   logWarning,
   ok,
@@ -12,6 +13,7 @@ import * as MPF from "@aiken-lang/merkle-patricia-forestry";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Data, LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
 import express from "express";
+import sqlite3 from "sqlite3";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
@@ -64,6 +66,7 @@ const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
 
 export const listen = (
   lucid: LucidEvolution,
+  db: sqlite3.Database,
   port: number,
   pollingInterval: number,
   confirmedStatePollingInterval: number
@@ -100,16 +103,35 @@ ${errorToString(latestBlockOutRefRes.error)}`);
   }, pollingInterval);
 };
 
-const storeTx = (dbFilePath: string, tx: string) => {
-  logWarning("storeTx: TODO");
+export const storeTx = (
+  lucid: LucidEvolution,
+  db: sqlite3.Database,
+  tx: string
+) => {
+  const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES (?, ?)`;
+  const txHash = lucid.fromTx(tx).toHash();
+  db.run(query, [txHash, tx], function (err) {
+    if (err) {
+      logAbort(`Error inserting transaction: ${err.message}`);
+    } else {
+      logInfo(`Transaction stored successfully with rowid ${this.lastID}`);
+    }
+  });
 };
 
 const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
   logWarning("submitBlock: TODO");
 };
 
-const clearMempool = async () => {
-  logWarning("clearMempool: TODO");
+export const clearMempool = async (db: sqlite3.Database) => {
+  const query = `DELETE FROM mempool;`;
+  db.run(query, function (err) {
+    if (err) {
+      logAbort(`Error inserting transaction: ${err.message}`);
+    } else {
+      logInfo(`Transaction stored successfully with rowid ${this.lastID}`);
+    }
+  });
 };
 
 const monitorConfirmedState = (
@@ -118,3 +140,21 @@ const monitorConfirmedState = (
 ) => {
   logWarning("mergeOldestBlock: TODO");
 };
+
+export async function initializeDb(dbFilePath: string) {
+  const db = new sqlite3.Database(dbFilePath, (err) => {
+    if (err) {
+      logAbort(`Error opening database: ${err.message}`);
+    } else {
+      logInfo("Connected to the SQLite database.");
+    }
+  });
+  await db.exec(
+    `CREATE TABLE IF NOT EXISTS mempool (
+      tx_hash BLOB NOT NULL UNIQUE,
+      tx_cbor BLOB NOT NULL,
+      PRIMARY KEY (tx_hash)
+    );`
+  );
+  return db;
+}
