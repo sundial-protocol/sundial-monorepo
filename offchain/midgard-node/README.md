@@ -27,13 +27,15 @@ sudo $(which dockerd)
 ### Build & run image
 
 ``` sh
-nix develop
+SEED_PHRASE="your seed phrase" nix develop
 sudo chown --recursive $(whoami):$(whoami) /var/run/docker.sock
-docker run --rm --publish 3000:3000 -it $(docker build -q .)
+
+docker run --rm --publish 3000:3000 -it -e SEED_PHRASE="$SEED_PHRASE" \
+  $(docker build --build-context sdk=../midgard-sdk -q .)
 ```
 
 ### Test node
 
 ``` sh
-curl http://localhost:3000 
+curl http://localhost:3000
 ```
