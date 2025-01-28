@@ -3,15 +3,15 @@ use aiken/cbor
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, blake2b_256}
 use cardano/address.{Script}
-use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
+use cardano/assets.{PolicyId, flatten, from_asset, lovelace_of, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proof/common/types.{MidgardTx, MidgardTxBody}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
 use midgard/fraud_proof/double_spend/step_02.{StepState as Step2State}
 use midgard/fraud_proof/double_spend/step_03.{
   Cancel, Continue, StepRedeemer as Step3Redeemer, StepState as Step3State,
 }
+use midgard/ledger_state.{MidgardTx, MidgardTxBody}
 
 validator main(
   double_spend_step_04_validator_script_hash: ScriptHash,
@@ -32,12 +32,10 @@ validator main(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
-        // Store output reference to avoid multiple field accesses
-        let output = own_input.output
-        // (1.2) Verify the computation thread token by asset name in the output
+        // (1.2) Get computation thread token asset name in output
         expect Some((_, ct_token_asset_name, _)) =
-          list.at(flatten(output.value), 1)
-        // (1.3) Burn the computation thread token
+          list.at(flatten(own_input.output.value), 1)
+        // (1.3) Burn the computation thread token, (3) Transaction must not mint or burn any other tokens
         expect
           self.mint == from_asset(
             policy_id: ct_token_policy_id,
@@ -45,23 +43,24 @@ validator main(
             quantity: -1,
           )
 
-        // (2.1) Lovelace amount in output to return to the fraud prover
-        expect Some((_, _, lovelace)) = list.at(flatten(output.value), 0)
+        // (2.1) get the lovelace amount from our own validator's input (ADA inside the input of the fraud proof thread)
+        let lovelace = lovelace_of(own_input.output.value)
+        // (2.2) verify an output is going to fraud prover address
         expect Some(output_to_fraud_prover) =
           list.at(self.outputs, index_output)
-        // (2.2) Validate output to fraud prover (output to fraud prover must match the fraud prover pubkey)
+        // (2.3) Validate output to fraud prover (output to fraud prover must match the fraud prover pubkey)
         expect
           validate_output_to_fraud_prover(
             output_to_fraud_prover,
             step_datum.fraud_prover,
           )
 
-        // (3.1) Lovelace amount in output to return to the fraud prover
-        expect quantity_of(output_to_fraud_prover.value, "", "") == lovelace
+        // (2.4) Lovelace amount in output to return to the fraud prover
+        expect lovelace == lovelace_of(output_to_fraud_prover.value)
         True
       }
       Continue {
-        frauded_input,
+        fraudulent_input,
         tx1_input_utxos,
         tx1_body,
         tx2_input_utxos,
@@ -90,11 +89,11 @@ validator main(
         expect blake2b_256(tx1_input_utxos) == tx1_body.spend_inputs
         expect blake2b_256(tx2_input_utxos) == tx2_body.spend_inputs
 
-        // both input lists contain the frauded input
+        // both input lists contain the fraudulent input
         // un_list_data(data: Data) -> List<Data>
-        expect list.has(builtin.un_list_data(tx1_input_utxos), frauded_input)
-        expect list.has(builtin.un_list_data(tx2_input_utxos), frauded_input)
-        expect parsed_frauded_input: OutputReference = frauded_input
+        expect list.has(builtin.un_list_data(tx1_input_utxos), fraudulent_input)
+        expect list.has(builtin.un_list_data(tx2_input_utxos), fraudulent_input)
+        expect parsed_fraudulent_input: OutputReference = fraudulent_input
 
         expect Some(own_input) =
           list.find(
@@ -117,7 +116,7 @@ validator main(
           Step3State {
             verified_tx1_hash,
             verified_tx2_hash,
-            verified_common_input: parsed_frauded_input,
+            verified_common_input: parsed_fraudulent_input,
           }
         let step_3_datum =
           StepDatum {

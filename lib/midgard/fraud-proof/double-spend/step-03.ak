@@ -1,10 +1,10 @@
 use cardano/transaction.{OutputReference}
-use midgard/fraud_proof/common/types.{MidgardTx, MidgardTxBody}
+use midgard/ledger_state.{MidgardTx, MidgardTxBody}
 
 pub type StepRedeemer {
   Cancel { index_output: Int }
   Continue {
-    frauded_input: Data,
+    fraudulent_input: Data,
     tx1_input_utxos: ByteArray,
     tx1_body: MidgardTxBody,
     tx2_input_utxos: ByteArray,

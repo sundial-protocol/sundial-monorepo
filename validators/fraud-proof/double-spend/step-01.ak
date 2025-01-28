@@ -1,10 +1,10 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
-use aiken_design_patterns/linked_list/ordered.{NodeDatum}
+use aiken_design_patterns/linked_list/unordered.{Key}
 use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script}
-use cardano/assets.{PolicyId, flatten, from_asset, quantity_of}
+use cardano/assets.{PolicyId, flatten, from_asset, lovelace_of, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
@@ -12,8 +12,8 @@ use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
 use midgard/fraud_proof/double_spend/step_01.{
   Cancel, Continue, StepRedeemer as Step1Redeemer, StepState as Step1State,
 }
-use midgard/ledger_state
-use midgard/state_queue
+use midgard/ledger_state.{Header}
+use midgard/state_queue.{Datum as NodeDatum}
 
 // -------- GOAL DEFINITION --------------------------------------
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs which spends the same input UTxO
@@ -53,7 +53,7 @@ validator main(
     when redeemer is {
       // -------------- REDEEMER: CANCEL -----------------
       // (1) Burn the computation thread token 
-      // (2) Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum
+      // (2) Return the ADA from the double spend computation thread utxo to the fraud prover pub-key defined in the input datum
       // (3) Transaction must not mint or burn any other tokens
       // --------------------------------------------------
       Cancel { index_output } -> {
@@ -63,12 +63,10 @@ validator main(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
-        // Store output reference to avoid multiple field accesses
-        let output = own_input.output
-        // (1.2) Verify the computation thread token by asset name in the output
+        // (1.2) Get computation thread token asset name in output
         expect Some((_, ct_token_asset_name, _)) =
-          list.at(flatten(output.value), 1)
-        // (1.3) Burn the computation thread token
+          list.at(flatten(own_input.output.value), 1)
+        // (1.3) Burn the computation thread token, (3) Transaction must not mint or burn any other tokens
         expect
           self.mint == from_asset(
             policy_id: ct_token_policy_id,
@@ -76,9 +74,9 @@ validator main(
             quantity: -1,
           )
 
-        // (2.1) Lovelace amount in output to return to the fraud prover
-        expect Some((_, _, lovelace)) = list.at(flatten(output.value), 0)
-        // (2.2)
+        // (2.1) get the lovelace amount from our own validator's input (ADA inside the input of the fraud proof thread)
+        let lovelace = lovelace_of(own_input.output.value)
+        // (2.2) verify an output is going to fraud prover address
         expect Some(output_to_fraud_prover) =
           list.at(self.outputs, index_output)
         // (2.3) Validate output to fraud prover (output to fraud prover must match the fraud prover pubkey)
@@ -88,8 +86,8 @@ validator main(
             step_datum.fraud_prover,
           )
 
-        // (3.1) Lovelace amount in output to return to the fraud prover
-        expect quantity_of(output_to_fraud_prover.value, "", "") == lovelace
+        // (2.4) Lovelace amount in output to return to the fraud prover
+        expect lovelace == lovelace_of(output_to_fraud_prover.value)
         True
       }
 
@@ -98,32 +96,29 @@ validator main(
       // (2) Delegate compute to the merkleized validator to verify the inclusion of tx1 in the tx_root
       // (3) The fraud prover field must match between the output state and the input datum
       // (4) Verify the state transition from the previous state to the new state
-      // (5) The computation thread token must be sent to the next step’s spending validator
+      // (5) The computation thread token must be sent to the next step's spending validator
       // (6) Transaction must not mint or burn any other tokens
       // ---------------------------------------------------
       Continue {
-        frauded_state_queue_node_ref_input_index,
-        frauded_tx1_hash,
-        frauded_tx1_info_hash,
-        tx1_to_root_proof_path,
+        bad_state_queue_node_ref_input_index,
+        bad_tx1_hash,
+        bad_tx1_info_hash,
+        bad_tx1_to_root_proof_path,
         index_output,
       } -> {
         // (1.1) Reference input with block_hash 
-        expect Some(frauded_state_queue_node_input) =
-          list.at(
-            self.reference_inputs,
-            frauded_state_queue_node_ref_input_index,
-          )
+        expect Some(bad_state_queue_node_input) =
+          list.at(self.reference_inputs, bad_state_queue_node_ref_input_index)
 
-        // (1.2) Extract tx_root via the state queue block hash (supposedly contains tx_1)
-        expect InlineDatum(frauded_state_queue_datum_data) =
-          frauded_state_queue_node_input.output.datum
-        expect frauded_state_queue_node_datum: state_queue.Datum =
-          frauded_state_queue_datum_data
-        expect parsed_state_queue_datum: ledger_state.Header =
-          frauded_state_queue_node_datum.data
-        let block_hash = parsed_state_queue_datum.utxos_root
-        let extracted_tx_root = #""
+        // (1.2) Extract tx_root via the state queue block hash
+        expect InlineDatum(bad_state_queue_datum_data) =
+          bad_state_queue_node_input.output.datum
+        expect bad_state_queue_node_datum: NodeDatum =
+          bad_state_queue_datum_data
+        expect parsed_state_queue_datum: Header =
+          bad_state_queue_node_datum.data
+        expect Key(block_hash) = bad_state_queue_node_datum.key
+        let extracted_tx_root = parsed_state_queue_datum.transactions_root
 
         // (1.3) Verify the computation thread token by asset name in the output
         expect Some(own_input) =
@@ -146,9 +141,9 @@ validator main(
           merkelized_validator.delegated_validation(
             function_input: MembershipProofInputs {
               tx_root: extracted_tx_root,
-              tx_hash: frauded_tx1_hash,
-              tx_info_hash: frauded_tx1_info_hash,
-              tx_to_root_proof_path: tx1_to_root_proof_path,
+              tx_hash: bad_tx1_hash,
+              tx_info_hash: bad_tx1_info_hash,
+              tx_to_root_proof_path: bad_tx1_to_root_proof_path,
             },
             staking_validator: plutarch_midgard_merkle_validator,
             input_data_coercer: fn(withdraw_redeemer: Data) {
@@ -170,7 +165,7 @@ validator main(
         // (4) Verify the state transition from the previous state to the new state
         // At this point, tx1_hash inclusion proof is verified by the plutarch_midgard_merkle_validator -- tx_1 is a member of the block we are running the fraud proof on    
         // (4.1) Define state transition (input -> output)    
-        let step1_state = Step1State { verified_tx1_hash: frauded_tx1_hash }
+        let step1_state = Step1State { verified_tx1_hash: bad_tx1_hash }
         let step_1_datum =
           StepDatum {
             fraud_prover: parsed_output_to_step_2_datum.fraud_prover,
