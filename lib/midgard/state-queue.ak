@@ -1,4 +1,3 @@
-use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName}
 use cardano/transaction.{OutputReference}
 
@@ -15,13 +14,24 @@ pub type Config {
   refund_waiting_period: Int,
 }
 
-pub type Datum =
-  NodeDatum
+pub type Datum {
+  operator: ByteArray,
+  start_time: Int,
+  end_time: Int,
+}
 
 pub type MintRedeemer {
   Init
   Deinit
-  CommitBlockHeader { operator: ByteArray }
+  CommitBlockHeader {
+    operator: ByteArray,
+    scheduler_asset_name: ByteArray,
+    hub_oracle_ref_input_index: Int,
+    scheduler_state_ref_input_index: Int,
+    header_node_output_index: Int,
+    previous_header_node_output_index: Int,
+    active_operators_redeemer_index: Int,
+  }
   MergeToConfirmedState
   RemoveFraudulentBlockHeader { fraudulent_operator: ByteArray }
 }

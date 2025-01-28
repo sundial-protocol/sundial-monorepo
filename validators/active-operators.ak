@@ -57,7 +57,8 @@ validator spend(
 
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect CommitBlockHeader(operator) = state_queue_redeemer_pair.2nd
+        expect CommitBlockHeader { operator, .. } =
+          state_queue_redeemer_pair.2nd
         and {
           no_active_operators_minted(
             self.mint,

@@ -9,7 +9,6 @@ use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/catalogue as fpc
 use midgard/hub_oracle
 use midgard/ledger_state
-use midgard/state_queue
 
 validator computation_thread_policy(
   fraud_proof_catalogue_script_hash: ByteArray,
@@ -53,7 +52,7 @@ validator computation_thread_policy(
           parsed_fraud_proof_catalogue_node_datum.key
         expect InlineDatum(frauded_state_queue_node_datum) =
           frauded_state_queue_node_input.output.datum
-        expect parsed_frauded_state_queue_node_datum: state_queue.Datum =
+        expect parsed_frauded_state_queue_node_datum: NodeDatum =
           frauded_state_queue_node_datum
         expect parsed_frauded_state_queue_node_app_data: ledger_state.Header =
           parsed_frauded_state_queue_node_datum.data
