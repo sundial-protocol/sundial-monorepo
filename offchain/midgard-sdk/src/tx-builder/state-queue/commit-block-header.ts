@@ -1,6 +1,11 @@
+import {
+  Config as FetchConfig,
+  fetchLatestCommitedBlockProgram,
+} from "@/endpoints/state-queue/fetch-latest-block.js";
 import { LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
+import { Effect } from "effect";
 
-export type CommitParams = {};
+export type Params = {};
 
 /**
  * Commit
@@ -11,8 +16,11 @@ export type CommitParams = {};
  */
 export const commitTxBuilder = (
   lucid: LucidEvolution,
-  params: CommitParams
-): TxBuilder => {
-  const tx = lucid.newTx();
-  return tx;
-};
+  config: FetchConfig,
+  params: Params
+): Effect.Effect<TxBuilder, string> =>
+  Effect.gen(function* () {
+    const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
+    const tx = lucid.newTx();
+    return tx;
+  });

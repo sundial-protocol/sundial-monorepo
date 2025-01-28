@@ -69,7 +69,7 @@ export const fetchConfirmedStateAndItsLinkProgram = (
 
 /**
  * Attempts fetching the confirmed state, i.e. the root node of the state queue
- * linked list.
+ * linked list, along with its link (i.e. first non-root node in the list).
  *
  * @param lucid - The `LucidEvolution` API object.
  * @param config - Configuration values required to know where to look for which NFT.
