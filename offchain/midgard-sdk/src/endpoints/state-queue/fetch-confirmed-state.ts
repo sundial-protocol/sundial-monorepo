@@ -62,5 +62,13 @@ export const fetchConfirmedStateProgram = (
     }
   });
 
+/**
+ * Attempts fetching the confirmed state, i.e. the root node of the state queue
+ * linked list.
+ *
+ * @param lucid - The `LucidEvolution` API object.
+ * @param config - Configuration values required to know where to look for which NFT.
+ * @returns {UTxO} - The authentic UTxO which is the root node.
+ */
 export const fetchConfirmedState = (lucid: LucidEvolution, config: Config) =>
   makeReturn(fetchConfirmedStateProgram(lucid, config)).unsafeRun();

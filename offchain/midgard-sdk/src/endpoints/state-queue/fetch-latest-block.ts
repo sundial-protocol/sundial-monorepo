@@ -32,7 +32,7 @@ const getLinkFromBlockUTxO = (
   }
 };
 
-export const fetchLatestBlockProgram = (
+export const fetchLatestCommitedBlockProgram = (
   lucid: LucidEvolution,
   config: Config
 ): Effect.Effect<UTxO, string> =>
@@ -57,5 +57,15 @@ export const fetchLatestBlockProgram = (
     }
   });
 
-export const fetchLatestBlock = (lucid: LucidEvolution, config: Config) =>
-  makeReturn(fetchLatestBlockProgram(lucid, config)).unsafeRun();
+/**
+ * Attempts fetching the commited block at the very end of the state queue
+ * linked list.
+ *
+ * @param lucid - The `LucidEvolution` API object.
+ * @param config - Configuration values required to know where to look for which NFT.
+ * @returns {UTxO} - The authentic UTxO which links to no other nodes.
+ */
+export const fetchLatestCommitedBlock = (
+  lucid: LucidEvolution,
+  config: Config
+) => makeReturn(fetchLatestCommitedBlockProgram(lucid, config)).unsafeRun();
