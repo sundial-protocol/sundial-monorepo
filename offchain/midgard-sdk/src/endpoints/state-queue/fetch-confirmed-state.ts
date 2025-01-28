@@ -49,11 +49,7 @@ export const fetchConfirmedStateProgram = (
     );
     const filtered = allBlocks.filter((u: UTxO) => {
       const eithConfirmedState = getConfirmedStateFromBlockUTxO(u);
-      if (Either.isRight(eithConfirmedState)) {
-        return Option.some(eithConfirmedState.right);
-      } else {
-        return Option.none();
-      }
+      return Either.isRight(eithConfirmedState);
     });
     if (filtered.length === 1) {
       return filtered[0];

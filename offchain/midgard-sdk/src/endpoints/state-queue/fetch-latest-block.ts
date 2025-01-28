@@ -44,11 +44,7 @@ export const fetchLatestCommitedBlockProgram = (
     );
     const filtered = allBlocks.filter((u: UTxO) => {
       const eithNodeKey = getLinkFromBlockUTxO(u);
-      if (Either.isRight(eithNodeKey) && eithNodeKey.right === "Empty") {
-        return Option.some(u);
-      } else {
-        return Option.none();
-      }
+      return Either.isRight(eithNodeKey) && eithNodeKey.right === "Empty";
     });
     if (filtered.length === 1) {
       return filtered[0];
