@@ -146,3 +146,16 @@ pub fn get_authentic_input_of(
 
   found_ref_input
 }
+
+// Used to retrieve the token name from a value with a specific policy id as a singleton
+pub fn get_token_name_from_value_with_policy(
+  value: Value,
+  policy_id: PolicyId,
+) -> AssetName {
+  expect [Pair(asset_name, _)] =
+    value
+      |> assets.tokens(policy_id) //return dict of policy id to asset name and quantity
+      |> dict.to_pairs
+
+  asset_name
+}
