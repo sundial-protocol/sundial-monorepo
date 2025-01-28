@@ -6,7 +6,7 @@ use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script}
 use cardano/assets.{PolicyId, from_asset, lovelace_of, quantity_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/common/utils.{get_token_name_from_value_with_policy} as get_token_name_from_value_with_policy
+use midgard/common/utils.{get_asset_name_from_value_with_policy} as get_asset_name_from_value_with_policy
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
@@ -47,7 +47,7 @@ validator main(
           )
         // (1.2) Get computation thread token asset name in output
         let ct_token_asset_name =
-          get_token_name_from_value_with_policy(
+          get_asset_name_from_value_with_policy(
             own_input.output.value,
             ct_token_policy_id,
           )
@@ -116,7 +116,7 @@ validator main(
             fn(a_input) { a_input.output_reference == input },
           )
         let ct_token_asset_name =
-          get_token_name_from_value_with_policy(
+          get_asset_name_from_value_with_policy(
             own_input.output.value,
             ct_token_policy_id,
           )

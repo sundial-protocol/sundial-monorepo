@@ -147,8 +147,8 @@ pub fn get_authentic_input_of(
   found_ref_input
 }
 
-// Used to retrieve the token name from a value with a specific policy id as a singleton
-pub fn get_token_name_from_value_with_policy(
+// Used to retrieve asset name from a value with a specific policy id
+pub fn get_asset_name_from_value_with_policy(
   value: Value,
   policy_id: PolicyId,
 ) -> AssetName {
