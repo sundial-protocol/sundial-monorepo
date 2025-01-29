@@ -43,6 +43,7 @@ validator mint(
   retired_operators_script_hash: PolicyId,
   scheduler_script_hash: PolicyId,
   fraud_proof_token_script_hash: PolicyId,
+  maturity_duration: Int,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
     let node_in_outputs = get_node_inputs(self.inputs, policy_id)
@@ -115,7 +116,6 @@ validator mint(
             node_mint,
           ),
           operator == header_node_block_data.operator,
-          //TODO Condition 5 doesn't make any sense
           parsed_header_node_datum.key == Key(
             crypto.sha2_256(parsed_header_node_block_data_as_bytearray),
           ),
@@ -137,7 +137,26 @@ validator mint(
           ordered.Key(operator) == parsed_active_node_datum.key,
         }
       }
-      MergeToConfirmedState -> todo
+      MergeToConfirmedState(
+        header_node_input_index,
+        confirmed_state_node_input_index,
+        confirmed_state_node_output_index,
+      ) -> and {
+          unordered.remove(
+            header_node_key,
+            header_node_input_index,
+            confirmed_state_node_input_index,
+            node_inputs,
+            node_outputs,
+            node_mint,
+          ),
+          unordered.is_root_node(confirmed_state_node_key),
+          valid_from >= header_node_data.commitment_time + maturity_duration,
+          //TODO should we check that key and next of confirmed_state_node_output are still the same?
+          header_node_data == confirmed_state_node_output_data,
+          //TODO create a settlement queue node here if the merged block contains deposits/withdrawals
+          True,
+        }
       RemoveFraudulentBlockHeader { fraudulent_operator } -> todo
     }
   }
@@ -145,8 +164,4 @@ validator mint(
   else(_) {
     fail
   }
-}
-
-fn in_between(x: Int, a: Int, b: Int) -> Bool {
-  a <= x && x <= b
 }

@@ -32,6 +32,10 @@ pub type MintRedeemer {
     previous_header_node_output_index: Int,
     active_operators_redeemer_index: Int,
   }
-  MergeToConfirmedState
+  MergeToConfirmedState {
+    header_node_input_index: Int,
+    confirmed_state_node_input_index: Int,
+    confirmed_state_node_output_index: Int,
+  }
   RemoveFraudulentBlockHeader { fraudulent_operator: ByteArray }
 }
