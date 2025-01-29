@@ -32,3 +32,6 @@
 7. Use enumerated comments right above each `expect`/validation to describe its
    purpose. While comments are prone to going stale, this allows easier
    conversations when discussing particular logics.
+8. In Cardano, "asset name" and "token name" are generally used interchangeably.
+   For consistency and coherence with Aiken, only use "asset name" throughout
+   the codebase and documentation.
