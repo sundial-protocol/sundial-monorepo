@@ -23,9 +23,9 @@
     - For type and data constructors, use `PascalCase`. Avoid using `_` in them.
       If you find yourself needing to have a prefix/postfix, consider breaking
       your file into multiple files.
-    - For variables, constants and functions, use `snake_case`.
+    - For variables, constants, functions, and field names, use `snake_case`.
 5. When pattern matching on a record type, always use the curly brackets syntax.
-   Using parenthesis won't allow the compiler to detect changes in the accessor
+   Using parenthesis won't allow the compiler to detect changes in the field
    names of type definitions.
 6. Strive to perform `expect`s as soon as possible, rather than including them
    all in a giant `and {}` at the end of your validators/functions.
