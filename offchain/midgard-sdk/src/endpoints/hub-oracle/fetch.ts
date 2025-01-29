@@ -1,12 +1,14 @@
 import { Effect } from "effect";
 import {
   Address,
+  Data,
   LucidEvolution,
   PolicyId,
   UTxO,
   toUnit,
 } from "@lucid-evolution/lucid";
 import { makeReturn } from "@/core.js";
+import {Datum} from "@/types/contracts/hub-oracle.js";
 
 export type Config = {
   hubOracleAddress: Address;
@@ -16,10 +18,10 @@ export type Config = {
 // TODO: This should ideally come from Aiken env directory.
 export const hubOracleAssetName = "";
 
-export const fetchHubOracleUTxOProgram = (
+export const fetchHubOracleProgram = (
   lucid: LucidEvolution,
   config: Config
-): Effect.Effect<UTxO, string> =>
+): Effect.Effect<{utxo: UTxO, datum: Datum}, string> =>
   Effect.gen(function* () {
     const hubOracleUTxOs = yield* Effect.tryPromise({
       try: async () => {
@@ -31,7 +33,21 @@ export const fetchHubOracleUTxOProgram = (
       catch: (_) => "Failed to fetch the hub oracle UTxO",
     });
     if (hubOracleUTxOs.length === 1) {
-      return hubOracleUTxOs[0];
+      const utxo = hubOracleUTxOs[0];
+      const datum = yield* Effect.try({
+        try: () => {
+          if (utxo.datum) {
+            const coerced = Data.from(utxo.datum, Datum);
+            return coerced;
+          } else {
+            throw new Error();
+          }
+        },
+        catch: (_) => {
+          return "Failed to parse the hub oracle datum"
+        },
+      });
+      return {utxo, datum};
     } else {
       return yield* Effect.fail(
         "Exactly one hub oracle UTxO was expected, but none or more were found"

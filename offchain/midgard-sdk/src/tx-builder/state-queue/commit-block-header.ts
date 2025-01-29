@@ -2,8 +2,10 @@ import {
   Config as FetchConfig,
   fetchLatestCommitedBlockProgram,
 } from "@/endpoints/state-queue/fetch-latest-block.js";
-import { LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
-import { Effect } from "effect";
+import { Header } from "@/types/contracts/ledger-state.js";
+import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
+import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
+import { Effect, Either } from "effect";
 
 export type Params = {};
 
@@ -21,6 +23,20 @@ export const commitTxBuilder = (
 ): Effect.Effect<TxBuilder, string> =>
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
+    const eithLatestNodeDatum = getNodeDatumFromUTxO(latestBlock);
+    const latestHeader = yield* Effect.try({
+      try: () => {
+        if (Either.isRight(eithLatestNodeDatum)) {
+          return Data.castFrom(eithLatestNodeDatum.right.data, Header);
+        } else {
+          throw new Error();
+        }
+      },
+      catch: (_) => "Failed coercing latest block's datum",
+    });
+    const newHeader = {
+      ...latestHeader,
+    };
     const tx = lucid.newTx();
     return tx;
   });
