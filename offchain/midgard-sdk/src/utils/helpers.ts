@@ -6,8 +6,20 @@ import {
   LucidEvolution,
   PolicyId,
   UTxO,
+  fromHex,
   fromUnit,
+  toHex,
 } from "@lucid-evolution/lucid";
+import { blake2b } from "@noble/hashes/blake2b";
+
+export const isHexString = (str: string): boolean => {
+  const hexRegex = /^[0-9A-Fa-f]+$/;
+  return hexRegex.test(str);
+};
+
+export const errorToString = (error: any): string => {
+  return error.message ?? JSON.stringify(error);
+};
 
 export const getSingleAssetApartFromAda = (
   assets: Assets
@@ -38,8 +50,8 @@ export const utxosAtByNFTPolicyId = (
       try: () => lucid.utxosAt(addressOrCred),
       catch: (_) => "Failed to fetch state queue UTxOs",
     });
-    const nftEithers: Either.Either<UTxO, string>[] =
-      allUTxOs.map((u: UTxO) => {
+    const nftEithers: Either.Either<UTxO, string>[] = allUTxOs.map(
+      (u: UTxO) => {
         const nfts = getSingleAssetApartFromAda(u.assets);
         return Either.andThen(
           nfts,
@@ -51,10 +63,32 @@ export const utxosAtByNFTPolicyId = (
             }
           }
         );
-      });
-    const authenticUTxOs = yield* Effect.filterMap(
-      nftEithers,
-      Option.some
+      }
     );
+    const authenticUTxOs = yield* Effect.filterMap(nftEithers, Option.some);
     return authenticUTxOs;
   });
+
+const blake2bHelper = (
+  hash: string,
+  dkLen: number,
+  functionName: string
+): Either.Either<string, string> => {
+  if (isHexString(hash)) {
+    try {
+      return Either.right(toHex(blake2b(fromHex(hash), { dkLen })));
+    } catch (e) {
+      return Either.left(errorToString(e));
+    }
+  } else {
+    return Either.left(`Invalid hash provided for ${functionName} function`);
+  }
+};
+
+export const hashHexWithBlake2b224 = (
+  hash: string
+): Either.Either<string, string> => blake2bHelper(hash, 28, "Blake2b224");
+
+export const hashHexWithBlake2b256 = (
+  hash: string
+): Either.Either<string, string> => blake2bHelper(hash, 32, "Blake2b256");
