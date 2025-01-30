@@ -4,11 +4,7 @@ import {
 } from "@/endpoints/state-queue/fetch-latest-block.js";
 import { Header } from "@/types/contracts/ledger-state.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
-import {
-  Data,
-  LucidEvolution,
-  TxBuilder,
-} from "@lucid-evolution/lucid";
+import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
 import { Effect, Either } from "effect";
 import { MerkleRoot, POSIXTime } from "@/types/contracts/common.js";
 import { hashHexWithBlake2b224 } from "@/utils/helpers.js";
@@ -59,7 +55,9 @@ export const commitTxBuilder = (
       };
       const tx = lucid
         .newTx()
-        .collectFrom([latestBlock], "d87980")
+        .validFrom(Number(latestHeader.endTime))
+        .validTo(Number(endTime))
+        .collectFrom([latestBlock], "d87980") // TODO: Placeholder redeemer.
         .pay.ToContract(
           config.stateQueueAddress,
           { kind: "inline", value: Data.to(newHeader, Header) },
