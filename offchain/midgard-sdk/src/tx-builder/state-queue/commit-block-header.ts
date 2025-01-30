@@ -16,7 +16,6 @@ import { hashHexWithBlake2b224 } from "@/utils/helpers.js";
 export type Params = {
   newUTxOsRoot: MerkleRoot;
   transactionsRoot: MerkleRoot;
-  startTime: POSIXTime;
   endTime: POSIXTime;
 };
 
@@ -30,7 +29,7 @@ export type Params = {
 export const commitTxBuilder = (
   lucid: LucidEvolution,
   config: FetchConfig,
-  { newUTxOsRoot, transactionsRoot, startTime, endTime }: Params
+  { newUTxOsRoot, transactionsRoot, endTime }: Params
 ): Effect.Effect<TxBuilder, string> =>
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
@@ -54,7 +53,7 @@ export const commitTxBuilder = (
         prevUtxosRoot: latestHeader.utxosRoot,
         utxosRoot: newUTxOsRoot,
         transactionsRoot,
-        startTime,
+        startTime: latestHeader.endTime,
         endTime,
         prevHeaderHash: eithPrevHeaderHash.right,
       };
