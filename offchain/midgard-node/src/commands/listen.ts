@@ -86,7 +86,11 @@ export const listen = (
   logInfo(`Server running at http://localhost:${port}`);
 };
 
-const monitorStateQueue = (lucid: LucidEvolution, db: sqlite3.Database, pollingInterval: number) => {
+const monitorStateQueue = (
+  lucid: LucidEvolution,
+  db: sqlite3.Database,
+  pollingInterval: number
+) => {
   let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
   setInterval(async () => {
     const latestBlockOutRefRes = await fetchLatestBlock(lucid);
@@ -135,7 +139,7 @@ export const addToArchive = async (
 ) => {
   const blockQuery = `
     INSERT INTO archive_block (tx_hash, block_hash) VALUES
-    ${txs.map(tx => `(?, ?)`).join(', ')}
+    ${txs.map((tx) => `(?, ?)`).join(", ")}
   `;
   const blockValues = txs.flatMap((tx) => [tx.tx_hash, blockHash]);
   await new Promise<void>((resolve, reject) => {
@@ -151,15 +155,21 @@ export const addToArchive = async (
   });
   const txQuery = `
     INSERT INTO archive_tx (tx_hash, tx_cbor) VALUES
-    ${txs.map(tx => `(?, ?)`).join(', ')}
+    ${txs.map((tx) => `(?, ?)`).join(", ")}
     `;
-  db.run(txQuery, txs.flatMap(tx => [tx.tx_hash, tx.tx_cbor]), function (err) {
-    if (err) {
-      logAbort(`Archive: error inserting txs: ${err.message}`);
-    } else {
-      logInfo(`Archive: ${txs.length} txs stored, last rowid: ${this.lastID}`);
+  db.run(
+    txQuery,
+    txs.flatMap((tx) => [tx.tx_hash, tx.tx_cbor]),
+    function (err) {
+      if (err) {
+        logAbort(`Archive: error inserting txs: ${err.message}`);
+      } else {
+        logInfo(
+          `Archive: ${txs.length} txs stored, last rowid: ${this.lastID}`
+        );
+      }
     }
-  });
+  );
 };
 
 export const clearArchive = async (db: sqlite3.Database) => {
@@ -178,7 +188,11 @@ export interface MempoolRow {
   tx_cbor: string;
 }
 
-export const addToMempool = async (db : sqlite3.Database, txHash : string, tx_cbor : string) => {
+export const addToMempool = async (
+  db: sqlite3.Database,
+  txHash: string,
+  tx_cbor: string
+) => {
   const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES (?, ?)`;
   await new Promise<void>((resolve, reject) => {
     db.run(query, [txHash, tx_cbor], function (err) {
@@ -191,16 +205,16 @@ export const addToMempool = async (db : sqlite3.Database, txHash : string, tx_cb
       }
     });
   });
-}
+};
 
-export const retrieveMempool = async (db : sqlite3.Database) => {
+export const retrieveMempool = async (db: sqlite3.Database) => {
   const query = `SELECT * FROM mempool`;
   const mempool = await new Promise<MempoolRow[]>((resolve, reject) => {
     db.all(query, (err, rows: MempoolRow[]) => {
       if (err) {
         logAbort(`Mempool: retrieving error: ${err.message}`);
-        reject(err)
-      };
+        reject(err);
+      }
       resolve(rows);
     });
   });
@@ -230,7 +244,7 @@ export async function initializeDb(dbFilePath: string) {
       logInfo("Connected to the SQLite database");
     }
   });
-  await db.exec(`
+  db.exec(`
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS mempool (
       tx_hash BLOB NOT NULL UNIQUE,
