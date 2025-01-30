@@ -103,13 +103,13 @@ ${errorToString(latestBlockOutRefRes.error)}`);
   }, pollingInterval);
 };
 
-export const storeTx = (
+export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
   tx: string
 ) => {
   const txHash = lucid.fromTx(tx).toHash();
-  addToMempool(db, txHash, tx);
+  await addToMempool(db, txHash, tx);
 };
 
 const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
@@ -138,12 +138,16 @@ export const addToArchive = async (
     ${txs.map(tx => `(?, ?)`).join(', ')}
   `;
   const blockValues = txs.flatMap((tx) => [tx.tx_hash, blockHash]);
-  db.run(blockQuery, blockValues, function (err) {
-    if (err) {
-      logAbort(`Archive: error inserting block: ${err.message}`);
-    } else {
-      logInfo(`Archive: block stored with rowid ${this.lastID}`);
-    }
+  await new Promise<void>((resolve, reject) => {
+    db.run(blockQuery, blockValues, function (err) {
+      if (err) {
+        logAbort(`Archive: error inserting block: ${err.message}`);
+        reject(err);
+      } else {
+        logInfo(`Archive: block stored with rowid ${this.lastID}`);
+        resolve();
+      }
+    });
   });
   const txQuery = `
     INSERT INTO archive_tx (tx_hash, tx_cbor) VALUES
@@ -176,12 +180,16 @@ export interface MempoolRow {
 
 export const addToMempool = async (db : sqlite3.Database, txHash : string, tx_cbor : string) => {
   const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES (?, ?)`;
-  db.run(query, [txHash, tx_cbor], function (err) {
-    if (err) {
-      logAbort(`Mempool: error inserting tx to mempool: ${err.message}`);
-    } else {
-      logInfo(`Mempool: tx stored with rowid ${this.lastID}`);
-    }
+  await new Promise<void>((resolve, reject) => {
+    db.run(query, [txHash, tx_cbor], function (err) {
+      if (err) {
+        logAbort(`Mempool: error inserting tx to mempool: ${err.message}`);
+        reject(err);
+      } else {
+        logInfo(`Mempool: tx stored with rowid ${this.lastID}`);
+        resolve();
+      }
+    });
   });
 }
 
@@ -201,12 +209,16 @@ export const retrieveMempool = async (db : sqlite3.Database) => {
 
 export const clearMempool = async (db: sqlite3.Database) => {
   const query = `DELETE FROM mempool;`;
-  db.run(query, function (err) {
-    if (err) {
-      logAbort(`Mempool: clearing error: ${err.message}`);
-    } else {
-      logInfo(`Mempool: cleared`);
-    }
+  await new Promise<void>((resolve, reject) => {
+    db.run(query, function (err) {
+      if (err) {
+        logAbort(`Mempool: clearing error: ${err.message}`);
+        reject(err);
+      } else {
+        logInfo(`Mempool: cleared`);
+        resolve();
+      }
+    });
   });
 };
 

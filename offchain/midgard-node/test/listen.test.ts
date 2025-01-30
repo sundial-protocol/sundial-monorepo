@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import sqlite3 from "sqlite3";
-import { addToArchive, ArchiveTxRow, clearArchive, clearMempool, initializeDb, retrieveMempool, storeTx } from "../src/commands/listen.js";
+import {
+  addToArchive,
+  ArchiveTxRow,
+  clearArchive,
+  clearMempool,
+  initializeDb,
+  retrieveMempool,
+  storeTx,
+} from "../src/commands/listen.js";
 import { CML, LucidEvolution } from "@lucid-evolution/lucid";
 import { logAbort } from "../src/utils.js";
 
@@ -19,10 +27,13 @@ describe("database", () => {
 
   const tx1 =
     "84a300d9010281825820000000000000000000000000000000000000000000000000000000000000000000019582581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d605ceb8240667acbd2cb93d8efe342c0b9fa51f04678e3d5cddec94a881a05f5b9f082581d603b493979352930f3eccbd47ae0e12ef6dcea89326211cd80f87cf85a1b00000001dcd95d400200a100d901028182582015c6708ee2da48b2c46c5ab3e001ff636fa0b0e2a48b6676dffc8e36fe02c5985840599c8a11e9888ab60c10f78c708b55f6b542c6d70fa57775b26efe519dc9459604f2e1633601e2b9e448181e694278f3a89d8fea462dcfd772a6a9248e1f730df5f6";
-  const expectedRow1: ArchiveTxRow = {"tx_cbor" : tx1, "tx_hash": lucid.fromTx(tx1).toHash()};
+  const expectedRow1: ArchiveTxRow = {
+    tx_cbor: tx1,
+    tx_hash: lucid.fromTx(tx1).toHash(),
+  };
 
   it("should store transaction in the mempool", async () => {
-    storeTx(lucid as unknown as LucidEvolution, db, tx1);
+    await storeTx(lucid as unknown as LucidEvolution, db, tx1);
     const result = await retrieveMempool(db);
     expect(result).toStrictEqual([expectedRow1]);
   });
@@ -35,45 +46,50 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
-  const tx2 = "84a300d90102818258207351d824f3565c936f87d67c7352e0d34f13a51e6427bfad2a86e49bbae8a2dc14019582581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60f2d5d0b7f8198330ba9410ffecdf45dcc67e774849bfbe8115a8cfcf1b0000000165a6d6800200a100d9010281825820f80e638fcfe3a3d60a785202efa9ff231b804db638896eb4a63bf6e0acceda405840567525cdfd1ee65e702c28901adbc16915a46f140dd91669c160b9b9095691205a26f7f95411ece1f2a9cd19901a6525a449256d4232eadf061db137967f0a09f5f6"
-  const expectedRow2: ArchiveTxRow = {"tx_cbor" : tx2, "tx_hash": lucid.fromTx(tx2).toHash()};
-  const blockHash = lucid.fromTx(tx1).toHash()
+  const tx2 =
+    "84a300d90102818258207351d824f3565c936f87d67c7352e0d34f13a51e6427bfad2a86e49bbae8a2dc14019582581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60902644a3189c282d9a54e4aeac15f03b16bef0fc17dd8aa6f9bc8b8f1a05f5b9f082581d60f2d5d0b7f8198330ba9410ffecdf45dcc67e774849bfbe8115a8cfcf1b0000000165a6d6800200a100d9010281825820f80e638fcfe3a3d60a785202efa9ff231b804db638896eb4a63bf6e0acceda405840567525cdfd1ee65e702c28901adbc16915a46f140dd91669c160b9b9095691205a26f7f95411ece1f2a9cd19901a6525a449256d4232eadf061db137967f0a09f5f6";
+  const expectedRow2: ArchiveTxRow = {
+    tx_cbor: tx2,
+    tx_hash: lucid.fromTx(tx2).toHash(),
+  };
+  const blockHash = lucid.fromTx(tx1).toHash();
 
   it("should store a block hash alongside with it's transactions in the archive", async () => {
     await addToArchive(db, blockHash, [expectedRow1, expectedRow2]);
     const result = await retrieveArchive(db);
-    expect(result).toStrictEqual(
-      [ {"block_hash": blockHash, ...expectedRow1}
-      , {"block_hash": blockHash, ...expectedRow2}
-      ]);
+    expect(result).toStrictEqual([
+      { block_hash: blockHash, ...expectedRow1 },
+      { block_hash: blockHash, ...expectedRow2 },
+    ]);
   });
 
   it("clears the archive", async () => {
     const initialRows = await retrieveArchive(db);
     expect(initialRows.length).toBe(2);
     await clearArchive(db);
-    const resultBlocks = await new Promise<AchiveBlockRow[]>((resolve, reject) => {
-      db.all("SELECT * FROM archive_block", (err, rows: AchiveBlockRow[]) => {
-        if (err) {
-          logAbort(`Error retrieving archive: ${err.message}`);
-          reject(err)
-        };
-        resolve(rows);
-      });
-    });
+    const resultBlocks = await new Promise<AchiveBlockRow[]>(
+      (resolve, reject) => {
+        db.all("SELECT * FROM archive_block", (err, rows: AchiveBlockRow[]) => {
+          if (err) {
+            logAbort(`Error retrieving archive: ${err.message}`);
+            reject(err);
+          }
+          resolve(rows);
+        });
+      }
+    );
     const resultTxs = await new Promise<ArchiveTxRow[]>((resolve, reject) => {
       db.all("SELECT * FROM archive_tx", (err, rows: ArchiveTxRow[]) => {
         if (err) {
           logAbort(`Error retrieving archive: ${err.message}`);
-          reject(err)
-        };
+          reject(err);
+        }
         resolve(rows);
       });
     });
     expect(resultBlocks.length).toBe(0);
     expect(resultTxs.length).toBe(0);
   });
-
 });
 
 interface AchiveBlockRow {
@@ -86,7 +102,7 @@ interface ArchiveRow {
   tx_cbor: string;
 }
 
-const retrieveArchive = async (db : sqlite3.Database) => {
+const retrieveArchive = async (db: sqlite3.Database) => {
   const query = `
     SELECT archive_block.block_hash,
            archive_block.tx_hash,
@@ -97,8 +113,8 @@ const retrieveArchive = async (db : sqlite3.Database) => {
     db.all(query, (err, rows: ArchiveRow[]) => {
       if (err) {
         logAbort(`Error retrieving archive: ${err.message}`);
-        reject(err)
-      };
+        reject(err);
+      }
       resolve(rows);
     });
   });
@@ -113,4 +129,3 @@ class MockLucid {
     };
   }
 }
-
