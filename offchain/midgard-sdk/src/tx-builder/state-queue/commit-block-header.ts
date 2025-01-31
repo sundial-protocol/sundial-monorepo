@@ -1,18 +1,11 @@
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
 import { Effect, Either } from "effect";
-import { MerkleRoot, POSIXTime } from "@/types/contracts/common.js";
 import { errorToString } from "@/utils/common.js";
-import { FetchConfig } from "@/types/state-queue.js";
+import { CommitBlockParams, FetchConfig } from "@/types/state-queue.js";
 import { fetchLatestCommitedBlockProgram } from "@/endpoints/state-queue/fetch-latest-block.js";
 import { Header } from "@/types/contracts/ledger-state.js";
 import { hashHeader } from "@/utils/ledger-state.js";
-
-export type CommitBlockParams = {
-  newUTxOsRoot: MerkleRoot;
-  transactionsRoot: MerkleRoot;
-  endTime: POSIXTime;
-};
 
 /**
  * Builds portions of a tx required for submitting a new block, using the

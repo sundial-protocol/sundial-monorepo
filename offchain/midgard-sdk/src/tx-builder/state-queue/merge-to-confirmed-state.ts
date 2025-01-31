@@ -2,7 +2,6 @@ import { Effect, Either } from "effect";
 import {
   Assets,
   Data,
-  Literal,
   LucidEvolution,
   TxBuilder,
   toUnit,
@@ -14,21 +13,18 @@ import { ConfirmedState, Header } from "@/types/contracts/ledger-state.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { hashHeader } from "@/utils/ledger-state.js";
 import { NodeDatum } from "@/types/contracts/linked-list/index.js";
-import { Redeemer, RedeemerSchema } from "@/types/contracts/state-queue.js";
-
-export type MergeParams = {};
+import { Redeemer } from "@/types/contracts/state-queue.js";
 
 /**
  * Merge
  *
- * @param lucid - The LucidEvolution
- * @param params - The parameters
+ * @param lucid - The `LucidEvolution` API object.
+ * @param fetchConfig - Configuration values required to know where to look for which NFT.
  * @returns {TxBuilder} A TxBuilder instance that can be used to build the transaction.
  */
 export const mergeTxBuilder = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
-  params: MergeParams
 ): Effect.Effect<TxBuilder, string> =>
   Effect.gen(function* () {
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
