@@ -9,7 +9,7 @@ import { Effect, Either } from "effect";
 import { MerkleRoot, POSIXTime } from "@/types/contracts/common.js";
 import { hashHexWithBlake2b224 } from "@/utils/helpers.js";
 
-export type Params = {
+export type CommitBlockParams = {
   newUTxOsRoot: MerkleRoot;
   transactionsRoot: MerkleRoot;
   endTime: POSIXTime;
@@ -25,7 +25,7 @@ export type Params = {
 export const commitTxBuilder = (
   lucid: LucidEvolution,
   config: FetchConfig,
-  { newUTxOsRoot, transactionsRoot, endTime }: Params
+  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams
 ): Effect.Effect<TxBuilder, string> =>
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);

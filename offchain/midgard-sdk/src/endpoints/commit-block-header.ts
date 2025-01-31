@@ -8,7 +8,7 @@ import { errorToString } from "@/utils/helpers.js";
 export const commitBlockHeaderProgram = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
-  sqCommitParams: StateQueue.Params,
+  sqCommitParams: StateQueue.CommitBlockParams,
   aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams
 ): Effect.Effect<TxSignBuilder, string> =>
   Effect.gen(function* () {
@@ -30,8 +30,8 @@ export const commitBlockHeaderProgram = (
   });
 
 /**
- * Commits a block header using the provided `LucidEvolution` instance, fetch
- * config, and required parameters.
+ * Builds completed tx for submitting a new block using the provided
+ * `LucidEvolution` instance, fetch config, and required parameters.
  *
  * @param lucid - The `LucidEvolution` API object.
  * @param fetchConfig - Configuration values required to know where to look for which NFT.
@@ -42,7 +42,7 @@ export const commitBlockHeaderProgram = (
 export const commitBlockHeader = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
-  sqCommitParams: StateQueue.Params,
+  sqCommitParams: StateQueue.CommitBlockParams,
   aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams
 ): Promise<TxSignBuilder> =>
   makeReturn(
