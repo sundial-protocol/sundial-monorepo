@@ -12,7 +12,7 @@ export const getLinkFromBlockUTxO = (
   return Either.map(nodeDatum, (nd) => nd.next)
 };
 
-export const getConfirmedStateFromBlockUTxO = (
+export const getConfirmedStateFromUTxO = (
   blockUTxO: UTxO
 ): Either.Either<{ data: ConfirmedState; link: NodeKey }, string> => {
   const datumCBOR = blockUTxO.datum;

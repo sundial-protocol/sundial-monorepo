@@ -36,7 +36,7 @@ export const getSingleAssetApartFromAda = (
       woLovelace[0][1],
     ]);
   } else {
-    return Either.left("Operation failed");
+    return Either.left("Expected exactly 1 additional asset apart from ADA");
   }
 };
 
@@ -48,7 +48,7 @@ export const utxosAtByNFTPolicyId = (
   Effect.gen(function* () {
     const allUTxOs = yield* Effect.tryPromise({
       try: () => lucid.utxosAt(addressOrCred),
-      catch: (_) => "Failed to fetch state queue UTxOs",
+      catch: (_) => `Failed to fetch UTxOs at: ${addressOrCred}`,
     });
     const nftEithers: Either.Either<UTxO, string>[] = allUTxOs.map(
       (u: UTxO) => {
@@ -59,7 +59,9 @@ export const utxosAtByNFTPolicyId = (
             if (sym === policyId && qty === 1n) {
               return Either.right(u);
             } else {
-              return Either.left("UTxO without expected NFT collection");
+              return Either.left(
+                "UTxO doesn't have the expected NFT policy ID, or its quantity is not exactly 1"
+              );
             }
           }
         );

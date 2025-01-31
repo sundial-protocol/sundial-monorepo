@@ -1,25 +1,16 @@
 import { Effect, Either } from "effect";
-import {
-  Address,
-  LucidEvolution,
-  PolicyId,
-  UTxO,
-} from "@lucid-evolution/lucid";
+import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
-import { getConfirmedStateFromBlockUTxO } from "@/utils/state-queue.js";
+import { getConfirmedStateFromUTxO } from "@/utils/state-queue.js";
 import { ConfirmedState } from "@/types/contracts/ledger-state.js";
 import { NodeKey } from "@/types/contracts/linked-list/index.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
-
-export type Config = {
-  stateQueueAddress: Address;
-  stateQueuePolicyId: PolicyId;
-};
+import { FetchConfig } from "@/types/state-queue.js";
 
 export const fetchConfirmedStateAndItsLinkProgram = (
   lucid: LucidEvolution,
-  config: Config
+  config: FetchConfig
 ): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, string> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
@@ -31,7 +22,7 @@ export const fetchConfirmedStateAndItsLinkProgram = (
       | { data: ConfirmedState; link: NodeKey }
       | undefined;
     const filteredForConfirmedState = allBlocks.filter((u: UTxO) => {
-      const eithConfirmedState = getConfirmedStateFromBlockUTxO(u);
+      const eithConfirmedState = getConfirmedStateFromUTxO(u);
       if (Either.isRight(eithConfirmedState)) {
         confirmedStateResult = eithConfirmedState.right;
         return true;
@@ -77,6 +68,6 @@ export const fetchConfirmedStateAndItsLinkProgram = (
  */
 export const fetchConfirmedStateAndItsLink = (
   lucid: LucidEvolution,
-  config: Config
+  config: FetchConfig
 ) =>
   makeReturn(fetchConfirmedStateAndItsLinkProgram(lucid, config)).unsafeRun();

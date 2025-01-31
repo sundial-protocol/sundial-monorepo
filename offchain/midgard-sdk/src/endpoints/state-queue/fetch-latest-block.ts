@@ -1,22 +1,13 @@
 import { Effect, Either } from "effect";
-import {
-  Address,
-  LucidEvolution,
-  PolicyId,
-  UTxO,
-} from "@lucid-evolution/lucid";
+import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
 import { getLinkFromBlockUTxO } from "@/utils/state-queue.js";
-
-export type Config = {
-  stateQueueAddress: Address;
-  stateQueuePolicyId: PolicyId;
-};
+import { FetchConfig } from "@/types/state-queue.js";
 
 export const fetchLatestCommitedBlockProgram = (
   lucid: LucidEvolution,
-  config: Config
+  config: FetchConfig
 ): Effect.Effect<UTxO, string> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
@@ -45,5 +36,5 @@ export const fetchLatestCommitedBlockProgram = (
  */
 export const fetchLatestCommitedBlock = (
   lucid: LucidEvolution,
-  config: Config
+  config: FetchConfig
 ) => makeReturn(fetchLatestCommitedBlockProgram(lucid, config)).unsafeRun();

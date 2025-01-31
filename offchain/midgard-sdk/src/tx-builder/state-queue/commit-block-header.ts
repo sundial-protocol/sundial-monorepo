@@ -1,13 +1,12 @@
-import {
-  Config as FetchConfig,
-  fetchLatestCommitedBlockProgram,
-} from "@/endpoints/state-queue/fetch-latest-block.js";
-import { Header } from "@/types/contracts/ledger-state.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
 import { Effect, Either } from "effect";
 import { MerkleRoot, POSIXTime } from "@/types/contracts/common.js";
-import { hashHexWithBlake2b224 } from "@/utils/common.js";
+import { errorToString } from "@/utils/common.js";
+import { FetchConfig } from "@/types/state-queue.js";
+import { fetchLatestCommitedBlockProgram } from "@/endpoints/state-queue/fetch-latest-block.js";
+import { Header } from "@/types/contracts/ledger-state.js";
+import { hashHeader } from "@/utils/ledger-state.js";
 
 export type CommitBlockParams = {
   newUTxOsRoot: MerkleRoot;
@@ -16,10 +15,12 @@ export type CommitBlockParams = {
 };
 
 /**
- * Commit
+ * Builds portions of a tx required for submitting a new block, using the
+ * provided `LucidEvolution` instance, fetch config, and required parameters.
  *
- * @param lucid - The LucidEvolution
- * @param params - The parameters
+ * @param lucid - The `LucidEvolution` API object.
+ * @param fetchConfig - Configuration values required to know where to look for which NFT.
+ * @param commitParams - Parameters required for committing to state queue.
  * @returns {TxBuilder} A TxBuilder instance that can be used to build the transaction.
  */
 export const commitTxBuilder = (
@@ -30,19 +31,13 @@ export const commitTxBuilder = (
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
     const eithLatestNodeDatum = getNodeDatumFromUTxO(latestBlock);
-    const latestHeader = yield* Effect.try({
-      try: () => {
-        if (Either.isRight(eithLatestNodeDatum)) {
-          return Data.castFrom(eithLatestNodeDatum.right.data, Header);
-        } else {
-          throw new Error();
-        }
-      },
-      catch: (_) => "Failed coercing latest block's datum",
+    const latestHeaderProgram: Effect.Effect<Header, string> = Effect.try({
+      try: () =>
+        Data.castFrom(Either.getOrThrow(eithLatestNodeDatum).data, Header),
+      catch: (e) => `Failed coercing latest block's datum: ${errorToString(e)}`,
     });
-    const eithPrevHeaderHash = hashHexWithBlake2b224(
-      Data.to(latestHeader, Header)
-    );
+    const latestHeader: Header = yield* latestHeaderProgram;
+    const eithPrevHeaderHash = hashHeader(latestHeader);
     if (Either.isRight(eithPrevHeaderHash)) {
       const newHeader = {
         ...latestHeader,

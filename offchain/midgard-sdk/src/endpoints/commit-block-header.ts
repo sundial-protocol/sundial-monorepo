@@ -1,9 +1,9 @@
-import { Config as FetchConfig } from "@/endpoints/state-queue/fetch-latest-block.js";
 import { makeReturn } from "../core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue, ActiveOperators } from "../tx-builder/index.js";
 import { Effect } from "effect";
 import { errorToString } from "@/utils/common.js";
+import {FetchConfig} from "@/types/state-queue.js";
 
 export const commitBlockHeaderProgram = (
   lucid: LucidEvolution,

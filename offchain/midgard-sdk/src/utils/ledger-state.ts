@@ -1,6 +1,8 @@
-import { CML, OutRef } from "@lucid-evolution/lucid";
+import { CML, Data, OutRef } from "@lucid-evolution/lucid";
 import { Either } from "effect";
 import { cmlInputToOutRef } from "./cml.js";
+import { Header } from "@/types/contracts/ledger-state.js";
+import { hashHexWithBlake2b224 } from "./common.js";
 
 export const findSpentAndProducedUTxOs = (
   txCBOR: string
@@ -27,3 +29,6 @@ export const findSpentAndProducedUTxOs = (
     return Either.left("Something went wrong decoding the transaction");
   }
 };
+
+export const hashHeader = (header: Header): Either.Either<string, string> =>
+  hashHexWithBlake2b224(Data.to(header, Header));
