@@ -2,7 +2,7 @@ import { Data } from "@lucid-evolution/lucid";
 import { ValueSchema } from "../common.js";
 
 export const NodeKeySchema = Data.Enum([
-  Data.Object({ Key: Data.Object({ key: Data.Bytes() }) }),
+  Data.Object({ Key: Data.Bytes() }),
   Data.Literal("Empty"),
 ]);
 export type NodeKey = Data.Static<typeof NodeKeySchema>;
