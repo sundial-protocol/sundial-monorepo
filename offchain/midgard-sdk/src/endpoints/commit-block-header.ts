@@ -3,7 +3,7 @@ import { makeReturn } from "../core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue, ActiveOperators } from "../tx-builder/index.js";
 import { Effect } from "effect";
-import { errorToString } from "@/utils/helpers.js";
+import { errorToString } from "@/utils/common.js";
 
 export const commitBlockHeaderProgram = (
   lucid: LucidEvolution,

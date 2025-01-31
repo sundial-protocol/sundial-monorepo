@@ -5,7 +5,7 @@ import {
   PolicyId,
   UTxO,
 } from "@lucid-evolution/lucid";
-import { utxosAtByNFTPolicyId } from "@/utils/helpers.js";
+import { utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
 import { getLinkFromBlockUTxO } from "@/utils/state-queue.js";
 

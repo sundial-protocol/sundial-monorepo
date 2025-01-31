@@ -7,7 +7,7 @@ import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
 import { Effect, Either } from "effect";
 import { MerkleRoot, POSIXTime } from "@/types/contracts/common.js";
-import { hashHexWithBlake2b224 } from "@/utils/helpers.js";
+import { hashHexWithBlake2b224 } from "@/utils/common.js";
 
 export type CommitBlockParams = {
   newUTxOsRoot: MerkleRoot;
