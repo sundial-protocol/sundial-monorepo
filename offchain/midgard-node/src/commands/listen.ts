@@ -145,32 +145,34 @@ export const addBlockUtxosToConfirmedState = (
       ) VALUES
     ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`).join(", ")}
   `;
-  const values = utxos.flatMap((utxo) =>
-    [ blockHash
-    , utxo.txHash
-    , utxo.outputIndex
-    , utxo.address
-    , JSON.stringify(utxo.assets, (_, v) => typeof v === 'bigint' ? v.toString() : v)
-    , utxo.datumHash
-    , utxo.datum
-    , utxo.scriptRef
-    ]);
-  return new Promise((resolve, reject) => {
-    db.all(query, values, (err, result) => {
+  const values = utxos.flatMap((utxo) => [
+    blockHash,
+    utxo.txHash,
+    utxo.outputIndex,
+    utxo.address,
+    JSON.stringify(utxo.assets, (_, v) =>
+      typeof v === "bigint" ? v.toString() : v
+    ),
+    utxo.datumHash,
+    utxo.datum,
+    utxo.scriptRef,
+  ]);
+  return new Promise<void>((resolve, reject) => {
+    db.run(query, values, err => {
       if (err) {
         logAbort(`Confirmed state: error inserting utxos: ${err.message}`);
         reject();
       } else {
         logInfo(`Confirmed state: ${utxos.length} new utxos added`);
-        resolve(result);
+        resolve();
       }
     });
-  })
-}
+  });
+};
 
-export const clearConfirmedState  = (db: sqlite3.Database) => {
+export const clearConfirmedState = (db: sqlite3.Database) => {
   const query = `DELETE FROM confirmed_state_utxo;`;
-  db.run(query, function (err) {
+  db.run(query, err => {
     if (err) {
       logAbort(`Confirmed state: clearing error: ${err.message}`);
     } else {
@@ -196,75 +198,38 @@ export const changeLatestBlock = async (
       , scriptRef
       ) VALUES ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`).join(", ")}
   `;
-  const values = utxos.flatMap((utxo) =>
-    [ blockHash
-    , utxo.txHash
-    , utxo.outputIndex
-    , utxo.address
-    , JSON.stringify(utxo.assets, (_, v) => typeof v === 'bigint' ? v.toString() : v)
-    , utxo.datumHash
-    , utxo.datum
-    , utxo.scriptRef
-    ]);
+  const values = utxos.flatMap((utxo) => [
+    blockHash,
+    utxo.txHash,
+    utxo.outputIndex,
+    utxo.address,
+    JSON.stringify(utxo.assets, (_, v) =>
+      typeof v === "bigint" ? v.toString() : v
+    ),
+    utxo.datumHash,
+    utxo.datum,
+    utxo.scriptRef,
+  ]);
   return new Promise<void>((resolve, reject) => {
-    db.run("BEGIN TRANSACTION;")
-    db.run(query, values, function (err) {
+    db.run("BEGIN TRANSACTION;");
+    db.run(query, values, err => {
       if (err) {
-          logAbort(`Confirmed state: error inserting utxos: ${err.message}`);
-          db.run("ROLLBACK;");
-          reject(err);
+        logAbort(`Confirmed state: error inserting utxos: ${err.message}`);
+        db.run("ROLLBACK;");
+        reject(err);
       } else {
-        logInfo(`Latest block utxos: new latest block ${blockHash} with ${utxos.length} utxos`);
-        db.run(`DELETE FROM latest_block_utxo WHERE NOT (block_hash = '${blockHash}');`);
+        logInfo(
+          `Latest block utxos: new latest block ${blockHash} with ${utxos.length} utxos`
+        );
+        db.run(
+          `DELETE FROM latest_block_utxo WHERE NOT (block_hash = '${blockHash}');`
+        );
         db.run("COMMIT;");
         resolve();
-      }})})
+      }
+    });
+  });
 };
-
-// export const changeLatestBlock = async (
-//   db: sqlite3.Database,
-//   blockHash: string,
-//   utxos: UTxO[]
-// ) => {
-//   const query = `
-//     INSERT INTO latest_block_utxo
-//       ( block_hash
-//       , tx_hash
-//       , output_index
-//       , address
-//       , assets
-//       , datum_hash
-//       , datum
-//       , scriptRef
-//       ) VALUES ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`).join(", ")};
-//   `;
-//   const values = utxos.flatMap((utxo) =>
-//     [ blockHash
-//     , utxo.txHash
-//     , utxo.outputIndex
-//     , utxo.address
-//     , JSON.stringify(utxo.assets, (_, v) => typeof v === 'bigint' ? v.toString() : v)
-//     , utxo.datumHash
-//     , utxo.datum
-//     , utxo.scriptRef
-//     ]);
-//   return new Promise<void>((resolve, reject) => {
-//     db.serialize(() => {
-//       db.run("BEGIN TRANSACTION;");
-//       db.run(query, values, function (err) {
-//         if (err) {
-//           logAbort(`Latest block utxos: error updating block: ${err.message}`);
-//           db.run("ROLLBACK;");
-//           reject(err);
-//         } else {
-//           logInfo(`Latest block utxos: new latest block ${blockHash} with ${utxos.length} utxos`);
-//           db.run(`DELETE FROM latest_block_utxo WHERE NOT (block_hash = '${blockHash}');`);
-//           db.run("COMMIT;");
-//           resolve();
-//         }
-//       })});
-//   });
-// }
 
 export interface ArchiveTxRow {
   tx_hash: string;
@@ -294,7 +259,7 @@ export const addToArchive = async (
   });
   const txQuery = `
     INSERT INTO archive_tx (tx_hash, tx_cbor) VALUES
-    ${txs.map((tx) => `(?, ?)`).join(", ")}
+    ${txs.map(_ => `(?, ?)`).join(", ")}
     `;
   db.run(
     txQuery,
@@ -314,7 +279,7 @@ export const addToArchive = async (
 export const clearArchive = (db: sqlite3.Database): Promise<void> => {
   const query = `DELETE FROM archive_block;`;
   return new Promise((resolve, reject) => {
-    db.run(query, function (err) {
+    db.run(query, err => {
       if (err) {
         logAbort(`Archive: clearing error: ${err.message}`);
         return reject(err);
@@ -325,11 +290,6 @@ export const clearArchive = (db: sqlite3.Database): Promise<void> => {
     });
   });
 };
-
-export interface MempoolRow {
-  tx_hash: string;
-  tx_cbor: string;
-}
 
 export const addToMempool = async (
   db: sqlite3.Database,
@@ -349,6 +309,11 @@ export const addToMempool = async (
     });
   });
 };
+
+export interface MempoolRow {
+  tx_hash: string;
+  tx_cbor: string;
+}
 
 export const retrieveMempool = async (db: sqlite3.Database) => {
   const query = `SELECT * FROM mempool`;
