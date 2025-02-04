@@ -30,12 +30,12 @@ A transaction cannot spend a non-existing (or an already spent) UTxO. Formal spe
 \begin{split}
   &\forall t \in Ledger,\; \forall i \in spend\_inputs(t): \\
     &\quad(
-      \exists t_1 \in Ledger,
+      \exists t_1 \in Ledger,\;
         t \neq t_1 \;\land\;
         i \in outputs(t_1) 
     ) \;\land\\
     &\quad(
-      \nexists t_2 \in Ledger,
+      \nexists t_2 \in Ledger,\;
         t \neq t_2 \;\land\;
         i \in spend\_inputs(t_2)
     )
@@ -270,14 +270,13 @@ Formal specification:
 \begin{split}
   &\forall t \in Ledger:\\
     &\quad required\_signer\_hashes(t) = \left\{
-      \begin{array}{l!{\vrule width 1pt}l}
-        paymentHK(addr(u)) &
+        paymentHK(addr(u))
+        \;\middle|\;
         \begin{array}{l}
            (r, u) \in utxos_{post} \\
            r \in spend\_inputs(t) \\
            addr(u) \in Addr^{vkey}
         \end{array}
-      \end{array}
     \right\}
 \end{split}
 \end{empheq}
@@ -407,7 +406,7 @@ All native scripts are provided.
 Formal specification:
 \begin{empheq}[box=\ledgerRuleBox]{equation*}
 \begin{split}
-  &\forall t \in Ledger, \forall u \in output(t):\\
+  &\forall t \in Ledger,\; \forall u \in output(t):\\
     &\quad
       addr(u) \in Addr^{native}_{v2} \implies \bigl(
         \exists (h, s) \in script\_tx\_wits(t),\; script\_hash(addr(u)) = h 
@@ -577,7 +576,7 @@ Formal specification:
 \begin{split}
   &\forall t \in Ledger:\\
     &\quad \bigl(
-        \forall o \in outputs(t), \, value(o) \geq \mathbf{0}
+        \forall o \in outputs(t),\; value(o) \geq \mathbf{0}
       \bigr)
 \end{split}
 \end{empheq}
@@ -640,7 +639,7 @@ Formal specification:
 Fraud proof construction:
 \begin{enumerate}
   \item Let $t$ be the transaction alleged to violate the ledger rule.
-  \item A membership proof must be provided that shows that the transaction $o$ is included in the ledger.
+  \item A membership proof must be provided that shows that $t \in txs$.
   \item A membership proof must be provided that shows that $o \in outputs(t)$.
   \item $lovelaces(value(o)) < min\_ada\_value(o)$ must hold.
 \end{enumerate}
@@ -659,11 +658,9 @@ Formal specification:
 Fraud proof construction:
 \begin{enumerate}
   \item Let $u$ be the utxo alleged to violate the ledger rule.
-  \item A membership proof must be provided that shows that the transaction $u \in utxos_{post}$.
+  \item A membership proof must be provided that shows that $u \in utxos_{post}$.
   \item $lovelaces(value(u)) < min\_ada\_value(u)$ must hold.
 \end{enumerate}
-
-% TODO George reached here.
 
 \subsection{Rule: Network id of outputs}
 \label{rule:network-id-of-outputs}
@@ -678,46 +675,56 @@ Formal specification:
 
 This ledger rule is violated if any of the following violations occur:
 \begin{itemize-multi}
-  \item \hyperref[violation:OUTPUT-NETWORK]{OUTPUT-NETWORK}
+  \item \hyperref[violation:OUTPUT-NETWORK-UTXO]{OUTPUT-NETWORK-UTXO}
+  \item \hyperref[violation:OUTPUT-NETWORK-TX]{OUTPUT-NETWORK-TX}
 \end{itemize-multi}
 
-\subsubsection{OUTPUT-NETWORK violation}
-\label{violation:OUTPUT-NETWORK}
-A UTxO $u$ address has a wrong network id.
+\subsubsection{OUTPUT-NETWORK-TX violation}
+\label{violation:OUTPUT-NETWORK-TX}
+An output of a transaction $t$ has a wrong network id.
 Formal specification:
 \begin{equation*}
 \begin{split}
-  &\exists u \in utxos_{post}:\\
-  &\quad network\_id(addr(o)) \neq network\_id_{Midgard}
+  &\exists t \in txs,\; \exists o \in outputs(t):\\
+    &\quad network\_id(addr(o)) \neq network\_id_{Midgard}
 \end{split}
 \end{equation*}
 
 Fraud proof construction:
 \begin{enumerate}
-  \item Let $u$ be the transaction alleged to violate the ledger rule.
-  \item A membership proof must be provided that shows that the transaction $u$ is included in the ledger.
+  \item Let $t$ be the transaction alleged to violate the ledger rule. 
+  \item A membership proof must be provided that shows that $t \in txs$.
+  \item A membership proof must be provided that $o \in outputs(t)$.
   \item $network\_id(addr(o)) \neq network\_id_{Midgard}$ must hold.
 \end{enumerate}
 
-\subsection{Rule: Network id of deposits}
-\label{rule:network-id-of-deposits}
-All deposit output addresses must have the correct network id.
+\subsubsection{OUTPUT-NETWORK-UTXO violation}
+\label{violation:OUTPUT-NETWORK-UTXO}
+A UTxO $u$ address has a wrong network id.
 Formal specification:
-\begin{empheq}[box=\ledgerRuleBox]{equation*}
-    \forall t \in Deposit, \forall o \in outputs(t), network\_id(addr(o)) = network\_id_{Midgard}
-\end{empheq}
+\begin{equation*}
+\begin{split}
+  &\exists u \in utxos_{post}:\\
+    &\quad network\_id(addr(o)) \neq network\_id_{Midgard}
+\end{split}
+\end{equation*}
 
-This ledger rule is violated if any of the following violations occur:
-\begin{itemize-multi}
-  \item \hyperref[violation:OUTPUT-NETWORK]{OUTPUT-NETWORK}
-\end{itemize-multi}
+Fraud proof construction:
+\begin{enumerate}
+  \item Let $u$ be the output alleged to violate the ledger rule.
+  \item A membership proof must be provided that shows that $u \in utxos_{post}$.
+  \item $network\_id(addr(o)) \neq network\_id_{Midgard}$ must hold.
+\end{enumerate}
 
 \subsection{Rule: Network id of transaction}
 \label{rule:network-id-of-transaction}
 All transactions must have the correct network id.
 Formal specification:
 \begin{empheq}[box=\ledgerRuleBox]{equation*}
-    \forall t \in Ledger, network\_id(t) = network\_id_{Midgard}
+\begin{split}
+  &\forall t \in Ledger:\\
+    &\quad network\_id(t) = network\_id_{Midgard}
+\end{split}
 \end{empheq}
 
 This ledger rule is violated if any of the following violations occur:
@@ -727,37 +734,36 @@ This ledger rule is violated if any of the following violations occur:
 
 \subsubsection{TRANSACTION-NETWORK violation}
 \label{violation:TRANSACTION-NETWORK}
-A UTxO $u$ address has a wrong network id.
+A transaction $t$ has a wrong network ID. 
 Formal specification:
 \begin{equation*}
-  \exists t \in txs, network\_id(t) \neq network\_id_{Midgard}
+\begin{split}
+  &\exists t \in txs:\\
+    &\quad network\_id(t) \neq network\_id_{Midgard}
+\end{split}
 \end{equation*}
 
 Fraud proof construction:
 \begin{enumerate}
   \item Let $t$ be the transaction alleged to violate the ledger rule.
-  \item A membership proof must be provided that shows that the transaction $t$ is included in the ledger.
+  \item A membership proof must be provided that shows that $t \in txs$.
   \item $network\_id(t) \neq network\_id_{Midgard}$ must hold.
 \end{enumerate}
 
 \subsection{Rule: All reference inputs must be valid}
 \label{rule:all-reference-inputs-must-be-valid}
 
-A transaction cannot reference a non-existing (or an already spent) UTxO. Formal specification:
+A transaction can only reference utxos that were produced by transactions that do not follow the transaction in the ledger's order, and it cannot reference utxos that were spent in preceding transactions.
+Formal specification:
 \begin{empheq}[box=\ledgerRuleBox]{equation*}
 \begin{split}
-  &\forall t \in Ledger, \forall i \in reference\_inputs(t): \\
-    &\quad(
-      \exists t_1 \in Ledger,\;
-        t \neq t_1 \;\land\;
-        i \in outputs(t_1)
-    ) \;\land\\
-    &\quad(
-      \nexists t_2 \in Ledger,\;
-        t \neq t_2 \;\land\;
-        block\_number(t_2) < block\_number(t) \;\land\;
-        i \in spend\_inputs(t_2)
-    )
+  &\forall t \in Ledger,\; \forall r \in reference\_inputs(t):\\
+    &\quad (\exists t_1 \in Ledger,\;
+      t_1 \preccurlyeq t \;\land\;
+      r \in outputs(t_1)) \;\land\\
+    &\quad (\nexists t_2 \in Ledger,\;
+      t_2 \prec t \;\land\;
+      r \in spent\_inputs(t_2))
 \end{split}
 \end{empheq}
 
@@ -773,29 +779,31 @@ A transaction $t$ attempted to spend the UTxO $i$ that does not exist or was spe
 Formal specification:
 \begin{equation*}
 \begin{split}
-    \exists t \in txs, &\exists i \in reference\_inputs(t): \\
-    &( i \notin utxos_{prev} ) \land  \\
-    &( \nexists t_1 \in txs, t \neq t_1 \land tx\_hash(t_1) = tx\_hash(i) )
+  &\exists t \in txs,\; \exists i \in reference\_inputs(t): \\
+    &\quad( i \notin utxos_{prev} ) \;\land\\
+    &\quad( \nexists t_1 \in txs,\; t \neq t_1 \land tx\_hash(t_1) = tx\_hash(i) )
 \end{split}
 \end{equation*}
 
 Fraud proof construction:
 \begin{enumerate}
   \item Let $t$ be the transaction alleged to violate the ledger rule. 
-  \item A membership proof must be provided for $t$ that shows that the transaction is included in the block ($t \in txs$).
-  \item A membership proof for input $i$ must be specified such that $i \in reference\_inputs(t)$.
-  \item A non-membership proof must be created to show that $i$ is not in $utxos_{prev}$.
-  \item A non-membership proof must also be generated that shows that there are no transactions in $txs$ that have id $tx\_hash(i)$.
+  \item A membership proof must be provided for $t$ that shows that $t \in txs$.
+  \item A membership proof for input $i$ must be provided such that $i \in reference\_inputs(t)$.
+  \item A non-membership proof must be provided to show that $i \notin utxos_{prev}$.
+  \item A non-membership proof must also be generated that shows that no transactions in the block match the input's tx hash.
 \end{enumerate}
 
 \subsubsection{REFERENCE-INPUT-NO-IDX violation}
 \label{violation:REFERENCE-INPUT-NO-IDX}
-A transaction $t$ attempted to spend the input $i$, which did not exist at all.
+A transaction $t$ attempted to spend an input $i$ that was not produced by the transaction matching the tx hash of $i$.
 Formal specification:
 \begin{equation*}
 \begin{split}
-    \exists t \in txs, &\exists i \in reference\_inputs(t): \\
-    &( \exists t_1 \in txs, tx\_hash(t_1) = tx\_hash(i) \land i \notin outputs(t_1) )
+  &\exists t \in txs,\; \exists i \in reference\_inputs(t): \\
+    &\quad( \exists t_1 \in txs,\;
+      tx\_hash(t_1) = tx\_hash(i) \;\land\;
+      length(outputs(t_1) <  index(i) )
 \end{split}
 \end{equation*}
 
