@@ -1408,18 +1408,6 @@
         }
       ]
     },
-<<<<<<< HEAD
-    "midgard/fraud_proof/double_spend/step_01/StepRedeemer": {
-      "title": "StepRedeemer",
-      "anyOf": [
-        {
-          "title": "Cancel",
-          "dataType": "constructor",
-          "index": 0,
-          "fields": [
-            {
-              "title": "index_output",
-=======
     "midgard/fraud_proof/catalogue/MintRedeemer": {
       "title": "MintRedeemer",
       "anyOf": [
@@ -1454,13 +1442,62 @@
             },
             {
               "title": "anchor_node_output_index",
->>>>>>> main
               "$ref": "#/definitions/Int"
             }
           ]
         },
         {
-<<<<<<< HEAD
+          "title": "RemoveFraudCategory",
+          "dataType": "constructor",
+          "index": 3,
+          "fields": [
+            {
+              "title": "node_to_remove_key",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "removed_node_input_index",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "anchor_node_input_index",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "midgard/fraud_proof/catalogue/SpendRedeemer": {
+      "title": "SpendRedeemer",
+      "anyOf": [
+        {
+          "title": "SpendRedeemer",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "fraud_proof_catalogue_asset_name",
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        }
+      ]
+    },
+    "midgard/fraud_proof/double_spend/step_01/StepRedeemer": {
+      "title": "StepRedeemer",
+      "anyOf": [
+        {
+          "title": "Cancel",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "index_output",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        },
+        {
           "title": "Continue",
           "dataType": "constructor",
           "index": 1,
@@ -1483,46 +1520,21 @@
             },
             {
               "title": "index_output",
-=======
-          "title": "RemoveFraudCategory",
-          "dataType": "constructor",
-          "index": 3,
-          "fields": [
-            {
-              "title": "node_to_remove_key",
-              "$ref": "#/definitions/ByteArray"
-            },
-            {
-              "title": "removed_node_input_index",
-              "$ref": "#/definitions/Int"
-            },
-            {
-              "title": "anchor_node_input_index",
->>>>>>> main
               "$ref": "#/definitions/Int"
             }
           ]
         }
       ]
     },
-<<<<<<< HEAD
     "midgard/fraud_proof/double_spend/step_02/StepRedeemer": {
       "title": "StepRedeemer",
       "anyOf": [
         {
           "title": "Cancel",
-=======
-    "midgard/fraud_proof/catalogue/SpendRedeemer": {
-      "title": "SpendRedeemer",
-      "anyOf": [
-        {
-          "title": "SpendRedeemer",
->>>>>>> main
           "dataType": "constructor",
           "index": 0,
           "fields": [
             {
-<<<<<<< HEAD
               "title": "index_output",
               "$ref": "#/definitions/Int"
             }
@@ -1638,10 +1650,6 @@
             {
               "title": "computation_thread_redeemer_index",
               "$ref": "#/definitions/Int"
-=======
-              "title": "fraud_proof_catalogue_asset_name",
-              "$ref": "#/definitions/ByteArray"
->>>>>>> main
             }
           ]
         }
