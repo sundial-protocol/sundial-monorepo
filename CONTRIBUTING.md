@@ -23,12 +23,15 @@
     - For type and data constructors, use `PascalCase`. Avoid using `_` in them.
       If you find yourself needing to have a prefix/postfix, consider breaking
       your file into multiple files.
-    - For variables, constants and functions, use `snake_case`.
+    - For variables, constants, functions, and field names, use `snake_case`.
 5. When pattern matching on a record type, always use the curly brackets syntax.
-   Using parenthesis won't allow the compiler to detect changes in the accessor
+   Using parenthesis won't allow the compiler to detect changes in the field
    names of type definitions.
 6. Strive to perform `expect`s as soon as possible, rather than including them
    all in a giant `and {}` at the end of your validators/functions.
 7. Use enumerated comments right above each `expect`/validation to describe its
    purpose. While comments are prone to going stale, this allows easier
    conversations when discussing particular logics.
+8. In Cardano, "asset name" and "token name" are generally used interchangeably.
+   For consistency and coherence with Aiken, only use "asset name" throughout
+   the codebase and documentation.
