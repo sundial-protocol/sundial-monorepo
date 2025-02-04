@@ -25,3 +25,23 @@ pub type ConfirmedState {
   end_time: POSIXTime,
   protocol_version: Int,
 }
+
+// TODO:
+// Some helper types for handling transaction inputs in the fraud proof
+// pub type TxInput =
+//   Data
+
+// pub type TxInputs =
+//   List<TxInput>
+
+// TODO:
+pub type MidgardTx {
+  body: ByteArray,
+  wits: ByteArray,
+  is_valid: Bool,
+}
+
+// TODO:
+pub type MidgardTxBody {
+  spend_inputs: ByteArray,
+}

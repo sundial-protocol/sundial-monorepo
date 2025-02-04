@@ -17,7 +17,7 @@ validator computation_thread_policy(
 ) {
   mint(redeemer: ct.Redeemer, policy_id: PolicyId, self: Transaction) {
     when redeemer is {
-      ct.Mint(
+      ct.Mint {
         fraud_proof_set_node_ref_input_index,
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
@@ -26,7 +26,7 @@ validator computation_thread_policy(
         fraud_proof_catalogue_asset_name,
         hub_oracle_asset_name,
         state_queue_asset_name,
-      ) -> {
+      } -> {
         expect Some(fraud_proof_catalogue_node_input) =
           list.at(self.reference_inputs, fraud_proof_set_node_ref_input_index)
         expect Some(hub_oracle_input) =

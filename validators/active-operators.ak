@@ -108,13 +108,13 @@ validator mint(
           quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == -1,
           ordered.deinit(node_in_outputs, node_mint, policy_id),
         }
-      ActivateOperator(
+      ActivateOperator {
         new_active_operator_key,
         hub_oracle_ref_input_index,
         active_operator_appended_node_output_index,
         active_operator_anchor_node_output_index,
         registered_operators_redeemer_index,
-      ) -> {
+      } -> {
         expect Some(active_node_output) =
           list.at(node_outputs, active_operator_appended_node_output_index)
         expect InlineDatum(active_operator_datum) = active_node_output.datum
@@ -150,13 +150,13 @@ validator mint(
           node_to_activate_key == new_active_operator_key,
         }
       }
-      RemoveOperatorSlashBond(
+      RemoveOperatorSlashBond {
         slashed_active_operator_key,
         hub_oracle_ref_input_index,
         active_operator_slashed_node_input_index,
         active_operator_anchor_node_input_index,
         state_queue_redeemer_index,
-      ) -> {
+      } -> {
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
@@ -186,14 +186,14 @@ validator mint(
           fraudulent_operator == slashed_active_operator_key,
         }
       }
-      RetireOperator(
+      RetireOperator {
         active_operator_key,
         hub_oracle_ref_input_index,
         active_operator_removed_node_input_index,
         active_operator_anchor_node_input_index,
         retired_operator_inserted_node_output_index,
         retired_operators_redeemer_index,
-      ) -> {
+      } -> {
         expect Some(active_node_input) =
           list.at(self.inputs, active_operator_removed_node_input_index)
         expect InlineDatum(active_operator_datum) =
@@ -213,7 +213,7 @@ validator mint(
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Some(retired_operators_redeemer_pair) =
           list.at(self.redeemers, retired_operators_redeemer_index)
-        expect retired_operators.RetireOperator { new_retire_operator_key, .. } =
+        expect retired_operators.RetireOperator { new_retired_operator_key, .. } =
           retired_operators_redeemer_pair.2nd
         and {
           quantity_of(
@@ -232,7 +232,7 @@ validator mint(
           retired_operators_redeemer_pair.1st == Mint(
             parsed_hub_oracle_datum.retired_operators,
           ),
-          new_retire_operator_key == active_operator_key,
+          new_retired_operator_key == active_operator_key,
           active_operator_data.commitment_time == retired_operator_data.commitment_time,
         }
       }
