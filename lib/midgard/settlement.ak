@@ -16,20 +16,20 @@ pub type EventType {
 }
 
 pub type SpendRedeemer {
-  UpdateProcessedFlag {
+  UpdateResolvedFlag {
     input_index: Int,
     output_index: Int,
     hub_ref_input_index: Int,
     active_operators_node_input_index: Int,
-    active_operators_spend_redeemer_index: Int,
+    active_operators_redeemer_index: Int,
     purpose: Purpose,
   }
   ConcludeSettlement
 }
 
 pub type Purpose {
-  ClaimAsProcessed
-  RevokeProcessedFlag {
+  ClaimAsResolved
+  RevokeResolvedFlag {
     unprocessed_event_ref_input_index: Int,
     unprocessed_event_asset_name: AssetName,
     event_type: EventType,

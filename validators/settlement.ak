@@ -17,8 +17,8 @@ use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement.{
-  BurnNFT, ClaimAsProcessed, ConcludeSettlement, Datum, MintNFTs, MintRedeemer,
-  RevokeProcessedFlag, SpendRedeemer, UpdateProcessedFlag,
+  BurnNFT, ClaimAsResolved, ConcludeSettlement, Datum, MintNFTs, MintRedeemer,
+  RevokeResolvedFlag, SpendRedeemer, UpdateResolvedFlag,
 }
 use midgard/state_queue
 use midgard/user_events
@@ -34,16 +34,15 @@ validator main(
     tx: Transaction,
   ) {
     expect Some(datum) = m_datum
-    let Datum { mpf_root, time_of_claimed_as_processed, operator, .. } =
-      datum
+    let Datum { mpf_root, time_of_claimed_as_processed, operator, .. } = datum
 
     when redeemer is {
-      UpdateProcessedFlag {
+      UpdateResolvedFlag {
         input_index,
         output_index,
         hub_ref_input_index,
         active_operators_node_input_index,
-        active_operators_spend_redeemer_index,
+        active_operators_redeemer_index,
         purpose,
       } -> {
         let Transaction {
@@ -58,6 +57,7 @@ validator main(
           deposit: deposit_script_hash,
           withdrawal: withdrawal_script_hash,
           active_operators_addr,
+          active_operators: active_operators_policy_id,
           ..
         } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
@@ -87,12 +87,12 @@ validator main(
             // to the active operator).
             expect input_value == cont_output_value
 
-            when spend_purpose is {
-              ClaimAsProcessed -> {
-                // 4. The UTxO must not have been subject to fraudulent activity
-                //    before.
-                expect Some(operator_vkey) = operator
+            // 4. The UTxO must not have been subject to fraudulent activity
+            //    before.
+            expect Some(operator_vkey) = operator
 
+            when spend_purpose is {
+              ClaimAsResolved -> {
                 // 5. Operator must have signed this claim.
                 expect operator_vkey |> utils.has_signed(extra_signatories)
 
@@ -104,10 +104,10 @@ validator main(
                 expect Some(
                   Pair(Spend(active_operators_spend_purpose_out_ref),
                   active_operators_spend_redeemer_data),
-                ) = list.at(redeemers, active_operators_spend_redeemer_index)
+                ) = list.at(redeemers, active_operators_redeemer_index)
 
-                // 8. Found redeemer data must have the same structure as
-                //    active operator's update commitment time redeemer.
+                // 8. Found redeemer data must have the same structure as active
+                //    operator's update commitment time redeemer.
                 expect active_operators.UpdateCommitmentTime {
                   active_node_output_index,
                   ..
@@ -165,7 +165,7 @@ validator main(
                   }
                 cont_output_datum_data == expected_cont_output_datum_data
               }
-              RevokeProcessedFlag {
+              RevokeResolvedFlag {
                 unprocessed_event_ref_input_index,
                 unprocessed_event_asset_name,
                 event_type,
@@ -219,13 +219,31 @@ validator main(
                     redeemers: redeemers,
                   )
 
-                // 4. Expect a spend redeemer at the specified redeemer index.
+                // 4. Expect a mint redeemer at the specified redeemer index.
                 expect Some(
-                  Pair(Spend(active_operators_spend_purpose_out_ref),
-                  active_operators_spend_redeemer_data),
-                ) = list.at(redeemers, active_operators_spend_redeemer_index)
+                  Pair(Mint(active_operators_mint_purpose_policy_id),
+                  active_operators_mint_redeemer_data),
+                ) = list.at(redeemers, active_operators_redeemer_index)
 
-                // 6. The only change in the datum should be removal of the claim.
+                // 5. The policy ID found via the redeemer must match the one
+                //    found in the hub oracle.
+                expect
+                  active_operators_mint_purpose_policy_id == active_operators_policy_id
+
+                // 6. Found redeemer data must have the same structure as active
+                //    operator's bond slash redeemer.
+                expect active_operators.RemoveOperatorSlashBond {
+                  slashed_active_operator_key,
+                  ..
+                }: active_operators.MintRedeemer =
+                  active_operators_mint_redeemer_data
+
+                // 7. Operator vkey found in the slash bond redeemer must match
+                //    the one stored in the spending settlement UTxO.
+                expect slashed_active_operator_key == operator_vkey
+
+                // 8. The only change in the datum should be removal of the
+                //    claim.
                 let expected_cont_output_datum_data: Data =
                   Datum { ..datum, time_of_claimed_as_processed: None }
                 cont_output_datum_data == expected_cont_output_datum_data
@@ -261,14 +279,14 @@ validator main(
         let hub.Datum { state_queue, state_queue_addr, .. } =
           hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-        // Ensure merge endpoint of state queue is present in the tx.
+        // 1. Ensure merge endpoint of state queue is present in the tx.
         expect Some(state_queue_redeemer_data) =
           redeemers |> pairs.get_first(Mint(state_queue))
         expect state_queue.MergeToConfirmedState: state_queue.MintRedeemer =
           state_queue_redeemer_data
 
-        // Grab the header hash of the new confirmed state to use as the asset
-        // name of the settlement authentication NFTs.
+        // 2. Grab the header hash of the new confirmed state to use as the
+        //    asset name of the settlement authentication NFTs.
         expect Some(Output {
           datum: InlineDatum(confirmed_state_datum_data),
           ..
@@ -278,9 +296,9 @@ validator main(
           ..
         } = confirmed_state_datum_data
 
-        // Only 2 UTxOs must be produced at own script address. It is expected
-        // that the deposits UTxO is produced at the smaller output index.
-        // Staking parts are not validated (TODO?).
+        // 3. Only 2 UTxOs must be produced at own script address. It is
+        //    expected that the deposits UTxO is produced at the smaller output
+        //    index. Staking parts are not validated (TODO?).
         expect [
           Output {
             value: produced_deposits_value,
@@ -305,7 +323,7 @@ validator main(
                 },
               )
 
-        // Validate produced UTxOs contain authentication NFTs.
+        // 4. Validate produced UTxOs contain authentication NFTs.
         let produced_deposits_nft_triplet =
           utils.get_single_asset_from_value_apart_from_ada(
             produced_deposits_value,
@@ -323,7 +341,7 @@ validator main(
             produced_withdrawals_nft_triplet == produced_deposits_nft_triplet,
           }
 
-        // Ensure the two NFTs are minted.
+        // 5. Ensure the two NFTs are minted.
         expect [Pair(minted_name, minted_qty)] =
           mint |> assets.tokens(own_policy) |> dict.to_pairs
         expect and {
@@ -331,8 +349,8 @@ validator main(
             minted_qty == 2,
           }
 
-        // Fetch the state commitment UTxO that's being spent in order to be
-        // merged into the confirmed state.
+        // 6. Fetch the state commitment UTxO that's being spent in order to be
+        //    merged into the confirmed state.
         expect Input {
           output: Output { datum: InlineDatum(block_datum_data), .. },
           ..
@@ -352,19 +370,19 @@ validator main(
           ..
         } = block_datum.data
 
-        // Validate the produced output datums.
+        // 7. Validate the produced output datums.
         let expected_produced_deposits_datum_data: Data =
           Datum {
             mpf_root: deposits_root,
             time_of_claimed_as_processed: None,
-            operator_vkey,
+            operator: Some(operator_vkey),
             tree_content: settlement.Deposit,
           }
         let expected_produced_withdrawals_datum_data: Data =
           Datum {
             mpf_root: withdrawals_root,
             time_of_claimed_as_processed: None,
-            operator_vkey,
+            operator: Some(operator_vkey),
             tree_content: settlement.Withdrawal,
           }
         and {
@@ -372,6 +390,9 @@ validator main(
           produced_withdrawals_datum_data == expected_produced_withdrawals_datum_data,
         }
       }
+      // TODO: Is validation on the state queue redeemer needed? I.e. are
+      // there any scenarios for spending the confirmed state other than the
+      // merging tx?
       BurnNFT -> {
         expect [Input { .. }] =
           tx.inputs
