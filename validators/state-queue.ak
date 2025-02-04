@@ -157,7 +157,51 @@ validator mint(
           //TODO create a settlement queue node here if the merged block contains deposits/withdrawals
           True,
         }
-      RemoveFraudulentBlockHeader { fraudulent_operator } -> todo
+      RemoveFraudulentBlockHeader {
+        fraud_proof_red_input_index,
+        fraud_proof_asset_name,
+        fraudulent_operator,
+        operator_status,
+      } -> {
+        expect Some(fraud_proof_red_input) =
+          list.at(self.reference_inputs, fraud_proof_red_input_index)
+
+        let fraud_proof_block_hash = last_28_bytes_of(fraud_proof_asset_name)
+        and {
+          unordered.remove(
+            removed_node_key,
+            removed_node_input_index,
+            confirmed_state_node_input_index,
+            node_inputs,
+            node_outputs,
+            node_mint,
+          ),
+          Key(fraudulent_operator) == removed_node_key,
+          when operator_status is {
+            Active -> {
+              let active_operators_redeemer = "todo"
+              fraudulent_operator == active_operators_redeemer.slashed_operator
+            }
+            Retired -> {
+              let retired_operators_redeemer = "todo"
+              fraudulent_operator == retired_operators_redeemer.slashed_operator
+            }
+            _ -> False
+          },
+          quantity_of(
+            fraud_proof_red_input.output.value,
+            fraud_proof_policy_id,
+            fraud_proof_asset_name,
+          ) == 1,
+          or {
+            Key(fraud_proof_block_hash) == predecessor_node_key,
+            and {
+              Key(fraud_proof_block_hash) == removed_node_key,
+              unordered.is_last_node(removed_node_link),
+            },
+          },
+        }
+      }
     }
   }
 

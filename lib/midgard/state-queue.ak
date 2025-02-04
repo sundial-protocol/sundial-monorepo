@@ -1,5 +1,6 @@
 use cardano/assets.{AssetName}
 use cardano/transaction.{OutputReference}
+use midgard/registered_operators.{WitnessStatus}
 
 /// TODO?
 /// > [!NOTE]
@@ -37,5 +38,10 @@ pub type MintRedeemer {
     confirmed_state_node_input_index: Int,
     confirmed_state_node_output_index: Int,
   }
-  RemoveFraudulentBlockHeader { fraudulent_operator: ByteArray }
+  RemoveFraudulentBlockHeader {
+    fraud_proof_red_input_index: Int,
+    fraud_proof_asset_name: ByteArray,
+    fraudulent_operator: ByteArray,
+    operator_status: WitnessStatus,
+  }
 }
