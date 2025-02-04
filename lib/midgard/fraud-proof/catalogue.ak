@@ -1,7 +1,4 @@
-use midgard/common/types.{POSIXTime}
-
 pub type Datum {
-  insert_time: POSIXTime,
   init_step_script_hash: ByteArray,
 }
 

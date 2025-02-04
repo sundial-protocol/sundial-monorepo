@@ -5,7 +5,7 @@ use aiken_design_patterns/linked_list/ordered.{
   Key, get_node_inputs, get_node_outputs,
 }
 use cardano/assets.{PolicyId, quantity_of, tokens}
-use cardano/transaction.{Input, OutputReference, Transaction}
+use cardano/transaction.{InlineDatum, Input, OutputReference, Transaction}
 use midgard/fraud_proof/catalogue.{
   Deinit, Init, MintRedeemer, NewFraudCategory, RemoveFraudCategory,
   SpendRedeemer,
@@ -67,7 +67,12 @@ validator mint(
         let new_node_key_as_int = bytearray.to_int_big_endian(new_node_key)
         let old_node_key_as_int = bytearray.to_int_big_endian(old_node_key)
 
-        //TODO Do we need to check that the datum is of type catalogue.Datum?
+        expect Some(appended_node_output) =
+          list.at(self.outputs, appended_node_output_index)
+        expect InlineDatum(appended_node_output_datum) =
+          appended_node_output.datum
+        expect catalogue.Datum(_) = appended_node_output_datum
+
         and {
           ordered.append(
             Key(new_node_key),
