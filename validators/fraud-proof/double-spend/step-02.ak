@@ -148,15 +148,12 @@ validator main(
 
         // (4) Verify the state transition from the previous state to the new state
         // (4.1) Define state transition (input -> output)    
-        let step2_state =
+        let step_2_state =
           Step2State { verified_tx1_hash, verified_tx2_hash: bad_tx2_hash }
-        let step_2_datum =
-          StepDatum {
-            fraud_prover: parsed_output_to_step_3_datum.fraud_prover,
-            data: step2_state,
-          }
+        expect parsed_step_2_state: Step2State =
+          parsed_output_to_step_3_datum.data
         // (4.2) State transition verified to be correct in the output
-        expect step_2_datum == parsed_output_to_step_3_datum
+        expect step_2_state == parsed_step_2_state
 
         // (5) Verify that output destination matches the expected hash of the next step spending validator
         expect Script(hash) = output_to_step_3.address.payment_credential

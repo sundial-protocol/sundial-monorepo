@@ -171,14 +171,11 @@ validator main(
         // (4) Verify the state transition from the previous state to the new state
         // At this point, tx1_hash inclusion proof is verified by the plutarch_midgard_merkle_validator -- tx_1 is a member of the block we are running the fraud proof on    
         // (4.1) Define state transition (input -> output)    
-        let step1_state = Step1State { verified_tx1_hash: bad_tx1_hash }
-        let step_1_datum =
-          StepDatum {
-            fraud_prover: parsed_output_to_step_2_datum.fraud_prover,
-            data: step1_state,
-          }
+        let step_1_state = Step1State { verified_tx1_hash: bad_tx1_hash }
+        expect parsed_step_1_state: Step1State =
+          parsed_output_to_step_2_datum.data
         // (4.2) State transition verified to be correct in the output
-        expect step_1_datum == parsed_output_to_step_2_datum
+        expect step_1_state == parsed_step_1_state
 
         // (5) Verify that output destination matches the expected hash of the next step spending validator (double_spend_step_02_validator_script_hash)
         expect Script(hash) = output_to_step_2.address.payment_credential
