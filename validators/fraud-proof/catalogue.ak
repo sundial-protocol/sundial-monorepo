@@ -26,8 +26,6 @@ validator spend(fraud_proof_catalog_mint_script_hash: ByteArray) {
         redeemer.fraud_proof_catalogue_asset_name,
       ) == -1,
       dict.size(tokens) == 1,
-      //TODO this is redundant, should we include anyway by linkedlist rule?
-      ordered.list_state_transition(tokens),
     }
   }
 
