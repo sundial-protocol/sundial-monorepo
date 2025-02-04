@@ -42,6 +42,8 @@ validator main(
         input_index,
         output_index,
         hub_ref_input_index,
+        active_operators_node_input_index,
+        active_operators_spend_redeemer_index,
         purpose,
       } -> {
         let Transaction {
@@ -59,9 +61,10 @@ validator main(
           ..
         } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
+        // Using the singular one-to-one indexer design pattern.
         singular_utxo_indexer.spend(
           fn(in_ix, input, spend_purpose, out_ix, output) {
-            // 1. Prevent double satisfaction.
+            // 1. Prevent double satisfaction (TODO: is this needed?).
             expect in_ix == out_ix
 
             let Input {
@@ -79,14 +82,13 @@ validator main(
             // 2. Make sure the UTxO is reproduced at own address.
             expect input_address == cont_output_address
 
-            // 3. Spent value must be reproduced unchanged.
+            // 3. Spent value must be reproduced unchanged. TODO: This is
+            // relying on some additional ADA being available (i.e. to be paid
+            // to the active operator).
             expect input_value == cont_output_value
 
             when spend_purpose is {
-              ClaimAsProcessed {
-                active_operators_node_input_index,
-                active_operators_spend_redeemer_index,
-              } -> {
+              ClaimAsProcessed -> {
                 // 4. The UTxO must not have been subject to fraudulent activity
                 //    before.
                 expect Some(operator_vkey) = operator
@@ -94,8 +96,8 @@ validator main(
                 // 5. Operator must have signed this claim.
                 expect operator_vkey |> utils.has_signed(extra_signatories)
 
-                // 6. The UTxO must not have been claimed as processed prior to this
-                //    transaction.
+                // 6. The UTxO must not have been claimed as processed prior to
+                //    this transaction.
                 expect time_of_claimed_as_processed == None
 
                 // 7. Expect a spend redeemer at the specified redeemer index.
@@ -127,7 +129,7 @@ validator main(
                   active_operators_out_ref == active_operators_spend_purpose_out_ref
 
                 // 10. Provided input index of an active operator node must come
-                //    from the address found from the hub oracle.
+                //     from the address found from the hub oracle.
                 expect active_operators_node_address == active_operators_addr
 
                 // Grab the continued output of the active operators contract.
@@ -136,6 +138,8 @@ validator main(
                   ..
                 }) = list.at(outputs, active_node_output_index)
 
+                // TODO: Update the `UpdateCommitmentTime` redeemer to carry
+                // this key, instead of reading it from the output datum.
                 expect NodeDatum {
                   key: Key(active_operators_node_key),
                   data: active_operators_data,
@@ -153,7 +157,7 @@ validator main(
                 )}: active_operators.Datum = active_operators_data
 
                 // 13. The only change in the updated time must be the addition
-                //     of "current time" as the moment of claim.
+                //     of the new commitment time as the moment of claim.
                 let expected_cont_output_datum_data: Data =
                   Datum {
                     ..datum,
@@ -167,9 +171,9 @@ validator main(
                 event_type,
                 membership_proof,
               } -> {
-                // 2. Find the specified (via its token name) event UTxO as a ref.
-                //    input at given index. Its NFT must have the same policy as its
-                //    address script hash.
+                // 2. Find the specified (via its token name) event UTxO as a
+                //    ref. input at given index. Its NFT must have the same
+                //    policy as its address script hash.
                 expect Input {
                   output: Output { datum: InlineDatum(event_datum_data), .. },
                   ..
@@ -189,9 +193,9 @@ validator main(
                 let Pair(event_key, event_value) =
                   user_events.unsafe_to_key_value_pair(event_datum_data)
 
-                // 3. The specified deposit event must be present in the stored tree
-                //    of the settlement datum that's been flagged as fully processed
-                //    by its operator.
+                // 3. The specified deposit event must be present in the stored
+                //    tree of the settlement datum that's been flagged as fully
+                //    processed by its operator.
                 expect
                   merkelized_validator.generic_delegated_validation(
                     staking_validator: plutarch_phas_validator_hash,

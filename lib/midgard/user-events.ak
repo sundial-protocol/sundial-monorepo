@@ -2,7 +2,7 @@ use aiken/builtin
 use cardano/transaction.{OutputReference}
 
 /// Wrapper datatype for both deposit and withdraw events. This allows a unified
-/// serialization function to be defined..
+/// serialization function to be defined.
 pub type Event<info> {
   id: OutputReference,
   info: info,
