@@ -159,3 +159,16 @@ pub fn get_asset_name_from_value_with_policy(
 
   asset_name
 }
+
+// Used to retrieve a singleton asset from a value with a specific policy id
+pub fn get_singleton_asset_with_policy(
+  value: Value,
+  policy_id: PolicyId,
+) -> Pair<AssetName, Int> {
+  expect [p] =
+    value
+      |> assets.tokens(policy_id) //return dict of policy id to asset name and quantity
+      |> dict.to_pairs
+
+  p
+}

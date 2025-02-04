@@ -4,9 +4,9 @@ use aiken/primitive/bytearray.{drop}
 use aiken_design_patterns/linked_list/unordered.{Key, NodeDatum}
 use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script}
-use cardano/assets.{PolicyId, from_asset, lovelace_of, quantity_of}
+use cardano/assets.{PolicyId, lovelace_of}
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use midgard/common/utils.{get_asset_name_from_value_with_policy} as get_asset_name_from_value_with_policy
+use midgard/common/utils.{get_singleton_asset_with_policy} as get_singleton_asset_with_policy
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{validate_output_to_fraud_prover}
@@ -46,23 +46,16 @@ validator main(
             fn(a_input) { a_input.output_reference == input },
           )
         // (1.2) Get computation thread token asset name in output
-        let ct_token_asset_name =
-          get_asset_name_from_value_with_policy(
+        expect Pair(ct_token_asset_name, 1) =
+          get_singleton_asset_with_policy(
             own_input.output.value,
             ct_token_policy_id,
           )
-        expect
-          quantity_of(
-            own_input.output.value,
-            ct_token_policy_id,
-            ct_token_asset_name,
-          ) == 1
         // (1.3) Burn the computation thread token, (3) Transaction must not mint or burn any other tokens
         expect
-          self.mint == from_asset(
-            policy_id: ct_token_policy_id,
-            asset_name: ct_token_asset_name,
-            quantity: -1,
+          Pair(ct_token_asset_name, -1) == get_singleton_asset_with_policy(
+            self.mint,
+            ct_token_policy_id,
           )
 
         // (2.1) get the lovelace amount from our own validator's input (ADA inside the input of the fraud proof thread)
@@ -115,17 +108,11 @@ validator main(
             self.inputs,
             fn(a_input) { a_input.output_reference == input },
           )
-        let ct_token_asset_name =
-          get_asset_name_from_value_with_policy(
+        expect Pair(ct_token_asset_name, 1) =
+          get_singleton_asset_with_policy(
             own_input.output.value,
             ct_token_policy_id,
           )
-        expect
-          quantity_of(
-            own_input.output.value,
-            ct_token_policy_id,
-            ct_token_asset_name,
-          ) == 1
         // (1.4) tx_root provided by fraud prover in the redeemer matches block_hash from the state queue block from the reference input (1.1) (ct_token_asset_name: last 28 bytes is the block_hash)
         expect drop(ct_token_asset_name, n: 4) == block_hash
 
@@ -177,11 +164,10 @@ validator main(
 
         // (6) Computation thread token sent to the next step validator
         expect
-          quantity_of(
+          Pair(ct_token_asset_name, 1) == get_singleton_asset_with_policy(
             output_to_step_3.value,
             ct_token_policy_id,
-            ct_token_asset_name,
-          ) == 1
+          )
         True
       }
     }
