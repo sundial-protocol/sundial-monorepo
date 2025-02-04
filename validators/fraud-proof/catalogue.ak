@@ -54,12 +54,12 @@ validator mint(
           quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == -1,
           ordered.deinit(node_outputs, node_mint, policy_id),
         }
-      NewFraudCategory(
+      NewFraudCategory {
         new_node_key,
         anchor_node_input_index,
         appended_node_output_index,
         anchor_node_output_index,
-      ) -> {
+      } -> {
         expect Some(old_node_input) =
           list.at(self.inputs, anchor_node_input_index)
         expect Key(old_node_key) =
@@ -94,11 +94,11 @@ validator mint(
           },
         }
       }
-      RemoveFraudCategory(
+      RemoveFraudCategory {
         node_to_remove_key,
         removed_node_input_index,
         anchor_node_input_index,
-      ) -> and {
+      } -> and {
           ordered.remove(
             Key(node_to_remove_key),
             removed_node_input_index,
