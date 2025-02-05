@@ -11,16 +11,12 @@ import {
   initializeDb,
   retrieveMempool,
   storeTx,
+  utxoFromRow,
+  UtxoRow,
+  utxoToRow,
 } from "../src/commands/listen.js";
-import {
-  Assets,
-  CML,
-  LucidEvolution,
-  Record,
-  UTxO,
-} from "@lucid-evolution/lucid";
+import { CML, LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { logAbort } from "../src/utils.js";
-import { changeCase } from "change-object-case";
 
 describe("database", () => {
   let db: sqlite3.Database;
@@ -65,7 +61,6 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
-
   it("should store a block hash alongside with it's transactions in the archive", async () => {
     await addToArchive(db, blockHash, [expectedRow1, expectedRow2]);
     const result = await retrieveArchive(db);
@@ -108,8 +103,10 @@ describe("database", () => {
     outputIndex: 0,
     address: "aaaa",
     assets: { lovelace: BigInt(25) },
-    datum: "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
-    datumHash: "9eead0de42833bbd51866cbafe5d29b8448fa1b9e7430a7af7a7f0e7e9913a07",
+    datum:
+      "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
+    datumHash:
+      "9eead0de42833bbd51866cbafe5d29b8448fa1b9e7430a7af7a7f0e7e9913a07",
     scriptRef: null,
   };
   const utxo2: UTxO = {
@@ -119,9 +116,18 @@ describe("database", () => {
     assets: { abcd: BigInt(12) },
     datum: null,
     datumHash: null,
-    scriptRef: {type: "PlutusV3", script: "6e461fe947e14c4a53b905d0aa92f08bff98fb94129f6ed26877fcf1c8a4495192c0b379fb06aa3b"},
+    scriptRef: {
+      type: "PlutusV3",
+      script:
+        "6e461fe947e14c4a53b905d0aa92f08bff98fb94129f6ed26877fcf1c8a4495192c0b379fb06aa3b",
+    },
   };
   const anotherBlockHash = "aaaa22221111";
+
+  it("fromRow . toRow == id", async () => {
+    expect(utxoFromRow(utxoToRow(utxo1))).toStrictEqual(utxo1);
+    expect(utxoFromRow(utxoToRow(utxo2))).toStrictEqual(utxo2);
+  });
 
   it("adds block's utxos to confirmed state", async () => {
     await addBlockUtxosToConfirmedState(db, blockHash, [utxo1]);
@@ -182,75 +188,38 @@ const retrieveArchive = async (db: sqlite3.Database) => {
   });
 };
 
-interface ConfirmedStateRow {
-  tx_hash: string;
-  output_index: number;
-  address: string;
-  assets: string;
-  datum_hash: string;
-  datum: string;
-  script_ref: string;
-}
-
-const retrieveConfirmedState = async (db: sqlite3.Database) => {
-  const query = `SELECT * FROM confirmed_state_utxo`;
-  return new Promise<[ConfirmedStateRow]>((resolve, reject) => {
-    db.all(query, (err, rows: [{ blockHash: string } & LastBlockUtxoRow]) => {
-      if (err) {
-        logAbort(`Error retrieving latest block utxo: ${err.message}`);
-        return reject(err);
-      }
-      const resultSnakeCase = rows.map((row) => ({
-        ...row,
-        assets: JSON.parse(row.assets, (_, v) => {
-          try {
-            return BigInt(v);
-          } catch {
-            return v;
-          }
-        }),
-      }));
-      const result = require("change-object-case").toCamel(resultSnakeCase);
-      resolve(result);
-    });
-  });
+const retrieveConfirmedState = async (
+  db: sqlite3.Database
+): Promise<({ blockHash: string } & UTxO)[]> => {
+  return retrieveBlockHashWithUtxosFromTable(db, "confirmed_state_utxo");
 };
-
-interface LastBlockUtxoRow {
-  tx_hash: string;
-  output_index: number;
-  address: string;
-  assets: string;
-  datum_hash: string;
-  datum: string;
-  script_ref: string;
-}
 
 export const retrieveLatestBlock = async (
   db: sqlite3.Database
-): Promise<[{ blockHash: string } & UTxO]> => {
-  const query = `SELECT * FROM latest_block_utxo`;
+): Promise<({ blockHash: string } & UTxO)[]> => {
+  return retrieveBlockHashWithUtxosFromTable(db, "latest_block_utxo");
+};
+
+const retrieveBlockHashWithUtxosFromTable = async (
+  db: sqlite3.Database,
+  tableName: string
+): Promise<({ blockHash: string } & UTxO)[]> => {
+  const query = `SELECT * FROM ${tableName}`;
   return new Promise((resolve, reject) => {
-    db.all(query, (err, rows: [{ blockHash: string } & LastBlockUtxoRow]) => {
+    db.all(query, (err, rows: ({ block_hash: string } & UtxoRow)[]) => {
       if (err) {
-        logAbort(`Error retrieving latest block utxo: ${err.message}`);
+        logAbort(`Error retrieving block hash with utxos from table ${tableName}
+          : ${err.message}`);
         return reject(err);
       }
-      const resultSnakeCase = rows.map((row) => ({
-        ...row,
-        assets: JSON.parse(row.assets, (_, v) => {
-          try {
-            return BigInt(v);
-          } catch {
-            return v;
-          }
-        }),
-      }));
-      const result = require("change-object-case").toCamel(resultSnakeCase);
+      const result = rows.map(({ block_hash, ...utxoRow }) => {
+        return { blockHash: block_hash, ...utxoFromRow(utxoRow) };
+      });
       resolve(result);
     });
   });
 };
+
 class MockLucid {
   fromTx(tx: string) {
     const tx_body = CML.Transaction.from_cbor_hex(tx).body();
