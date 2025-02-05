@@ -24,7 +24,7 @@ pub type SpendRedeemer {
     active_operators_redeemer_index: Int,
     purpose: Purpose,
   }
-  ConcludeSettlement
+  ConcludeSettlement { input_index: Int }
 }
 
 pub type Purpose {

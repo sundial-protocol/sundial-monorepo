@@ -7,7 +7,7 @@ use aiken/interval.{Finite}
 use aiken_design_patterns/linked_list/ordered.{Key, NodeDatum}
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
-use cardano/address.{Script}
+use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
@@ -257,7 +257,36 @@ validator main(
           tx,
         )
       }
-      ConcludeSettlement -> todo
+      ConcludeSettlement { input_index } -> {
+        let Transaction { inputs, mint, .. } = tx
+
+        // Grab own script hash.
+        expect Output {
+          address: Address { payment_credential: Script(own_hash), .. },
+          value: own_value,
+          ..
+        } = utils.get_own_input_at(inputs, own_out_ref, input_index)
+
+        // 1. Only one NFT is expected in the spending UTxO.
+        let (own_nft_policy_id, own_nft_asset_name, _own_nft_qty) =
+          utils.get_single_asset_from_value_apart_from_ada(own_value)
+
+        // 2. The NFT must have the same policy ID as the spending script.
+        expect own_nft_policy_id == own_hash
+
+        // TODO: Is this needed?
+        // expect _own_nft_qty == 1
+        // 3. The spending NFT must be burnt. Since there are only 2 endpoints
+        //    available in the minting logic, one of which expects the mint
+        //    quantity to be 2, this automatically validates the other endpoint
+        //    is invoked (i.e. the burning endpoint).
+        expect [Pair(burnt_asset_name, burn_qty)] =
+          mint |> assets.tokens(own_hash) |> dict.to_pairs
+        and {
+          burnt_asset_name == own_nft_asset_name,
+          burn_qty == -1,
+        }
+      }
     }
   }
 
