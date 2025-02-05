@@ -24,10 +24,10 @@ export const insert = async (
   await new Promise<void>((resolve, reject) => {
     db.run(query, [tx_hash, tx_cbor], function (err) {
       if (err) {
-        logAbort(`Mempool: error inserting tx to mempool: ${err.message}`);
+        logAbort(`mempool db: error inserting tx: ${err.message}`);
         reject(err);
       } else {
-        logInfo(`Mempool: tx stored with rowid ${this.lastID}`);
+        logInfo(`mempool db: tx stored with rowid ${this.lastID}`);
         resolve();
       }
     });
@@ -36,10 +36,10 @@ export const insert = async (
 
 export const retrieve = async (db: sqlite3.Database) => {
   const query = `SELECT * FROM mempool`;
-  const mempool = await new Promise<MempoolRow[]>((resolve, reject) => {
-    db.all(query, (err, rows: MempoolRow[]) => {
+  const mempool = await new Promise<[string, string][]>((resolve, reject) => {
+    db.all(query, (err, rows: [string, string][]) => {
       if (err) {
-        logAbort(`Mempool: retrieving error: ${err.message}`);
+        logAbort(`mempool db: retrieving error: ${err.message}`);
         reject(err);
       }
       resolve(rows);
@@ -49,8 +49,3 @@ export const retrieve = async (db: sqlite3.Database) => {
 };
 
 export const clear = async (db: sqlite3.Database) => clearTable(db, "mempool");
-
-export interface MempoolRow {
-  tx_hash: string;
-  tx_cbor: string;
-}

@@ -8,7 +8,6 @@ import * as mempool from "../src/database/mempool.js";
 import * as immutable from "../src/database/immutable.js";
 import * as confirmedLedger from "../src/database/confirmedLedger.js";
 import { utxoFromRow, UtxoRow, utxoToRow } from "../src/database/utils.js";
-import { AchiveBlockRow, ArchiveTxRow } from "../src/database/immutable.js";
 
 describe("database", () => {
   let db: sqlite3.Database;
@@ -55,7 +54,7 @@ describe("database", () => {
     expect(result).toStrictEqual([]);
   });
 
-  it("should store transaction in the mempool", async () => {
+  it("should store transactions in the mempool", async () => {
     await blocks.insert(db, block1Hash, [tx1Hash]);
     await blocks.insert(db, block2Hash, [tx2Hash]);
     await mempool.insert(db, tx1Hash, tx1);
@@ -76,6 +75,28 @@ describe("database", () => {
     expect(initialRows.length).toBe(2);
     await mempool.clear(db);
     const result = await mempool.retrieve(db);
+    expect(result.length).toBe(0);
+  });
+
+  it("should store transactions in the immutableDb", async () => {
+    await immutable.insert(db, tx1Hash, tx1);
+    const result1 = await immutable.retrieve(db);
+    expect(result1.map((o) => Object.values(o))).toStrictEqual([[tx1Hash, tx1]]);
+
+    await immutable.insert(db, tx2Hash, tx2);
+    const result2 = await immutable.retrieve(db);
+    expect(result2.map((o) => Object.values(o))).toStrictEqual(
+      [ [tx1Hash, tx1]
+      , [tx2Hash, tx2]
+      ]
+    );
+  });
+
+  it("clears the immutableDb", async () => {
+    const initialRows = await immutable.retrieve(db);
+    expect(initialRows.length).toBe(2);
+    await immutable.clear(db);
+    const result = await immutable.retrieve(db);
     expect(result.length).toBe(0);
   });
 

@@ -21,10 +21,10 @@ export const insert = async (
   await new Promise<void>((resolve, reject) => {
     db.run(query, values, function (err) {
       if (err) {
-        logAbort(`blocks: inserting error: ${err.message}`);
+        logAbort(`blocks db: inserting error: ${err.message}`);
         reject(err);
       } else {
-        logInfo(`blocks: ${tx_hashes.length} new tx_hashes added`);
+        logInfo(`blocks db: ${tx_hashes.length} new tx_hashes added`);
         resolve();
       }
     });
@@ -36,7 +36,7 @@ export const retrieve = async (db: sqlite3.Database) => {
   const blocks = await new Promise<[string, string][]>((resolve, reject) => {
     db.all(query, (err, rows: [string, string][]) => {
       if (err) {
-        logAbort(`blocks: retrieving error: ${err.message}`);
+        logAbort(`blocks db: retrieving error: ${err.message}`);
         reject(err);
       }
       resolve(rows);
