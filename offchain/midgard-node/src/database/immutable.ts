@@ -45,4 +45,5 @@ export const retrieve = async (db: sqlite3.Database) => {
   return mempool;
 };
 
-export const clear = async (db: sqlite3.Database) => clearTable(db, "immutable");
+export const clear = async (db: sqlite3.Database) =>
+  clearTable(db, "immutable");

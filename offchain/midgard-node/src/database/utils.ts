@@ -1,24 +1,11 @@
 import {
-  Result,
-  errorToString,
-  fail,
-  isHexString,
   logAbort,
   logInfo,
-  logWarning,
-  ok,
-  setupLucid,
 } from "../utils.js";
-import * as MPF from "@aiken-lang/merkle-patricia-forestry";
-import * as SDK from "@al-ft/midgard-sdk";
 import {
-  Data,
-  LucidEvolution,
-  OutRef,
   ScriptType,
   UTxO,
 } from "@lucid-evolution/lucid";
-import express from "express";
 import sqlite3 from "sqlite3";
 
 export interface UtxoRow {
@@ -79,22 +66,55 @@ export function utxoToRow(utxo: UTxO): UtxoRow {
   };
 }
 
-export const retrieveBlockHashWithUtxosFromTable = async (
+export const retrieveUtxosFromTable = async (
   db: sqlite3.Database,
   tableName: string
-): Promise<({ blockHash: string } & UTxO)[]> => {
+): Promise<UTxO[]> => {
   const query = `SELECT * FROM ${tableName}`;
   return new Promise((resolve, reject) => {
-    db.all(query, (err, rows: ({ block_hash: string } & UtxoRow)[]) => {
+    db.all(query, (err, rows: UtxoRow[]) => {
       if (err) {
-        logAbort(`Error retrieving block hash with utxos from table ${tableName}
-            : ${err.message}`);
+        logAbort(
+          `${tableName}: error retrieving utxos from table: ${err.message}`
+        );
         return reject(err);
       }
-      const result = rows.map(({ block_hash, ...utxoRow }) => {
-        return { blockHash: block_hash, ...utxoFromRow(utxoRow) };
+      const result = rows.map((utxoRow) => {
+        return utxoFromRow(utxoRow);
       });
       resolve(result);
+    });
+  });
+};
+
+export const insertUtxosIntoTable = async (
+  db: sqlite3.Database,
+  tableName: string,
+  utxos: UTxO[]
+) => {
+  const query = `
+      INSERT INTO ${tableName}
+        ( tx_hash
+        , output_index
+        , address
+        , assets
+        , datum_hash
+        , datum
+        , script_ref_type
+        , script_ref_script
+        ) VALUES
+      ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`).join(", ")}
+    `;
+  const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
+  return new Promise<void>((resolve, reject) => {
+    db.run(query, values, (err) => {
+      if (err) {
+        logAbort(`${tableName} db: error inserting utxos: ${err.message}`);
+        reject();
+      } else {
+        logInfo(`${tableName} db: ${utxos.length} new utxos added`);
+        resolve();
+      }
     });
   });
 };

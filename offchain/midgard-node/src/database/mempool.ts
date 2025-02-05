@@ -1,7 +1,4 @@
-import {
-  logAbort,
-  logInfo,
-} from "../utils.js";
+import { logAbort, logInfo } from "../utils.js";
 import sqlite3 from "sqlite3";
 import { clearTable } from "./utils.js";
 

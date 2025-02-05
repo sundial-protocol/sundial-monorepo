@@ -1,14 +1,13 @@
 import { UTxO } from "@lucid-evolution/lucid";
-import {
-  logAbort,
-  logInfo,
-} from "../utils.js";
 import sqlite3 from "sqlite3";
-import { clearTable, retrieveBlockHashWithUtxosFromTable, utxoToRow } from "./utils.js";
+import {
+  clearTable,
+  insertUtxosIntoTable,
+  retrieveUtxosFromTable,
+} from "./utils.js";
 
 export const createQuery = `
-  CREATE TABLE IF NOT EXISTS latest_block_utxo (
-    block_hash BLOB NOT NULL,
+  CREATE TABLE IF NOT EXISTS latest_ledger (
     tx_hash BLOB NOT NULL,
     output_index INTEGER NOT NULL,
     address TEXT NOT NULL,
@@ -16,49 +15,19 @@ export const createQuery = `
     datum_hash BLOB,
     datum BLOB,
     script_ref_type TEXT (8),
-    script_ref_script TEXT
-  );`
+    script_ref_script TEXT,
+    PRIMARY KEY (tx_hash, output_index)
+      FOREIGN KEY (tx_hash)
+      REFERENCES blocks(tx_hash)
+      ON DELETE CASCADE
+  );`;
 
-export const insert = async (
-  db: sqlite3.Database,
-  blockHash: string,
-  utxos: UTxO[]
-) => {
-  const query = `
-      INSERT INTO confirmed_state_utxo
-        ( block_hash
-        , tx_hash
-        , output_index
-        , address
-        , assets
-        , datum_hash
-        , datum
-        , script_ref_type
-        , script_ref_script
-        ) VALUES
-      ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?, ?, ?)`).join(", ")}
-    `;
-  const values = utxos.flatMap((utxo) => {
-    const row = utxoToRow(utxo);
-    return [blockHash, ...Object.values(utxoToRow(utxo))];
-  });
-  return new Promise<void>((resolve, reject) => {
-    db.run(query, values, (err) => {
-      if (err) {
-        logAbort(`Confirmed state: error inserting utxos: ${err.message}`);
-        reject();
-      } else {
-        logInfo(`Confirmed state: ${utxos.length} new utxos added`);
-        resolve();
-      }
-    });
-  });
+export const insert = async (db: sqlite3.Database, utxos: UTxO[]) =>
+  insertUtxosIntoTable(db, "latest_ledger", utxos);
+
+export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> => {
+  return retrieveUtxosFromTable(db, "latest_ledger");
 };
 
-export const retrieve = async (
-  db: sqlite3.Database
-): Promise<({ blockHash: string } & UTxO)[]> => {
-  return retrieveBlockHashWithUtxosFromTable(db, "confirmed_state_utxo");
-};
-
-export const clear = async (db: sqlite3.Database) => clearTable(db, "confirmed_state_utxo");
+export const clear = async (db: sqlite3.Database) =>
+  clearTable(db, "latest_ledger");
