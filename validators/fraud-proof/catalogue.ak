@@ -5,7 +5,7 @@ use aiken_design_patterns/linked_list/ordered.{
   Key, get_node_inputs, get_node_outputs,
 }
 use cardano/assets.{PolicyId, quantity_of, tokens}
-use cardano/transaction.{Input, OutputReference, Transaction}
+use cardano/transaction.{InlineDatum, Input, OutputReference, Transaction}
 use midgard/fraud_proof/catalogue.{
   Deinit, Init, MintRedeemer, NewFraudCategory, RemoveFraudCategory,
   SpendRedeemer,
@@ -26,8 +26,6 @@ validator spend(fraud_proof_catalog_mint_script_hash: ByteArray) {
         redeemer.fraud_proof_catalogue_asset_name,
       ) == -1,
       dict.size(tokens) == 1,
-      //TODO this is redundant, should we include anyway by linkedlist rule?
-      ordered.list_state_transition(tokens),
     }
   }
 
@@ -54,12 +52,12 @@ validator mint(
           quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == -1,
           ordered.deinit(node_outputs, node_mint, policy_id),
         }
-      NewFraudCategory(
+      NewFraudCategory {
         new_node_key,
         anchor_node_input_index,
         appended_node_output_index,
         anchor_node_output_index,
-      ) -> {
+      } -> {
         expect Some(old_node_input) =
           list.at(self.inputs, anchor_node_input_index)
         expect Key(old_node_key) =
@@ -67,7 +65,12 @@ validator mint(
         let new_node_key_as_int = bytearray.to_int_big_endian(new_node_key)
         let old_node_key_as_int = bytearray.to_int_big_endian(old_node_key)
 
-        //TODO Do we need to check that the datum is of type catalogue.Datum?
+        expect Some(appended_node_output) =
+          list.at(self.outputs, appended_node_output_index)
+        expect InlineDatum(appended_node_output_datum) =
+          appended_node_output.datum
+        expect catalogue.Datum(_) = appended_node_output_datum
+
         and {
           ordered.append(
             Key(new_node_key),
@@ -89,11 +92,11 @@ validator mint(
           },
         }
       }
-      RemoveFraudCategory(
+      RemoveFraudCategory {
         node_to_remove_key,
         removed_node_input_index,
         anchor_node_input_index,
-      ) -> and {
+      } -> and {
           ordered.remove(
             Key(node_to_remove_key),
             removed_node_input_index,

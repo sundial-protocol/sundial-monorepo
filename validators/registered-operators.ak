@@ -51,7 +51,7 @@ validator mint(
           quantity_of(self.mint, hub_oracle_script_hash, hub_oracle_asset_name) == -1,
           unordered.deinit(node_outputs, node_mint, policy_id),
         }
-      Register(
+      Register {
         key_to_prepend,
         hub_oracle_ref_input_index,
         active_operator_ref_input_index,
@@ -60,7 +60,7 @@ validator mint(
         retired_operator_asset_name,
         prepended_node_output_index,
         anchor_node_output_index,
-      ) -> {
+      } -> {
         expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
@@ -118,7 +118,7 @@ validator mint(
         }
       }
 
-      Activate(
+      Activate {
         node_to_activate_key,
         hub_oracle_ref_input_index,
         retired_operator_ref_input_index,
@@ -127,7 +127,7 @@ validator mint(
         anchor_node_input_index,
         active_operators_inserted_node_output_index,
         active_operators_anchor_node_output_index,
-      ) -> {
+      } -> {
         expect Finite(valid_from) = self.validity_range.lower_bound.bound_type
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
@@ -185,11 +185,11 @@ validator mint(
           ),
         }
       }
-      Deregister(
+      Deregister {
         node_to_deregister_key,
         removed_node_input_index,
         anchor_node_input_index,
-      ) -> and {
+      } -> and {
           unordered.remove(
             Key(node_to_deregister_key),
             removed_node_input_index,
@@ -201,7 +201,7 @@ validator mint(
           list.has(self.extra_signatories, node_to_deregister_key),
         }
 
-      RemoveDuplicateSlashBond(
+      RemoveDuplicateSlashBond {
         duplicate_node_key,
         hub_oracle_ref_input_index,
         duplicate_node_ref_input_index,
@@ -209,7 +209,7 @@ validator mint(
         removed_node_input_index,
         anchor_node_input_index,
         witness_status,
-      ) -> {
+      } -> {
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
