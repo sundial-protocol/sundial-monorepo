@@ -93,11 +93,11 @@ validator computation_thread_policy(
           ),
         }
       }
-      ct.Success(token_to_burn_asset_name) -> and {
+      ct.Success { token_to_burn_asset_name } -> and {
           quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
-      ct.Cancel(token_to_burn_asset_name) -> and {
+      ct.Cancel { token_to_burn_asset_name } -> and {
           quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
