@@ -4,7 +4,7 @@ import {
   logInfo,
 } from "../utils.js";
 import sqlite3 from "sqlite3";
-import { retrieveBlockHashWithUtxosFromTable, utxoToRow } from "./utils.js";
+import { clearTable, retrieveBlockHashWithUtxosFromTable, utxoToRow } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS confirmed_state_utxo (
@@ -61,13 +61,4 @@ export const retrieve = async (
   return retrieveBlockHashWithUtxosFromTable(db, "confirmed_state_utxo");
 };
 
-export const clear = async  (db: sqlite3.Database) => {
-  const query = `DELETE FROM confirmed_state_utxo;`;
-  db.run(query, (err) => {
-    if (err) {
-      logAbort(`Confirmed state: clearing error: ${err.message}`);
-    } else {
-      logInfo(`Confirmed state: cleared`);
-    }
-  });
-};
+export const clear = async (db: sqlite3.Database) => clearTable(db, "confirmed_state_utxo");

@@ -3,12 +3,16 @@ import {
   logInfo,
 } from "../utils.js";
 import sqlite3 from "sqlite3";
+import { clearTable } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS mempool (
     tx_hash BLOB NOT NULL UNIQUE,
     tx_cbor BLOB NOT NULL UNIQUE,
     PRIMARY KEY (tx_hash)
+    FOREIGN KEY (tx_hash)
+      REFERENCES blocks(tx_hash)
+      ON DELETE CASCADE
   );`;
 
 export const insert = async (
@@ -44,20 +48,7 @@ export const retrieve = async (db: sqlite3.Database) => {
   return mempool;
 };
 
-export const clear = async (db: sqlite3.Database) => {
-  const query = `DELETE FROM mempool;`;
-  await new Promise<void>((resolve, reject) => {
-    db.run(query, function (err) {
-      if (err) {
-        logAbort(`Mempool: clearing error: ${err.message}`);
-        reject(err);
-      } else {
-        logInfo(`Mempool: cleared`);
-        resolve();
-      }
-    });
-  });
-};
+export const clear = async (db: sqlite3.Database) => clearTable(db, "mempool");
 
 export interface MempoolRow {
   tx_hash: string;

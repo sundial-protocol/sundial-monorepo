@@ -21,6 +21,7 @@ import {
 import express from "express";
 import sqlite3 from "sqlite3";
 import { utxoToRow } from "./database/utils.js";
+import * as blocks from "./database/blocks.js"
 import * as mempool from "./database/mempool.js"
 import * as immutable from "./database/immutable.js"
 import * as confirmedLedger from "./database/confirmedLedger.js"
@@ -98,6 +99,7 @@ export async function initializeDb(dbFilePath: string) {
       PRAGMA foreign_keys = ON;
       PRAGMA read_uncommitted=false;
   `)
+  db.exec(blocks.createQuery)
   db.exec(mempool.createQuery);
   db.exec(immutable.createQuery);
   db.exec(confirmedLedger.createQuery)

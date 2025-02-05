@@ -98,3 +98,18 @@ export const retrieveBlockHashWithUtxosFromTable = async (
     });
   });
 };
+
+export const clearTable = async (db: sqlite3.Database, tableName: string) => {
+  const query = `DELETE FROM ${tableName};`;
+  await new Promise<void>((resolve, reject) => {
+    db.run(query, function (err) {
+      if (err) {
+        logAbort(`${tableName}: clearing error: ${err.message}`);
+        reject(err);
+      } else {
+        logInfo(`${tableName}: cleared`);
+        resolve();
+      }
+    });
+  });
+};
