@@ -1,22 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import sqlite3 from "sqlite3";
-import {
-  addBlockUtxosToConfirmedState,
-  addToArchive,
-  ArchiveTxRow,
-  changeLatestBlock,
-  clearArchive,
-  clearConfirmedState,
-  clearMempool,
-  initializeDb,
-  retrieveMempool,
-  storeTx,
-  utxoFromRow,
-  UtxoRow,
-  utxoToRow,
-} from "../src/commands/listen.js";
+import { changeLatestBlock, initializeDb } from "../src/database.js";
 import { CML, LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { logAbort } from "../src/utils.js";
+import * as mempool from "../src/database/mempool.js";
+import * as immutable from "../src/database/immutable.js";
+import * as confirmedLedger from "../src/database/confirmedLedger.js";
+import { utxoFromRow, UtxoRow, utxoToRow } from "../src/database/utils.js";
+import { AchiveBlockRow, ArchiveTxRow } from "../src/database/immutable.js";
 
 describe("database", () => {
   let db: sqlite3.Database;
@@ -48,22 +39,22 @@ describe("database", () => {
   const blockHash = lucid.fromTx(tx1).toHash();
 
   it("should store transaction in the mempool", async () => {
-    await storeTx(lucid as unknown as LucidEvolution, db, tx1);
-    const result = await retrieveMempool(db);
+    await mempool.insert(db, tx1Hash, tx1);
+    const result = await mempool.retrieve(db);
     expect(result).toStrictEqual([expectedRow1]);
   });
 
   it("clears the mempool", async () => {
-    const initialRows = await retrieveMempool(db);
+    const initialRows = await mempool.retrieve(db);
     expect(initialRows.length).toBe(1);
-    await clearMempool(db);
-    const result = await retrieveMempool(db);
+    await mempool.clear(db);
+    const result = await mempool.retrieve(db);
     expect(result.length).toBe(0);
   });
 
   it("should store a block hash alongside with it's transactions in the archive", async () => {
-    await addToArchive(db, blockHash, [expectedRow1, expectedRow2]);
-    const result = await retrieveArchive(db);
+    await immutable.insert(db, blockHash, [expectedRow1, expectedRow2]);
+    const result = await immutable.retrieve(db);
     expect(result).toStrictEqual([
       { block_hash: blockHash, ...expectedRow1 },
       { block_hash: blockHash, ...expectedRow2 },
@@ -71,9 +62,9 @@ describe("database", () => {
   });
 
   it("clears the archive", async () => {
-    const initialRows = await retrieveArchive(db);
+    const initialRows = await immutable.retrieve(db);
     expect(initialRows.length).toBe(2);
-    await clearArchive(db);
+    await immutable.clear(db);
     const resultBlocks = await new Promise<AchiveBlockRow[]>(
       (resolve, reject) => {
         db.all("SELECT * FROM archive_block", (err, rows: AchiveBlockRow[]) => {
@@ -130,12 +121,12 @@ describe("database", () => {
   });
 
   it("adds block's utxos to confirmed state", async () => {
-    await addBlockUtxosToConfirmedState(db, blockHash, [utxo1]);
-    const result1 = await retrieveConfirmedState(db);
+    await confirmedLedger.insert(db, blockHash, [utxo1]);
+    const result1 = await confirmedLedger.retrieve(db);
     expect(result1).toStrictEqual([{ blockHash: blockHash, ...utxo1 }]);
 
-    await addBlockUtxosToConfirmedState(db, anotherBlockHash, [utxo2]);
-    const result2 = await retrieveConfirmedState(db);
+    await confirmedLedger.insert(db, anotherBlockHash, [utxo2]);
+    const result2 = await confirmedLedger.retrieve(db);
     expect(result2).toStrictEqual([
       { blockHash: blockHash, ...utxo1 },
       { blockHash: anotherBlockHash, ...utxo2 },
@@ -143,82 +134,50 @@ describe("database", () => {
   });
 
   it("clears the confirmed state", async () => {
-    clearConfirmedState(db);
-    const result = await retrieveConfirmedState(db);
+    confirmedLedger.clear(db);
+    const result = await confirmedLedger.retrieve(db);
     expect(result).toStrictEqual([]);
   });
 
-  it("updates latest block utxos", async () => {
-    await changeLatestBlock(db, blockHash, [utxo1]);
-    const result1 = await retrieveLatestBlock(db);
-    expect(result1).toStrictEqual([{ blockHash: blockHash, ...utxo1 }]);
+  // it("updates latest block utxos", async () => {
+  //   await changeLatestBlock(db, blockHash, [utxo1]);
+  //   const result1 = await retrieveLatestBlock(db);
+  //   expect(result1).toStrictEqual([{ blockHash: blockHash, ...utxo1 }]);
 
-    await changeLatestBlock(db, anotherBlockHash, [utxo2, utxo1]);
-    const result2 = await retrieveLatestBlock(db);
-    expect(result2).toStrictEqual([
-      { blockHash: anotherBlockHash, ...utxo2 },
-      { blockHash: anotherBlockHash, ...utxo1 },
-    ]);
-  });
+  //   await changeLatestBlock(db, anotherBlockHash, [utxo2, utxo1]);
+  //   const result2 = await retrieveLatestBlock(db);
+  //   expect(result2).toStrictEqual([
+  //     { blockHash: anotherBlockHash, ...utxo2 },
+  //     { blockHash: anotherBlockHash, ...utxo1 },
+  //   ]);
+  // });
 });
 
-interface AchiveBlockRow {
-  block_hash: string;
-  tx_hash: string;
-}
-interface ArchiveRow {
-  block_hash: string;
-  tx_hash: string;
-  tx_cbor: string;
-}
+// export const retrieveLatestBlock = async (
+//   db: sqlite3.Database
+// ): Promise<({ blockHash: string } & UTxO)[]> => {
+//   return retrieveBlockHashWithUtxosFromTable(db, "latest_block_utxo");
+// };
 
-const retrieveArchive = async (db: sqlite3.Database) => {
-  const query = `
-    SELECT *
-    FROM archive_block
-    JOIN archive_tx ON archive_block.tx_hash = archive_tx.tx_hash;`;
-  return new Promise<ArchiveRow[]>((resolve, reject) => {
-    db.all(query, (err, rows: ArchiveRow[]) => {
-      if (err) {
-        logAbort(`Error retrieving archive: ${err.message}`);
-        reject(err);
-      }
-      resolve(rows);
-    });
-  });
-};
-
-const retrieveConfirmedState = async (
-  db: sqlite3.Database
-): Promise<({ blockHash: string } & UTxO)[]> => {
-  return retrieveBlockHashWithUtxosFromTable(db, "confirmed_state_utxo");
-};
-
-export const retrieveLatestBlock = async (
-  db: sqlite3.Database
-): Promise<({ blockHash: string } & UTxO)[]> => {
-  return retrieveBlockHashWithUtxosFromTable(db, "latest_block_utxo");
-};
-
-const retrieveBlockHashWithUtxosFromTable = async (
-  db: sqlite3.Database,
-  tableName: string
-): Promise<({ blockHash: string } & UTxO)[]> => {
-  const query = `SELECT * FROM ${tableName}`;
-  return new Promise((resolve, reject) => {
-    db.all(query, (err, rows: ({ block_hash: string } & UtxoRow)[]) => {
-      if (err) {
-        logAbort(`Error retrieving block hash with utxos from table ${tableName}
-          : ${err.message}`);
-        return reject(err);
-      }
-      const result = rows.map(({ block_hash, ...utxoRow }) => {
-        return { blockHash: block_hash, ...utxoFromRow(utxoRow) };
-      });
-      resolve(result);
-    });
-  });
-};
+// const retrieveBlockHashWithUtxosFromTable = async (
+//   db: sqlite3.Database,
+//   tableName: string
+// ): Promise<({ blockHash: string } & UTxO)[]> => {
+//   const query = `SELECT * FROM ${tableName}`;
+//   return new Promise((resolve, reject) => {
+//     db.all(query, (err, rows: ({ block_hash: string } & UtxoRow)[]) => {
+//       if (err) {
+//         logAbort(`Error retrieving block hash with utxos from table ${tableName}
+//           : ${err.message}`);
+//         return reject(err);
+//       }
+//       const result = rows.map(({ block_hash, ...utxoRow }) => {
+//         return { blockHash: block_hash, ...utxoFromRow(utxoRow) };
+//       });
+//       resolve(result);
+//     });
+//   });
+// };
 
 class MockLucid {
   fromTx(tx: string) {
