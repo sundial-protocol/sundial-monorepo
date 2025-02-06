@@ -9,7 +9,7 @@ export const createQuery = `
     address TEXT NOT NULL,
     datum_hash BLOB,
     datum BLOB,
-    script_ref_type TEXT (8),
+    script_ref_type VARCHAR (8),
     script_ref_script TEXT,
     PRIMARY KEY (tx_hash, output_index)
       FOREIGN KEY (tx_hash)
@@ -19,7 +19,7 @@ export const createQuery = `
   CREATE TABLE IF NOT EXISTS confirmed_ledger_assets (
     tx_hash BLOB NOT NULL,
     output_index INTEGER NOT NULL,
-    unit TEXT,
+    unit VARCHAR (120),
     quantity BIGINT NOT NULL,
     FOREIGN KEY (tx_hash, output_index)
       REFERENCES confirmed_ledger(tx_hash, output_index)

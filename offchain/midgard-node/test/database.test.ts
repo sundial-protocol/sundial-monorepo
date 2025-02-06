@@ -105,7 +105,11 @@ describe("database", () => {
     txHash: tx1Hash,
     outputIndex: 0,
     address: "aaaa",
-    assets: { abcd: BigInt(12), lovelace: BigInt("9223372036854779904") },
+    assets: {
+      c5334d60505f62b715b098cb5f9a391416a6ed2064c7d813e03a11c1e2fb72ac0da4e312c4a0a27b73a59eba40ee6848131f82fc62be628ab72e490e:
+        BigInt(12),
+      lovelace: BigInt("9223372036854779904"),
+    },
     datum:
       "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
     datumHash:
