@@ -1,34 +1,39 @@
 import { ConfirmedState } from "@/types/contracts/ledger-state.js";
 import { Data, UTxO } from "@lucid-evolution/lucid";
 import { NodeKey } from "@/types/contracts/linked-list/index.js";
-import { Either } from "effect";
+import { Effect } from "effect";
 import { Datum } from "@/types/contracts/state-queue.js";
-import {getNodeDatumFromUTxO} from "./linked-list.js";
+import { getNodeDatumFromUTxO } from "./linked-list.js";
 
 export const getLinkFromBlockUTxO = (
   blockUTxO: UTxO
-): Either.Either<NodeKey, string> => {
+): Effect.Effect<NodeKey, Error> => {
   const nodeDatum = getNodeDatumFromUTxO(blockUTxO);
-  return Either.map(nodeDatum, (nd) => nd.next)
+  return Effect.map(nodeDatum, (nd) => nd.next);
 };
 
+/**
+ * Given a block UTxO, this function confirmes the node is root (i.e. no keys
+ * in its datum), and attempts to coerce its underlying data into a
+ * `ConfirmedState`.
+ */
 export const getConfirmedStateFromUTxO = (
   blockUTxO: UTxO
-): Either.Either<{ data: ConfirmedState; link: NodeKey }, string> => {
+): Effect.Effect<{ data: ConfirmedState; link: NodeKey }, Error> => {
   const datumCBOR = blockUTxO.datum;
   if (datumCBOR) {
     try {
       const nodeDatum = Data.from(datumCBOR, Datum);
       if (nodeDatum.key === "Empty") {
         const confirmedState = Data.castFrom(nodeDatum.data, ConfirmedState);
-        return Either.right({ data: confirmedState, link: nodeDatum.next });
+        return Effect.succeed({ data: confirmedState, link: nodeDatum.next });
       } else {
-        return Either.left("Given UTxO is not root");
+        return Effect.fail(new Error("Given UTxO is not root"));
       }
     } catch {
-      return Either.left("Could not coerce to a node datum");
+      return Effect.fail(new Error("Could not coerce to a node datum"));
     }
   } else {
-    return Either.left("No datum found");
+    return Effect.fail(new Error("No datum found"));
   }
 };

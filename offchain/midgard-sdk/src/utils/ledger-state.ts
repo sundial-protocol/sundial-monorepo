@@ -1,12 +1,12 @@
 import { CML, Data, OutRef } from "@lucid-evolution/lucid";
-import { Either } from "effect";
+import { Effect } from "effect";
 import { cmlInputToOutRef } from "./cml.js";
 import { Header } from "@/types/contracts/ledger-state.js";
 import { hashHexWithBlake2b224 } from "./common.js";
 
 export const findSpentAndProducedUTxOs = (
   txCBOR: string
-): Either.Either<{ spent: OutRef[]; produced: OutRef[] }, string> => {
+): Effect.Effect<{ spent: OutRef[]; produced: OutRef[] }, Error> => {
   try {
     const tx = CML.Transaction.from_cbor_hex(txCBOR);
     const txBody = tx.body();
@@ -24,11 +24,13 @@ export const findSpentAndProducedUTxOs = (
     for (let i = 0; i < outputsCount; i++) {
       produced.push({ txHash, outputIndex: i });
     }
-    return Either.right({ spent, produced });
+    return Effect.succeed({ spent, produced });
   } catch (_e) {
-    return Either.left("Something went wrong decoding the transaction");
+    return Effect.fail(
+      new Error("Something went wrong decoding the transaction")
+    );
   }
 };
 
-export const hashHeader = (header: Header): Either.Either<string, string> =>
+export const hashHeader = (header: Header): Effect.Effect<string, Error> =>
   hashHexWithBlake2b224(Data.to(header, Header));
