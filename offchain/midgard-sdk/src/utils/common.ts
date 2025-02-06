@@ -17,10 +17,6 @@ export const isHexString = (str: string): boolean => {
   return hexRegex.test(str);
 };
 
-export const errorToString = (error: any): string => {
-  return error.message ?? JSON.stringify(error);
-};
-
 export const getSingleAssetApartFromAda = (
   assets: Assets
 ): Effect.Effect<[PolicyId, string, bigint], Error> =>
@@ -53,9 +49,7 @@ export const utxosAtByNFTPolicyId = (
       try: () => lucid.utxosAt(addressOrCred),
       catch: (e) =>
         new Error(
-          `Failed to fetch UTxOs at: ${addressOrCred} -- Cause: ${errorToString(
-            e
-          )}`
+          `Failed to fetch UTxOs at: ${addressOrCred} -- Cause: ${e}`
         ),
     });
     const nftEffects: Effect.Effect<UTxO, Error>[] = allUTxOs.map((u: UTxO) => {
@@ -88,7 +82,7 @@ const blake2bHelper = (
     try {
       return Effect.succeed(toHex(blake2b(fromHex(hash), { dkLen })));
     } catch (e) {
-      return Effect.fail(new Error(errorToString(e)));
+      return Effect.fail(new Error(`${e}`));
     }
   } else {
     return Effect.fail(

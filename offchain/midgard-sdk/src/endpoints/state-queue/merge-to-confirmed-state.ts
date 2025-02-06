@@ -2,7 +2,6 @@ import { makeReturn } from "@/core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue } from "@/tx-builder/index.js";
 import { Effect } from "effect";
-import { errorToString } from "@/utils/common.js";
 import { FetchConfig } from "@/types/state-queue.js";
 
 export const mergeToConfirmedStateProgram = (
@@ -13,7 +12,7 @@ export const mergeToConfirmedStateProgram = (
     const completedTx = yield* StateQueue.mergeTxBuilder(lucid, fetchConfig);
     return yield* Effect.tryPromise({
       try: () => completedTx.complete(),
-      catch: (e) => new Error(errorToString(e)),
+      catch: (e) => new Error(`${e}`),
     });
   });
 

@@ -8,7 +8,7 @@ import {
 } from "@lucid-evolution/lucid";
 import { fetchConfirmedStateAndItsLinkProgram } from "@/endpoints/state-queue/fetch-confirmed-state-and-its-link.js";
 import { FetchConfig } from "@/types/state-queue.js";
-import { errorToString, getSingleAssetApartFromAda } from "@/utils/common.js";
+import { getSingleAssetApartFromAda } from "@/utils/common.js";
 import { ConfirmedState, Header } from "@/types/contracts/ledger-state.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { hashHeader } from "@/utils/ledger-state.js";
@@ -38,11 +38,11 @@ export const mergeTxBuilder = (
       const currentConfirmedState: ConfirmedState = yield* Effect.try({
         try: () =>
           Data.castFrom(currentConfirmedNodeDatum.data, ConfirmedState),
-        catch: (e) => new Error(errorToString(e)),
+        catch: (e) => new Error(`${e}`),
       });
       const blockHeader: Header = yield* Effect.try({
         try: () => Data.castFrom(blockNodeDatum.data, Header),
-        catch: (e) => new Error(errorToString(e)),
+        catch: (e) => new Error(`${e}`),
       });
       const headerHash = yield* hashHeader(blockHeader);
       const newConfirmedState = {

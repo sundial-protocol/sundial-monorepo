@@ -1,7 +1,6 @@
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
-import { errorToString } from "@/utils/common.js";
 import { CommitBlockParams, FetchConfig } from "@/types/state-queue.js";
 import { fetchLatestCommitedBlockProgram } from "@/endpoints/state-queue/fetch-latest-block.js";
 import { Header } from "@/types/contracts/ledger-state.js";
@@ -27,7 +26,7 @@ export const commitTxBuilder = (
     const latestHeaderProgram: Effect.Effect<Header, Error> = Effect.try({
       try: () => Data.castFrom(latestNodeDatum.data, Header),
       catch: (e) =>
-        new Error(`Failed coercing latest block's datum: ${errorToString(e)}`),
+        new Error(`Failed coercing latest block's datum: ${e}`),
     });
     const latestHeader: Header = yield* latestHeaderProgram;
     const prevHeaderHash = yield* hashHeader(latestHeader);
