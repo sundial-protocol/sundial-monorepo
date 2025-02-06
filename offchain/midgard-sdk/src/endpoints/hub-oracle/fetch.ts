@@ -21,7 +21,7 @@ export const hubOracleAssetName = "";
 export const fetchHubOracleUTxOProgram = (
   lucid: LucidEvolution,
   config: Config
-): Effect.Effect<{ utxo: UTxO; datum: Datum }, string> =>
+): Effect.Effect<{ utxo: UTxO; datum: Datum }, Error> =>
   Effect.gen(function* () {
     const hubOracleUTxOs = yield* Effect.tryPromise({
       try: async () => {
@@ -30,7 +30,7 @@ export const fetchHubOracleUTxOProgram = (
           toUnit(config.hubOraclePolicyId, hubOracleAssetName)
         );
       },
-      catch: (_) => "Failed to fetch the hub oracle UTxO",
+      catch: (_) => new Error("Failed to fetch the hub oracle UTxO"),
     });
     if (hubOracleUTxOs.length === 1) {
       const utxo = hubOracleUTxOs[0];
@@ -44,13 +44,15 @@ export const fetchHubOracleUTxOProgram = (
           }
         },
         catch: (_) => {
-          return "Failed to parse the hub oracle datum";
+          return new Error("Failed to parse the hub oracle datum");
         },
       });
       return { utxo, datum };
     } else {
       return yield* Effect.fail(
-        "Exactly one hub oracle UTxO was expected, but none or more were found"
+        new Error(
+          "Exactly one hub oracle UTxO was expected, but none or more were found"
+        )
       );
     }
   });

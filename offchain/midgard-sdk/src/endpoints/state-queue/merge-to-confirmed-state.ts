@@ -8,12 +8,12 @@ import { FetchConfig } from "@/types/state-queue.js";
 export const mergeToConfirmedStateProgram = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig
-): Effect.Effect<TxSignBuilder, string> =>
+): Effect.Effect<TxSignBuilder, Error> =>
   Effect.gen(function* () {
     const completedTx = yield* StateQueue.mergeTxBuilder(lucid, fetchConfig);
     return yield* Effect.tryPromise({
       try: () => completedTx.complete(),
-      catch: errorToString,
+      catch: (e) => new Error(errorToString(e)),
     });
   });
 

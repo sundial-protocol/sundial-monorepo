@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect } from "effect";
 import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
@@ -11,7 +11,7 @@ import { FetchConfig } from "@/types/state-queue.js";
 export const fetchConfirmedStateAndItsLinkProgram = (
   lucid: LucidEvolution,
   config: FetchConfig
-): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, string> =>
+): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, Error> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
       lucid,
@@ -21,40 +21,50 @@ export const fetchConfirmedStateAndItsLinkProgram = (
     let confirmedStateResult:
       | { data: ConfirmedState; link: NodeKey }
       | undefined;
-    const filteredForConfirmedState = allBlocks.filter((u: UTxO) => {
-      const eithConfirmedState = getConfirmedStateFromUTxO(u);
-      if (Either.isRight(eithConfirmedState)) {
-        confirmedStateResult = eithConfirmedState.right;
-        return true;
-      } else {
-        return false;
-      }
-    });
+    const filteredForConfirmedState = yield* Effect.allSuccesses(
+      allBlocks.map((u: UTxO) => {
+        const confirmedStateEffect = getConfirmedStateFromUTxO(u);
+        return Effect.map(confirmedStateEffect, (confirmedState) => {
+          confirmedStateResult = confirmedState;
+          return u;
+        });
+      })
+    );
     if (filteredForConfirmedState.length === 1 && confirmedStateResult) {
       const confirmedStateUTxO = filteredForConfirmedState[0];
       if (confirmedStateResult.link !== "Empty") {
         const firstLink = confirmedStateResult.link.Key;
-        const filteredForLink = allBlocks.filter((u: UTxO) => {
-          const eithNodeDatum = getNodeDatumFromUTxO(u);
-          if (
-            Either.isRight(eithNodeDatum) &&
-            eithNodeDatum.right.key !== "Empty"
-          ) {
-            return eithNodeDatum.right.key.Key === firstLink;
-          } else {
-            return false;
-          }
-        });
+        const filteredForLink = yield* Effect.allSuccesses(
+          allBlocks.map((u: UTxO) => {
+            const nodeDatumEffect = getNodeDatumFromUTxO(u);
+            return Effect.andThen(nodeDatumEffect, (nodeDatum) => {
+              if (
+                nodeDatum.key !== "Empty" &&
+                nodeDatum.key.Key === firstLink
+              ) {
+                return Effect.succeed(u);
+              } else {
+                return Effect.fail(
+                  new Error(
+                    "Link is either a root, or its key doesn't match with what the root is pointing to"
+                  )
+                );
+              }
+            });
+          })
+        );
         if (filteredForLink.length === 1) {
           return { confirmed: confirmedStateUTxO, link: filteredForLink[0] };
         } else {
-          return yield* Effect.fail("Confirmed state's link not found");
+          return yield* Effect.fail(
+            new Error("Confirmed state's link not found")
+          );
         }
       } else {
         return { confirmed: confirmedStateUTxO };
       }
     } else {
-      return yield* Effect.fail("Confirmed state not found");
+      return yield* Effect.fail(new Error("Confirmed state not found"));
     }
   });
 
