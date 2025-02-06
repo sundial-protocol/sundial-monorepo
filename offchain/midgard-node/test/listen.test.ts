@@ -87,19 +87,19 @@ describe("database", () => {
     ]);
 
     await immutable.insert(db, tx2Hash, tx2);
-    // const result2 = await immutable.retrieve(db);
-    // expect(result2.map((o) => Object.values(o))).toStrictEqual([
-    //   [tx1Hash, tx1],
-    //   [tx2Hash, tx2],
-    // ]);
+    const result2 = await immutable.retrieve(db);
+    expect(result2.map((o) => Object.values(o))).toStrictEqual([
+      [tx1Hash, tx1],
+      [tx2Hash, tx2],
+    ]);
   });
 
   it("clears the immutable db", async () => {
-    // const initialRows = await immutable.retrieve(db);
-    // expect(initialRows.length).toBe(2);
+    const initialRows = await immutable.retrieve(db);
+    expect(initialRows.length).toBe(2);
     await immutable.clear(db);
-    // const result = await immutable.retrieve(db);
-    // expect(result.length).toBe(0);
+    const result = await immutable.retrieve(db);
+    expect(result.length).toBe(0);
   });
 
   const utxo1: UTxO = {
@@ -117,7 +117,7 @@ describe("database", () => {
     txHash: tx2Hash,
     outputIndex: 0,
     address: "bbbb",
-    assets: { lovelace: BigInt(25) },
+    assets: { lovelace: BigInt(33) },
     datum: null,
     datumHash: null,
     scriptRef: {
@@ -128,22 +128,21 @@ describe("database", () => {
   };
   it("should store utxos in the confirmed ledger db", async () => {
     await confirmedLedger.insert(db, [utxo1]);
-  //   await confirmedLedger.insert(db, [utxo1]);
-    // const result1 = await confirmedLedger.retrieve(db);
-    // expect(result1).toStrictEqual([utxo1]);
+    const result1 = await confirmedLedger.retrieve(db);
+    expect(result1).toStrictEqual([utxo1]);
 
-    // await confirmedLedger.insert(db, [utxo2]);
-    // const result2 = await confirmedLedger.retrieve(db);
-    // expect(result2).toStrictEqual([utxo1, utxo2]);
+    await confirmedLedger.insert(db, [utxo2]);
+    const result2 = await confirmedLedger.retrieve(db);
+    expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
-  // it("clears the confirmed ledger db", async () => {
-  //   const initialRows = await confirmedLedger.retrieve(db);
-  //   expect(initialRows.length).toBe(2);
-  //   await confirmedLedger.clear(db);
-  //   const result = await confirmedLedger.retrieve(db);
-  //   expect(result.length).toBe(0);
-  // });
+  it("clears the confirmed ledger db", async () => {
+    const initialRows = await confirmedLedger.retrieve(db);
+    expect(initialRows.length).toBe(2);
+    await confirmedLedger.clear(db);
+    const result = await confirmedLedger.retrieve(db);
+    expect(result.length).toBe(0);
+  });
 
   // it("should store utxos in the latest ledger db", async () => {
   //   await latestLedger.insert(db, [utxo1]);
