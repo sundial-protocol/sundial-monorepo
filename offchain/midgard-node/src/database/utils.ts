@@ -2,15 +2,122 @@ import { logAbort, logInfo } from "../utils.js";
 import { ScriptType, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 
-export interface UtxoToRow {
-  tx_hash: string;
-  output_index: number;
-  address: string;
-  datum_hash?: string | null;
-  datum?: string | null;
-  script_ref_type?: string | null;
-  script_ref_script?: string | null;
-}
+export const insertUtxos = async (
+  db: sqlite3.Database,
+  tableName: string,
+  assetTableName: string,
+  utxos: UTxO[]
+) => {
+  const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
+  const query = `
+    INSERT INTO ${tableName}
+      (tx_hash, output_index, address, datum_hash, datum, script_ref_type, script_ref_script)
+    VALUES
+    ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")}
+  `;
+  const normalizedAssets = utxos.flatMap((utxo) =>
+    utxoToNormalizedAssets(utxo)
+  );
+  const assetQuery = `
+    INSERT INTO ${assetTableName}
+      (tx_hash, output_index, unit, quantity)
+    VALUES
+     ${normalizedAssets.map(() => `(?, ?, ?, ?)`).join(", ")}
+  `;
+  const assetValues = normalizedAssets.flatMap((v) => Object.values(v));
+  return new Promise<void>((resolve, reject) => {
+    db.run("BEGIN TRANSACTION;", (err) => {
+      if (err) {
+        logAbort(`${tableName}: error starting transaction: ${err.message}`);
+        return reject(err);
+      }
+      db.run(query, values, (err) => {
+        if (err) {
+          logAbort(`${tableName}: error inserting UTXOs: ${err.message}`);
+          db.run("ROLLBACK;", () => reject(err));
+        } else {
+          logInfo(`${utxos.length} new UTXOs added to confirmed_ledger`);
+          db.run(assetQuery, assetValues, (err) => {
+            if (err) {
+              logAbort(`${tableName}: error inserting assets: ${err.message}`);
+              db.run("ROLLBACK;", () => reject(err));
+            } else {
+              logInfo(
+                `${tableName}: ${normalizedAssets.length} assets added to ${assetTableName}`
+              );
+              db.run("COMMIT;", (err) => {
+                if (err) {
+                  logAbort(
+                    `${tableName}: error committing transaction: ${err.message}`
+                  );
+                  return reject(err);
+                }
+                resolve();
+              });
+            }
+          });
+        }
+      });
+    });
+  });
+};
+
+export const retrieveUtxos = async (
+  db: sqlite3.Database,
+  tableName: string,
+  assetTableName: string
+): Promise<UTxO[]> => {
+  const query = `
+    SELECT
+      t.tx_hash,
+      t.output_index,
+      address,
+      json_group_array(json_object('unit', a.unit, 'quantity', a.quantity)) AS assets,
+      datum_hash,
+      datum,
+      script_ref_type,
+      script_ref_script
+    FROM ${tableName} AS t
+      LEFT JOIN ${assetTableName} AS a
+        ON t.tx_hash = a.tx_hash AND t.output_index = a.output_index
+    GROUP BY
+      t.tx_hash,
+      t.output_index,
+      address,
+      datum_hash,
+      datum,
+      script_ref_type,
+      script_ref_script
+    ORDER BY
+      t.tx_hash,
+      t.output_index;
+    ;
+    `;
+  return new Promise((resolve, reject) => {
+    db.all(query, (err, rows: UtxoFromRow[]) => {
+      if (err) {
+        logAbort(`${tableName}: error retrieving utxos: ${err.message}`);
+        return reject(err);
+      }
+      resolve(rows.map((r) => utxoFromRow(r)));
+    });
+  });
+};
+
+export const clearTable = async (db: sqlite3.Database, tableName: string) => {
+  const query = `DELETE FROM ${tableName};`;
+  await new Promise<void>((resolve, reject) => {
+    db.run(query, function (err) {
+      if (err) {
+        logAbort(`${tableName} db: clearing error: ${err.message}`);
+        reject(err);
+      } else {
+        logInfo(`${tableName} db: cleared`);
+        resolve();
+      }
+    });
+  });
+};
 
 export interface UtxoFromRow {
   tx_hash: string;
@@ -55,17 +162,6 @@ export function utxoFromRow(row: UtxoFromRow): UTxO {
   };
 }
 
-export function utxoToRow(utxo: UTxO): UtxoToRow {
-  return {
-    tx_hash: utxo.txHash,
-    output_index: utxo.outputIndex,
-    address: utxo.address,
-    datum_hash: utxo.datumHash,
-    datum: utxo.datum,
-    script_ref_type: utxo.scriptRef?.type || null,
-    script_ref_script: utxo.scriptRef?.script || null,
-  };
-}
 // transforms [{"unit":u1,"quantity":q1},...]-like string into assets
 const transformAssetsToObject = (
   assetsString: string
@@ -88,6 +184,28 @@ const transformAssetsToObject = (
   }
 };
 
+export interface UtxoToRow {
+  tx_hash: string;
+  output_index: number;
+  address: string;
+  datum_hash?: string | null;
+  datum?: string | null;
+  script_ref_type?: string | null;
+  script_ref_script?: string | null;
+}
+
+export function utxoToRow(utxo: UTxO): UtxoToRow {
+  return {
+    tx_hash: utxo.txHash,
+    output_index: utxo.outputIndex,
+    address: utxo.address,
+    datum_hash: utxo.datumHash,
+    datum: utxo.datum,
+    script_ref_type: utxo.scriptRef?.type || null,
+    script_ref_script: utxo.scriptRef?.script || null,
+  };
+}
+
 export interface NormalizedAsset {
   tx_hash: string;
   output_index: number;
@@ -107,74 +225,3 @@ export function utxoToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
     return asset;
   });
 }
-
-export const insertUtxos = async (
-  db: sqlite3.Database,
-  // , tableName: string
-  // , assetTableName: string
-  utxos: UTxO[]
-) => {
-  const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
-  const query = `
-    INSERT INTO confirmed_ledger
-      (tx_hash, output_index, address, datum_hash, datum, script_ref_type, script_ref_script)
-    VALUES
-    ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")}
-  `;
-  const normalizedAssets = utxos.flatMap((utxo) =>
-    utxoToNormalizedAssets(utxo)
-  );
-  const assetQuery = `
-    INSERT INTO confirmed_ledger_assets
-      (tx_hash, output_index, unit, quantity)
-    VALUES
-     ${normalizedAssets.map(() => `(?, ?, ?, ?)`).join(", ")}
-  `;
-  const assetValues = normalizedAssets.flatMap((v) => Object.values(v));
-  return new Promise<void>((resolve, reject) => {
-    db.run("BEGIN TRANSACTION;", (err) => {
-      if (err) {
-        logAbort(`Error starting transaction: ${err.message}`);
-        return reject(err);
-      }
-      db.run(query, values, (err) => {
-        if (err) {
-          logAbort(`Error inserting UTXOs: ${err.message}`);
-          db.run("ROLLBACK;", () => reject(err));
-        } else {
-          logInfo(`${utxos.length} new UTXOs added to confirmed_ledger`);
-          db.run(assetQuery, assetValues, (err) => {
-            if (err) {
-              logAbort(`Error inserting assets: ${err.message}`);
-              db.run("ROLLBACK;", () => reject(err));
-            } else {
-              logInfo(`Assets added to confirmed_ledger_assets`);
-              db.run("COMMIT;", (err) => {
-                if (err) {
-                  logAbort(`Error committing transaction: ${err.message}`);
-                  return reject(err);
-                }
-                resolve();
-              });
-            }
-          });
-        }
-      });
-    });
-  });
-};
-
-export const clearTable = async (db: sqlite3.Database, tableName: string) => {
-  const query = `DELETE FROM ${tableName};`;
-  await new Promise<void>((resolve, reject) => {
-    db.run(query, function (err) {
-      if (err) {
-        logAbort(`${tableName} db: clearing error: ${err.message}`);
-        reject(err);
-      } else {
-        logInfo(`${tableName} db: cleared`);
-        resolve();
-      }
-    });
-  });
-};
