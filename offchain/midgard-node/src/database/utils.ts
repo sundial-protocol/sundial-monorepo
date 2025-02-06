@@ -8,7 +8,17 @@ import {
 } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 
-export interface UtxoRow {
+export interface UtxoToRow {
+  tx_hash: string;
+  output_index: number;
+  address: string;
+  datum_hash?: string | null;
+  datum?: string | null;
+  script_ref_type?: string | null;
+  script_ref_script?: string | null;
+}
+
+export interface UtxoFromRow {
   tx_hash: string;
   output_index: number;
   address: string;
@@ -19,7 +29,7 @@ export interface UtxoRow {
   script_ref_script?: string | null;
 }
 
-export function utxoFromRow(row: UtxoRow): UTxO {
+export function utxoFromRow(row: UtxoFromRow): UTxO {
   const scriptRefType: ScriptType | null =
     row.script_ref_type == "Native"
       ? "Native"
@@ -51,14 +61,14 @@ export function utxoFromRow(row: UtxoRow): UTxO {
   };
 }
 
-export function utxoToRow(utxo: UTxO): UtxoRow {
+export function utxoToRow (utxo: UTxO): UtxoToRow {
   return {
     tx_hash: utxo.txHash,
     output_index: utxo.outputIndex,
     address: utxo.address,
-    assets: JSON.stringify(utxo.assets, (_, v) =>
-      typeof v === "bigint" ? v.toString() : v
-    ),
+    // assets: JSON.stringify(utxo.assets, (_, v) =>
+    //   typeof v === "bigint" ? v.toString() : v
+    // ),
     datum_hash: utxo.datumHash,
     datum: utxo.datum,
     script_ref_type: utxo.scriptRef?.type || null,
@@ -66,58 +76,25 @@ export function utxoToRow(utxo: UTxO): UtxoRow {
   };
 }
 
-export const retrieveUtxosFromTable = async (
-  db: sqlite3.Database,
-  tableName: string
-): Promise<UTxO[]> => {
-  const query = `SELECT * FROM ${tableName}`;
-  return new Promise((resolve, reject) => {
-    db.all(query, (err, rows: UtxoRow[]) => {
-      if (err) {
-        logAbort(
-          `${tableName}: error retrieving utxos from table: ${err.message}`
-        );
-        return reject(err);
-      }
-      const result = rows.map((utxoRow) => {
-        return utxoFromRow(utxoRow);
-      });
-      resolve(result);
-    });
-  });
+export interface NormalizedAsset {
+  tx_hash: string;
+  output_index: number;
+  unit: string;
+  quantity: number;
 };
 
-export const insertUtxosIntoTable = async (
-  db: sqlite3.Database,
-  tableName: string,
-  utxos: UTxO[]
-) => {
-  const query = `
-      INSERT INTO ${tableName}
-        ( tx_hash
-        , output_index
-        , address
-        , assets
-        , datum_hash
-        , datum
-        , script_ref_type
-        , script_ref_script
-        ) VALUES
-      ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?, ?)`).join(", ")}
-    `;
-  const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
-  return new Promise<void>((resolve, reject) => {
-    db.run(query, values, (err) => {
-      if (err) {
-        logAbort(`${tableName} db: error inserting utxos: ${err.message}`);
-        reject();
-      } else {
-        logInfo(`${tableName} db: ${utxos.length} new utxos added`);
-        resolve();
-      }
-    });
-  });
-};
+//TODO: figure out how to store bigInt in the database
+export function utxoToNormalizedAssets (utxo: UTxO): NormalizedAsset[] {
+  return Object.entries(utxo.assets).flatMap(([unit, quantity]) => {
+    const asset: NormalizedAsset = {tx_hash: utxo.txHash
+                                   , output_index: utxo.outputIndex
+                                   , unit: unit
+                                   , quantity: Number(quantity)
+                                   }
+    return asset;
+    }
+  );
+}
 
 export const clearTable = async (db: sqlite3.Database, tableName: string) => {
   const query = `DELETE FROM ${tableName};`;
