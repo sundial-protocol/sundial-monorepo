@@ -13,6 +13,8 @@ use cardano/transaction.{
 }
 use midgard/active_operators
 use midgard/hub_oracle.{Datum as HubOracleDatum}
+use midgard/registered_operators
+use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum}
 use midgard/state_queue.{
   CommitBlockHeader, Datum, Deinit, Init, MergeToConfirmedState, MintRedeemer,
@@ -63,6 +65,7 @@ validator mint(
         scheduler_asset_name,
         hub_oracle_ref_input_index,
         scheduler_state_ref_input_index,
+        active_node_input_index,
         header_node_output_index,
         previous_header_node_output_index,
         active_operators_redeemer_index,
@@ -96,11 +99,10 @@ validator mint(
           parsed_previous_header_node_datum.data
         expect Some(active_operators_redeemer_pair) =
           list.at(self.redeemers, active_operators_redeemer_index)
-        expect Spend(..) = active_operators_redeemer_pair.1st
-        expect active_operators.UpdateCommitmentTime {
-          active_node_input_index,
-          ..
-        } = active_operators_redeemer_pair.2nd
+        expect Spend(active_node_input_output_reference) =
+          active_operators_redeemer_pair.1st
+        expect active_operators.UpdateCommitmentTime { .. } =
+          active_operators_redeemer_pair.2nd
         expect Some(active_node_input) =
           list.at(self.inputs, active_node_input_index)
         expect InlineDatum(active_node_datum) = active_node_input.output.datum
@@ -129,6 +131,7 @@ validator mint(
           header_node_block_data.end_time == valid_to,
           header_node_block_data.end_time >= parsed_scheduler_state_datum.start_time,
           header_node_block_data.end_time <= parsed_scheduler_state_datum.end_time,
+          active_node_input_output_reference == active_node_input.output_reference,
           ordered.prove_is_member(
             parsed_hub_oracle_datum.active_operators,
             parsed_active_node_datum.key,
@@ -138,65 +141,104 @@ validator mint(
         }
       }
       MergeToConfirmedState(
+        header_node_key,
         header_node_input_index,
         confirmed_state_node_input_index,
         confirmed_state_node_output_index,
-      ) -> and {
+      ) -> {
+        expect Finite(valid_from) = self.validity_range.lower_bound.bound_type
+        expect Some(confirmed_state_node_input) =
+          list.at(self.inputs, confirmed_state_node_input_index)
+        expect InlineDatum(confirmed_state_node_input_datum) =
+          confirmed_state_node_input.output.datum
+        expect parsed_confirmed_state_node_input_datum: NodeDatum =
+          confirmed_state_node_input_datum
+        expect Some(header_node_input) =
+          list.at(self.outputs, header_node_input_index)
+        expect InlineDatum(header_node_input_datum) = header_node_input.datum
+        expect parsed_header_node_input_datum: NodeDatum =
+          header_node_input_datum
+        expect header_node_block_data: Datum =
+          parsed_header_node_input_datum.data
+        and {
           unordered.remove(
-            header_node_key,
+            Key(header_node_key),
             header_node_input_index,
             confirmed_state_node_input_index,
-            node_inputs,
+            node_in_outputs,
             node_outputs,
             node_mint,
           ),
-          unordered.is_root_node(confirmed_state_node_key),
-          valid_from >= header_node_data.commitment_time + maturity_duration,
+          unordered.prove_is_root_node(
+            policy_id,
+            confirmed_state_node_input.output,
+          ),
+          valid_from >= header_node_block_data.end_time + maturity_duration,
           //TODO should we check that key and next of confirmed_state_node_output are still the same?
-          header_node_data == confirmed_state_node_output_data,
+          parsed_header_node_input_datum.data == parsed_confirmed_state_node_input_datum.data,
           //TODO create a settlement queue node here if the merged block contains deposits/withdrawals
           True,
         }
+      }
       RemoveFraudulentBlockHeader {
-        fraud_proof_red_input_index,
+        removed_node_input_index,
+        predecessor_node_input_index,
+        operators_redeemer_index,
+        fraud_proof_ref_input_index,
         fraud_proof_asset_name,
         fraudulent_operator,
         operator_status,
       } -> {
-        expect Some(fraud_proof_red_input) =
-          list.at(self.reference_inputs, fraud_proof_red_input_index)
+        expect Some(fraud_proof_ref_input) =
+          list.at(self.reference_inputs, fraud_proof_ref_input_index)
 
-        let fraud_proof_block_hash = last_28_bytes_of(fraud_proof_asset_name)
+        //Get last 28 bytes of fraud_proof_asset_name
+        let fraud_proof_block_hash =
+          bytearray.drop(
+            fraud_proof_asset_name,
+            bytearray.length(fraud_proof_asset_name) - 28,
+          )
         and {
           unordered.remove(
-            removed_node_key,
+            Key(fraudulent_operator),
             removed_node_input_index,
-            confirmed_state_node_input_index,
-            node_inputs,
+            predecessor_node_input_index,
+            node_in_outputs,
             node_outputs,
             node_mint,
           ),
-          Key(fraudulent_operator) == removed_node_key,
           when operator_status is {
-            Active -> {
-              let active_operators_redeemer = "todo"
-              fraudulent_operator == active_operators_redeemer.slashed_operator
+            registered_operators.Active -> {
+              expect Some(active_operators_redeemer_pair) =
+                list.at(self.redeemers, operators_redeemer_index)
+              expect Mint(..) = active_operators_redeemer_pair.1st
+              expect active_operators.RemoveOperatorSlashBond {
+                slashed_active_operator_key,
+                ..
+              } = active_operators_redeemer_pair.2nd
+              fraudulent_operator == slashed_active_operator_key
             }
-            Retired -> {
-              let retired_operators_redeemer = "todo"
-              fraudulent_operator == retired_operators_redeemer.slashed_operator
+            registered_operators.Retired -> {
+              expect Some(retired_operators_redeemer_pair) =
+                list.at(self.redeemers, operators_redeemer_index)
+              expect Mint(..) = retired_operators_redeemer_pair.1st
+              expect retired_operators.RemoveOperatorSlashBond {
+                slashed_retired_operator_key,
+                ..
+              } = retired_operators_redeemer_pair.2nd
+              fraudulent_operator == slashed_retired_operator_key
             }
             _ -> False
           },
           quantity_of(
-            fraud_proof_red_input.output.value,
+            fraud_proof_ref_input.output.value,
             fraud_proof_policy_id,
             fraud_proof_asset_name,
           ) == 1,
           or {
             Key(fraud_proof_block_hash) == predecessor_node_key,
             and {
-              Key(fraud_proof_block_hash) == removed_node_key,
+              fraud_proof_block_hash == fraudulent_operator,
               unordered.is_last_node(removed_node_link),
             },
           },

@@ -95,7 +95,7 @@ validator main(
         // (1.2) Extract tx_root via the state queue block hash
         expect InlineDatum(bad_state_queue_datum_data) =
           bad_state_queue_node_input.output.datum
-        expect bad_state_queue_node_datum: state_queue.Datum =
+        expect bad_state_queue_node_datum: unordered.NodeDatum =
           bad_state_queue_datum_data
         expect parsed_state_queue_datum: ledger_state.Header =
           bad_state_queue_node_datum.data

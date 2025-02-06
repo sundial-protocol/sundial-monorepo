@@ -29,17 +29,22 @@ pub type MintRedeemer {
     scheduler_asset_name: ByteArray,
     hub_oracle_ref_input_index: Int,
     scheduler_state_ref_input_index: Int,
+    active_node_input_index: Int,
     header_node_output_index: Int,
     previous_header_node_output_index: Int,
     active_operators_redeemer_index: Int,
   }
   MergeToConfirmedState {
+    header_node_key: ByteArray,
     header_node_input_index: Int,
     confirmed_state_node_input_index: Int,
     confirmed_state_node_output_index: Int,
   }
   RemoveFraudulentBlockHeader {
-    fraud_proof_red_input_index: Int,
+    removed_node_input_index: Int,
+    predecessor_node_input_index: Int,
+    operators_redeemer_index: Int,
+    fraud_proof_ref_input_index: Int,
     fraud_proof_asset_name: ByteArray,
     fraudulent_operator: ByteArray,
     operator_status: WitnessStatus,

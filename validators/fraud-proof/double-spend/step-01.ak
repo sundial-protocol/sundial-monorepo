@@ -1,7 +1,7 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
-use aiken_design_patterns/linked_list/ordered.{NodeDatum}
+use aiken_design_patterns/linked_list/ordered.{Key, NodeDatum}
 use aiken_design_patterns/linked_list/unordered
 use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script}
@@ -15,7 +15,6 @@ use midgard/fraud_proof/double_spend/step_01.{
   Cancel, Continue, StepRedeemer as Step1Redeemer, StepState as Step1State,
 }
 use midgard/ledger_state.{Header}
-use midgard/state_queue.{Datum as NodeDatum}
 
 // -------- GOAL DEFINITION --------------------------------------
 // double_spend fraud proof: Proves membership Merkle proofs for 2 unique txs which spends the same input UTxO
