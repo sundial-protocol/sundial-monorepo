@@ -36,7 +36,7 @@ export const insertUtxos = async (
           logAbort(`${tableName}: error inserting UTXOs: ${err.message}`);
           db.run("ROLLBACK;", () => reject(err));
         } else {
-          logInfo(`${utxos.length} new UTXOs added to confirmed_ledger`);
+          logInfo(`${tableName}: ${utxos.length} new UTXOs added to confirmed_ledger`);
           db.run(assetQuery, assetValues, (err) => {
             if (err) {
               logAbort(`${tableName}: error inserting assets: ${err.message}`);
@@ -210,17 +210,16 @@ export interface NormalizedAsset {
   tx_hash: string;
   output_index: number;
   unit: string;
-  quantity: number;
+  quantity: string; //sqlite threats bigInt as null
 }
 
-//TODO: figure out how to store bigInt in the database
 export function utxoToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
   return Object.entries(utxo.assets).flatMap(([unit, quantity]) => {
     const asset: NormalizedAsset = {
       tx_hash: utxo.txHash,
       output_index: utxo.outputIndex,
       unit: unit,
-      quantity: Number(quantity),
+      quantity: quantity.toString(), //sqlite threats bigInt as null
     };
     return asset;
   });
