@@ -7,7 +7,6 @@ import * as mempool from "../src/database/mempool.js";
 import * as immutable from "../src/database/immutable.js";
 import * as confirmedLedger from "../src/database/confirmedLedger.js";
 import * as latestLedger from "../src/database/latestLedger.js";
-import { utxoToNormalizedAssets } from "../src/database/utils.js";
 
 describe("database", () => {
   let db: sqlite3.Database;
@@ -106,7 +105,7 @@ describe("database", () => {
     txHash: tx1Hash,
     outputIndex: 0,
     address: "aaaa",
-    assets: { abcd: BigInt(12),  lovelace: BigInt(25000)},
+    assets: { abcd: BigInt(12), lovelace: BigInt(25000) },
     datum:
       "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
     datumHash:
@@ -144,23 +143,23 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
-  // it("should store utxos in the latest ledger db", async () => {
-  //   await latestLedger.insert(db, [utxo1]);
-  //   const result1 = await latestLedger.retrieve(db);
-  //   expect(result1).toStrictEqual([utxo1]);
+  it("should store utxos in the latest ledger db", async () => {
+    await latestLedger.insert(db, [utxo1]);
+    const result1 = await latestLedger.retrieve(db);
+    expect(result1).toStrictEqual([utxo1]);
 
-  //   await latestLedger.insert(db, [utxo2]);
-  //   const result2 = await latestLedger.retrieve(db);
-  //   expect(result2).toStrictEqual([utxo1, utxo2]);
-  // });
+    await latestLedger.insert(db, [utxo2]);
+    const result2 = await latestLedger.retrieve(db);
+    expect(result2).toStrictEqual([utxo1, utxo2]);
+  });
 
-  // it("clears the latest ledger db", async () => {
-  //   const initialRows = await latestLedger.retrieve(db);
-  //   expect(initialRows.length).toBe(2);
-  //   await latestLedger.clear(db);
-  //   const result = await latestLedger.retrieve(db);
-  //   expect(result.length).toBe(0);
-  // });
+  it("clears the latest ledger db", async () => {
+    const initialRows = await latestLedger.retrieve(db);
+    expect(initialRows.length).toBe(2);
+    await latestLedger.clear(db);
+    const result = await latestLedger.retrieve(db);
+    expect(result.length).toBe(0);
+  });
 });
 
 class MockLucid {
