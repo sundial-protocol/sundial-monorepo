@@ -44,7 +44,7 @@ validator mint(
   active_operators_script_hash: PolicyId,
   retired_operators_script_hash: PolicyId,
   scheduler_script_hash: PolicyId,
-  fraud_proof_token_script_hash: PolicyId,
+  fraud_proof_script_hash: PolicyId,
   maturity_duration: Int,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
@@ -232,7 +232,7 @@ validator mint(
           },
           quantity_of(
             fraud_proof_ref_input.output.value,
-            fraud_proof_policy_id,
+            fraud_proof_script_hash,
             fraud_proof_asset_name,
           ) == 1,
           or {
