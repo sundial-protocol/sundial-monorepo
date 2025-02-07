@@ -38,7 +38,6 @@ pub type MintRedeemer {
     header_node_key: ByteArray,
     header_node_input_index: Int,
     confirmed_state_node_input_index: Int,
-    confirmed_state_node_output_index: Int,
   }
   RemoveFraudulentBlockHeader {
     removed_node_input_index: Int,

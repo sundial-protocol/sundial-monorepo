@@ -2,7 +2,6 @@ use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
 use aiken_design_patterns/linked_list/ordered.{Key, NodeDatum}
-use aiken_design_patterns/linked_list/unordered
 use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script}
 use cardano/assets.{PolicyId, lovelace_of}

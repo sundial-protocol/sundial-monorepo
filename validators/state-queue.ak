@@ -1,4 +1,3 @@
-use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto
 use aiken/interval.{Finite, Interval}
@@ -38,6 +37,7 @@ validator spend(fraud_proof_catalog_mint_script_hash: ByteArray) {
   }
 }
 
+//TODO Decide if using hub_oracle datum or hardcoded minting policies, not both!
 validator mint(
   hub_oracle_script_hash: PolicyId,
   hub_oracle_asset_name: ByteArray,
@@ -144,7 +144,6 @@ validator mint(
         header_node_key,
         header_node_input_index,
         confirmed_state_node_input_index,
-        confirmed_state_node_output_index,
       ) -> {
         expect Finite(valid_from) = self.validity_range.lower_bound.bound_type
         expect Some(confirmed_state_node_input) =
@@ -174,7 +173,7 @@ validator mint(
             confirmed_state_node_input.output,
           ),
           valid_from >= header_node_block_data.end_time + maturity_duration,
-          //TODO should we check that key and next of confirmed_state_node_output are still the same?
+          //TODO should we check that key and link of confirmed_state_node_output are still the same?
           parsed_header_node_input_datum.data == parsed_confirmed_state_node_input_datum.data,
           //TODO create a settlement queue node here if the merged block contains deposits/withdrawals
           True,
@@ -191,6 +190,14 @@ validator mint(
       } -> {
         expect Some(fraud_proof_ref_input) =
           list.at(self.reference_inputs, fraud_proof_ref_input_index)
+        expect Some(removed_node_input) =
+          list.at(self.inputs, removed_node_input_index)
+        expect Some(predecessor_node_input) =
+          list.at(self.inputs, predecessor_node_input_index)
+        let predecessor_node_key =
+          unordered.get_key(
+            unordered.get_raw_key_and_link(predecessor_node_input.output),
+          )
 
         //Get last 28 bytes of fraud_proof_asset_name
         let fraud_proof_block_hash =
@@ -211,22 +218,29 @@ validator mint(
             registered_operators.Active -> {
               expect Some(active_operators_redeemer_pair) =
                 list.at(self.redeemers, operators_redeemer_index)
-              expect Mint(..) = active_operators_redeemer_pair.1st
+              expect Mint(mint_script_hash) = active_operators_redeemer_pair.1st
               expect active_operators.RemoveOperatorSlashBond {
                 slashed_active_operator_key,
                 ..
               } = active_operators_redeemer_pair.2nd
-              fraudulent_operator == slashed_active_operator_key
+              and {
+                mint_script_hash == active_operators_script_hash,
+                fraudulent_operator == slashed_active_operator_key,
+              }
             }
             registered_operators.Retired -> {
               expect Some(retired_operators_redeemer_pair) =
                 list.at(self.redeemers, operators_redeemer_index)
-              expect Mint(..) = retired_operators_redeemer_pair.1st
+              expect Mint(mint_script_hash) =
+                retired_operators_redeemer_pair.1st
               expect retired_operators.RemoveOperatorSlashBond {
                 slashed_retired_operator_key,
                 ..
               } = retired_operators_redeemer_pair.2nd
-              fraudulent_operator == slashed_retired_operator_key
+              and {
+                mint_script_hash == retired_operators_script_hash,
+                fraudulent_operator == slashed_retired_operator_key,
+              }
             }
             _ -> False
           },
@@ -239,7 +253,7 @@ validator mint(
             Key(fraud_proof_block_hash) == predecessor_node_key,
             and {
               fraud_proof_block_hash == fraudulent_operator,
-              unordered.is_last_node(removed_node_link),
+              unordered.prove_is_last_node(policy_id, removed_node_input.output),
             },
           },
         }

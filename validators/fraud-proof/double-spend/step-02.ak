@@ -15,7 +15,6 @@ use midgard/fraud_proof/double_spend/step_02.{
   Cancel, Continue, StepRedeemer as Step2Redeemer, StepState as Step2State,
 }
 use midgard/ledger_state
-use midgard/state_queue
 
 validator main(
   // Script hash of next step (backwards compilation order of step validators required)
