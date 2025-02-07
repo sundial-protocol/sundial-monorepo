@@ -11,7 +11,6 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
 }
 use midgard/active_operators
-use midgard/hub_oracle.{Datum as HubOracleDatum}
 use midgard/registered_operators
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum}
@@ -37,7 +36,6 @@ validator spend(fraud_proof_catalog_mint_script_hash: ByteArray) {
   }
 }
 
-//TODO Decide if using hub_oracle datum or hardcoded minting policies, not both!
 validator mint(
   hub_oracle_script_hash: PolicyId,
   hub_oracle_asset_name: ByteArray,
@@ -63,7 +61,6 @@ validator mint(
       CommitBlockHeader(
         operator,
         scheduler_asset_name,
-        hub_oracle_ref_input_index,
         scheduler_state_ref_input_index,
         active_node_input_index,
         header_node_output_index,
@@ -72,10 +69,6 @@ validator mint(
       ) -> {
         expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
 
-        expect Some(hub_oracle_ref_input) =
-          list.at(self.reference_inputs, hub_oracle_ref_input_index)
-        expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
-        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
         expect Some(scheduler_state_ref_input) =
           list.at(self.reference_inputs, scheduler_state_ref_input_index)
         expect InlineDatum(scheduler_state_datum) =
@@ -123,7 +116,7 @@ validator mint(
           ),
           quantity_of(
             scheduler_state_ref_input.output.value,
-            parsed_hub_oracle_datum.scheduler,
+            scheduler_script_hash,
             scheduler_asset_name,
           ) == 1,
           operator == parsed_scheduler_state_datum.operator,
@@ -133,7 +126,7 @@ validator mint(
           header_node_block_data.end_time <= parsed_scheduler_state_datum.end_time,
           active_node_input_output_reference == active_node_input.output_reference,
           ordered.prove_is_member(
-            parsed_hub_oracle_datum.active_operators,
+            active_operators_script_hash,
             parsed_active_node_datum.key,
             active_node_input.output,
           ),

@@ -27,7 +27,6 @@ pub type MintRedeemer {
   CommitBlockHeader {
     operator: ByteArray,
     scheduler_asset_name: ByteArray,
-    hub_oracle_ref_input_index: Int,
     scheduler_state_ref_input_index: Int,
     active_node_input_index: Int,
     header_node_output_index: Int,
