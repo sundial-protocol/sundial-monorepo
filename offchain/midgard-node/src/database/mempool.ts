@@ -45,4 +45,11 @@ export const retrieve = async (db: sqlite3.Database) => {
   return mempool;
 };
 
+export const retrieveByTX = async (db: sqlite3.Database, tx_hash:string) => {
+  const blocks = await new Promise<[string][]>((resolve, reject) => {
+    // TODO get all tx_cbor with tx_hash
+  });
+  return blocks
+};
+
 export const clear = async (db: sqlite3.Database) => clearTable(db, "mempool");
