@@ -2,7 +2,8 @@
 
 import { Command } from "commander";
 import { ENV_VARS_GUIDE, chalk, logInfo, setupLucid } from "./utils.js";
-import { initializeDb, listen } from "./commands/listen.js";
+import { listen } from "./commands/listen.js";
+import { initializeDb } from "./database.js"
 import * as packageJson from "../package.json";
 
 const VERSION = packageJson.default.version;
