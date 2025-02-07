@@ -2,6 +2,7 @@ import {
   Result,
   errorToString,
   fail,
+  isBech32,
   isHexString,
   logAbort,
   logInfo,
@@ -21,6 +22,8 @@ import {
 import express from "express";
 import sqlite3 from "sqlite3";
 import * as mempool from "../database/mempool.js"
+import * as blocks from "../database/blocks.js"
+import * as latestLedger from "../database/latestLedger.js"
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
@@ -79,16 +82,70 @@ export const listen = (
   confirmedStatePollingInterval: number
 ) => {
   const app = express();
-  app.get("/", (req, res) => {
+
+  app.get("/tx", (req, res) => {
     res.type("text/plain");
-    const txHex = req.query.tx;
-    const txIsString = typeof txHex === "string";
-    if (txIsString && isHexString(txHex)) {
-      res.send(`Transaction received: ${req.query.tx}`);
+    const txHash = req.query.tx_hash;
+    const txIsString = typeof txHash === "string";
+    const validLength = txHash?.length === 32;
+
+    if (txIsString && isHexString(txHash) && validLength) {
+      mempool.retrieveByTX(db, txHash).then((v =>
+        res.send(v)
+      ));
     } else {
-      res.send("Please provide a valid transaction CBOR.");
+      res.status(400)
+      res.send(`Invalid transaction hash: ${txHash}`);
     }
   });
+
+  app.get("/utxos", (req, res) => {
+    res.type("text/plain");
+    const addr = req.query.addr;
+    const addrIsString = typeof addr === "string";
+    if (addrIsString && isBech32(addr)) {
+      latestLedger.retrieveByAddr(db, addr).then((v =>
+        res.send(v)
+      ));
+    } else {
+      res.status(400)
+      res.send(`Invalid address: ${addr}`);
+    }
+  });
+
+  app.get("/block", (req, res) => {
+    res.type("text/plain");
+    const hdrHash = req.query.header_hash;
+    const txIsString = typeof hdrHash === "string";
+    const validLength = hdrHash?.length === 32
+    if (txIsString && isHexString(hdrHash) && validLength) { // TODO: change to a proper Blake2b check
+        blocks.retrieveByHeader(db, hdrHash).then((v =>
+          res.send(v)
+        ));
+      } else {
+        res.status(400)
+        res.send(`Invalid block header hash: ${hdrHash}`);
+      }
+    });
+
+    app.post("/submit", (req, res) => {
+      res.type("text/plain");
+      const txCBOR = req.query.tx_cbor;
+      const txIsString = typeof txCBOR === "string";
+      // TODO handling of CBOR?
+      // https://github.com/hildjj/cbor2
+
+      const tx_hash = "" // TODO add transaction hash?
+      if (txIsString && isHexString(txCBOR)) {
+        mempool.insert(db, tx_hash, txCBOR).then((v =>
+          res.send(v) // Perhaps a better way to send 200 ?
+        ));
+      } else {
+        res.status(400)
+        res.send(`Invalid CBOR: ${txCBOR}`);
+      }
+    });
+
   app.listen(port, () => {});
   logInfo(`Server running at http://localhost:${port}`);
 };

@@ -106,4 +106,11 @@ export const retrieve = async (db: sqlite3.Database) => {
   return blocks;
 };
 
+export const retrieveByHeader = async (db: sqlite3.Database, header_hash:string) => {
+  const blocks = await new Promise<[string][]>((resolve, reject) => {
+    // TODO get all tx_hashes with header_hash
+  });
+  return blocks
+};
+
 export const clear = async (db: sqlite3.Database) => clearTable(db, `blocks`);
