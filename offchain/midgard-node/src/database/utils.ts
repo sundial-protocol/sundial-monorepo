@@ -28,18 +28,18 @@ export const insertUtxos = async (
   return new Promise<void>((resolve, reject) => {
     db.run("BEGIN TRANSACTION;", (err) => {
       if (err) {
-        logAbort(`${tableName}: error starting transaction: ${err.message}`);
+        logAbort(`${tableName} db: error starting transaction: ${err.message}`);
         return reject(err);
       }
       db.run(query, values, (err) => {
         if (err) {
-          logAbort(`${tableName}: error inserting UTXOs: ${err.message}`);
+          logAbort(`${tableName} db: error inserting UTXOs: ${err.message}`);
           db.run("ROLLBACK;", () => reject(err));
         } else {
-          logInfo(`${tableName}: ${utxos.length} new UTXOs added to confirmed_ledger`);
+          logInfo(`${tableName} db: ${utxos.length} new UTXOs added to confirmed_ledger`);
           db.run(assetQuery, assetValues, (err) => {
             if (err) {
-              logAbort(`${tableName}: error inserting assets: ${err.message}`);
+              logAbort(`${tableName} db: error inserting assets: ${err.message}`);
               db.run("ROLLBACK;", () => reject(err));
             } else {
               logInfo(
