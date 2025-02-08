@@ -1,6 +1,7 @@
 import { UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
+import { logAbort, logInfo } from "../utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS confirmed_ledger (
@@ -27,11 +28,32 @@ export const createQuery = `
   );
   `;
 
-export const insert = async (db: sqlite3.Database, utxos: UTxO[]) =>
+export const insert = async (
+  db: sqlite3.Database,
+  utxos: UTxO[]
+): Promise<void> =>
   insertUtxos(db, "confirmed_ledger", "confirmed_ledger_assets", utxos);
 
 export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
   retrieveUtxos(db, "confirmed_ledger", "confirmed_ledger_assets");
 
-export const clear = async (db: sqlite3.Database) =>
+export const clearTx = async (
+  db: sqlite3.Database,
+  txHash: string
+): Promise<void> => {
+  const query = `DELETE FROM confirmed_ledger WHERE tx_hash = ?;`;
+  await new Promise<void>((resolve, reject) => {
+    db.run(query, [txHash], function (err) {
+      if (err) {
+        logAbort(`confirmed_ledger db: clearing error: ${err.message}`);
+        reject(err);
+      } else {
+        logInfo(`confirmed_ledger db: cleared`);
+        resolve();
+      }
+    });
+  });
+};
+
+export const clear = async (db: sqlite3.Database): Promise<void> =>
   clearTable(db, "confirmed_ledger");

@@ -68,7 +68,7 @@ describe("database", () => {
     expect(result2).toEqual(Option.none());
   });
 
-  it("clears given block", async () => {
+  it("clears given block in the blocks db", async () => {
     await blocks.clearBlock(db, "non-existent block");
     const result1 = await blocks.retrieve(db);
     expect(result1.map((o) => Object.values(o))).toStrictEqual([
@@ -177,9 +177,19 @@ describe("database", () => {
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
+  it("clears given tx in the confirmed ledger db", async () => {
+    await confirmedLedger.clearTx(db, "non-existent tx");
+    const result1 = await confirmedLedger.retrieve(db);
+    expect(result1).toStrictEqual([utxo1, utxo2]);
+
+    await confirmedLedger.clearTx(db, tx2Hash);
+    const result2 = await confirmedLedger.retrieve(db);
+    expect(result2).toStrictEqual([utxo1]);
+  })
+
   it("clears the confirmed ledger db", async () => {
     const initialRows = await confirmedLedger.retrieve(db);
-    expect(initialRows.length).toBe(2);
+    expect(initialRows.length).toBe(1);
     await confirmedLedger.clear(db);
     const result = await confirmedLedger.retrieve(db);
     expect(result.length).toBe(0);
@@ -195,9 +205,19 @@ describe("database", () => {
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
+  it("clears given tx in the latest ledger db", async () => {
+    await latestLedger.clearTx(db, "non-existent tx");
+    const result1 = await latestLedger.retrieve(db);
+    expect(result1).toStrictEqual([utxo1, utxo2]);
+
+    await latestLedger.clearTx(db, tx2Hash);
+    const result2 = await latestLedger.retrieve(db);
+    expect(result2).toStrictEqual([utxo1]);
+  })
+
   it("clears the latest ledger db", async () => {
     const initialRows = await latestLedger.retrieve(db);
-    expect(initialRows.length).toBe(2);
+    expect(initialRows.length).toBe(1);
     await latestLedger.clear(db);
     const result = await latestLedger.retrieve(db);
     expect(result.length).toBe(0);
