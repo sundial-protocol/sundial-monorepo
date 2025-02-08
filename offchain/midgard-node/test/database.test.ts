@@ -75,9 +75,9 @@ describe("database", () => {
       [block1Hash, tx1Hash],
       [block1Hash, tx2Hash],
     ]);
-    const block3Hash = "cccccccccccccccc"
+    const block3Hash = "cccccccccccccccc";
     await blocks.insert(db, block3Hash, ["1", "2"]);
-    await blocks.clearBlock(db, block3Hash)
+    await blocks.clearBlock(db, block3Hash);
     const result2 = await blocks.retrieve(db);
     expect(result2.map((o) => Object.values(o))).toStrictEqual([
       [block1Hash, tx1Hash],
@@ -129,6 +129,17 @@ describe("database", () => {
       [tx1Hash, tx1],
       [tx2Hash, tx2],
     ]);
+  });
+
+  it("retrieves tx by hash in the immutable db", async () => {
+    const result1 = await immutable.retrieveTxCborByHash(
+      db,
+      "non-existent tx hash"
+    );
+    expect(result1).toEqual(Option.none());
+
+    const result2 = await immutable.retrieveTxCborByHash(db, tx1Hash);
+    expect(result2).toEqual(Option.some({ tx_cbor: tx1 }));
   });
 
   it("clears the immutable db", async () => {
@@ -185,7 +196,7 @@ describe("database", () => {
     await confirmedLedger.clearTx(db, tx2Hash);
     const result2 = await confirmedLedger.retrieve(db);
     expect(result2).toStrictEqual([utxo1]);
-  })
+  });
 
   it("clears the confirmed ledger db", async () => {
     const initialRows = await confirmedLedger.retrieve(db);
@@ -213,7 +224,7 @@ describe("database", () => {
     await latestLedger.clearTx(db, tx2Hash);
     const result2 = await latestLedger.retrieve(db);
     expect(result2).toStrictEqual([utxo1]);
-  })
+  });
 
   it("clears the latest ledger db", async () => {
     const initialRows = await latestLedger.retrieve(db);
@@ -231,4 +242,4 @@ class MockLucid {
       toHash: () => CML.hash_transaction(tx_body).to_hex(),
     };
   }
-};
+}

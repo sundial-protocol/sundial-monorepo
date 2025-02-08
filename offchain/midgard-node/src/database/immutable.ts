@@ -1,6 +1,7 @@
 import { logAbort, logInfo } from "../utils.js";
 import sqlite3 from "sqlite3";
 import { clearTable } from "./utils.js";
+import { Option } from "effect";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS immutable (
@@ -33,7 +34,7 @@ export const insert = async (
 
 export const retrieve = async (db: sqlite3.Database) => {
   const query = `SELECT * FROM immutable`;
-  const mempool = await new Promise<[string, string][]>((resolve, reject) => {
+  const result = await new Promise<[string, string][]>((resolve, reject) => {
     db.all(query, (err, rows: [string, string][]) => {
       if (err) {
         logAbort(`immutable db: retrieving error: ${err.message}`);
@@ -42,7 +43,24 @@ export const retrieve = async (db: sqlite3.Database) => {
       resolve(rows);
     });
   });
-  return mempool;
+  return result;
+};
+
+export const retrieveTxCborByHash = async (
+  db: sqlite3.Database,
+  txHash: string
+): Promise<Option.Option<string>> => {
+  const query = `SELECT tx_cbor FROM immutable WHERE tx_hash = ?`;
+  const result = await new Promise<string[]>((resolve, reject) => {
+    db.all(query, [txHash], (err, rows: string[]) => {
+      if (err) {
+        logAbort(`immutable db: retrieving error: ${err.message}`);
+        reject(err);
+      }
+      resolve(rows);
+    });
+  });
+  return Option.fromIterable(result);
 };
 
 export const clear = async (db: sqlite3.Database) =>
