@@ -2,7 +2,6 @@ import { makeReturn } from "@/core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue, ActiveOperators } from "@/tx-builder/index.js";
 import { Effect } from "effect";
-import { errorToString } from "@/utils/common.js";
 import { CommitBlockParams, FetchConfig } from "@/types/state-queue.js";
 
 export const commitBlockHeaderProgram = (
@@ -10,7 +9,7 @@ export const commitBlockHeaderProgram = (
   fetchConfig: FetchConfig,
   sqCommitParams: CommitBlockParams,
   aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams
-): Effect.Effect<TxSignBuilder, string> =>
+): Effect.Effect<TxSignBuilder, Error> =>
   Effect.gen(function* () {
     const commitTx = yield* StateQueue.commitTxBuilder(
       lucid,
@@ -24,7 +23,7 @@ export const commitBlockHeaderProgram = (
             ActiveOperators.updateCommitmentTimeTxBuilder(lucid, aoUpdateParams)
           )
           .complete(),
-      catch: (e) => errorToString(e),
+      catch: (e) => new Error(`${e}`),
     });
     return completedTx;
   });

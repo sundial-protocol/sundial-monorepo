@@ -8,7 +8,7 @@ pub type MintRedeemer {
   Init
   Deinit
   RetireOperator {
-    new_retire_operator_key: ByteArray,
+    new_retired_operator_key: ByteArray,
     hub_oracle_ref_input_index: Int,
     retired_operator_appended_node_output_index: Int,
     retired_operator_anchor_node_output_index: Int,

@@ -1,7 +1,6 @@
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
-import { Effect, Either } from "effect";
-import { errorToString } from "@/utils/common.js";
+import { Effect } from "effect";
 import { CommitBlockParams, FetchConfig } from "@/types/state-queue.js";
 import { fetchLatestCommitedBlockProgram } from "@/endpoints/state-queue/fetch-latest-block.js";
 import { Header } from "@/types/contracts/ledger-state.js";
@@ -20,39 +19,35 @@ export const commitTxBuilder = (
   lucid: LucidEvolution,
   config: FetchConfig,
   { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams
-): Effect.Effect<TxBuilder, string> =>
+): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
-    const eithLatestNodeDatum = getNodeDatumFromUTxO(latestBlock);
-    const latestHeaderProgram: Effect.Effect<Header, string> = Effect.try({
-      try: () =>
-        Data.castFrom(Either.getOrThrow(eithLatestNodeDatum).data, Header),
-      catch: (e) => `Failed coercing latest block's datum: ${errorToString(e)}`,
+    const latestNodeDatum = yield* getNodeDatumFromUTxO(latestBlock);
+    const latestHeaderProgram: Effect.Effect<Header, Error> = Effect.try({
+      try: () => Data.castFrom(latestNodeDatum.data, Header),
+      catch: (e) =>
+        new Error(`Failed coercing latest block's datum: ${e}`),
     });
     const latestHeader: Header = yield* latestHeaderProgram;
-    const eithPrevHeaderHash = hashHeader(latestHeader);
-    if (Either.isRight(eithPrevHeaderHash)) {
-      const newHeader = {
-        ...latestHeader,
-        prevUtxosRoot: latestHeader.utxosRoot,
-        utxosRoot: newUTxOsRoot,
-        transactionsRoot,
-        startTime: latestHeader.endTime,
-        endTime,
-        prevHeaderHash: eithPrevHeaderHash.right,
-      };
-      const tx = lucid
-        .newTx()
-        .validFrom(Number(latestHeader.endTime))
-        .validTo(Number(endTime))
-        .collectFrom([latestBlock], "d87980") // TODO: Placeholder redeemer.
-        .pay.ToContract(
-          config.stateQueueAddress,
-          { kind: "inline", value: Data.to(newHeader, Header) },
-          latestBlock.assets
-        );
-      return tx;
-    } else {
-      return yield* Effect.fail(eithPrevHeaderHash.left);
-    }
+    const prevHeaderHash = yield* hashHeader(latestHeader);
+    const newHeader = {
+      ...latestHeader,
+      prevUtxosRoot: latestHeader.utxosRoot,
+      utxosRoot: newUTxOsRoot,
+      transactionsRoot,
+      startTime: latestHeader.endTime,
+      endTime,
+      prevHeaderHash,
+    };
+    const tx = lucid
+      .newTx()
+      .validFrom(Number(latestHeader.endTime))
+      .validTo(Number(endTime))
+      .collectFrom([latestBlock], "d87980") // TODO: Placeholder redeemer.
+      .pay.ToContract(
+        config.stateQueueAddress,
+        { kind: "inline", value: Data.to(newHeader, Header) },
+        latestBlock.assets
+      );
+    return tx;
   });

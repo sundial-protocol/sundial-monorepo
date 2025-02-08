@@ -7,8 +7,7 @@ pub type Datum {
 pub type SpendRedeemer {
   ListStateTransition
   UpdateCommitmentTime {
-    active_node_input_index: Int,
-    prev_active_node_ref_input_index: Int,
+    active_node_output_index: Int,
     hub_oracle_ref_input_index: Int,
     state_queue_redeemer_index: Int,
   }
