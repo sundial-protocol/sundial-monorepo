@@ -96,7 +96,7 @@ export const retrieveUtxos = async (
   return new Promise((resolve, reject) => {
     db.all(query, (err, rows: UtxoFromRow[]) => {
       if (err) {
-        logAbort(`${tableName}: error retrieving utxos: ${err.message}`);
+        logAbort(`${tableName} db: error retrieving utxos: ${err.message}`);
         return reject(err);
       }
       resolve(rows.map((r) => utxoFromRow(r)));

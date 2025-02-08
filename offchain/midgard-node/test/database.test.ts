@@ -150,10 +150,11 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
+  const address = "addr1q8gg2r3vf9zggn48g7m8vx62rwf6warcs4k7ej8mdzmqmesj30jz7psduyk6n4n2qrud2xlv9fgj53n6ds3t8cs4fvzs05yzmz";
   const utxo1: UTxO = {
     txHash: tx1Hash,
     outputIndex: 0,
-    address: "aaaa",
+    address: address,
     assets: {
       c5334d60505f62b715b098cb5f9a391416a6ed2064c7d813e03a11c1e2fb72ac0da4e312c4a0a27b73a59eba40ee6848131f82fc62be628ab72e490e:
         BigInt(12),
@@ -168,7 +169,7 @@ describe("database", () => {
   const utxo2: UTxO = {
     txHash: tx2Hash,
     outputIndex: 0,
-    address: "bbbb",
+    address: address,
     assets: { lovelace: BigInt(33) },
     datum: null,
     datumHash: null,
@@ -215,6 +216,14 @@ describe("database", () => {
     const result2 = await latestLedger.retrieve(db);
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
+
+  it("retrieves utxos by address in the latest ledger db", async () => {
+    const result1 = await latestLedger.retrieveUtxosOnAddress(db, "non-existent address");
+    expect(result1).toEqual([]);
+
+    const result2 = await latestLedger.retrieveUtxosOnAddress(db, address);
+    expect(result2).toEqual([utxo1, utxo2]);
+  })
 
   it("clears given tx in the latest ledger db", async () => {
     await latestLedger.clearTx(db, "non-existent tx");

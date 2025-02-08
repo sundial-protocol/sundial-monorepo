@@ -1,6 +1,6 @@
-import { UTxO } from "@lucid-evolution/lucid";
+import { Address, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
-import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
+import { clearTable, insertUtxos, retrieveUtxos, utxoFromRow, UtxoFromRow } from "./utils.js";
 import { logAbort, logInfo } from "../utils.js";
 
 export const createQuery = `
@@ -33,6 +33,48 @@ export const insert = async (db: sqlite3.Database, utxos: UTxO[]) =>
 
 export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
   retrieveUtxos(db, "latest_ledger", "latest_ledger_assets");
+
+export const retrieveUtxosOnAddress = async (
+  db: sqlite3.Database,
+  address: Address,
+): Promise<UTxO[]> => {
+  const query = `
+    SELECT
+      t.tx_hash,
+      t.output_index,
+      address,
+      json_group_array(json_object('unit', a.unit, 'quantity', a.quantity)) AS assets,
+      datum_hash,
+      datum,
+      script_ref_type,
+      script_ref_script
+    FROM latest_ledger AS t
+      LEFT JOIN latest_ledger_assets AS a
+        ON t.tx_hash = a.tx_hash AND t.output_index = a.output_index
+    WHERE address = ?
+    GROUP BY
+      t.tx_hash,
+      t.output_index,
+      address,
+      datum_hash,
+      datum,
+      script_ref_type,
+      script_ref_script
+    ORDER BY
+      t.tx_hash,
+      t.output_index;
+    ;
+    `;
+  return new Promise((resolve, reject) => {
+    db.all(query, [address], (err, rows: UtxoFromRow[]) => {
+      if (err) {
+        logAbort(`latest_ledger db: error retrieving utxos: ${err.message}`);
+        return reject(err);
+      }
+      resolve(rows.map((r) => utxoFromRow(r)));
+    });
+  });
+};
 
 export const clearTx = async (
   db: sqlite3.Database,
