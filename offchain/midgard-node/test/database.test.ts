@@ -7,6 +7,8 @@ import * as mempool from "../src/database/mempool.js";
 import * as immutable from "../src/database/immutable.js";
 import * as confirmedLedger from "../src/database/confirmedLedger.js";
 import * as latestLedger from "../src/database/latestLedger.js";
+import { logAbort } from "../src/utils.js";
+import { Option } from "effect";
 
 describe("database", () => {
   let db: sqlite3.Database;
@@ -39,11 +41,47 @@ describe("database", () => {
       [block1Hash, tx1Hash],
     ]);
 
-    await blocks.insert(db, block2Hash, [tx2Hash]);
+    await blocks.insert(db, block1Hash, [tx2Hash]);
     const result2 = await blocks.retrieve(db);
     expect(result2.map((o) => Object.values(o))).toStrictEqual([
       [block1Hash, tx1Hash],
-      [block2Hash, tx2Hash],
+      [block1Hash, tx2Hash],
+    ]);
+  });
+
+  it("retrieves tx hashes by block hash", async () => {
+    const result1 = await blocks.retrieveTxHashesByBlockHash(db, block1Hash);
+    expect(result1.flatMap((o) => Object.values(o))).toEqual([
+      tx1Hash,
+      tx2Hash,
+    ]);
+
+    const result2 = await blocks.retrieveTxHashesByBlockHash(db, block2Hash);
+    expect(result2).toEqual([]);
+  });
+
+  it("retrieves block hash by tx hash", async () => {
+    const result1 = await blocks.retrieveBlockHashByTxHash(db, tx1Hash);
+    expect(result1).toEqual(Option.some({ header_hash: block1Hash }));
+
+    const result2 = await blocks.retrieveBlockHashByTxHash(db, block2Hash);
+    expect(result2).toEqual(Option.none());
+  });
+
+  it("clears given block", async () => {
+    await blocks.clearBlock(db, "non-existent block");
+    const result1 = await blocks.retrieve(db);
+    expect(result1.map((o) => Object.values(o))).toStrictEqual([
+      [block1Hash, tx1Hash],
+      [block1Hash, tx2Hash],
+    ]);
+    const block3Hash = "cccccccccccccccc"
+    await blocks.insert(db, block3Hash, ["1", "2"]);
+    await blocks.clearBlock(db, block3Hash)
+    const result2 = await blocks.retrieve(db);
+    expect(result2.map((o) => Object.values(o))).toStrictEqual([
+      [block1Hash, tx1Hash],
+      [block1Hash, tx2Hash],
     ]);
   });
 
@@ -173,4 +211,4 @@ class MockLucid {
       toHash: () => CML.hash_transaction(tx_body).to_hex(),
     };
   }
-}
+};
