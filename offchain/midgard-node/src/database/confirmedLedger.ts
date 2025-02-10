@@ -13,6 +13,9 @@ export const createQuery = `
     script_ref_type VARCHAR (8),
     script_ref_script BLOB,
     PRIMARY KEY (tx_hash, output_index)
+    FOREIGN KEY (tx_hash)
+    REFERENCES immutable(tx_hash)
+      ON DELETE CASCADE
   );
   CREATE TABLE IF NOT EXISTS confirmed_ledger_assets (
     tx_hash BLOB NOT NULL,

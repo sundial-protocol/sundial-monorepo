@@ -173,6 +173,8 @@ describe("database", () => {
     },
   };
   it("should store utxos in the confirmed ledger db", async () => {
+    await immutable.insert(db, tx1Hash, tx1);
+    await immutable.insert(db, tx2Hash, tx2);
     await confirmedLedger.insert(db, [utxo1]);
     const result1 = await confirmedLedger.retrieve(db);
     expect(result1).toStrictEqual([utxo1]);
