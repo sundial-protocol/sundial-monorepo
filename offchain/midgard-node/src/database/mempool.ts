@@ -13,7 +13,7 @@ export const createQuery = `
 export const insert = async (
   db: sqlite3.Database,
   tx_hash: string,
-  tx_cbor: string
+  tx_cbor: string,
 ) => {
   const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES (?, ?)`;
   await new Promise<void>((resolve, reject) => {
@@ -47,11 +47,11 @@ export const retrieve = async (db: sqlite3.Database) => {
   return mempool;
 };
 
-export const retrieveByTX = async (db: sqlite3.Database, tx_hash:string) => {
+export const retrieveByTX = async (db: sqlite3.Database, tx_hash: string) => {
   const blocks = await new Promise<[string][]>((resolve, reject) => {
     // TODO get all tx_cbor with tx_hash
   });
-  return blocks
+  return blocks;
 };
 
 export const clear = async (db: sqlite3.Database) => clearTable(db, "mempool");

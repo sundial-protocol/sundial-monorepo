@@ -108,7 +108,7 @@ export const retrieve = async (db: sqlite3.Database) => {
 
 export const retrieveByHeader = async (
   db: sqlite3.Database,
-  header_hash: string
+  header_hash: string,
 ) => {
   const blocks = await new Promise<[string][]>((resolve, reject) => {
     // TODO get all tx_hashes with header_hash
@@ -118,7 +118,7 @@ export const retrieveByHeader = async (
 
 export const clearByHeader = async (
   db: sqlite3.Database,
-  header_hash: string
+  header_hash: string,
 ) => {
   // TODO Remove all header hashes from BlocksDB associated with the merged block
   return;

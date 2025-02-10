@@ -19,14 +19,14 @@ pnpm run listen
 
 ### Start docker daemon
 
-``` sh
+```sh
 nix develop
 sudo $(which dockerd)
 ```
 
 ### Build & run image
 
-``` sh
+```sh
 SEED_PHRASE="your seed phrase" nix develop
 sudo chown --recursive $(whoami):$(whoami) /var/run/docker.sock
 
@@ -36,6 +36,6 @@ docker run --rm --publish 3000:3000 -it -e SEED_PHRASE="$SEED_PHRASE" \
 
 ### Test node
 
-``` sh
+```sh
 curl http://localhost:3000
 ```

@@ -13,7 +13,7 @@ export const insertUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
   assetTableName: string,
-  utxos: UTxO[]
+  utxos: UTxO[],
 ) => {
   const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
   const query = `
@@ -23,7 +23,7 @@ export const insertUTxOs = async (
     ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")}
   `;
   const normalizedAssets = utxos.flatMap((utxo) =>
-    utxoToNormalizedAssets(utxo)
+    utxoToNormalizedAssets(utxo),
   );
   const assetQuery = `
     INSERT INTO ${assetTableName}
@@ -52,12 +52,12 @@ export const insertUTxOs = async (
               db.run("ROLLBACK;", () => reject(err));
             } else {
               logInfo(
-                `${tableName}: ${normalizedAssets.length} assets added to ${assetTableName}`
+                `${tableName}: ${normalizedAssets.length} assets added to ${assetTableName}`,
               );
               db.run("COMMIT;", (err) => {
                 if (err) {
                   logAbort(
-                    `${tableName}: error committing transaction: ${err.message}`
+                    `${tableName}: error committing transaction: ${err.message}`,
                   );
                   return reject(err);
                 }
@@ -74,7 +74,7 @@ export const insertUTxOs = async (
 export const retrieveUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
-  assetTableName: string
+  assetTableName: string,
 ): Promise<UTxO[]> => {
   const query = `
     SELECT
@@ -166,12 +166,12 @@ export function utxoFromRow(row: UTxOFromRow): UTxO {
     row.script_ref_type == "Native"
       ? "Native"
       : row.script_ref_type == "PlutusV1"
-      ? "PlutusV1"
-      : row.script_ref_type == "PlutusV2"
-      ? "PlutusV2"
-      : row.script_ref_type == "PlutusV3"
-      ? "PlutusV3"
-      : null;
+        ? "PlutusV1"
+        : row.script_ref_type == "PlutusV2"
+          ? "PlutusV2"
+          : row.script_ref_type == "PlutusV3"
+            ? "PlutusV3"
+            : null;
   const assets = JSON.parse(row.assets, (_, v) => {
     try {
       return BigInt(v);
@@ -195,7 +195,7 @@ export function utxoFromRow(row: UTxOFromRow): UTxO {
 
 // transforms [{"unit":u1,"quantity":q1},...]-like string into assets
 const transformAssetsToObject = (
-  assetsString: string
+  assetsString: string,
 ): Record<string, bigint> => {
   if (!assetsString || assetsString === "null") {
     return {};

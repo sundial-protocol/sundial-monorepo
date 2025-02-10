@@ -21,13 +21,13 @@ import {
 } from "@lucid-evolution/lucid";
 import express from "express";
 import sqlite3 from "sqlite3";
-import * as mempool from "../database/mempool.js"
-import * as blocks from "../database/blocks.js"
-import * as latestLedger from "../database/latestLedger.js"
+import * as mempool from "../database/mempool.js";
+import * as blocks from "../database/blocks.js";
+import * as latestLedger from "../database/latestLedger.js";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
-  _lucid: LucidEvolution
+  _lucid: LucidEvolution,
 ): Promise<Result<UTxO>> => {
   return ok({
     txHash: "",
@@ -39,7 +39,7 @@ const fetchLatestBlock = async (
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchConfirmedState = async (
-  _lucid: LucidEvolution
+  _lucid: LucidEvolution,
 ): Promise<Result<UTxO>> => {
   return ok({
     txHash: "",
@@ -79,7 +79,7 @@ export const listen = (
   db: sqlite3.Database,
   port: number,
   pollingInterval: number,
-  confirmedStatePollingInterval: number
+  confirmedStatePollingInterval: number,
 ) => {
   const app = express();
 
@@ -90,11 +90,9 @@ export const listen = (
     const validLength = txHash?.length === 32;
 
     if (txIsString && isHexString(txHash) && validLength) {
-      mempool.retrieveByTX(db, txHash).then((v =>
-        res.send(v)
-      ));
+      mempool.retrieveByTX(db, txHash).then((v) => res.send(v));
     } else {
-      res.status(400)
+      res.status(400);
       res.send(`Invalid transaction hash: ${txHash}`);
     }
   });
@@ -104,11 +102,9 @@ export const listen = (
     const addr = req.query.addr;
     const addrIsString = typeof addr === "string";
     if (addrIsString && isBech32(addr)) {
-      latestLedger.retrieveByAddr(db, addr).then((v =>
-        res.send(v)
-      ));
+      latestLedger.retrieveByAddr(db, addr).then((v) => res.send(v));
     } else {
-      res.status(400)
+      res.status(400);
       res.send(`Invalid address: ${addr}`);
     }
   });
@@ -117,34 +113,33 @@ export const listen = (
     res.type("text/plain");
     const hdrHash = req.query.header_hash;
     const txIsString = typeof hdrHash === "string";
-    const validLength = hdrHash?.length === 32
-    if (txIsString && isHexString(hdrHash) && validLength) { // TODO: change to a proper Blake2b check
-        blocks.retrieveByHeader(db, hdrHash).then((v =>
-          res.send(v)
-        ));
-      } else {
-        res.status(400)
-        res.send(`Invalid block header hash: ${hdrHash}`);
-      }
-    });
+    const validLength = hdrHash?.length === 32;
+    if (txIsString && isHexString(hdrHash) && validLength) {
+      // TODO: change to a proper Blake2b check
+      blocks.retrieveByHeader(db, hdrHash).then((v) => res.send(v));
+    } else {
+      res.status(400);
+      res.send(`Invalid block header hash: ${hdrHash}`);
+    }
+  });
 
-    app.post("/submit", (req, res) => {
-      res.type("text/plain");
-      const txCBOR = req.query.tx_cbor;
-      const txIsString = typeof txCBOR === "string";
-      // TODO handling of CBOR?
-      // https://github.com/hildjj/cbor2
+  app.post("/submit", (req, res) => {
+    res.type("text/plain");
+    const txCBOR = req.query.tx_cbor;
+    const txIsString = typeof txCBOR === "string";
+    // TODO handling of CBOR?
+    // https://github.com/hildjj/cbor2
 
-      const tx_hash = "" // TODO add transaction hash?
-      if (txIsString && isHexString(txCBOR)) {
-        mempool.insert(db, tx_hash, txCBOR).then((v =>
-          res.send(v) // Perhaps a better way to send 200 ?
-        ));
-      } else {
-        res.status(400)
-        res.send(`Invalid CBOR: ${txCBOR}`);
-      }
-    });
+    const tx_hash = ""; // TODO add transaction hash?
+    if (txIsString && isHexString(txCBOR)) {
+      mempool.insert(db, tx_hash, txCBOR).then(
+        (v) => res.send(v), // Perhaps a better way to send 200 ?
+      );
+    } else {
+      res.status(400);
+      res.send(`Invalid CBOR: ${txCBOR}`);
+    }
+  });
 
   app.listen(port, () => {});
   logInfo(`Server running at http://localhost:${port}`);
@@ -153,7 +148,7 @@ export const listen = (
 const monitorStateQueue = (
   lucid: LucidEvolution,
   db: sqlite3.Database,
-  pollingInterval: number
+  pollingInterval: number,
 ) => {
   let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
   setInterval(async () => {
@@ -174,7 +169,7 @@ ${errorToString(latestBlockOutRefRes.error)}`);
 export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
-  tx: string
+  tx: string,
 ) => {
   const txHash = lucid.fromTx(tx).toHash();
   await mempool.insert(db, txHash, tx);
@@ -186,7 +181,7 @@ const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
 
 const monitorConfirmedState = (
   lucid: LucidEvolution,
-  pollingInterval: number
+  pollingInterval: number,
 ) => {
   logWarning("mergeOldestBlock: TODO");
 };

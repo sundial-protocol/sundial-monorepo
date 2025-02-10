@@ -11,7 +11,7 @@ export type ListStateTransitionParams = {};
  */
 export const listStateTransitionTxBuilder = (
   lucid: LucidEvolution,
-  params: ListStateTransitionParams
+  params: ListStateTransitionParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

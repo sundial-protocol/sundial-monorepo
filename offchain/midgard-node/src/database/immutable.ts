@@ -14,7 +14,7 @@ export const createQuery = `
 export const insert = async (
   db: sqlite3.Database,
   tx_hash: string,
-  tx_cbor: string
+  tx_cbor: string,
 ) => {
   const query = `INSERT INTO immutable (tx_hash, tx_cbor) VALUES (?, ?)`;
   await new Promise<void>((resolve, reject) => {
@@ -67,7 +67,7 @@ export const retrieveTxCborByHash = async (
 
 export const retrieveByBlockHeaderHash = async (
   db: sqlite3.Database,
-  headerHash: string
+  headerHash: string,
 ) => {
   const query = `
     SELECT im.* 

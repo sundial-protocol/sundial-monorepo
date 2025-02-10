@@ -10,6 +10,8 @@
   "scripts": {
     "build": "tsup src/index.ts --minify --format esm",
     "quick-test": "pnpm run build && node dist/index.js --help",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "format-check": "prettier --check \"**/*.{ts,tsx,md}\"",
     "listen": "pnpm run build && node dist/index.js listen",
     "test": "export NODE_ENV='emulator' && vitest run"
   },
@@ -34,6 +36,7 @@
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.0.0",
+    "prettier": "^3.2.5",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.7",
     "tsup": "^8.3.5",

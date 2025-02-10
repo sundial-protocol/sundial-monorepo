@@ -32,20 +32,23 @@ import { handleSignSubmit } from "../utils.js";
 export const fetchFirstBlockTxs = (
   lucid: LucidEvolution,
   fetchConfig: SDK.Types.FetchConfig,
-  db: Database
-): Effect.Effect<{ txHash: string; txCbor: string }[], unknown, unknown> =>
+  db: Database,
+): Effect.Effect<
+  { txs: { txHash: string; txCbor: string }[]; headerHash: string },
+  unknown,
+  unknown
+> =>
   Effect.gen(function* () {
     const { link: firstBlockUTxO } =
       yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
         lucid,
-        fetchConfig
+        fetchConfig,
       );
     if (!firstBlockUTxO) {
       return yield* Effect.fail(new Error("No blocks in queue"));
     } else {
-      const blockNodeDatum = yield* SDK.Utils.getNodeDatumFromUTxO(
-        firstBlockUTxO
-      );
+      const blockNodeDatum =
+        yield* SDK.Utils.getNodeDatumFromUTxO(firstBlockUTxO);
       const blockHeader = yield* Effect.try({
         try: () =>
           Data.castFrom(blockNodeDatum.data, SDK.Types.LedgerState.Header),
@@ -53,9 +56,9 @@ export const fetchFirstBlockTxs = (
       });
       const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
       const txs = yield* Effect.tryPromise(() =>
-        retrieveByBlockHeaderHash(db, headerHash)
+        retrieveByBlockHeaderHash(db, headerHash),
       );
-      return txs;
+      return { txs, headerHash };
     }
   });
 
@@ -70,7 +73,7 @@ export const fetchFirstBlockTxs = (
 export const applyTxsToConfirmedLedger = (
   lucid: LucidEvolution,
   db: Database,
-  txs: { txHash: string; txCbor: string }[]
+  txs: { txHash: string; txCbor: string }[],
 ) =>
   Effect.gen(function* () {
     let utxos: UTxO[] = [];
@@ -105,16 +108,17 @@ export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
   db: Database,
   fetchConfig: SDK.Types.FetchConfig,
-  header_hash: string
 ) =>
   Effect.gen(function* ($) {
     // Fetch transactions from the first block
-    const firstBlockTxs = yield* $(fetchFirstBlockTxs(lucid, fetchConfig, db));
+    const { txs: firstBlockTxs, headerHash } = yield* $(
+      fetchFirstBlockTxs(lucid, fetchConfig, db),
+    );
 
     // Build the transaction
     const txBuilder = yield* SDK.Endpoints.mergeToConfirmedStateProgram(
       lucid,
-      fetchConfig
+      fetchConfig,
     );
     // Submit the transaction
     yield* $(handleSignSubmit(lucid, txBuilder));
@@ -129,8 +133,8 @@ export const buildAndSubmitMergeTx = (
                 reject(new Error(`Error starting transaction: ${err.message}`));
               else resolve();
             });
-          })
-      )
+          }),
+      ),
     );
 
     try {
@@ -138,7 +142,7 @@ export const buildAndSubmitMergeTx = (
       yield* applyTxsToConfirmedLedger(lucid, db, firstBlockTxs);
 
       // Remove header hashes
-      yield* Effect.tryPromise(() => clearByHeader(db, header_hash));
+      yield* Effect.tryPromise(() => clearByHeader(db, headerHash));
 
       // Commit transaction
       yield* $(
@@ -148,12 +152,12 @@ export const buildAndSubmitMergeTx = (
               db.run("COMMIT;", (err) => {
                 if (err)
                   reject(
-                    new Error(`Error committing transaction: ${err.message}`)
+                    new Error(`Error committing transaction: ${err.message}`),
                   );
                 else resolve();
               });
-            })
-        )
+            }),
+        ),
       );
     } catch (error) {
       // Rollback transaction on failure
@@ -162,8 +166,8 @@ export const buildAndSubmitMergeTx = (
           () =>
             new Promise<void>((resolve) => {
               db.run("ROLLBACK;", () => resolve());
-            })
-        )
+            }),
+        ),
       );
       return yield* $(Effect.fail(new Error(`Transaction failed: ${error}`)));
     }

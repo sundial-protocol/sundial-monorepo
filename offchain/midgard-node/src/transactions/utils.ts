@@ -16,7 +16,7 @@ import * as SDK from "@al-ft/midgard-sdk";
  */
 export const handleSignSubmit = (
   lucid: LucidEvolution,
-  signBuilder: TxSignBuilder
+  signBuilder: TxSignBuilder,
 ) =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign.withWallet().completeProgram();
@@ -38,7 +38,7 @@ export const handleSignSubmit = (
  */
 export const buildMerkleRoots = (
   lucid: LucidEvolution,
-  txs: { txHash: string; txCbor: string }[]
+  txs: { txHash: string; txCbor: string }[],
 ) =>
   Effect.gen(function* () {
     let utxos: UTxO[] = [];

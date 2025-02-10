@@ -36,7 +36,7 @@ export const findSpentAndProducedUTxOs = (
     return Effect.succeed({ spent, produced });
   } catch (_e) {
     return Effect.fail(
-      new Error("Something went wrong decoding the transaction")
+      new Error("Something went wrong decoding the transaction"),
     );
   }
 };

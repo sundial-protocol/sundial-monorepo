@@ -11,7 +11,7 @@ export type DeregisterParams = {};
  */
 export const deregisterTxBuilder = (
   lucid: LucidEvolution,
-  params: DeregisterParams
+  params: DeregisterParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;
