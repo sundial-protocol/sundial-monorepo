@@ -1,5 +1,5 @@
 import { logAbort, logInfo } from "../utils.js";
-import { ScriptType, UTxO } from "@lucid-evolution/lucid";
+import { fromHex, ScriptType, toHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 
 export const insertUtxos = async (
@@ -36,10 +36,14 @@ export const insertUtxos = async (
           logAbort(`${tableName} db: error inserting UTXOs: ${err.message}`);
           db.run("ROLLBACK;", () => reject(err));
         } else {
-          logInfo(`${tableName} db: ${utxos.length} new UTXOs added to confirmed_ledger`);
+          logInfo(
+            `${tableName} db: ${utxos.length} new UTXOs added to confirmed_ledger`
+          );
           db.run(assetQuery, assetValues, (err) => {
             if (err) {
-              logAbort(`${tableName} db: error inserting assets: ${err.message}`);
+              logAbort(
+                `${tableName} db: error inserting assets: ${err.message}`
+              );
               db.run("ROLLBACK;", () => reject(err));
             } else {
               logInfo(
@@ -72,7 +76,7 @@ export const retrieveUtxos = async (
       t.tx_hash,
       t.output_index,
       address,
-      json_group_array(json_object('unit', a.unit, 'quantity', a.quantity)) AS assets,
+      json_group_array(json_object('unit', hex(a.unit), 'quantity', a.quantity)) AS assets,
       datum_hash,
       datum,
       script_ref_type,
@@ -120,14 +124,14 @@ export const clearTable = async (db: sqlite3.Database, tableName: string) => {
 };
 
 export interface UtxoFromRow {
-  tx_hash: string;
+  tx_hash: Uint8Array;
   output_index: number;
   address: string;
   assets: string;
-  datum_hash?: string | null;
-  datum?: string | null;
+  datum_hash?: Uint8Array | null;
+  datum?: Uint8Array | null;
   script_ref_type?: string | null;
-  script_ref_script?: string | null;
+  script_ref_script?: Uint8Array | null;
 }
 
 export function utxoFromRow(row: UtxoFromRow): UTxO {
@@ -149,15 +153,15 @@ export function utxoFromRow(row: UtxoFromRow): UTxO {
     }
   });
   return {
-    txHash: row.tx_hash,
+    txHash: toHex(row.tx_hash),
     outputIndex: row.output_index,
     address: row.address,
     assets: transformAssetsToObject(row.assets),
-    datumHash: row.datum_hash || null,
-    datum: row.datum || null,
+    datumHash: row.datum_hash != null ? toHex(row.datum_hash) : null,
+    datum: row.datum != null ? toHex(row.datum) : null,
     scriptRef:
       scriptRefType && row.script_ref_script
-        ? { type: scriptRefType, script: row.script_ref_script }
+        ? { type: scriptRefType, script: toHex(row.script_ref_script) }
         : null,
   };
 }
@@ -175,7 +179,11 @@ const transformAssetsToObject = (
       JSON.parse(assetsString);
     const assetsObject: Record<string, bigint> = {};
     assetsArray.forEach((asset) => {
-      assetsObject[asset.unit] = BigInt(asset.quantity);
+      const unit =
+        asset.unit == "6C6F76656C616365"
+          ? "lovelace"
+          : asset.unit.toLowerCase();
+      assetsObject[unit] = BigInt(asset.quantity);
     });
     return assetsObject;
   } catch (error) {
@@ -185,40 +193,41 @@ const transformAssetsToObject = (
 };
 
 export interface UtxoToRow {
-  tx_hash: string;
+  tx_hash: Uint8Array;
   output_index: number;
   address: string;
-  datum_hash?: string | null;
-  datum?: string | null;
+  datum_hash?: Uint8Array | null;
+  datum?: Uint8Array | null;
   script_ref_type?: string | null;
-  script_ref_script?: string | null;
+  script_ref_script?: Uint8Array | null;
 }
 
 export function utxoToRow(utxo: UTxO): UtxoToRow {
   return {
-    tx_hash: utxo.txHash,
+    tx_hash: fromHex(utxo.txHash),
     output_index: utxo.outputIndex,
     address: utxo.address,
-    datum_hash: utxo.datumHash,
-    datum: utxo.datum,
+    datum_hash: utxo.datumHash != null ? fromHex(utxo.datumHash) : null,
+    datum: utxo.datum != null ? fromHex(utxo.datum) : null,
     script_ref_type: utxo.scriptRef?.type || null,
-    script_ref_script: utxo.scriptRef?.script || null,
+    script_ref_script:
+      utxo.scriptRef?.script != null ? fromHex(utxo.scriptRef?.script) : null,
   };
 }
 
 export interface NormalizedAsset {
-  tx_hash: string;
+  tx_hash: Uint8Array;
   output_index: number;
-  unit: string;
+  unit: Uint8Array;
   quantity: string; //sqlite threats bigInt as null
 }
 
 export function utxoToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
   return Object.entries(utxo.assets).flatMap(([unit, quantity]) => {
     const asset: NormalizedAsset = {
-      tx_hash: utxo.txHash,
+      tx_hash: fromHex(utxo.txHash),
       output_index: utxo.outputIndex,
-      unit: unit,
+      unit: unit == "lovelace" ? fromHex("6c6f76656c616365") : fromHex(unit),
       quantity: quantity.toString(), //sqlite threats bigInt as null
     };
     return asset;

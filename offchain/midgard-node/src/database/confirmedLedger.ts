@@ -1,4 +1,4 @@
-import { UTxO } from "@lucid-evolution/lucid";
+import { fromHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
 import { logAbort, logInfo } from "../utils.js";
@@ -11,16 +11,13 @@ export const createQuery = `
     datum_hash BLOB,
     datum BLOB,
     script_ref_type VARCHAR (8),
-    script_ref_script TEXT,
+    script_ref_script BLOB,
     PRIMARY KEY (tx_hash, output_index)
-      FOREIGN KEY (tx_hash)
-      REFERENCES blocks(tx_hash)
-      ON DELETE CASCADE
   );
   CREATE TABLE IF NOT EXISTS confirmed_ledger_assets (
     tx_hash BLOB NOT NULL,
     output_index INTEGER NOT NULL,
-    unit VARCHAR (120),
+    unit BLOB,
     quantity BIGINT NOT NULL,
     FOREIGN KEY (tx_hash, output_index)
       REFERENCES confirmed_ledger(tx_hash, output_index)
@@ -43,7 +40,7 @@ export const clearTx = async (
 ): Promise<void> => {
   const query = `DELETE FROM confirmed_ledger WHERE tx_hash = ?;`;
   await new Promise<void>((resolve, reject) => {
-    db.run(query, [txHash], function (err) {
+    db.run(query, [fromHex(txHash)], function (err) {
       if (err) {
         logAbort(`confirmed_ledger db: clearing error: ${err.message}`);
         reject(err);

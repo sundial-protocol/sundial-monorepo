@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import sqlite3 from "sqlite3";
 import { initializeDb } from "../src/database.js";
-import { CML, UTxO } from "@lucid-evolution/lucid";
+import { CML, fromHex, UTxO } from "@lucid-evolution/lucid";
 import * as blocks from "../src/database/blocks.js";
 import * as mempool from "../src/database/mempool.js";
 import * as immutable from "../src/database/immutable.js";
@@ -37,13 +37,11 @@ describe("database", () => {
   it("should store tx hashes in blocks db", async () => {
     await blocks.insert(db, block1Hash, [tx1Hash]);
     const result1 = await blocks.retrieve(db);
-    expect(result1.map((o) => Object.values(o))).toStrictEqual([
-      [block1Hash, tx1Hash],
-    ]);
+    expect(result1).toStrictEqual([[block1Hash, tx1Hash]]);
 
     await blocks.insert(db, block1Hash, [tx2Hash]);
     const result2 = await blocks.retrieve(db);
-    expect(result2.map((o) => Object.values(o))).toStrictEqual([
+    expect(result2).toStrictEqual([
       [block1Hash, tx1Hash],
       [block1Hash, tx2Hash],
     ]);
@@ -51,10 +49,7 @@ describe("database", () => {
 
   it("retrieves tx hashes by block hash", async () => {
     const result1 = await blocks.retrieveTxHashesByBlockHash(db, block1Hash);
-    expect(result1.flatMap((o) => Object.values(o))).toEqual([
-      tx1Hash,
-      tx2Hash,
-    ]);
+    expect(result1).toEqual([tx1Hash, tx2Hash]);
 
     const result2 = await blocks.retrieveTxHashesByBlockHash(db, block2Hash);
     expect(result2).toEqual([]);
@@ -62,21 +57,22 @@ describe("database", () => {
 
   it("retrieves block hash by tx hash", async () => {
     const result1 = await blocks.retrieveBlockHashByTxHash(db, tx1Hash);
-    expect(result1).toEqual(Option.some({ header_hash: block1Hash }));
+    expect(result1).toEqual(Option.some(block1Hash));
 
     const result2 = await blocks.retrieveBlockHashByTxHash(db, block2Hash);
     expect(result2).toEqual(Option.none());
   });
 
   it("clears given block in the blocks db", async () => {
-    await blocks.clearBlock(db, "non-existent block");
+    const nonExistintBlockHash = "1234";
+    await blocks.clearBlock(db, nonExistintBlockHash);
     const result1 = await blocks.retrieve(db);
     expect(result1.map((o) => Object.values(o))).toStrictEqual([
       [block1Hash, tx1Hash],
       [block1Hash, tx2Hash],
     ]);
     const block3Hash = "cccccccccccccccc";
-    await blocks.insert(db, block3Hash, ["1", "2"]);
+    await blocks.insert(db, block3Hash, ["11", "22"]);
     await blocks.clearBlock(db, block3Hash);
     const result2 = await blocks.retrieve(db);
     expect(result2.map((o) => Object.values(o))).toStrictEqual([
@@ -113,15 +109,13 @@ describe("database", () => {
     expect(initialRows.length).toBe(2);
     await mempool.clear(db);
     const result = await mempool.retrieve(db);
-    await immutable.insert(db, tx1Hash, tx1);
     expect(result.length).toBe(0);
   });
 
   it("should store transactions in the immutable db", async () => {
+    await immutable.insert(db, tx1Hash, tx1);
     const result1 = await immutable.retrieve(db);
-    expect(result1.map((o) => Object.values(o))).toStrictEqual([
-      [tx1Hash, tx1],
-    ]);
+    expect(result1).toStrictEqual([[tx1Hash, tx1]]);
 
     await immutable.insert(db, tx2Hash, tx2);
     const result2 = await immutable.retrieve(db);
@@ -132,14 +126,12 @@ describe("database", () => {
   });
 
   it("retrieves tx by hash in the immutable db", async () => {
-    const result1 = await immutable.retrieveTxCborByHash(
-      db,
-      "non-existent tx hash"
-    );
+    const nonExistentTxHash = "1234";
+    const result1 = await immutable.retrieveTxCborByHash(db, nonExistentTxHash);
     expect(result1).toEqual(Option.none());
 
     const result2 = await immutable.retrieveTxCborByHash(db, tx1Hash);
-    expect(result2).toEqual(Option.some({ tx_cbor: tx1 }));
+    expect(result2).toEqual(Option.some(tx1));
   });
 
   it("clears the immutable db", async () => {
@@ -150,7 +142,8 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
-  const address = "addr1q8gg2r3vf9zggn48g7m8vx62rwf6warcs4k7ej8mdzmqmesj30jz7psduyk6n4n2qrud2xlv9fgj53n6ds3t8cs4fvzs05yzmz";
+  const address =
+    "addr1q8gg2r3vf9zggn48g7m8vx62rwf6warcs4k7ej8mdzmqmesj30jz7psduyk6n4n2qrud2xlv9fgj53n6ds3t8cs4fvzs05yzmz";
   const utxo1: UTxO = {
     txHash: tx1Hash,
     outputIndex: 0,
@@ -190,7 +183,8 @@ describe("database", () => {
   });
 
   it("clears given tx in the confirmed ledger db", async () => {
-    await confirmedLedger.clearTx(db, "non-existent tx");
+    const nonExistentTxHash = "1234";
+    await confirmedLedger.clearTx(db, nonExistentTxHash);
     const result1 = await confirmedLedger.retrieve(db);
     expect(result1).toStrictEqual([utxo1, utxo2]);
 
@@ -218,15 +212,19 @@ describe("database", () => {
   });
 
   it("retrieves utxos by address in the latest ledger db", async () => {
-    const result1 = await latestLedger.retrieveUtxosOnAddress(db, "non-existent address");
+    const result1 = await latestLedger.retrieveUtxosOnAddress(
+      db,
+      "non-existent address"
+    );
     expect(result1).toEqual([]);
 
     const result2 = await latestLedger.retrieveUtxosOnAddress(db, address);
     expect(result2).toEqual([utxo1, utxo2]);
-  })
+  });
 
   it("clears given tx in the latest ledger db", async () => {
-    await latestLedger.clearTx(db, "non-existent tx");
+    const nonExistentTxHash = "1234";
+    await latestLedger.clearTx(db, nonExistentTxHash);
     const result1 = await latestLedger.retrieve(db);
     expect(result1).toStrictEqual([utxo1, utxo2]);
 

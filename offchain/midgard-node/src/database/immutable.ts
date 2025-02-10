@@ -2,15 +2,13 @@ import { logAbort, logInfo } from "../utils.js";
 import sqlite3 from "sqlite3";
 import { clearTable } from "./utils.js";
 import { Option } from "effect";
+import { fromHex, toHex } from "@lucid-evolution/lucid";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS immutable (
     tx_hash BLOB NOT NULL UNIQUE,
     tx_cbor BLOB NOT NULL UNIQUE,
     PRIMARY KEY (tx_hash)
-    FOREIGN KEY (tx_hash)
-      REFERENCES blocks(tx_hash)
-      ON DELETE CASCADE
   );`;
 
 export const insert = async (
@@ -20,7 +18,7 @@ export const insert = async (
 ) => {
   const query = `INSERT INTO immutable (tx_hash, tx_cbor) VALUES (?, ?)`;
   await new Promise<void>((resolve, reject) => {
-    db.run(query, [tx_hash, tx_cbor], function (err) {
+    db.run(query, [fromHex(tx_hash), fromHex(tx_cbor)], function (err) {
       if (err) {
         logAbort(`immutable db: error inserting tx: ${err.message}`);
         reject(err);
@@ -35,12 +33,16 @@ export const insert = async (
 export const retrieve = async (db: sqlite3.Database) => {
   const query = `SELECT * FROM immutable`;
   const result = await new Promise<[string, string][]>((resolve, reject) => {
-    db.all(query, (err, rows: [string, string][]) => {
+    db.all(query, (err, rows: { tx_hash: Buffer; tx_cbor: Buffer }[]) => {
       if (err) {
         logAbort(`immutable db: retrieving error: ${err.message}`);
         reject(err);
       }
-      resolve(rows);
+      const result: [string, string][] = rows.map((row) => [
+        toHex(new Uint8Array(row.tx_hash)),
+        toHex(new Uint8Array(row.tx_cbor)),
+      ]);
+      resolve(result);
     });
   });
   return result;
@@ -52,12 +54,12 @@ export const retrieveTxCborByHash = async (
 ): Promise<Option.Option<string>> => {
   const query = `SELECT tx_cbor FROM immutable WHERE tx_hash = ?`;
   const result = await new Promise<string[]>((resolve, reject) => {
-    db.all(query, [txHash], (err, rows: string[]) => {
+    db.all(query, [fromHex(txHash)], (err, rows: { tx_cbor: Buffer }[]) => {
       if (err) {
         logAbort(`immutable db: retrieving error: ${err.message}`);
         reject(err);
       }
-      resolve(rows);
+      resolve(rows.map((r) => toHex(new Uint8Array(r.tx_cbor))));
     });
   });
   return Option.fromIterable(result);

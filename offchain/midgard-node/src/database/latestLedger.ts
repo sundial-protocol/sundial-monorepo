@@ -1,6 +1,12 @@
-import { Address, UTxO } from "@lucid-evolution/lucid";
+import { Address, fromHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
-import { clearTable, insertUtxos, retrieveUtxos, utxoFromRow, UtxoFromRow } from "./utils.js";
+import {
+  clearTable,
+  insertUtxos,
+  retrieveUtxos,
+  utxoFromRow,
+  UtxoFromRow,
+} from "./utils.js";
 import { logAbort, logInfo } from "../utils.js";
 
 export const createQuery = `
@@ -11,16 +17,13 @@ export const createQuery = `
     datum_hash BLOB,
     datum BLOB,
     script_ref_type VARCHAR (8),
-    script_ref_script TEXT,
+    script_ref_script BLOB,
     PRIMARY KEY (tx_hash, output_index)
-      FOREIGN KEY (tx_hash)
-      REFERENCES blocks(tx_hash)
-      ON DELETE CASCADE
   );
   CREATE TABLE IF NOT EXISTS latest_ledger_assets (
     tx_hash BLOB NOT NULL,
     output_index INTEGER NOT NULL,
-    unit VARCHAR (120),
+    unit BLOB,
     quantity BIGINT NOT NULL,
     FOREIGN KEY (tx_hash, output_index)
       REFERENCES latest_ledger(tx_hash, output_index)
@@ -36,14 +39,14 @@ export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
 
 export const retrieveUtxosOnAddress = async (
   db: sqlite3.Database,
-  address: Address,
+  address: Address
 ): Promise<UTxO[]> => {
   const query = `
     SELECT
       t.tx_hash,
       t.output_index,
       address,
-      json_group_array(json_object('unit', a.unit, 'quantity', a.quantity)) AS assets,
+      json_group_array(json_object('unit', hex(a.unit), 'quantity', a.quantity)) AS assets,
       datum_hash,
       datum,
       script_ref_type,
@@ -82,7 +85,7 @@ export const clearTx = async (
 ): Promise<void> => {
   const query = `DELETE FROM latest_ledger WHERE tx_hash = ?;`;
   await new Promise<void>((resolve, reject) => {
-    db.run(query, [txHash], function (err) {
+    db.run(query, [fromHex(txHash)], function (err) {
       if (err) {
         logAbort(`latest_ledger db: clearing error: ${err.message}`);
         reject(err);
