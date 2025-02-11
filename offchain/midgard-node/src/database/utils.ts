@@ -15,7 +15,7 @@ export const insertUTxOs = async (
   assetTableName: string,
   utxos: UTxO[]
 ) => {
-  const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
+  const values = utxos.flatMap((utxo) => Object.values(uTxOToRow(utxo)));
   const query = `
     INSERT INTO ${tableName}
       (tx_hash, output_index, address, datum_hash, datum, script_ref_type, script_ref_script)
@@ -23,7 +23,7 @@ export const insertUTxOs = async (
     ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")}
   `;
   const normalizedAssets = utxos.flatMap((utxo) =>
-    utxoToNormalizedAssets(utxo)
+    uTxOToNormalizedAssets(utxo)
   );
   const assetQuery = `
     INSERT INTO ${assetTableName}
@@ -103,12 +103,12 @@ export const retrieveUTxOs = async (
     ;
     `;
   return new Promise((resolve, reject) => {
-    db.all(query, (err, rows: UtxoFromRow[]) => {
+    db.all(query, (err, rows: UTxOFromRow[]) => {
       if (err) {
         logAbort(`${tableName} db: error retrieving utxos: ${err.message}`);
         return reject(err);
       }
-      resolve(rows.map((r) => utxoFromRow(r)));
+      resolve(rows.map((r) => uTxOFromRow(r)));
     });
   });
 };
@@ -150,7 +150,7 @@ export const clearTable = async (db: sqlite3.Database, tableName: string) => {
   });
 };
 
-export interface UtxoFromRow {
+export interface UTxOFromRow {
   tx_hash: Uint8Array;
   output_index: number;
   address: string;
@@ -161,7 +161,7 @@ export interface UtxoFromRow {
   script_ref_script?: Uint8Array | null;
 }
 
-export function utxoFromRow(row: UtxoFromRow): UTxO {
+export function uTxOFromRow(row: UTxOFromRow): UTxO {
   const scriptRefType: ScriptType | null =
     row.script_ref_type == "Native"
       ? "Native"
@@ -229,7 +229,7 @@ export interface UtxoToRow {
   script_ref_script?: Uint8Array | null;
 }
 
-export function utxoToRow(utxo: UTxO): UtxoToRow {
+export function uTxOToRow(utxo: UTxO): UtxoToRow {
   return {
     tx_hash: fromHex(utxo.txHash),
     output_index: utxo.outputIndex,
@@ -249,7 +249,7 @@ export interface NormalizedAsset {
   quantity: string; //sqlite threats bigInt as null
 }
 
-export function utxoToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
+export function uTxOToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
   return Object.entries(utxo.assets).flatMap(([unit, quantity]) => {
     const asset: NormalizedAsset = {
       tx_hash: fromHex(utxo.txHash),
