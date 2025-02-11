@@ -11,9 +11,16 @@ import {
 } from "../utils.js";
 import * as MPF from "@aiken-lang/merkle-patricia-forestry";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Data, LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
+import {
+  Data,
+  LucidEvolution,
+  OutRef,
+  ScriptType,
+  UTxO,
+} from "@lucid-evolution/lucid";
 import express from "express";
 import sqlite3 from "sqlite3";
+import * as mempool from "../database/mempool.js"
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
@@ -86,7 +93,11 @@ export const listen = (
   logInfo(`Server running at http://localhost:${port}`);
 };
 
-const monitorStateQueue = (lucid: LucidEvolution, pollingInterval: number) => {
+const monitorStateQueue = (
+  lucid: LucidEvolution,
+  db: sqlite3.Database,
+  pollingInterval: number
+) => {
   let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
   setInterval(async () => {
     const latestBlockOutRefRes = await fetchLatestBlock(lucid);
@@ -103,35 +114,17 @@ ${errorToString(latestBlockOutRefRes.error)}`);
   }, pollingInterval);
 };
 
-export const storeTx = (
+export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
   tx: string
 ) => {
-  const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES (?, ?)`;
   const txHash = lucid.fromTx(tx).toHash();
-  db.run(query, [txHash, tx], function (err) {
-    if (err) {
-      logAbort(`Error inserting transaction: ${err.message}`);
-    } else {
-      logInfo(`Transaction stored successfully with rowid ${this.lastID}`);
-    }
-  });
+  await mempool.insert(db, txHash, tx);
 };
 
 const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
   logWarning("submitBlock: TODO");
-};
-
-export const clearMempool = async (db: sqlite3.Database) => {
-  const query = `DELETE FROM mempool;`;
-  db.run(query, function (err) {
-    if (err) {
-      logAbort(`Error inserting transaction: ${err.message}`);
-    } else {
-      logInfo(`Transaction stored successfully with rowid ${this.lastID}`);
-    }
-  });
 };
 
 const monitorConfirmedState = (
@@ -140,21 +133,3 @@ const monitorConfirmedState = (
 ) => {
   logWarning("mergeOldestBlock: TODO");
 };
-
-export async function initializeDb(dbFilePath: string) {
-  const db = new sqlite3.Database(dbFilePath, (err) => {
-    if (err) {
-      logAbort(`Error opening database: ${err.message}`);
-    } else {
-      logInfo("Connected to the SQLite database.");
-    }
-  });
-  await db.exec(
-    `CREATE TABLE IF NOT EXISTS mempool (
-      tx_hash BLOB NOT NULL UNIQUE,
-      tx_cbor BLOB NOT NULL,
-      PRIMARY KEY (tx_hash)
-    );`
-  );
-  return db;
-}
