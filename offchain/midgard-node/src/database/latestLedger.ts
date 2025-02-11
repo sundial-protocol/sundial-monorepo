@@ -1,7 +1,6 @@
-import { Address, fromHex, UTxO } from "@lucid-evolution/lucid";
+import { fromHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
-import * as utils from "./utils.js";
 import { clearTable, insertUTxOs, retrieveUTxOs } from "./utils.js";
 
 export const createQuery = `
@@ -31,17 +30,6 @@ export const insert = async (db: sqlite3.Database, utxos: UTxO[]) =>
 
 export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
   retrieveUTxOs(db, "latest_ledger", "latest_ledger_assets");
-
-export const retrieveUTxOsAtAddress = async (
-  db: sqlite3.Database,
-  address: Address
-): Promise<UTxO[]> =>
-  utils.retrieveUTxOsAtAddress(
-    db,
-    "latest_ledger",
-    "latest_ledger_assets",
-    address
-  );
 
 export const clearTx = async (
   db: sqlite3.Database,

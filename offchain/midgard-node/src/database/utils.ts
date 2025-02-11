@@ -1,10 +1,4 @@
-import {
-  Address,
-  fromHex,
-  ScriptType,
-  toHex,
-  UTxO,
-} from "@lucid-evolution/lucid";
+import { fromHex, ScriptType, toHex, UTxO } from "@lucid-evolution/lucid";
 import { logAbort, logInfo } from "../utils.js";
 
 import sqlite3 from "sqlite3";
@@ -104,50 +98,6 @@ export const retrieveUTxOs = async (
     `;
   return new Promise((resolve, reject) => {
     db.all(query, (err, rows: UtxoFromRow[]) => {
-      if (err) {
-        logAbort(`${tableName} db: error retrieving utxos: ${err.message}`);
-        return reject(err);
-      }
-      resolve(rows.map((r) => utxoFromRow(r)));
-    });
-  });
-};
-
-export const retrieveUTxOsAtAddress = async (
-  db: sqlite3.Database,
-  tableName: string,
-  assetTableName: string,
-  address: Address
-): Promise<UTxO[]> => {
-  const query = `
-      SELECT
-        t.tx_hash,
-        t.output_index,
-        address,
-        json_group_array(json_object('unit', hex(a.unit), 'quantity', a.quantity)) AS assets,
-        datum_hash,
-        datum,
-        script_ref_type,
-        script_ref_script
-      FROM ${tableName} AS t
-        LEFT JOIN ${assetTableName} AS a
-          ON t.tx_hash = a.tx_hash AND t.output_index = a.output_index
-      WHERE address = ?
-      GROUP BY
-        t.tx_hash,
-        t.output_index,
-        address,
-        datum_hash,
-        datum,
-        script_ref_type,
-        script_ref_script
-      ORDER BY
-        t.tx_hash,
-        t.output_index
-      ;
-      `;
-  return new Promise((resolve, reject) => {
-    db.all(query, [address], (err, rows: UtxoFromRow[]) => {
       if (err) {
         logAbort(`${tableName} db: error retrieving utxos: ${err.message}`);
         return reject(err);

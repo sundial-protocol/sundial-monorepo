@@ -242,17 +242,6 @@ describe("database", () => {
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
-  it("retrieves utxos by address in the latest ledger db", async () => {
-    const result1 = await latestLedger.retrieveUTxOsAtAddress(
-      db,
-      "non-existent address"
-    );
-    expect(result1).toEqual([]);
-
-    const result2 = await latestLedger.retrieveUTxOsAtAddress(db, address);
-    expect(result2).toEqual([utxo1, utxo2]);
-  });
-
   it("clears given tx in the latest ledger db", async () => {
     const nonExistentTxHash = "1234";
     await latestLedger.clearTx(db, nonExistentTxHash);
