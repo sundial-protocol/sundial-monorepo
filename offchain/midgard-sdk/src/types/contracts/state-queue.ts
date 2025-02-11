@@ -24,4 +24,4 @@ export type Redeemer = Data.Static<typeof RedeemerSchema>;
 export const Redeemer = RedeemerSchema as unknown as Redeemer;
 
 export type Datum = Data.Static<typeof NodeDatumSchema>;
-export const Datum = NodeDatumSchema as unknown as Redeemer;
+export const Datum = NodeDatumSchema as unknown as Datum;
