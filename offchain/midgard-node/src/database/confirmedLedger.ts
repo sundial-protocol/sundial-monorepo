@@ -1,7 +1,7 @@
 import { fromHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
-import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
 import { logAbort, logInfo } from "../utils.js";
+import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS confirmed_ledger (

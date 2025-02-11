@@ -1,7 +1,7 @@
-import { logAbort, logInfo } from "../utils.js";
-import sqlite3 from "sqlite3";
-import { clearTable } from "./utils.js";
 import { fromHex, toHex } from "@lucid-evolution/lucid";
+import sqlite3 from "sqlite3";
+import { logAbort, logInfo } from "../utils.js";
+import { clearTable } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS mempool (

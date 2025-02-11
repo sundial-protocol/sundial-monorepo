@@ -1,5 +1,12 @@
+import {
+  Address,
+  fromHex,
+  ScriptType,
+  toHex,
+  UTxO,
+} from "@lucid-evolution/lucid";
 import { logAbort, logInfo } from "../utils.js";
-import { Address, fromHex, ScriptType, toHex, UTxO } from "@lucid-evolution/lucid";
+
 import sqlite3 from "sqlite3";
 
 export const insertUtxos = async (
@@ -36,9 +43,7 @@ export const insertUtxos = async (
           logAbort(`${tableName} db: error inserting UTXOs: ${err.message}`);
           db.run("ROLLBACK;", () => reject(err));
         } else {
-          logInfo(
-            `${tableName} db: ${utxos.length} new UTXOs added`
-          );
+          logInfo(`${tableName} db: ${utxos.length} new UTXOs added`);
           db.run(assetQuery, assetValues, (err) => {
             if (err) {
               logAbort(

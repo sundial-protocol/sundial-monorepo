@@ -1,12 +1,7 @@
-import { logAbort } from "../utils.js";
-import sqlite3 from "sqlite3";
-import {
-  clearTable,
-  insertUtxos,
-  retrieveUtxos,
-} from "./utils.js";
 import { Address, UTxO } from "@lucid-evolution/lucid";
+import sqlite3 from "sqlite3";
 import * as utils from "./utils.js";
+import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS mempool_ledger (

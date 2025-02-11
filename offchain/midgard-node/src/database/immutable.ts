@@ -1,8 +1,8 @@
-import { logAbort, logInfo } from "../utils.js";
-import sqlite3 from "sqlite3";
-import { clearTable } from "./utils.js";
-import { Option } from "effect";
 import { fromHex, toHex } from "@lucid-evolution/lucid";
+import { Option } from "effect";
+import sqlite3 from "sqlite3";
+import { logAbort, logInfo } from "../utils.js";
+import { clearTable } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS immutable (
