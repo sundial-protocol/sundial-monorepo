@@ -2,7 +2,6 @@ import {
   Result,
   errorToString,
   fail,
-  isBech32,
   isHexString,
   logAbort,
   logInfo,
@@ -19,6 +18,7 @@ import {
   ScriptType,
   UTxO,
   CML,
+  getAddressDetails
 } from "@lucid-evolution/lucid";
 import express from "express";
 import sqlite3 from "sqlite3";
@@ -92,8 +92,15 @@ export const listen = (
     const validLength = txHash?.length === 32;
 
     if (txIsString && isHexString(txHash) && validLength) {
-      mempool.retrieveByTxHash(db, txHash).then((v =>
-        res.json(v)
+      mempool.retrieve(db).then((pool => {
+          const matches = pool.filter(a => a[0] == txHash).map(a => a[1])
+          if (matches.length == 0) {
+            res.status(404)
+            res.json(`No matching transactions found`);
+          } else {
+            res.json(matches)
+          }
+        }
       ));
     } else {
       res.status(400)
@@ -105,10 +112,21 @@ export const listen = (
     res.type("text/plain");
     const addr = req.query.addr;
     const addrIsString = typeof addr === "string";
-    if (addrIsString && isBech32(addr)) {
-      latestLedger.retrieveByAddr(db, addr).then((v =>
-        res.json(v)
-      ));
+    if (addrIsString) {
+      try {
+        const addrDetails = getAddressDetails(addr)
+        if (addrDetails.paymentCredential != undefined) {
+          latestLedger.retrieve(db).then(allUTxOs => {
+            res.json(allUTxOs.filter(a => a.address == addrDetails.address.bech32))
+        });
+        } else {
+          res.status(400)
+          res.json(`Invalid address: ${addr}`);
+        }
+      } catch {
+        res.status(400)
+        res.json(`Invalid address: ${addr}`);
+      }
     } else {
       res.status(400)
       res.json(`Invalid address: ${addr}`);
@@ -121,8 +139,8 @@ export const listen = (
     const txIsString = typeof hdrHash === "string";
     const validLength = hdrHash?.length === 32
     if (txIsString && isHexString(hdrHash) && validLength) {
-        blocks.retrieveByHeader(db, hdrHash).then((v =>
-          res.json(v)
+        blocks.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes =>
+          res.json(hashes)
         ));
       } else {
         res.status(400)
