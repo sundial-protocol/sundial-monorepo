@@ -1,4 +1,4 @@
-import { UTxO, Address } from "@lucid-evolution/lucid";
+import { OutRef, UTxO, Address, TxSignBuilder } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
 
@@ -39,6 +39,13 @@ export const retrieveByAddr  = async (db: sqlite3.Database, addr: Address): Prom
     });
     return utxos
   }
+
+export const updateByTx = async (db: sqlite3.Database, txSignBuilder: TxSignBuilder): Promise<void> => {
+  const utxos = await new Promise<[UTxO][]>((resolve, reject) => {
+    // TODO remove all used UTxOs, throw if `txSignBuilder` has bad configuration
+  });
+  return
+}
 
   export const clear = async (db: sqlite3.Database) =>
   clearTable(db, "latest_ledger");
