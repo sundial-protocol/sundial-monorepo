@@ -6,7 +6,7 @@ import {
   clearTable,
   insertUTxOs,
   retrieveUTxOs,
-  uTxOFromRow,
+  utxoFromRow,
   UTxOFromRow,
 } from "./utils.js";
 
@@ -74,7 +74,7 @@ export const retrieveUTxOsAtAddress = async (
         logAbort(`mempool_ledger db: error retrieving utxos: ${err.message}`);
         return reject(err);
       }
-      resolve(rows.map((r) => uTxOFromRow(r)));
+      resolve(rows.map((r) => utxoFromRow(r)));
     });
   });
 };

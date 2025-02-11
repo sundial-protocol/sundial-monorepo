@@ -15,7 +15,7 @@ export const insertUTxOs = async (
   assetTableName: string,
   utxos: UTxO[]
 ) => {
-  const values = utxos.flatMap((utxo) => Object.values(uTxOToRow(utxo)));
+  const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
   const query = `
     INSERT INTO ${tableName}
       (tx_hash, output_index, address, datum_hash, datum, script_ref_type, script_ref_script)
@@ -23,7 +23,7 @@ export const insertUTxOs = async (
     ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")}
   `;
   const normalizedAssets = utxos.flatMap((utxo) =>
-    uTxOToNormalizedAssets(utxo)
+    utxoToNormalizedAssets(utxo)
   );
   const assetQuery = `
     INSERT INTO ${assetTableName}
@@ -108,7 +108,7 @@ export const retrieveUTxOs = async (
         logAbort(`${tableName} db: error retrieving utxos: ${err.message}`);
         return reject(err);
       }
-      resolve(rows.map((r) => uTxOFromRow(r)));
+      resolve(rows.map((r) => utxoFromRow(r)));
     });
   });
 };
@@ -161,7 +161,7 @@ export interface UTxOFromRow {
   script_ref_script?: Uint8Array | null;
 }
 
-export function uTxOFromRow(row: UTxOFromRow): UTxO {
+export function utxoFromRow(row: UTxOFromRow): UTxO {
   const scriptRefType: ScriptType | null =
     row.script_ref_type == "Native"
       ? "Native"
@@ -219,7 +219,7 @@ const transformAssetsToObject = (
   }
 };
 
-export interface UtxoToRow {
+export interface UTxOToRow {
   tx_hash: Uint8Array;
   output_index: number;
   address: string;
@@ -229,7 +229,7 @@ export interface UtxoToRow {
   script_ref_script?: Uint8Array | null;
 }
 
-export function uTxOToRow(utxo: UTxO): UtxoToRow {
+export function utxoToRow(utxo: UTxO): UTxOToRow {
   return {
     tx_hash: fromHex(utxo.txHash),
     output_index: utxo.outputIndex,
@@ -249,7 +249,7 @@ export interface NormalizedAsset {
   quantity: string; //sqlite threats bigInt as null
 }
 
-export function uTxOToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
+export function utxoToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
   return Object.entries(utxo.assets).flatMap(([unit, quantity]) => {
     const asset: NormalizedAsset = {
       tx_hash: fromHex(utxo.txHash),
