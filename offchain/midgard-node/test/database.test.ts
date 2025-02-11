@@ -1,14 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import sqlite3 from "sqlite3";
 import { initializeDb } from "../src/database.js";
-import { CML, fromHex, UTxO } from "@lucid-evolution/lucid";
+import { CML, UTxO } from "@lucid-evolution/lucid";
 import * as blocks from "../src/database/blocks.js";
 import * as mempool from "../src/database/mempool.js";
 import * as mempoolLedger from "../src/database/mempoolLedger.js";
 import * as immutable from "../src/database/immutable.js";
 import * as confirmedLedger from "../src/database/confirmedLedger.js";
 import * as latestLedger from "../src/database/latestLedger.js";
-import { logAbort } from "../src/utils.js";
 import { Option } from "effect";
 
 describe("database", () => {

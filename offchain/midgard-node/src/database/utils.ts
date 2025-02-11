@@ -1,5 +1,5 @@
 import { logAbort, logInfo } from "../utils.js";
-import { fromHex, ScriptType, toHex, UTxO } from "@lucid-evolution/lucid";
+import { Address, fromHex, ScriptType, toHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 
 export const insertUtxos = async (
@@ -37,7 +37,7 @@ export const insertUtxos = async (
           db.run("ROLLBACK;", () => reject(err));
         } else {
           logInfo(
-            `${tableName} db: ${utxos.length} new UTXOs added to confirmed_ledger`
+            `${tableName} db: ${utxos.length} new UTXOs added`
           );
           db.run(assetQuery, assetValues, (err) => {
             if (err) {
@@ -99,6 +99,50 @@ export const retrieveUtxos = async (
     `;
   return new Promise((resolve, reject) => {
     db.all(query, (err, rows: UtxoFromRow[]) => {
+      if (err) {
+        logAbort(`${tableName} db: error retrieving utxos: ${err.message}`);
+        return reject(err);
+      }
+      resolve(rows.map((r) => utxoFromRow(r)));
+    });
+  });
+};
+
+export const retrieveUtxosOnAddress = async (
+  db: sqlite3.Database,
+  tableName: string,
+  assetTableName: string,
+  address: Address
+): Promise<UTxO[]> => {
+  const query = `
+      SELECT
+        t.tx_hash,
+        t.output_index,
+        address,
+        json_group_array(json_object('unit', hex(a.unit), 'quantity', a.quantity)) AS assets,
+        datum_hash,
+        datum,
+        script_ref_type,
+        script_ref_script
+      FROM ${tableName} AS t
+        LEFT JOIN ${assetTableName} AS a
+          ON t.tx_hash = a.tx_hash AND t.output_index = a.output_index
+      WHERE address = ?
+      GROUP BY
+        t.tx_hash,
+        t.output_index,
+        address,
+        datum_hash,
+        datum,
+        script_ref_type,
+        script_ref_script
+      ORDER BY
+        t.tx_hash,
+        t.output_index
+      ;
+      `;
+  return new Promise((resolve, reject) => {
+    db.all(query, [address], (err, rows: UtxoFromRow[]) => {
       if (err) {
         logAbort(`${tableName} db: error retrieving utxos: ${err.message}`);
         return reject(err);

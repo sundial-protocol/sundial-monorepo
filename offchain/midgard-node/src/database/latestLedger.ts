@@ -4,9 +4,8 @@ import {
   clearTable,
   insertUtxos,
   retrieveUtxos,
-  utxoFromRow,
-  UtxoFromRow,
 } from "./utils.js";
+import * as utils from "./utils.js";
 import { logAbort, logInfo } from "../utils.js";
 
 export const createQuery = `
@@ -40,44 +39,13 @@ export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
 export const retrieveUtxosOnAddress = async (
   db: sqlite3.Database,
   address: Address
-): Promise<UTxO[]> => {
-  const query = `
-    SELECT
-      t.tx_hash,
-      t.output_index,
-      address,
-      json_group_array(json_object('unit', hex(a.unit), 'quantity', a.quantity)) AS assets,
-      datum_hash,
-      datum,
-      script_ref_type,
-      script_ref_script
-    FROM latest_ledger AS t
-      LEFT JOIN latest_ledger_assets AS a
-        ON t.tx_hash = a.tx_hash AND t.output_index = a.output_index
-    WHERE address = ?
-    GROUP BY
-      t.tx_hash,
-      t.output_index,
-      address,
-      datum_hash,
-      datum,
-      script_ref_type,
-      script_ref_script
-    ORDER BY
-      t.tx_hash,
-      t.output_index;
-    ;
-    `;
-  return new Promise((resolve, reject) => {
-    db.all(query, [address], (err, rows: UtxoFromRow[]) => {
-      if (err) {
-        logAbort(`latest_ledger db: error retrieving utxos: ${err.message}`);
-        return reject(err);
-      }
-      resolve(rows.map((r) => utxoFromRow(r)));
-    });
-  });
-};
+): Promise<UTxO[]> =>
+  utils.retrieveUtxosOnAddress(
+    db,
+    "latest_ledger",
+    "latest_ledger_assets",
+    address
+  );
 
 export const clearTx = async (
   db: sqlite3.Database,
