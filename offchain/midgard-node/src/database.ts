@@ -5,6 +5,7 @@ import {
 import sqlite3 from "sqlite3";
 import * as blocks from "./database/blocks.js"
 import * as mempool from "./database/mempool.js"
+import * as mempoolLedger from "./database/mempoolLedger.js"
 import * as immutable from "./database/immutable.js"
 import * as confirmedLedger from "./database/confirmedLedger.js"
 import * as latestLedger from "./database/latestLedger.js"
@@ -23,6 +24,7 @@ export async function initializeDb(dbFilePath: string) {
   `)
   db.exec(blocks.createQuery)
   db.exec(mempool.createQuery);
+  db.exec(mempoolLedger.createQuery)
   db.exec(immutable.createQuery);
   db.exec(confirmedLedger.createQuery)
   db.exec(latestLedger.createQuery)

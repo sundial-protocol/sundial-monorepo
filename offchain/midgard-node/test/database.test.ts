@@ -4,6 +4,7 @@ import { initializeDb } from "../src/database.js";
 import { CML, fromHex, UTxO } from "@lucid-evolution/lucid";
 import * as blocks from "../src/database/blocks.js";
 import * as mempool from "../src/database/mempool.js";
+import * as mempoolLedger from "../src/database/mempoolLedger.js";
 import * as immutable from "../src/database/immutable.js";
 import * as confirmedLedger from "../src/database/confirmedLedger.js";
 import * as latestLedger from "../src/database/latestLedger.js";
@@ -34,6 +35,36 @@ describe("database", () => {
   const block1Hash = "aaaaaaaaaaaaaaaaaa";
   const block2Hash = "bbbbbbbbbbbbbbbbbb";
 
+  const address =
+    "addr1q8gg2r3vf9zggn48g7m8vx62rwf6warcs4k7ej8mdzmqmesj30jz7psduyk6n4n2qrud2xlv9fgj53n6ds3t8cs4fvzs05yzmz";
+  const utxo1: UTxO = {
+    txHash: tx1Hash,
+    outputIndex: 0,
+    address: address,
+    assets: {
+      c5334d60505f62b715b098cb5f9a391416a6ed2064c7d813e03a11c1e2fb72ac0da4e312c4a0a27b73a59eba40ee6848131f82fc62be628ab72e490e:
+        BigInt(12),
+      lovelace: BigInt("9223372036854779904"),
+    },
+    datum:
+      "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
+    datumHash:
+      "9eead0de42833bbd51866cbafe5d29b8448fa1b9e7430a7af7a7f0e7e9913a07",
+    scriptRef: null,
+  };
+  const utxo2: UTxO = {
+    txHash: tx2Hash,
+    outputIndex: 0,
+    address: address,
+    assets: { lovelace: BigInt(33) },
+    datum: null,
+    datumHash: null,
+    scriptRef: {
+      type: "PlutusV3",
+      script:
+        "6e461fe947e14c4a53b905d0aa92f08bff98fb94129f6ed26877fcf1c8a4495192c0b379fb06aa3b",
+    },
+  };
   it("should store tx hashes in blocks db", async () => {
     await blocks.insert(db, block1Hash, [tx1Hash]);
     const result1 = await blocks.retrieve(db);
@@ -112,6 +143,35 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
+  it("should store utxos in the mempool ledger db", async () => {
+    await mempoolLedger.insert(db, [utxo1]);
+    const result1 = await mempoolLedger.retrieve(db);
+    expect(result1).toStrictEqual([utxo1]);
+
+    await mempoolLedger.insert(db, [utxo2]);
+    const result2 = await mempoolLedger.retrieve(db);
+    expect(result2).toStrictEqual([utxo1, utxo2]);
+  });
+
+  it("retrieves utxos by address in the mempool ledger db", async () => {
+    const result1 = await mempoolLedger.retrieveUtxosOnAddress(
+      db,
+      "non-existent address"
+    );
+    expect(result1).toEqual([]);
+
+    const result2 = await mempoolLedger.retrieveUtxosOnAddress(db, address);
+    expect(result2).toEqual([utxo1, utxo2]);
+  });
+
+  it("clears the mempool ledger db", async () => {
+    const initialRows = await mempoolLedger.retrieve(db);
+    expect(initialRows.length).toBe(2);
+    await mempoolLedger.clear(db);
+    const result = await mempoolLedger.retrieve(db);
+    expect(result.length).toBe(0);
+  });
+
   it("should store transactions in the immutable db", async () => {
     await immutable.insert(db, tx1Hash, tx1);
     const result1 = await immutable.retrieve(db);
@@ -142,36 +202,6 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
-  const address =
-    "addr1q8gg2r3vf9zggn48g7m8vx62rwf6warcs4k7ej8mdzmqmesj30jz7psduyk6n4n2qrud2xlv9fgj53n6ds3t8cs4fvzs05yzmz";
-  const utxo1: UTxO = {
-    txHash: tx1Hash,
-    outputIndex: 0,
-    address: address,
-    assets: {
-      c5334d60505f62b715b098cb5f9a391416a6ed2064c7d813e03a11c1e2fb72ac0da4e312c4a0a27b73a59eba40ee6848131f82fc62be628ab72e490e:
-        BigInt(12),
-      lovelace: BigInt("9223372036854779904"),
-    },
-    datum:
-      "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
-    datumHash:
-      "9eead0de42833bbd51866cbafe5d29b8448fa1b9e7430a7af7a7f0e7e9913a07",
-    scriptRef: null,
-  };
-  const utxo2: UTxO = {
-    txHash: tx2Hash,
-    outputIndex: 0,
-    address: address,
-    assets: { lovelace: BigInt(33) },
-    datum: null,
-    datumHash: null,
-    scriptRef: {
-      type: "PlutusV3",
-      script:
-        "6e461fe947e14c4a53b905d0aa92f08bff98fb94129f6ed26877fcf1c8a4495192c0b379fb06aa3b",
-    },
-  };
   it("should store utxos in the confirmed ledger db", async () => {
     await immutable.insert(db, tx1Hash, tx1);
     await immutable.insert(db, tx2Hash, tx2);
