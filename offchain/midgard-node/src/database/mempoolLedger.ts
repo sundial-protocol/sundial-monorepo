@@ -79,8 +79,8 @@ export const retrieveUTxOsAtAddress = async (
   });
 };
 
-export const clearUTxO = async (db: sqlite3.Database, ref: OutRef) =>
-  utils.clearUTxOs(db, "mempool_ledger", [ref]);
+export const clearUTxOs = async (db: sqlite3.Database, refs: OutRef[]) =>
+  utils.clearUTxOs(db, "mempool_ledger", refs);
 
 export const clear = async (db: sqlite3.Database) =>
   clearTable(db, "mempool_ledger");
