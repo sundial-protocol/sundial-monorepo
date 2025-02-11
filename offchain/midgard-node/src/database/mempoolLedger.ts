@@ -1,6 +1,7 @@
-import { Address, UTxO } from "@lucid-evolution/lucid";
+import { Address, OutRef, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import { logAbort } from "../utils.js";
+import * as utils from "./utils.js";
 import {
   clearTable,
   insertUTxOs,
@@ -77,6 +78,9 @@ export const retrieveUTxOsAtAddress = async (
     });
   });
 };
+
+export const clearUTxO = async (db: sqlite3.Database, ref: OutRef) =>
+  utils.clearUTxOs(db, "mempool_ledger", [ref]);
 
 export const clear = async (db: sqlite3.Database) =>
   clearTable(db, "mempool_ledger");

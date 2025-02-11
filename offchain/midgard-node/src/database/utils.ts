@@ -1,4 +1,10 @@
-import { fromHex, ScriptType, toHex, UTxO } from "@lucid-evolution/lucid";
+import {
+  fromHex,
+  OutRef,
+  ScriptType,
+  toHex,
+  UTxO,
+} from "@lucid-evolution/lucid";
 import { logAbort, logInfo } from "../utils.js";
 
 import sqlite3 from "sqlite3";
@@ -103,6 +109,28 @@ export const retrieveUTxOs = async (
         return reject(err);
       }
       resolve(rows.map((r) => utxoFromRow(r)));
+    });
+  });
+};
+
+export const clearUTxOs = async (
+  db: sqlite3.Database,
+  tableName: string,
+  refs: OutRef[]
+) => {
+  const query = `DELETE FROM ${tableName} WHERE (tx_hash, output_index) IN (${refs
+    .map(() => `(?, ?)`)
+    .join(", ")})`;
+  const values = refs.flatMap((r) => [fromHex(r.txHash), r.outputIndex]);
+  await new Promise<void>((resolve, reject) => {
+    db.run(query, values, function (err) {
+      if (err) {
+        logAbort(`${tableName} db: utxos removing error: ${err.message}`);
+        reject(err);
+      } else {
+        logInfo(`${tableName} db: ${this.changes} utxos removed`);
+        resolve();
+      }
     });
   });
 };

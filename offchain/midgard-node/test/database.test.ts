@@ -53,7 +53,7 @@ describe("database", () => {
   };
   const utxo2: UTxO = {
     txHash: tx2Hash,
-    outputIndex: 0,
+    outputIndex: 1,
     address: address,
     assets: { lovelace: BigInt(33) },
     datum: null,
@@ -163,7 +163,32 @@ describe("database", () => {
     expect(result2).toEqual([utxo1, utxo2]);
   });
 
+  it("clears given utxo in the mempool ledger db", async () => {
+    await mempoolLedger.clearUTxO(db, {
+      txHash: utxo1.txHash,
+      outputIndex: utxo2.outputIndex,
+    });
+    const result0 = await mempoolLedger.retrieve(db);
+    expect(result0).toEqual([utxo1, utxo2]);
+
+    await mempoolLedger.clearUTxO(db, {
+      txHash: utxo1.txHash,
+      outputIndex: utxo1.outputIndex,
+    });
+    const result1 = await mempoolLedger.retrieve(db);
+    expect(result1).toEqual([utxo2]);
+
+    await mempoolLedger.clearUTxO(db, {
+      txHash: utxo2.txHash,
+      outputIndex: utxo2.outputIndex,
+    });
+    const result2 = await mempoolLedger.retrieve(db);
+    expect(result2).toEqual([]);
+  });
+
   it("clears the mempool ledger db", async () => {
+    await mempoolLedger.insert(db, [utxo1]);
+    await mempoolLedger.insert(db, [utxo2]);
     const initialRows = await mempoolLedger.retrieve(db);
     expect(initialRows.length).toBe(2);
     await mempoolLedger.clear(db);
@@ -213,20 +238,44 @@ describe("database", () => {
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
-  it("clears given tx in the confirmed ledger db", async () => {
-    const nonExistentTxHash = "1234";
-    await confirmedLedger.clearTx(db, nonExistentTxHash);
-    const result1 = await confirmedLedger.retrieve(db);
-    expect(result1).toStrictEqual([utxo1, utxo2]);
+  it("clears given utxo in the confirmed ledger db", async () => {
+    await confirmedLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+    ]);
+    const result0 = await confirmedLedger.retrieve(db);
+    expect(result0).toEqual([utxo1, utxo2]);
 
-    await confirmedLedger.clearTx(db, tx2Hash);
+    await confirmedLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
+    const result1 = await confirmedLedger.retrieve(db);
+    expect(result1).toEqual([utxo2]);
+
+    await confirmedLedger.insert(db, [utxo1]);
+    await confirmedLedger.clearUTxOs(db, [
+      {
+        txHash: utxo2.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
     const result2 = await confirmedLedger.retrieve(db);
-    expect(result2).toStrictEqual([utxo1]);
+    expect(result2).toEqual([]);
   });
 
   it("clears the confirmed ledger db", async () => {
+    await confirmedLedger.insert(db, [utxo1, utxo2]);
     const initialRows = await confirmedLedger.retrieve(db);
-    expect(initialRows.length).toBe(1);
+    expect(initialRows.length).toBe(2);
     await confirmedLedger.clear(db);
     const result = await confirmedLedger.retrieve(db);
     expect(result.length).toBe(0);
@@ -242,20 +291,44 @@ describe("database", () => {
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
-  it("clears given tx in the latest ledger db", async () => {
-    const nonExistentTxHash = "1234";
-    await latestLedger.clearTx(db, nonExistentTxHash);
-    const result1 = await latestLedger.retrieve(db);
-    expect(result1).toStrictEqual([utxo1, utxo2]);
+  it("clears given utxo in the latest ledger db", async () => {
+    await latestLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+    ]);
+    const result0 = await latestLedger.retrieve(db);
+    expect(result0).toEqual([utxo1, utxo2]);
 
-    await latestLedger.clearTx(db, tx2Hash);
+    await latestLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
+    const result1 = await latestLedger.retrieve(db);
+    expect(result1).toEqual([utxo2]);
+
+    await latestLedger.insert(db, [utxo1]);
+    await latestLedger.clearUTxOs(db, [
+      {
+        txHash: utxo2.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
     const result2 = await latestLedger.retrieve(db);
-    expect(result2).toStrictEqual([utxo1]);
+    expect(result2).toEqual([]);
   });
 
   it("clears the latest ledger db", async () => {
+    await latestLedger.insert(db, [utxo1, utxo2]);
     const initialRows = await latestLedger.retrieve(db);
-    expect(initialRows.length).toBe(1);
+    expect(initialRows.length).toBe(2);
     await latestLedger.clear(db);
     const result = await latestLedger.retrieve(db);
     expect(result.length).toBe(0);
