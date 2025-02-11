@@ -1,4 +1,4 @@
-import { CML, Data, OutRef } from "@lucid-evolution/lucid";
+import { CML, Data, OutRef, UTxO, valueToAssets } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { cmlInputToOutRef } from "./cml.js";
 import { Header } from "@/types/contracts/ledger-state.js";
@@ -6,7 +6,7 @@ import { hashHexWithBlake2b224 } from "./common.js";
 
 export const findSpentAndProducedUTxOs = (
   txCBOR: string
-): Effect.Effect<{ spent: OutRef[]; produced: OutRef[] }, Error> => {
+): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> => {
   try {
     const tx = CML.Transaction.from_cbor_hex(txCBOR);
     const txBody = tx.body();
@@ -22,7 +22,16 @@ export const findSpentAndProducedUTxOs = (
     const outputsCount = outputs.len();
     const produced = [];
     for (let i = 0; i < outputsCount; i++) {
-      produced.push({ txHash, outputIndex: i });
+      const output = outputs.get(i);
+      produced.push({
+        address: output.address().to_bech32(),
+        assets: valueToAssets(output.amount()),
+        datumHash: output.datum_hash()?.to_hex(),
+        datum: output.datum()?.to_cbor_hex(),
+        scriptRef: output.script_ref()?.to_cbor_hex(),
+        txHash,
+        outputIndex: i,
+      } as UTxO);
     }
     return Effect.succeed({ spent, produced });
   } catch (_e) {
