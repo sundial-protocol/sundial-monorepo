@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import sqlite3 from "sqlite3";
-import { initializeDb } from "../src/database.js";
 import { CML, UTxO } from "@lucid-evolution/lucid";
-import * as blocks from "../src/database/blocks.js";
-import * as mempool from "../src/database/mempool.js";
-import * as immutable from "../src/database/immutable.js";
-import * as confirmedLedger from "../src/database/confirmedLedger.js";
-import * as latestLedger from "../src/database/latestLedger.js";
-import { logAbort } from "../src/utils.js";
 import { Option } from "effect";
+import sqlite3 from "sqlite3";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { initializeDb } from "../src/database.js";
+import * as blocks from "../src/database/blocks.js";
+import * as confirmedLedger from "../src/database/confirmedLedger.js";
+import * as immutable from "../src/database/immutable.js";
+import * as latestLedger from "../src/database/latestLedger.js";
+import * as mempool from "../src/database/mempool.js";
+import * as mempoolLedger from "../src/database/mempoolLedger.js";
 
 describe("database", () => {
   let db: sqlite3.Database;
@@ -34,16 +34,44 @@ describe("database", () => {
   const block1Hash = "aaaaaaaaaaaaaaaaaa";
   const block2Hash = "bbbbbbbbbbbbbbbbbb";
 
+  const address =
+    "addr1q8gg2r3vf9zggn48g7m8vx62rwf6warcs4k7ej8mdzmqmesj30jz7psduyk6n4n2qrud2xlv9fgj53n6ds3t8cs4fvzs05yzmz";
+  const utxo1: UTxO = {
+    txHash: tx1Hash,
+    outputIndex: 0,
+    address: address,
+    assets: {
+      c5334d60505f62b715b098cb5f9a391416a6ed2064c7d813e03a11c1e2fb72ac0da4e312c4a0a27b73a59eba40ee6848131f82fc62be628ab72e490e:
+        BigInt(12),
+      lovelace: BigInt("9223372036854779904"),
+    },
+    datum:
+      "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
+    datumHash:
+      "9eead0de42833bbd51866cbafe5d29b8448fa1b9e7430a7af7a7f0e7e9913a07",
+    scriptRef: null,
+  };
+  const utxo2: UTxO = {
+    txHash: tx2Hash,
+    outputIndex: 1,
+    address: address,
+    assets: { lovelace: BigInt(33) },
+    datum: null,
+    datumHash: null,
+    scriptRef: {
+      type: "PlutusV3",
+      script:
+        "6e461fe947e14c4a53b905d0aa92f08bff98fb94129f6ed26877fcf1c8a4495192c0b379fb06aa3b",
+    },
+  };
   it("should store tx hashes in blocks db", async () => {
     await blocks.insert(db, block1Hash, [tx1Hash]);
     const result1 = await blocks.retrieve(db);
-    expect(result1.map((o) => Object.values(o))).toStrictEqual([
-      [block1Hash, tx1Hash],
-    ]);
+    expect(result1).toStrictEqual([[block1Hash, tx1Hash]]);
 
     await blocks.insert(db, block1Hash, [tx2Hash]);
     const result2 = await blocks.retrieve(db);
-    expect(result2.map((o) => Object.values(o))).toStrictEqual([
+    expect(result2).toStrictEqual([
       [block1Hash, tx1Hash],
       [block1Hash, tx2Hash],
     ]);
@@ -51,10 +79,7 @@ describe("database", () => {
 
   it("retrieves tx hashes by block hash", async () => {
     const result1 = await blocks.retrieveTxHashesByBlockHash(db, block1Hash);
-    expect(result1.flatMap((o) => Object.values(o))).toEqual([
-      tx1Hash,
-      tx2Hash,
-    ]);
+    expect(result1).toEqual([tx1Hash, tx2Hash]);
 
     const result2 = await blocks.retrieveTxHashesByBlockHash(db, block2Hash);
     expect(result2).toEqual([]);
@@ -62,22 +87,23 @@ describe("database", () => {
 
   it("retrieves block hash by tx hash", async () => {
     const result1 = await blocks.retrieveBlockHashByTxHash(db, tx1Hash);
-    expect(result1).toEqual(Option.some({ header_hash: block1Hash }));
+    expect(result1).toEqual(Option.some(block1Hash));
 
     const result2 = await blocks.retrieveBlockHashByTxHash(db, block2Hash);
     expect(result2).toEqual(Option.none());
   });
 
-  it("clears given block", async () => {
-    await blocks.clearBlock(db, "non-existent block");
+  it("clears given block in the blocks db", async () => {
+    const nonExistintBlockHash = "1234";
+    await blocks.clearBlock(db, nonExistintBlockHash);
     const result1 = await blocks.retrieve(db);
     expect(result1.map((o) => Object.values(o))).toStrictEqual([
       [block1Hash, tx1Hash],
       [block1Hash, tx2Hash],
     ]);
-    const block3Hash = "cccccccccccccccc"
-    await blocks.insert(db, block3Hash, ["1", "2"]);
-    await blocks.clearBlock(db, block3Hash)
+    const block3Hash = "cccccccccccccccc";
+    await blocks.insert(db, block3Hash, ["11", "22"]);
+    await blocks.clearBlock(db, block3Hash);
     const result2 = await blocks.retrieve(db);
     expect(result2.map((o) => Object.values(o))).toStrictEqual([
       [block1Hash, tx1Hash],
@@ -113,15 +139,69 @@ describe("database", () => {
     expect(initialRows.length).toBe(2);
     await mempool.clear(db);
     const result = await mempool.retrieve(db);
-    await immutable.insert(db, tx1Hash, tx1);
+    expect(result.length).toBe(0);
+  });
+
+  it("should store utxos in the mempool ledger db", async () => {
+    await mempoolLedger.insert(db, [utxo1]);
+    const result1 = await mempoolLedger.retrieve(db);
+    expect(result1).toStrictEqual([utxo1]);
+
+    await mempoolLedger.insert(db, [utxo2]);
+    const result2 = await mempoolLedger.retrieve(db);
+    expect(result2).toStrictEqual([utxo1, utxo2]);
+  });
+
+  it("retrieves utxos by address in the mempool ledger db", async () => {
+    const result1 = await mempoolLedger.retrieveUTxOsAtAddress(
+      db,
+      "non-existent address"
+    );
+    expect(result1).toEqual([]);
+
+    const result2 = await mempoolLedger.retrieveUTxOsAtAddress(db, address);
+    expect(result2).toEqual([utxo1, utxo2]);
+  });
+
+  it("clears given utxo in the mempool ledger db", async () => {
+    await mempoolLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+    ]);
+    const result0 = await mempoolLedger.retrieve(db);
+    expect(result0).toEqual([utxo1, utxo2]);
+
+    await mempoolLedger.clearUTxOs(db, [{
+      txHash: utxo1.txHash,
+      outputIndex: utxo1.outputIndex,
+    }]);
+    const result1 = await mempoolLedger.retrieve(db);
+    expect(result1).toEqual([utxo2]);
+
+    await mempoolLedger.clearUTxOs(db, [{
+      txHash: utxo2.txHash,
+      outputIndex: utxo2.outputIndex,
+    }]);
+    const result2 = await mempoolLedger.retrieve(db);
+    expect(result2).toEqual([]);
+  });
+
+  it("clears the mempool ledger db", async () => {
+    await mempoolLedger.insert(db, [utxo1]);
+    await mempoolLedger.insert(db, [utxo2]);
+    const initialRows = await mempoolLedger.retrieve(db);
+    expect(initialRows.length).toBe(2);
+    await mempoolLedger.clear(db);
+    const result = await mempoolLedger.retrieve(db);
     expect(result.length).toBe(0);
   });
 
   it("should store transactions in the immutable db", async () => {
+    await immutable.insert(db, tx1Hash, tx1);
     const result1 = await immutable.retrieve(db);
-    expect(result1.map((o) => Object.values(o))).toStrictEqual([
-      [tx1Hash, tx1],
-    ]);
+    expect(result1).toStrictEqual([[tx1Hash, tx1]]);
 
     await immutable.insert(db, tx2Hash, tx2);
     const result2 = await immutable.retrieve(db);
@@ -129,6 +209,15 @@ describe("database", () => {
       [tx1Hash, tx1],
       [tx2Hash, tx2],
     ]);
+  });
+
+  it("retrieves tx by hash in the immutable db", async () => {
+    const nonExistentTxHash = "1234";
+    const result1 = await immutable.retrieveTxCborByHash(db, nonExistentTxHash);
+    expect(result1).toEqual(Option.none());
+
+    const result2 = await immutable.retrieveTxCborByHash(db, tx1Hash);
+    expect(result2).toEqual(Option.some(tx1));
   });
 
   it("clears the immutable db", async () => {
@@ -139,35 +228,9 @@ describe("database", () => {
     expect(result.length).toBe(0);
   });
 
-  const utxo1: UTxO = {
-    txHash: tx1Hash,
-    outputIndex: 0,
-    address: "aaaa",
-    assets: {
-      c5334d60505f62b715b098cb5f9a391416a6ed2064c7d813e03a11c1e2fb72ac0da4e312c4a0a27b73a59eba40ee6848131f82fc62be628ab72e490e:
-        BigInt(12),
-      lovelace: BigInt("9223372036854779904"),
-    },
-    datum:
-      "e100c1a248cb3e9eb91d1534b176a410312a283100345de6d7f3b7b55ea7b067b4b46a43dca4f674b0682b06ed9f",
-    datumHash:
-      "9eead0de42833bbd51866cbafe5d29b8448fa1b9e7430a7af7a7f0e7e9913a07",
-    scriptRef: null,
-  };
-  const utxo2: UTxO = {
-    txHash: tx2Hash,
-    outputIndex: 0,
-    address: "bbbb",
-    assets: { lovelace: BigInt(33) },
-    datum: null,
-    datumHash: null,
-    scriptRef: {
-      type: "PlutusV3",
-      script:
-        "6e461fe947e14c4a53b905d0aa92f08bff98fb94129f6ed26877fcf1c8a4495192c0b379fb06aa3b",
-    },
-  };
   it("should store utxos in the confirmed ledger db", async () => {
+    await immutable.insert(db, tx1Hash, tx1);
+    await immutable.insert(db, tx2Hash, tx2);
     await confirmedLedger.insert(db, [utxo1]);
     const result1 = await confirmedLedger.retrieve(db);
     expect(result1).toStrictEqual([utxo1]);
@@ -177,7 +240,42 @@ describe("database", () => {
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
+  it("clears given utxo in the confirmed ledger db", async () => {
+    await confirmedLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+    ]);
+    const result0 = await confirmedLedger.retrieve(db);
+    expect(result0).toEqual([utxo1, utxo2]);
+
+    await confirmedLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
+    const result1 = await confirmedLedger.retrieve(db);
+    expect(result1).toEqual([utxo2]);
+
+    await confirmedLedger.insert(db, [utxo1]);
+    await confirmedLedger.clearUTxOs(db, [
+      {
+        txHash: utxo2.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
+    const result2 = await confirmedLedger.retrieve(db);
+    expect(result2).toEqual([]);
+  });
+
   it("clears the confirmed ledger db", async () => {
+    await confirmedLedger.insert(db, [utxo1, utxo2]);
     const initialRows = await confirmedLedger.retrieve(db);
     expect(initialRows.length).toBe(2);
     await confirmedLedger.clear(db);
@@ -195,7 +293,42 @@ describe("database", () => {
     expect(result2).toStrictEqual([utxo1, utxo2]);
   });
 
+  it("clears given utxo in the latest ledger db", async () => {
+    await latestLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+    ]);
+    const result0 = await latestLedger.retrieve(db);
+    expect(result0).toEqual([utxo1, utxo2]);
+
+    await latestLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
+    const result1 = await latestLedger.retrieve(db);
+    expect(result1).toEqual([utxo2]);
+
+    await latestLedger.insert(db, [utxo1]);
+    await latestLedger.clearUTxOs(db, [
+      {
+        txHash: utxo2.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
+    const result2 = await latestLedger.retrieve(db);
+    expect(result2).toEqual([]);
+  });
+
   it("clears the latest ledger db", async () => {
+    await latestLedger.insert(db, [utxo1, utxo2]);
     const initialRows = await latestLedger.retrieve(db);
     expect(initialRows.length).toBe(2);
     await latestLedger.clear(db);
@@ -211,4 +344,4 @@ class MockLucid {
       toHash: () => CML.hash_transaction(tx_body).to_hex(),
     };
   }
-};
+}

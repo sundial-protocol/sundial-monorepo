@@ -97,11 +97,6 @@ export const isHexString = (str: string): boolean => {
   return hexRegex.test(str);
 };
 
-export const isBech32 = (str: string): boolean => {
-  const bechRegex = /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/;
-  return bechRegex.test(str);
-};
-
 export const setupLucid = async (
   network: Network,
   providerName: ProviderName
