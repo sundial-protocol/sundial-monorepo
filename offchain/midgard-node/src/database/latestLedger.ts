@@ -2,7 +2,7 @@ import { Address, fromHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
 import * as utils from "./utils.js";
-import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
+import { clearTable, insertUTxOs, retrieveUTxOs } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS latest_ledger (
@@ -27,16 +27,16 @@ export const createQuery = `
   `;
 
 export const insert = async (db: sqlite3.Database, utxos: UTxO[]) =>
-  insertUtxos(db, "latest_ledger", "latest_ledger_assets", utxos);
+  insertUTxOs(db, "latest_ledger", "latest_ledger_assets", utxos);
 
 export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
-  retrieveUtxos(db, "latest_ledger", "latest_ledger_assets");
+  retrieveUTxOs(db, "latest_ledger", "latest_ledger_assets");
 
-export const retrieveUtxosOnAddress = async (
+export const retrieveUTxOsAtAddress = async (
   db: sqlite3.Database,
   address: Address
 ): Promise<UTxO[]> =>
-  utils.retrieveUtxosOnAddress(
+  utils.retrieveUTxOsAtAddress(
     db,
     "latest_ledger",
     "latest_ledger_assets",

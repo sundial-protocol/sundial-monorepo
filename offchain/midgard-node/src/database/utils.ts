@@ -9,7 +9,7 @@ import { logAbort, logInfo } from "../utils.js";
 
 import sqlite3 from "sqlite3";
 
-export const insertUtxos = async (
+export const insertUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
   assetTableName: string,
@@ -71,7 +71,7 @@ export const insertUtxos = async (
   });
 };
 
-export const retrieveUtxos = async (
+export const retrieveUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
   assetTableName: string
@@ -113,7 +113,7 @@ export const retrieveUtxos = async (
   });
 };
 
-export const retrieveUtxosOnAddress = async (
+export const retrieveUTxOsAtAddress = async (
   db: sqlite3.Database,
   tableName: string,
   assetTableName: string,

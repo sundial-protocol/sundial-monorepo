@@ -1,7 +1,7 @@
 import { fromHex, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
-import { clearTable, insertUtxos, retrieveUtxos } from "./utils.js";
+import { clearTable, insertUTxOs, retrieveUTxOs } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS confirmed_ledger (
@@ -32,10 +32,10 @@ export const insert = async (
   db: sqlite3.Database,
   utxos: UTxO[]
 ): Promise<void> =>
-  insertUtxos(db, "confirmed_ledger", "confirmed_ledger_assets", utxos);
+  insertUTxOs(db, "confirmed_ledger", "confirmed_ledger_assets", utxos);
 
 export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
-  retrieveUtxos(db, "confirmed_ledger", "confirmed_ledger_assets");
+  retrieveUTxOs(db, "confirmed_ledger", "confirmed_ledger_assets");
 
 export const clearTx = async (
   db: sqlite3.Database,
