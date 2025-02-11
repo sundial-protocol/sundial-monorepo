@@ -13,7 +13,7 @@ export const createQuery = `
 export const insert = async (
   db: sqlite3.Database,
   header_hash: string,
-  tx_hashes: string[]
+  tx_hashes: string[],
 ): Promise<void> => {
   const query = `
     INSERT INTO blocks (header_hash, tx_hash)
@@ -38,7 +38,7 @@ export const insert = async (
 
 export const retrieveTxHashesByBlockHash = async (
   db: sqlite3.Database,
-  blockHash: string
+  blockHash: string,
 ): Promise<string[]> => {
   const query = `SELECT tx_hash FROM blocks WHERE header_hash = ?`;
   const txHashes = await new Promise<string[]>((resolve, reject) => {
@@ -55,7 +55,7 @@ export const retrieveTxHashesByBlockHash = async (
 
 export const retrieveBlockHashByTxHash = async (
   db: sqlite3.Database,
-  txHash: string
+  txHash: string,
 ): Promise<Option.Option<string>> => {
   const query = `SELECT header_hash FROM blocks WHERE tx_hash = ?`;
   const blockHash = await new Promise<string[]>((resolve, reject) => {
@@ -72,7 +72,7 @@ export const retrieveBlockHashByTxHash = async (
 
 export const clearBlock = async (
   db: sqlite3.Database,
-  blockHash: string
+  blockHash: string,
 ): Promise<void> => {
   const query = `DELETE from blocks WHERE header_hash = ?`;
   await new Promise<void>((resolve, reject) => {

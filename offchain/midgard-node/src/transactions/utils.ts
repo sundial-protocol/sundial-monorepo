@@ -1,11 +1,14 @@
 import {
   coreToTxOutput,
+  Data,
   LucidEvolution,
   TxSignBuilder,
   UTxO,
 } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
+import { Database } from "sqlite3";
+import { retrieveByBlockHeaderHash } from "../database/immutable";
 
 /**
  * Handle the signing and submission of a transaction.
@@ -54,10 +57,50 @@ export const buildMerkleRoots = (
           };
           utxos.push(utxo);
         }
-        return utxos;
       }
     }
-    const txRoot = SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
-    const utxoRoot = SDK.Utils.mptFromList(utxos);
+    const txRoot = yield* SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
+    const utxoRoot = yield* SDK.Utils.mptFromList(utxos);
     return { txRoot, utxoRoot };
+  });
+
+/**
+ * Fetch transactions of the first block by querying ImmutableDB.
+ *
+ * @param lucid - The LucidEvolution instance.
+ * @param fetchConfig - The configuration for fetching data.
+ * @param db - The database instance.
+ * @returns An Effect that resolves to an array of transactions.
+ */
+export const fetchFirstBlockTxs = (
+  lucid: LucidEvolution,
+  fetchConfig: SDK.Types.FetchConfig,
+  db: Database,
+): Effect.Effect<
+  { txs: { txHash: string; txCbor: string }[]; headerHash: string },
+  unknown,
+  unknown
+> =>
+  Effect.gen(function* () {
+    const { link: firstBlockUTxO } =
+      yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
+        lucid,
+        fetchConfig,
+      );
+    if (!firstBlockUTxO) {
+      return yield* Effect.fail(new Error("No blocks in queue"));
+    } else {
+      const blockNodeDatum =
+        yield* SDK.Utils.getNodeDatumFromUTxO(firstBlockUTxO);
+      const blockHeader = yield* Effect.try({
+        try: () =>
+          Data.castFrom(blockNodeDatum.data, SDK.Types.LedgerState.Header),
+        catch: (e) => new Error(`${e}`),
+      });
+      const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
+      const txs = yield* Effect.tryPromise(() =>
+        retrieveByBlockHeaderHash(db, headerHash),
+      );
+      return { txs, headerHash };
+    }
   });

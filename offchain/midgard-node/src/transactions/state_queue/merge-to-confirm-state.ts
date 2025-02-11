@@ -9,58 +9,11 @@
 
 import { Database } from "sqlite3";
 import * as confirmedLedger from "../../database/confirmedLedger.js";
-import {
-  coreToTxOutput,
-  Data,
-  LucidEvolution,
-  UTxO,
-} from "@lucid-evolution/lucid";
+import { coreToTxOutput, LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect } from "effect";
-import { retrieveByBlockHeaderHash } from "../../database/immutable.js";
 import { clearByHeader } from "../../database/blocks.js";
-import { handleSignSubmit } from "../utils.js";
-
-/**
- * Fetch transactions of the first block by querying ImmutableDB.
- *
- * @param lucid - The LucidEvolution instance.
- * @param fetchConfig - The configuration for fetching data.
- * @param db - The database instance.
- * @returns An Effect that resolves to an array of transactions.
- */
-export const fetchFirstBlockTxs = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
-  db: Database,
-): Effect.Effect<
-  { txs: { txHash: string; txCbor: string }[]; headerHash: string },
-  unknown,
-  unknown
-> =>
-  Effect.gen(function* () {
-    const { link: firstBlockUTxO } =
-      yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
-        lucid,
-        fetchConfig,
-      );
-    if (!firstBlockUTxO) {
-      return yield* Effect.fail(new Error("No blocks in queue"));
-    } else {
-      const blockNodeDatum =
-        yield* SDK.Utils.getNodeDatumFromUTxO(firstBlockUTxO);
-      const blockHeader = yield* Effect.try({
-        try: () =>
-          Data.castFrom(blockNodeDatum.data, SDK.Types.LedgerState.Header),
-        catch: (e) => new Error(`${e}`),
-      });
-      const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
-      const txs = yield* Effect.tryPromise(() =>
-        retrieveByBlockHeaderHash(db, headerHash),
-      );
-      return { txs, headerHash };
-    }
-  });
+import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 
 /**
  * Apply the fetched transactions to ConfirmedLedgerDB.
@@ -121,20 +74,18 @@ export const buildAndSubmitMergeTx = (
       fetchConfig,
     );
     // Submit the transaction
-    yield* $(handleSignSubmit(lucid, txBuilder));
+    yield* handleSignSubmit(lucid, txBuilder);
 
     // Begin database transaction
-    yield* $(
-      Effect.tryPromise(
-        () =>
-          new Promise<void>((resolve, reject) => {
-            db.run("BEGIN TRANSACTION;", (err) => {
-              if (err)
-                reject(new Error(`Error starting transaction: ${err.message}`));
-              else resolve();
-            });
-          }),
-      ),
+    yield* Effect.tryPromise(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          db.run("BEGIN TRANSACTION;", (err) => {
+            if (err)
+              reject(new Error(`Error starting transaction: ${err.message}`));
+            else resolve();
+          });
+        }),
     );
 
     try {
@@ -145,30 +96,27 @@ export const buildAndSubmitMergeTx = (
       yield* Effect.tryPromise(() => clearByHeader(db, headerHash));
 
       // Commit transaction
-      yield* $(
-        Effect.tryPromise(
-          () =>
-            new Promise<void>((resolve, reject) => {
-              db.run("COMMIT;", (err) => {
-                if (err)
-                  reject(
-                    new Error(`Error committing transaction: ${err.message}`),
-                  );
-                else resolve();
-              });
-            }),
-        ),
+      yield* Effect.tryPromise(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            db.run("COMMIT;", (err) => {
+              if (err)
+                reject(
+                  new Error(`Error committing transaction: ${err.message}`),
+                );
+              else resolve();
+            });
+          }),
       );
     } catch (error) {
       // Rollback transaction on failure
-      yield* $(
-        Effect.tryPromise(
-          () =>
-            new Promise<void>((resolve) => {
-              db.run("ROLLBACK;", () => resolve());
-            }),
-        ),
+      yield* Effect.tryPromise(
+        () =>
+          new Promise<void>((resolve) => {
+            db.run("ROLLBACK;", () => resolve());
+          }),
       );
-      return yield* $(Effect.fail(new Error(`Transaction failed: ${error}`)));
+
+      return yield* Effect.fail(new Error(`Transaction failed: ${error}`));
     }
   });

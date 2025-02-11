@@ -47,7 +47,7 @@ export const insertUTxOs = async (
           db.run(assetQuery, assetValues, (err) => {
             if (err) {
               logAbort(
-                `${tableName} db: error inserting assets: ${err.message}`
+                `${tableName} db: error inserting assets: ${err.message}`,
               );
               db.run("ROLLBACK;", () => reject(err));
             } else {
@@ -116,7 +116,7 @@ export const retrieveUTxOs = async (
 export const clearUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
-  refs: OutRef[]
+  refs: OutRef[],
 ) => {
   const query = `DELETE FROM ${tableName} WHERE (tx_hash, output_index) IN (${refs
     .map(() => `(?, ?)`)

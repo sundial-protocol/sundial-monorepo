@@ -155,7 +155,7 @@ describe("database", () => {
   it("retrieves utxos by address in the mempool ledger db", async () => {
     const result1 = await mempoolLedger.retrieveUTxOsAtAddress(
       db,
-      "non-existent address"
+      "non-existent address",
     );
     expect(result1).toEqual([]);
 
@@ -173,17 +173,21 @@ describe("database", () => {
     const result0 = await mempoolLedger.retrieve(db);
     expect(result0).toEqual([utxo1, utxo2]);
 
-    await mempoolLedger.clearUTxOs(db, [{
-      txHash: utxo1.txHash,
-      outputIndex: utxo1.outputIndex,
-    }]);
+    await mempoolLedger.clearUTxOs(db, [
+      {
+        txHash: utxo1.txHash,
+        outputIndex: utxo1.outputIndex,
+      },
+    ]);
     const result1 = await mempoolLedger.retrieve(db);
     expect(result1).toEqual([utxo2]);
 
-    await mempoolLedger.clearUTxOs(db, [{
-      txHash: utxo2.txHash,
-      outputIndex: utxo2.outputIndex,
-    }]);
+    await mempoolLedger.clearUTxOs(db, [
+      {
+        txHash: utxo2.txHash,
+        outputIndex: utxo2.outputIndex,
+      },
+    ]);
     const result2 = await mempoolLedger.retrieve(db);
     expect(result2).toEqual([]);
   });
