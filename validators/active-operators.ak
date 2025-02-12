@@ -25,7 +25,7 @@ validator spend(
   spend(
     datumOpt: Option<NodeDatum>,
     redeemer: SpendRedeemer,
-    _input: OutputReference,
+    input_out_ref: OutputReference,
     self: Transaction,
   ) {
     when redeemer is {
@@ -35,14 +35,16 @@ validator spend(
         )
       UpdateCommitmentTime {
         active_node_output_index,
-        prev_active_node_ref_input_index,
         hub_oracle_ref_input_index,
         state_queue_redeemer_index,
       } -> {
         expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
+        expect Some(active_node_input) =
+          list.find(
+            self.inputs,
+            fn(input) { input.output_reference == input_out_ref },
+          )
         expect Some(active_node_input_datum) = datumOpt
-        expect Some(prev_active_node_ref_input) =
-          list.at(self.reference_inputs, prev_active_node_ref_input_index)
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
@@ -57,7 +59,7 @@ validator spend(
 
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect CommitBlockHeader(operator) = state_queue_redeemer_pair.2nd
+        expect CommitBlockHeader { operator } = state_queue_redeemer_pair.2nd
         and {
           no_active_operators_minted(
             self.mint,
@@ -66,7 +68,7 @@ validator spend(
           ordered.prove_is_member(
             active_operators_mint_script_hash,
             parsed_active_node_output_datum.key,
-            prev_active_node_ref_input.output,
+            active_node_input.output,
           ),
           //keys are already checked by prove_is_member()
           parsed_active_node_output_datum.link == active_node_input_datum.link,
@@ -163,7 +165,7 @@ validator mint(
         expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect RemoveFraudulentBlockHeader(fraudulent_operator) =
+        expect RemoveFraudulentBlockHeader { fraudulent_operator } =
           state_queue_redeemer_pair.2nd
         and {
           quantity_of(
