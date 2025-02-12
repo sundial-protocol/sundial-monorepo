@@ -3,7 +3,6 @@ use aiken/collection/dict
 use aiken/collection/list
 use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
-use aiken/interval.{Finite}
 use aiken_design_patterns/linked_list/ordered.{Key, NodeDatum}
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
