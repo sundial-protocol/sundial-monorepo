@@ -20,12 +20,14 @@ import {
   CML,
   getAddressDetails
 } from "@lucid-evolution/lucid";
+import { findSpentAndProducedUTxOs } from "../../../midgard-sdk/src/utils/ledger-state.js"
 import express from "express";
 import sqlite3 from "sqlite3";
 import * as mempool from "../database/mempool.js"
 import * as mempoolLedger from "../database/mempoolLedger.js"
 import * as blocks from "../database/blocks.js"
 import * as latestLedger from "../database/latestLedger.js"
+import { Effect } from "effect";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
@@ -155,22 +157,28 @@ export const listen = (
 
       if (txIsString && isHexString(txCBOR)) {
         const tx = lucid.fromTx(txCBOR)
-        latestLedger.updateByTx(db, tx).then(
-          v => {
-            mempool.insert(db, tx.toHash(), txCBOR)
-                   .then(v => res.json(v)
-                        , r => {
-                          res.status(400)
-                          res.json(`Unable to insert the transaction`);
-                        });
-          },
-          r => {
+        try {
+          const spentAndProduced = findSpentAndProducedUTxOs(txCBOR)
+          latestLedger.clearUTxOs(db, spentAndProduced.spent).then( v =>
+            latestLedger.insert(db, spentAndProduced.produced).then( v =>
+              mempool.insert(db, tx.toHash(), txCBOR).then(v =>
+                  res.json(v)
+                , r => {
+                  res.status(400)
+                  res.json(`Unable to insert the transaction hash`);
+               })
+            , r => {
+              res.status(400)
+              res.json(`Unable to insert produced UTxOs`);
+            })
+          , r => {
             res.status(400)
-            res.json(`Invalid tranactions`)
-          });
-        } else {
-        res.status(400)
-        res.json(`Invalid CBOR: ${txCBOR}`);
+            res.json(`Unable to clear spent UTxOs`);
+          })
+        } catch (_e) {
+          res.status(400)
+          res.json(`Something went wrong decoding the transaction`);
+        }
       }
     });
 
