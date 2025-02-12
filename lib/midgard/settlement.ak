@@ -5,7 +5,7 @@ use midgard/common/types.{POSIXTime, PubKeyHash}
 /// The `operator_vkey` is optional to model UTxOs subject to fraudulent claims.
 pub type Datum {
   mpf_root: ByteArray,
-  time_of_claimed_as_processed: Option<POSIXTime>,
+  time_of_claimed_as_resolved: Option<POSIXTime>,
   operator: Option<PubKeyHash>,
   tree_content: EventType,
 }
@@ -30,8 +30,8 @@ pub type SpendRedeemer {
 pub type Purpose {
   ClaimAsResolved
   RevokeResolvedFlag {
-    unprocessed_event_ref_input_index: Int,
-    unprocessed_event_asset_name: AssetName,
+    unresolved_event_ref_input_index: Int,
+    unresolved_event_asset_name: AssetName,
     event_type: EventType,
     membership_proof: mpf.Proof,
   }

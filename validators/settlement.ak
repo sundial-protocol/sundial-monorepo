@@ -34,7 +34,7 @@ validator main(
     tx: Transaction,
   ) {
     expect Some(datum) = m_datum
-    let Datum { mpf_root, time_of_claimed_as_processed, operator, .. } = datum
+    let Datum { mpf_root, time_of_claimed_as_resolved, operator, .. } = datum
 
     when redeemer is {
       UpdateResolvedFlag {
@@ -96,9 +96,9 @@ validator main(
                 // 5. Operator must have signed this claim.
                 expect operator_vkey |> utils.has_signed(extra_signatories)
 
-                // 6. The UTxO must not have been claimed as processed prior to
+                // 6. The UTxO must not have been claimed as resolved prior to
                 //    this transaction.
-                expect time_of_claimed_as_processed == None
+                expect time_of_claimed_as_resolved == None
 
                 // 7. Expect a spend redeemer at the specified redeemer index.
                 expect Some(
@@ -161,13 +161,13 @@ validator main(
                 let expected_cont_output_datum_data: Data =
                   Datum {
                     ..datum,
-                    time_of_claimed_as_processed: Some(new_commitment_time),
+                    time_of_claimed_as_resolved: Some(new_commitment_time),
                   }
                 cont_output_datum_data == expected_cont_output_datum_data
               }
               RevokeResolvedFlag {
-                unprocessed_event_ref_input_index,
-                unprocessed_event_asset_name,
+                unresolved_event_ref_input_index,
+                unresolved_event_asset_name,
                 event_type,
                 membership_proof,
               } -> {
@@ -184,8 +184,8 @@ validator main(
                       settlement.Deposit -> deposit_script_hash
                       settlement.Withdrawal -> withdrawal_script_hash
                     },
-                    unprocessed_event_asset_name,
-                    unprocessed_event_ref_input_index,
+                    unresolved_event_asset_name,
+                    unresolved_event_ref_input_index,
                   )
 
                 // Unsafe coercion is fine here as we have already validated the
@@ -195,7 +195,7 @@ validator main(
 
                 // 3. The specified deposit event must be present in the stored
                 //    tree of the settlement datum that's been flagged as fully
-                //    processed by its operator.
+                //    resolved by its operator.
                 expect
                   merkelized_validator.generic_delegated_validation(
                     staking_validator: plutarch_phas_validator_hash,
@@ -245,7 +245,7 @@ validator main(
                 // 8. The only change in the datum should be removal of the
                 //    claim.
                 let expected_cont_output_datum_data: Data =
-                  Datum { ..datum, time_of_claimed_as_processed: None }
+                  Datum { ..datum, time_of_claimed_as_resolved: None }
                 cont_output_datum_data == expected_cont_output_datum_data
               }
             }
@@ -403,14 +403,14 @@ validator main(
         let expected_produced_deposits_datum_data: Data =
           Datum {
             mpf_root: deposits_root,
-            time_of_claimed_as_processed: None,
+            time_of_claimed_as_resolved: None,
             operator: Some(operator_vkey),
             tree_content: settlement.Deposit,
           }
         let expected_produced_withdrawals_datum_data: Data =
           Datum {
             mpf_root: withdrawals_root,
-            time_of_claimed_as_processed: None,
+            time_of_claimed_as_resolved: None,
             operator: Some(operator_vkey),
             tree_content: settlement.Withdrawal,
           }
