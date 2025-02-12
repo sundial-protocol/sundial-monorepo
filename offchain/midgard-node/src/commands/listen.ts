@@ -98,15 +98,15 @@ export const listen = (
           const matches = pool.filter(a => a[0] == txHash).map(a => a[1])
           if (matches.length == 0) {
             res.status(404)
-            res.json(`No matching transactions found`);
+            res.json({ message: "No matching transactions found" });
           } else {
-            res.json(matches)
+            res.json({ matching_transactions: matches })
           }
         }
       ));
     } else {
       res.status(400)
-      res.json(`Invalid transaction hash: ${txHash}`);
+      res.json({ message: `Invalid transaction hash: ${txHash}` });
     }
   });
 
@@ -119,19 +119,19 @@ export const listen = (
         const addrDetails = getAddressDetails(addr)
         if (addrDetails.paymentCredential != undefined) {
           latestLedger.retrieve(db).then(allUTxOs => {
-            res.json(allUTxOs.filter(a => a.address == addrDetails.address.bech32))
+            res.json({ matching_uxtos: allUTxOs.filter(a => a.address == addrDetails.address.bech32) })
         });
         } else {
           res.status(400)
-          res.json(`Invalid address: ${addr}`);
+          res.json({ message: `Invalid address: ${addr}` });
         }
       } catch {
         res.status(400)
-        res.json(`Invalid address: ${addr}`);
+        res.json({ message: `Invalid address: ${addr}` });
       }
     } else {
       res.status(400)
-      res.json(`Invalid address: ${addr}`);
+      res.json({ message: `Invalid address: ${addr}` });
     }
   });
 
@@ -142,11 +142,11 @@ export const listen = (
     const validLength = hdrHash?.length === 32
     if (txIsString && isHexString(hdrHash) && validLength) {
         blocks.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes =>
-          res.json(hashes)
+          res.json({ matching_hashes: hashes} )
         ));
       } else {
         res.status(400)
-        res.json(`Invalid block header hash: ${hdrHash}`);
+        res.json({ message: `Invalid block header hash: ${hdrHash}` });
       }
     });
 
@@ -162,22 +162,22 @@ export const listen = (
           latestLedger.clearUTxOs(db, spentAndProduced.spent).then( v =>
             latestLedger.insert(db, spentAndProduced.produced).then( v =>
               mempool.insert(db, tx.toHash(), txCBOR).then(v =>
-                  res.json(v)
+                  res.json({ message: "Successfully submitted the transaction" })
                 , r => {
                   res.status(400)
-                  res.json(`Unable to insert the transaction hash`);
+                  res.json({ message: "Unable to insert the transaction hash" });
                })
             , r => {
               res.status(400)
-              res.json(`Unable to insert produced UTxOs`);
+              res.json({ message: "Unable to insert produced UTxOs" });
             })
           , r => {
             res.status(400)
-            res.json(`Unable to clear spent UTxOs`);
+            res.json({ message: "Unable to clear spent UTxOs" });
           })
         } catch (_e) {
           res.status(400)
-          res.json(`Something went wrong decoding the transaction`);
+          res.json({ message: "Something went wrong decoding the transaction" });
         }
       }
     });
