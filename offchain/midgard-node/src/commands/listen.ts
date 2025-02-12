@@ -100,7 +100,7 @@ export const listen = (
             res.status(404)
             res.json({ message: "No matching transactions found" });
           } else {
-            res.json({ matching_transactions: matches })
+            res.json({ transactions: matches })
           }
         }
       ));
@@ -119,7 +119,7 @@ export const listen = (
         const addrDetails = getAddressDetails(addr)
         if (addrDetails.paymentCredential != undefined) {
           latestLedger.retrieve(db).then(allUTxOs => {
-            res.json({ matching_uxtos: allUTxOs.filter(a => a.address == addrDetails.address.bech32) })
+            res.json({ uxtos: allUTxOs.filter(a => a.address == addrDetails.address.bech32) })
         });
         } else {
           res.status(400)
@@ -142,7 +142,7 @@ export const listen = (
     const validLength = hdrHash?.length === 32
     if (txIsString && isHexString(hdrHash) && validLength) {
         blocks.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes =>
-          res.json({ matching_hashes: hashes} )
+          res.json({ hashes: hashes} )
         ));
       } else {
         res.status(400)
