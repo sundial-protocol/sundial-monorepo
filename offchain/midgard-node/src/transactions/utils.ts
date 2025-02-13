@@ -8,7 +8,8 @@ import {
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "sqlite3";
-import { retrieveTxHashesByBlockHash } from "../database/blocks";
+import * as BlocksDB from "../database/blocks.js";
+import * as ImmutableDB from "../database/immutable.js";
 
 /**
  * Handle the signing and submission of a transaction.
@@ -78,7 +79,7 @@ export const fetchFirstBlockTxs = (
   db: Database,
 ): Effect.Effect<
   { txs: { txHash: string; txCbor: string }[]; headerHash: string },
-  unknown,
+  Error,
   unknown
 > =>
   Effect.gen(function* () {
@@ -90,17 +91,13 @@ export const fetchFirstBlockTxs = (
     if (!firstBlockUTxO) {
       return yield* Effect.fail(new Error("No blocks in queue"));
     } else {
-      const blockNodeDatum =
-        yield* SDK.Utils.getNodeDatumFromUTxO(firstBlockUTxO);
-      const blockHeader = yield* Effect.try({
-        try: () =>
-          Data.castFrom(blockNodeDatum.data, SDK.Types.LedgerState.Header),
+      const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
+      const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
+      const txHashes = yield* Effect.tryPromise({
+        try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),
         catch: (e) => new Error(`${e}`),
       });
-      const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
-      const txs = yield* Effect.tryPromise(() =>
-        retrieveTxHashesByBlockHash(db, headerHash),
-      );
+      const txs = ImmutableDB.retrieveTxCborsByHashes(db, txHashes);
       return { txs, headerHash };
     }
   });

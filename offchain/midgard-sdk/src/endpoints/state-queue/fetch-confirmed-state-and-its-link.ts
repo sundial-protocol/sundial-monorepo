@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
-import { getConfirmedStateFromUTxO } from "@/utils/state-queue.js";
+import { getConfirmedStateFromUTxO } from "@/utils/ledger-state.js";
 import { ConfirmedState } from "@/types/contracts/ledger-state.js";
 import { NodeKey } from "@/types/contracts/linked-list/index.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
