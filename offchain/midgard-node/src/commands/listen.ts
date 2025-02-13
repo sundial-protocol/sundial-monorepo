@@ -27,7 +27,8 @@ import * as mempool from "../database/mempool.js"
 import * as mempoolLedger from "../database/mempoolLedger.js"
 import * as blocks from "../database/blocks.js"
 import * as latestLedger from "../database/latestLedger.js"
-import { Effect } from "effect";
+import * as immutable from "../database/immutable.js"
+import { Effect, Option } from "effect";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
@@ -94,14 +95,25 @@ export const listen = (
     const validLength = txHash?.length === 32;
 
     if (txIsString && isHexString(txHash) && validLength) {
-      mempool.retrieve(db).then((pool => {
-          const matches = pool.filter(a => a[0] == txHash).map(a => a[1])
-          if (matches.length == 0) {
-            res.status(404)
-            res.json({ message: "No matching transactions found" });
-          } else {
-            res.json({ transactions: matches })
-          }
+      mempool.retrieveTxCborByHash(db, txHash).then((ret => {
+          Option.match(ret, {
+            onSome: (retreived) => {
+              res.json({ transactions: retreived })
+            },
+            onNone: () => {
+              immutable.retrieveTxCborByHash(db, txHash).then((ret => {
+                Option.match(ret, {
+                  onSome: (retreived) => {
+                    res.json({ transactions: retreived })
+                  },
+                  onNone: () => {
+                    res.status(404)
+                    res.json({ message: "No matching transactions found" });
+                  }
+                })
+              }))
+            }
+          })
         }
       ));
     } else {
