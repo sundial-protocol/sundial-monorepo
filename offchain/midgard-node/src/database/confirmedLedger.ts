@@ -30,7 +30,7 @@ export const createQuery = `
 
 export const insert = async (
   db: sqlite3.Database,
-  utxos: UTxO[]
+  utxos: UTxO[],
 ): Promise<void> =>
   insertUTxOs(db, "confirmed_ledger", "confirmed_ledger_assets", utxos);
 

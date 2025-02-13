@@ -13,7 +13,7 @@ export const insertUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
   assetTableName: string,
-  utxos: UTxO[]
+  utxos: UTxO[],
 ) => {
   const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
   const query = `
@@ -23,7 +23,7 @@ export const insertUTxOs = async (
     ${utxos.map(() => `(?, ?, ?, ?, ?, ?, ?)`).join(", ")}
   `;
   const normalizedAssets = utxos.flatMap((utxo) =>
-    utxoToNormalizedAssets(utxo)
+    utxoToNormalizedAssets(utxo),
   );
   const assetQuery = `
     INSERT INTO ${assetTableName}
@@ -47,17 +47,17 @@ export const insertUTxOs = async (
           db.run(assetQuery, assetValues, (err) => {
             if (err) {
               logAbort(
-                `${tableName} db: error inserting assets: ${err.message}`
+                `${tableName} db: error inserting assets: ${err.message}`,
               );
               db.run("ROLLBACK;", () => reject(err));
             } else {
               logInfo(
-                `${tableName}: ${normalizedAssets.length} assets added to ${assetTableName}`
+                `${tableName}: ${normalizedAssets.length} assets added to ${assetTableName}`,
               );
               db.run("COMMIT;", (err) => {
                 if (err) {
                   logAbort(
-                    `${tableName}: error committing transaction: ${err.message}`
+                    `${tableName}: error committing transaction: ${err.message}`,
                   );
                   return reject(err);
                 }
@@ -74,7 +74,7 @@ export const insertUTxOs = async (
 export const retrieveUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
-  assetTableName: string
+  assetTableName: string,
 ): Promise<UTxO[]> => {
   const query = `
     SELECT
@@ -116,7 +116,7 @@ export const retrieveUTxOs = async (
 export const clearUTxOs = async (
   db: sqlite3.Database,
   tableName: string,
-  refs: OutRef[]
+  refs: OutRef[],
 ) => {
   const query = `DELETE FROM ${tableName} WHERE (tx_hash, output_index) IN (${refs
     .map(() => `(?, ?)`)
@@ -138,7 +138,7 @@ export const clearUTxOs = async (
 export const retrieveTxCborByHash = async (
   db: sqlite3.Database,
   tableName: string,
-  txHash: string
+  txHash: string,
 ): Promise<Option.Option<string>> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ?`;
   const result = await new Promise<string[]>((resolve, reject) => {
@@ -184,12 +184,12 @@ export function utxoFromRow(row: UTxOFromRow): UTxO {
     row.script_ref_type == "Native"
       ? "Native"
       : row.script_ref_type == "PlutusV1"
-      ? "PlutusV1"
-      : row.script_ref_type == "PlutusV2"
-      ? "PlutusV2"
-      : row.script_ref_type == "PlutusV3"
-      ? "PlutusV3"
-      : null;
+        ? "PlutusV1"
+        : row.script_ref_type == "PlutusV2"
+          ? "PlutusV2"
+          : row.script_ref_type == "PlutusV3"
+            ? "PlutusV3"
+            : null;
   const assets = JSON.parse(row.assets, (_, v) => {
     try {
       return BigInt(v);
@@ -213,7 +213,7 @@ export function utxoFromRow(row: UTxOFromRow): UTxO {
 
 // transforms [{"unit":u1,"quantity":q1},...]-like string into assets
 const transformAssetsToObject = (
-  assetsString: string
+  assetsString: string,
 ): Record<string, bigint> => {
   if (!assetsString || assetsString === "null") {
     return {};

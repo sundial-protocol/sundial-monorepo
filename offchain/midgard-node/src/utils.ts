@@ -1,4 +1,13 @@
-import {Blockfrost, Koios, Kupmios, Lucid, LucidEvolution, Maestro, Network, Provider} from "@lucid-evolution/lucid";
+import {
+  Blockfrost,
+  Koios,
+  Kupmios,
+  Lucid,
+  LucidEvolution,
+  Maestro,
+  Network,
+  Provider,
+} from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 
 export const chalk = new chalk_.Chalk();
@@ -44,14 +53,14 @@ export const showTime = (d: Date): string => {
 const logWithTime = (
   color: chalk_.ChalkInstance,
   label: string,
-  msg: string
+  msg: string,
 ) => {
   const now = new Date();
   const timeStr = showTime(now);
   console.log(
     `${color(chalk.bold(`${timeStr}\u0009${label}`))}${
       label === "" ? "" : " "
-    }${color(msg)}`
+    }${color(msg)}`,
   );
 };
 
@@ -65,7 +74,7 @@ export const logWarning = (msg: string, quiet?: true) => {
       chalk.yellow,
       "WARNING",
       `
-${msg}`
+${msg}`,
     );
   }
 };
@@ -75,7 +84,7 @@ export const logAbort = (msg: string) => {
     chalk.red,
     "ABORT",
     `
-${msg}`
+${msg}`,
   );
 };
 
@@ -88,7 +97,7 @@ export const logInfo = (msg: string) => {
     chalk.blue,
     "INFO",
     `
-${msg}`
+${msg}`,
   );
 };
 
@@ -99,7 +108,7 @@ export const isHexString = (str: string): boolean => {
 
 export const setupLucid = async (
   network: Network,
-  providerName: ProviderName
+  providerName: ProviderName,
 ): Promise<LucidEvolution> => {
   const seedPhrase = process.env.SEED_PHRASE;
   if (!seedPhrase) {
@@ -117,7 +126,7 @@ export const setupLucid = async (
     if (providerName === "Blockfrost") {
       provider = new Blockfrost(
         `https://cardano-${networkStr}.blockfrost.io/api/v0`,
-        apiKey
+        apiKey,
       );
     } else {
       provider = new Maestro({
@@ -127,14 +136,14 @@ export const setupLucid = async (
     }
   } else if (providerName === "Koios") {
     provider = new Koios(
-      `https://${network === "Mainnet" ? "api" : networkStr}.koios.rest/api/v1`
+      `https://${network === "Mainnet" ? "api" : networkStr}.koios.rest/api/v1`,
     );
   } else {
     const kupoURL = process.env.KUPO_URL;
     const ogmiosURL = process.env.OGMIOS_URL;
     if (!kupoURL || !ogmiosURL) {
       logAbort(
-        "Make sure to set both KUPO_URL and OGMIOS_URL environment variables"
+        "Make sure to set both KUPO_URL and OGMIOS_URL environment variables",
       );
       process.exit(1);
     }

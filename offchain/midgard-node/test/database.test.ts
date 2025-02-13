@@ -164,7 +164,7 @@ describe("database", () => {
   it("retrieves utxos by address in the mempool ledger db", async () => {
     const result1 = await mempoolLedger.retrieveUTxOsAtAddress(
       db,
-      "non-existent address"
+      "non-existent address",
     );
     expect(result1).toEqual([]);
 
