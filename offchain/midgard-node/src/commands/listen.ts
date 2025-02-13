@@ -150,37 +150,55 @@ export const listen = (
       }
     });
 
-    app.post("/submit", (req, res) => {
-      res.type("text/plain");
-      const txCBOR = req.query.tx_cbor;
-      const txIsString = typeof txCBOR === "string";
+  app.post("/submit", (req, res) => {
+    res.type("text/plain");
+    const txCBOR = req.query.tx_cbor;
+    const txIsString = typeof txCBOR === "string";
 
-      if (txIsString && isHexString(txCBOR)) {
-        const tx = lucid.fromTx(txCBOR)
-        try {
-          const spentAndProduced = findSpentAndProducedUTxOs(txCBOR)
-          latestLedger.clearUTxOs(db, spentAndProduced.spent).then( v =>
-            latestLedger.insert(db, spentAndProduced.produced).then( v =>
-              mempool.insert(db, tx.toHash(), txCBOR).then(v =>
-                  res.json({ message: "Successfully submitted the transaction" })
-                , r => {
-                  res.status(400)
-                  res.json({ message: "Unable to insert the transaction hash" });
-               })
-            , r => {
-              res.status(400)
-              res.json({ message: "Unable to insert produced UTxOs" });
-            })
-          , r => {
-            res.status(400)
-            res.json({ message: "Unable to clear spent UTxOs" });
-          })
-        } catch (_e) {
-          res.status(400)
-          res.json({ message: "Something went wrong decoding the transaction" });
+    if (txIsString && isHexString(txCBOR)) {
+      const tx = lucid.fromTx(txCBOR)
+      const spentAndProduced = findSpentAndProducedUTxOs(txCBOR)
+      db.run("BEGIN TRANSACTION;", (err) => {
+        if (err) {
+          res.status(400);
+          res.json({ message: "Unable to begin transaction" });
         }
+      });
+      try {
+        latestLedger.clearUTxOs(db, spentAndProduced.spent).then( v =>
+          latestLedger.insert(db, spentAndProduced.produced).then( v =>
+            mempool.insert(db, tx.toHash(), txCBOR).then(v =>
+              db.run("COMMIT;", (e) => {
+                  if (e) {
+                    res.status(400)
+                    res.json({ message: "Unable to commit" });
+                  }
+                  res.json({ message: "Successfully submitted the transaction" });
+                })
+                , r => {
+                db.run("ROLLBACK;");
+                res.status(400)
+                res.json({ message: "Unable to insert the transaction hash" });
+              })
+          , r => {
+            db.run("ROLLBACK;");
+            res.status(400)
+            res.json({ message: "Unable to insert produced UTxOs" });
+          })
+        , r => {
+          db.run("ROLLBACK;");
+          res.status(400)
+          res.json({ message: "Unable to clear spent UTxOs" });
+        })
+      } catch (_e) {
+      res.status(400)
+      res.json({ message: "Something went wrong decoding the transaction" });
       }
-    });
+    } else {
+      res.status(400);
+      res.json({ message: "Invalid CBOR provided" });
+    }
+  });
 
   app.listen(port, () => {});
   logInfo(`Server running at http://localhost:${port}`);
