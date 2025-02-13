@@ -1,6 +1,8 @@
 import { fromHex, toHex } from "@lucid-evolution/lucid";
+import { Option } from "effect";
 import sqlite3 from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
+import * as utils from "./utils.js";
 import { clearTable } from "./utils.js";
 
 export const createQuery = `
@@ -29,6 +31,12 @@ export const insert = async (
   });
 };
 
+export const retrieveTxCborByHash = async (
+  db: sqlite3.Database,
+  txHash: string
+): Promise<Option.Option<string>> =>
+  utils.retrieveTxCborByHash(db, "mempool", txHash);
+
 export const retrieve = async (db: sqlite3.Database) => {
   const query = `SELECT * FROM mempool`;
   const mempool = await new Promise<[string, string][]>((resolve, reject) => {
@@ -45,13 +53,6 @@ export const retrieve = async (db: sqlite3.Database) => {
     });
   });
   return mempool;
-};
-
-export const retrieveByTX = async (db: sqlite3.Database, tx_hash: string) => {
-  const blocks = await new Promise<[string][]>((resolve, reject) => {
-    // TODO get all tx_cbor with tx_hash
-  });
-  return blocks;
 };
 
 export const clear = async (db: sqlite3.Database) => clearTable(db, "mempool");

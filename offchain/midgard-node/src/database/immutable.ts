@@ -2,6 +2,7 @@ import { fromHex, toHex } from "@lucid-evolution/lucid";
 import { Option } from "effect";
 import sqlite3 from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
+import * as utils from "./utils.js";
 import { clearTable } from "./utils.js";
 
 export const createQuery = `
@@ -80,20 +81,9 @@ export const retrieve = async (db: sqlite3.Database) => {
 
 export const retrieveTxCborByHash = async (
   db: sqlite3.Database,
-  txHash: string,
-): Promise<Option.Option<string>> => {
-  const query = `SELECT tx_cbor FROM immutable WHERE tx_hash = ?`;
-  const result = await new Promise<string[]>((resolve, reject) => {
-    db.all(query, [fromHex(txHash)], (err, rows: { tx_cbor: Buffer }[]) => {
-      if (err) {
-        logAbort(`immutable db: retrieving error: ${err.message}`);
-        reject(err);
-      }
-      resolve(rows.map((r) => toHex(new Uint8Array(r.tx_cbor))));
-    });
-  });
-  return Option.fromIterable(result);
-};
+  txHash: string
+): Promise<Option.Option<string>> =>
+  utils.retrieveTxCborByHash(db, "immutable", txHash);
 
 export const retrieveByBlockHeaderHash = async (
   db: sqlite3.Database,

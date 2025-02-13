@@ -5,9 +5,9 @@ import {
   toHex,
   UTxO,
 } from "@lucid-evolution/lucid";
-import { logAbort, logInfo } from "../utils.js";
-
+import { Option } from "effect";
 import sqlite3 from "sqlite3";
+import { logAbort, logInfo } from "../utils.js";
 
 export const insertUTxOs = async (
   db: sqlite3.Database,
@@ -133,6 +133,24 @@ export const clearUTxOs = async (
       }
     });
   });
+};
+
+export const retrieveTxCborByHash = async (
+  db: sqlite3.Database,
+  tableName: string,
+  txHash: string
+): Promise<Option.Option<string>> => {
+  const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ?`;
+  const result = await new Promise<string[]>((resolve, reject) => {
+    db.all(query, [fromHex(txHash)], (err, rows: { tx_cbor: Buffer }[]) => {
+      if (err) {
+        logAbort(`${tableName} db: retrieving error: ${err.message}`);
+        reject(err);
+      }
+      resolve(rows.map((r) => toHex(new Uint8Array(r.tx_cbor))));
+    });
+  });
+  return Option.fromIterable(result);
 };
 
 export const clearTable = async (db: sqlite3.Database, tableName: string) => {

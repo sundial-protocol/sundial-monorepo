@@ -134,6 +134,15 @@ describe("database", () => {
     ]);
   });
 
+  it("retrieves tx by hash in the mempool db", async () => {
+    const nonExistentTxHash = "1234";
+    const result1 = await mempool.retrieveTxCborByHash(db, nonExistentTxHash);
+    expect(result1).toEqual(Option.none());
+
+    const result2 = await mempool.retrieveTxCborByHash(db, tx1Hash);
+    expect(result2).toEqual(Option.some(tx1));
+  });
+
   it("clears the mempool db", async () => {
     const initialRows = await mempool.retrieve(db);
     expect(initialRows.length).toBe(2);
