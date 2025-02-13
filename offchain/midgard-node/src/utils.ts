@@ -11,8 +11,9 @@ import {
   OutRef,
   Provider,
   UTxO,
+  valueToAssets,
 } from "@lucid-evolution/lucid";
-import { cmlInputToOutRef } from "@al-ft/midgard-sdk";
+import * as SDK from "@al-ft/midgard-sdk";
 import * as chalk_ from "chalk";
 
 export const chalk = new chalk_.Chalk();
@@ -172,15 +173,15 @@ export const findSpentAndProducedUTxOs = (
     const txBody = tx.body();
     const inputs = txBody.inputs();
     const inputsCount = inputs.len();
-    const spent = [];
+    const spent: OutRef[] = [];
     for (let i = 0; i < inputsCount; i++) {
       const input = inputs.get(i);
-      spent.push(cmlInputToOutRef(input));
+      spent.push(SDK.Utils.cmlInputToOutRef(input));
     }
     const txHash = CML.hash_transaction(txBody).to_hex();
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
-    const produced = [];
+    const produced: UTxO[] = [];
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
       produced.push({

@@ -3,24 +3,17 @@ import {
   errorToString,
   fail,
   isHexString,
-  logAbort,
   logInfo,
   logWarning,
   ok,
-  setupLucid,
 } from "../utils.js";
-import * as MPF from "@aiken-lang/merkle-patricia-forestry";
-import * as SDK from "@al-ft/midgard-sdk";
 import {
-  Data,
   LucidEvolution,
   OutRef,
-  ScriptType,
   UTxO,
-  CML,
   getAddressDetails,
 } from "@lucid-evolution/lucid";
-import { findSpentAndProducedUTxOs } from "../../../midgard-sdk/src/utils/ledger-state.js";
+import { findSpentAndProducedUTxOs } from "@/utils.js";
 import express from "express";
 import sqlite3 from "sqlite3";
 import * as mempool from "../database/mempool.js";
@@ -28,11 +21,11 @@ import * as mempoolLedger from "../database/mempoolLedger.js";
 import * as blocks from "../database/blocks.js";
 import * as latestLedger from "../database/latestLedger.js";
 import * as immutable from "../database/immutable.js";
-import { Effect, Option } from "effect";
+import { Option } from "effect";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
-  _lucid: LucidEvolution,
+  _lucid: LucidEvolution
 ): Promise<Result<UTxO>> => {
   return ok({
     txHash: "",
@@ -44,7 +37,7 @@ const fetchLatestBlock = async (
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchConfirmedState = async (
-  _lucid: LucidEvolution,
+  _lucid: LucidEvolution
 ): Promise<Result<UTxO>> => {
   return ok({
     txHash: "",
@@ -84,7 +77,7 @@ export const listen = (
   db: sqlite3.Database,
   port: number,
   pollingInterval: number,
-  confirmedStatePollingInterval: number,
+  confirmedStatePollingInterval: number
 ) => {
   const app = express();
 
@@ -132,7 +125,7 @@ export const listen = (
           mempoolLedger.retrieve(db).then((allUTxOs) => {
             res.json({
               uxtos: allUTxOs.filter(
-                (a) => a.address == addrDetails.address.bech32,
+                (a) => a.address == addrDetails.address.bech32
               ),
             });
           });
@@ -201,19 +194,19 @@ export const listen = (
                     res.json({
                       message: "Unable to insert the transaction hash",
                     });
-                  },
+                  }
                 ),
               (r) => {
                 db.run("ROLLBACK;");
                 res.status(400);
                 res.json({ message: "Unable to insert produced UTxOs" });
-              },
+              }
             ),
           (r) => {
             db.run("ROLLBACK;");
             res.status(400);
             res.json({ message: "Unable to clear spent UTxOs" });
-          },
+          }
         );
       } catch (_e) {
         res.status(400);
@@ -232,7 +225,7 @@ export const listen = (
 const monitorStateQueue = (
   lucid: LucidEvolution,
   db: sqlite3.Database,
-  pollingInterval: number,
+  pollingInterval: number
 ) => {
   let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
   setInterval(async () => {
@@ -253,7 +246,7 @@ ${errorToString(latestBlockOutRefRes.error)}`);
 export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
-  tx: string,
+  tx: string
 ) => {
   const txHash = lucid.fromTx(tx).toHash();
   await mempool.insert(db, txHash, tx);
@@ -265,7 +258,7 @@ const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
 
 const monitorConfirmedState = (
   lucid: LucidEvolution,
-  pollingInterval: number,
+  pollingInterval: number
 ) => {
   logWarning("mergeOldestBlock: TODO");
 };
