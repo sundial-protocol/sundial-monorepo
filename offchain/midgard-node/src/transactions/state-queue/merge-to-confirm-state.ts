@@ -12,7 +12,7 @@ import * as confirmedLedger from "../../database/confirmedLedger.js";
 import { coreToTxOutput, LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect } from "effect";
-import { clearByHeader } from "../../database/blocks.js";
+import { clearBlock } from "../../database/blocks.js";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 
 /**
@@ -93,7 +93,7 @@ export const buildAndSubmitMergeTx = (
       yield* applyTxsToConfirmedLedger(lucid, db, firstBlockTxs);
 
       // Remove header hashes
-      yield* Effect.tryPromise(() => clearByHeader(db, headerHash));
+      yield* Effect.tryPromise(() => clearBlock(db, headerHash));
 
       // Commit transaction
       yield* Effect.tryPromise(

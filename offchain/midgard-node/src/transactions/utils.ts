@@ -8,7 +8,7 @@ import {
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "sqlite3";
-import { retrieveByBlockHeaderHash } from "../database/immutable";
+import { retrieveTxHashesByBlockHash } from "../database/blocks";
 
 /**
  * Handle the signing and submission of a transaction.
@@ -99,7 +99,7 @@ export const fetchFirstBlockTxs = (
       });
       const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
       const txs = yield* Effect.tryPromise(() =>
-        retrieveByBlockHeaderHash(db, headerHash),
+        retrieveTxHashesByBlockHash(db, headerHash),
       );
       return { txs, headerHash };
     }

@@ -1,4 +1,4 @@
-import { Address, OutRef, UTxO } from "@lucid-evolution/lucid";
+import { OutRef, UTxO } from "@lucid-evolution/lucid";
 import sqlite3 from "sqlite3";
 import * as utils from "./utils.js";
 import { clearTable, insertUTxOs, retrieveUTxOs } from "./utils.js";
@@ -33,16 +33,6 @@ export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
 
 export const clearUTxOs = async (db: sqlite3.Database, refs: OutRef[]) =>
   utils.clearUTxOs(db, "latest_ledger", refs);
-
-export const retrieveByAddr = async (
-  db: sqlite3.Database,
-  addr: Address,
-): Promise<[UTxO][]> => {
-  const utxos = await new Promise<[UTxO][]>((resolve, reject) => {
-    // TODO get all utxos with addr
-  });
-  return utxos;
-};
 
 export const clear = async (db: sqlite3.Database) =>
   clearTable(db, "latest_ledger");
