@@ -1,4 +1,5 @@
 import { fromHex, toHex } from "@lucid-evolution/lucid";
+import { Option } from "effect";
 import sqlite3 from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
 import { clearTable } from "./utils.js";
@@ -27,6 +28,23 @@ export const insert = async (
       }
     });
   });
+};
+
+export const retrieveTxCborByHash = async (
+  db: sqlite3.Database,
+  txHash: string
+): Promise<Option.Option<string>> => {
+  const query = `SELECT tx_cbor FROM mempool WHERE tx_hash = ?`;
+  const result = await new Promise<string[]>((resolve, reject) => {
+    db.all(query, [fromHex(txHash)], (err, rows: { tx_cbor: Buffer }[]) => {
+      if (err) {
+        logAbort(`mempool db: retrieving error: ${err.message}`);
+        reject(err);
+      }
+      resolve(rows.map((r) => toHex(new Uint8Array(r.tx_cbor))));
+    });
+  });
+  return Option.fromIterable(result);
 };
 
 export const retrieve = async (db: sqlite3.Database) => {
