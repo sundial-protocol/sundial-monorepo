@@ -11,7 +11,7 @@ export type UpdateCommitmentTimeParams = {};
  */
 export const updateCommitmentTimeTxBuilder = (
   lucid: LucidEvolution,
-  params: UpdateCommitmentTimeParams
+  params: UpdateCommitmentTimeParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

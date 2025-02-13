@@ -11,7 +11,7 @@ export type SuccessParams = {};
  */
 export const successTxBuilder = (
   lucid: LucidEvolution,
-  params: SuccessParams
+  params: SuccessParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;
