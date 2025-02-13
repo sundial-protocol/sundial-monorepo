@@ -98,13 +98,13 @@ export const listen = (
       mempool.retrieveTxCborByHash(db, txHash).then((ret => {
           Option.match(ret, {
             onSome: (retreived) => {
-              res.json({ transactions: retreived })
+              res.json({ tx: retreived })
             },
             onNone: () => {
               immutable.retrieveTxCborByHash(db, txHash).then((ret => {
                 Option.match(ret, {
                   onSome: (retreived) => {
-                    res.json({ transactions: retreived })
+                    res.json({ tx: retreived })
                   },
                   onNone: () => {
                     res.status(404)
@@ -130,7 +130,7 @@ export const listen = (
       try {
         const addrDetails = getAddressDetails(addr)
         if (addrDetails.paymentCredential != undefined) {
-          latestLedger.retrieve(db).then(allUTxOs => {
+          mempoolLedger.retrieve(db).then(allUTxOs => {
             res.json({ uxtos: allUTxOs.filter(a => a.address == addrDetails.address.bech32) })
         });
         } else {
