@@ -6,7 +6,7 @@ import { hashHexWithBlake2b224 } from "./common.js";
 
 export const findSpentAndProducedUTxOs = (
   txCBOR: string
-): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> => {
+): { spent: OutRef[]; produced: UTxO[] } => {
   try {
     const tx = CML.Transaction.from_cbor_hex(txCBOR);
     const txBody = tx.body();
@@ -33,11 +33,9 @@ export const findSpentAndProducedUTxOs = (
         outputIndex: i,
       } as UTxO);
     }
-    return Effect.succeed({ spent, produced });
+    return ({ spent, produced });
   } catch (_e) {
-    return Effect.fail(
-      new Error("Something went wrong decoding the transaction")
-    );
+      throw Error("Something went wrong decoding the transaction")
   }
 };
 

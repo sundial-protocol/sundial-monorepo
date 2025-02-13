@@ -39,7 +39,7 @@ export const retrieve = async (db: sqlite3.Database): Promise<UTxO[]> =>
 
 export const retrieveUTxOsAtAddress = async (
   db: sqlite3.Database,
-  address: Address
+  address: Address,
 ): Promise<UTxO[]> => {
   const query = `
       SELECT

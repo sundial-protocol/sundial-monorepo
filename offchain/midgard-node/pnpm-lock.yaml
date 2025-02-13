@@ -45,6 +45,9 @@ importers:
       '@types/node':
         specifier: ^22.10.7
         version: 22.13.1
+      prettier:
+        specifier: ^3.2.5
+        version: 3.5.1
       tsup:
         specifier: ^8.3.5
         version: 8.3.6(postcss@8.5.1)(typescript@5.7.3)
@@ -58,7 +61,7 @@ packages:
     resolution: {integrity: sha512-yEie4HFRoQS+ShbEYGNcVEQKFvnClXHFEysYT7lqoL1FGVxwvWWTBsctsEXolUIvusslztzrnJyUG67KGljBKw==}
 
   '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-JEeUqSgW4utv5VSBakKLgh+q59j0zMjveoslPHYVM7eBvb9T6etNGxqHN70wTCe1W5n35M82NUl6nWHxHKjG5Q==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-0HmbyMlpG5dO/96nXAJbAWNMTs3VpKcVWA6Cr8wZB/tOyK2m7vwcxMA+BBOa36skjfPcVZ2c5p9pkA3uO/kWBA==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
     version: 0.1.0
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2':
@@ -1646,6 +1649,11 @@ packages:
   prebuild-install@7.1.3:
     resolution: {integrity: sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==}
     engines: {node: '>=10'}
+    hasBin: true
+
+  prettier@3.5.1:
+    resolution: {integrity: sha512-hPpFQvHwL3Qv5AdRvBFMhnKo4tYxp0ReXiPn2bxkiohEX6mBeBwEpBSQTkD458RaaDKQMYSp4hX4UtfUTA5wDw==}
+    engines: {node: '>=14'}
     hasBin: true
 
   progress-events@1.0.1:
@@ -3820,6 +3828,8 @@ snapshots:
       simple-get: 4.0.1
       tar-fs: 2.1.2
       tunnel-agent: 0.6.0
+
+  prettier@3.5.1: {}
 
   progress-events@1.0.1: {}
 
