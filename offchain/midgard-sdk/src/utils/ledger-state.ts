@@ -5,7 +5,7 @@ import { Header } from "@/types/contracts/ledger-state.js";
 import { hashHexWithBlake2b224 } from "./common.js";
 
 export const findSpentAndProducedUTxOs = (
-  txCBOR: string
+  txCBOR: string,
 ): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> => {
   try {
     const tx = CML.Transaction.from_cbor_hex(txCBOR);

@@ -20,11 +20,11 @@ import {
 } from "@lucid-evolution/lucid";
 import express from "express";
 import sqlite3 from "sqlite3";
-import * as mempool from "../database/mempool.js"
+import * as mempool from "../database/mempool.js";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
-  _lucid: LucidEvolution
+  _lucid: LucidEvolution,
 ): Promise<Result<UTxO>> => {
   return ok({
     txHash: "",
@@ -36,7 +36,7 @@ const fetchLatestBlock = async (
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchConfirmedState = async (
-  _lucid: LucidEvolution
+  _lucid: LucidEvolution,
 ): Promise<Result<UTxO>> => {
   return ok({
     txHash: "",
@@ -76,7 +76,7 @@ export const listen = (
   db: sqlite3.Database,
   port: number,
   pollingInterval: number,
-  confirmedStatePollingInterval: number
+  confirmedStatePollingInterval: number,
 ) => {
   const app = express();
   app.get("/", (req, res) => {
@@ -96,7 +96,7 @@ export const listen = (
 const monitorStateQueue = (
   lucid: LucidEvolution,
   db: sqlite3.Database,
-  pollingInterval: number
+  pollingInterval: number,
 ) => {
   let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
   setInterval(async () => {
@@ -117,7 +117,7 @@ ${errorToString(latestBlockOutRefRes.error)}`);
 export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
-  tx: string
+  tx: string,
 ) => {
   const txHash = lucid.fromTx(tx).toHash();
   await mempool.insert(db, txHash, tx);
@@ -129,7 +129,7 @@ const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
 
 const monitorConfirmedState = (
   lucid: LucidEvolution,
-  pollingInterval: number
+  pollingInterval: number,
 ) => {
   logWarning("mergeOldestBlock: TODO");
 };

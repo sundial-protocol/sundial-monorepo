@@ -81,34 +81,9 @@ export const retrieve = async (db: sqlite3.Database) => {
 
 export const retrieveTxCborByHash = async (
   db: sqlite3.Database,
-  txHash: string
+  txHash: string,
 ): Promise<Option.Option<string>> =>
   utils.retrieveTxCborByHash(db, "immutable", txHash);
-
-export const retrieveByBlockHeaderHash = async (
-  db: sqlite3.Database,
-  headerHash: string,
-) => {
-  const query = `
-    SELECT im.* 
-    FROM immutable im
-    JOIN blocks b ON im.tx_hash = b.tx_hash
-    WHERE b.header_hash = ?
-  `;
-  const txs = await new Promise<[string, string][]>((resolve, reject) => {
-    db.all(query, [headerHash], (err, rows: [string, string][]) => {
-      if (err) {
-        logAbort(`immutable db: retrieving error: ${err.message}`);
-        reject(err);
-      }
-      resolve(rows);
-    });
-  });
-  return txs.map(([txHash, txCbor]) => ({
-    txHash,
-    txCbor,
-  }));
-};
 
 export const clear = async (db: sqlite3.Database) =>
   clearTable(db, "immutable");

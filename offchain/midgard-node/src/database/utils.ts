@@ -138,7 +138,7 @@ export const clearUTxOs = async (
 export const retrieveTxCborByHash = async (
   db: sqlite3.Database,
   tableName: string,
-  txHash: string
+  txHash: string,
 ): Promise<Option.Option<string>> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ?`;
   const result = await new Promise<string[]>((resolve, reject) => {

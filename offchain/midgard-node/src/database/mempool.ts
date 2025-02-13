@@ -33,7 +33,7 @@ export const insert = async (
 
 export const retrieveTxCborByHash = async (
   db: sqlite3.Database,
-  txHash: string
+  txHash: string,
 ): Promise<Option.Option<string>> =>
   utils.retrieveTxCborByHash(db, "mempool", txHash);
 
