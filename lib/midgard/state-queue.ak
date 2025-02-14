@@ -15,12 +15,6 @@ pub type Config {
   refund_waiting_period: Int,
 }
 
-pub type Datum {
-  operator: ByteArray,
-  start_time: Int,
-  end_time: Int,
-}
-
 pub type MintRedeemer {
   Init
   Deinit
@@ -37,6 +31,7 @@ pub type MintRedeemer {
     header_node_key: ByteArray,
     header_node_input_index: Int,
     confirmed_state_node_input_index: Int,
+    confirmed_state_node_output_index: Int,
   }
   RemoveFraudulentBlockHeader {
     removed_node_input_index: Int,

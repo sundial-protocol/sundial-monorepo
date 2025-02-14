@@ -11,11 +11,12 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
 }
 use midgard/active_operators
+use midgard/ledger_state.{ConfirmedState, Header}
 use midgard/registered_operators
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum}
 use midgard/state_queue.{
-  CommitBlockHeader, Datum, Deinit, Init, MergeToConfirmedState, MintRedeemer,
+  CommitBlockHeader, Deinit, Init, MergeToConfirmedState, MintRedeemer,
   RemoveFraudulentBlockHeader,
 }
 
@@ -79,7 +80,7 @@ validator mint(
           list.at(self.outputs, header_node_output_index)
         expect InlineDatum(header_node_datum) = header_node_output.datum
         expect parsed_header_node_datum: NodeDatum = header_node_datum
-        expect header_node_block_data: Datum = parsed_header_node_datum.data
+        expect header_node_block_data: Header = parsed_header_node_datum.data
         expect parsed_header_node_block_data_as_bytearray: ByteArray =
           parsed_header_node_datum.data
         expect Some(previous_header_node_output) =
@@ -88,7 +89,7 @@ validator mint(
           previous_header_node_output.datum
         expect parsed_previous_header_node_datum: NodeDatum =
           previous_header_node_datum
-        expect previous_header_node_block_data: Datum =
+        expect previous_header_node_block_data: Header =
           parsed_previous_header_node_datum.data
         expect Some(active_operators_redeemer_pair) =
           list.at(self.redeemers, active_operators_redeemer_index)
@@ -110,7 +111,7 @@ validator mint(
             node_outputs,
             node_mint,
           ),
-          operator == header_node_block_data.operator,
+          operator == header_node_block_data.operator_vkey,
           parsed_header_node_datum.key == Key(
             crypto.sha2_256(parsed_header_node_block_data_as_bytearray),
           ),
@@ -137,6 +138,7 @@ validator mint(
         header_node_key,
         header_node_input_index,
         confirmed_state_node_input_index,
+        confirmed_state_node_output_index,
       ) -> {
         expect Finite(valid_from) = self.validity_range.lower_bound.bound_type
         expect Some(confirmed_state_node_input) =
@@ -145,13 +147,32 @@ validator mint(
           confirmed_state_node_input.output.datum
         expect parsed_confirmed_state_node_input_datum: NodeDatum =
           confirmed_state_node_input_datum
+        expect ConfirmedState { header_hash, utxo_root, .. } =
+          parsed_confirmed_state_node_input_datum.data
         expect Some(header_node_input) =
           list.at(self.outputs, header_node_input_index)
         expect InlineDatum(header_node_input_datum) = header_node_input.datum
         expect parsed_header_node_input_datum: NodeDatum =
           header_node_input_datum
-        expect header_node_block_data: Datum =
+        expect Header { start_time, end_time, protocol_version, .. } =
           parsed_header_node_input_datum.data
+        expect Some(confirmed_state_node_output) =
+          list.at(self.outputs, confirmed_state_node_output_index)
+        expect InlineDatum(confirmed_state_node_output_datum) =
+          confirmed_state_node_output.datum
+        expect parsed_confirmed_state_node_output_datum: NodeDatum =
+          confirmed_state_node_output_datum
+        expect parsed_confirmed_state_node_output_datum_data: ConfirmedState =
+          parsed_confirmed_state_node_output_datum.data
+        let expected_new_confirmed_state =
+          ConfirmedState {
+            header_hash: header_node_key,
+            prev_header_hash: header_hash,
+            utxo_root,
+            start_time,
+            end_time,
+            protocol_version,
+          }
         and {
           unordered.remove(
             Key(header_node_key),
@@ -165,9 +186,9 @@ validator mint(
             policy_id,
             confirmed_state_node_input.output,
           ),
-          valid_from >= header_node_block_data.end_time + maturity_duration,
-          //TODO should we check that key and link of confirmed_state_node_output are still the same?
-          parsed_header_node_input_datum.data == parsed_confirmed_state_node_input_datum.data,
+          valid_from >= end_time + maturity_duration,
+          unordered.prove_is_root_node(policy_id, confirmed_state_node_output),
+          parsed_confirmed_state_node_output_datum_data == expected_new_confirmed_state,
           //TODO create a settlement queue node here if the merged block contains deposits/withdrawals
           True,
         }
