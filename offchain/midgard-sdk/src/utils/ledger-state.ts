@@ -11,7 +11,7 @@ import { Datum } from "@/types/contracts/state-queue.js";
  * `ConfirmedState`.
  */
 export const getConfirmedStateFromUTxO = (
-  blockUTxO: UTxO
+  blockUTxO: UTxO,
 ): Effect.Effect<{ data: ConfirmedState; link: NodeKey }, Error> => {
   const datumCBOR = blockUTxO.datum;
   if (datumCBOR) {

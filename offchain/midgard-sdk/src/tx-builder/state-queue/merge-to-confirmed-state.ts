@@ -14,7 +14,7 @@ import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { hashHeader } from "@/utils/ledger-state.js";
 import { NodeDatum } from "@/types/contracts/linked-list/index.js";
 import { Redeemer } from "@/types/contracts/state-queue.js";
-import {getHeaderFromBlockUTxO} from "@/utils/state-queue.js";
+import { getHeaderFromBlockUTxO } from "@/utils/state-queue.js";
 
 /**
  * Merge

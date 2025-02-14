@@ -5,14 +5,14 @@ import { getNodeDatumFromUTxO } from "./linked-list.js";
 import { Header } from "@/types/contracts/ledger-state.js";
 
 export const getLinkFromBlockUTxO = (
-  blockUTxO: UTxO
+  blockUTxO: UTxO,
 ): Effect.Effect<NodeKey, Error> => {
   const nodeDatum = getNodeDatumFromUTxO(blockUTxO);
   return Effect.map(nodeDatum, (nd) => nd.next);
 };
 
 export const getHeaderFromBlockUTxO = (
-  blockUTxO: UTxO
+  blockUTxO: UTxO,
 ): Effect.Effect<Header, Error> =>
   Effect.gen(function* () {
     const nodeDatum = yield* getNodeDatumFromUTxO(blockUTxO);

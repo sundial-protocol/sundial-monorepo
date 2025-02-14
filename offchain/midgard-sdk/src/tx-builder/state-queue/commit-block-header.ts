@@ -18,7 +18,7 @@ import { getHeaderFromBlockUTxO } from "@/utils/state-queue.js";
 export const commitTxBuilder = (
   lucid: LucidEvolution,
   config: FetchConfig,
-  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams
+  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommittedBlockProgram(lucid, config);
@@ -41,7 +41,7 @@ export const commitTxBuilder = (
       .pay.ToContract(
         config.stateQueueAddress,
         { kind: "inline", value: Data.to(newHeader, Header) },
-        latestBlock.assets
+        latestBlock.assets,
       );
     return tx;
   });
