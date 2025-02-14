@@ -5,15 +5,15 @@ import { makeReturn } from "@/core.js";
 import { getLinkFromBlockUTxO } from "@/utils/state-queue.js";
 import { FetchConfig } from "@/types/state-queue.js";
 
-export const fetchLatestCommitedBlockProgram = (
+export const fetchLatestCommittedBlockProgram = (
   lucid: LucidEvolution,
-  config: FetchConfig,
+  config: FetchConfig
 ): Effect.Effect<UTxO, Error> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
       lucid,
       config.stateQueueAddress,
-      config.stateQueuePolicyId,
+      config.stateQueuePolicyId
     );
     const filtered = yield* Effect.allSuccesses(
       allBlocks.map((u: UTxO) => {
@@ -21,9 +21,9 @@ export const fetchLatestCommitedBlockProgram = (
         return Effect.andThen(nodeKeyEffect, (nodeKey) =>
           nodeKey === "Empty"
             ? Effect.succeed(u)
-            : Effect.fail(new Error("Not a tail node")),
+            : Effect.fail(new Error("Not a tail node"))
         );
-      }),
+      })
     );
     if (filtered.length === 1) {
       return filtered[0];
@@ -33,14 +33,14 @@ export const fetchLatestCommitedBlockProgram = (
   });
 
 /**
- * Attempts fetching the commited block at the very end of the state queue
+ * Attempts fetching the committed block at the very end of the state queue
  * linked list.
  *
  * @param lucid - The `LucidEvolution` API object.
  * @param config - Configuration values required to know where to look for which NFT.
  * @returns {UTxO} - The authentic UTxO which links to no other nodes.
  */
-export const fetchLatestCommitedBlock = (
+export const fetchLatestCommittedBlock = (
   lucid: LucidEvolution,
-  config: FetchConfig,
-) => makeReturn(fetchLatestCommitedBlockProgram(lucid, config)).unsafeRun();
+  config: FetchConfig
+) => makeReturn(fetchLatestCommittedBlockProgram(lucid, config)).unsafeRun();
