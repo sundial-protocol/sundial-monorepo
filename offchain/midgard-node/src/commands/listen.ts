@@ -20,7 +20,6 @@ import {
   CML,
   getAddressDetails,
 } from "@lucid-evolution/lucid";
-import { findSpentAndProducedUTxOs } from "../../../midgard-sdk/src/utils/ledger-state.js";
 import express from "express";
 import sqlite3 from "sqlite3";
 import * as mempool from "../database/mempool.js";
@@ -172,7 +171,7 @@ export const listen = (
 
     if (txIsString && isHexString(txCBOR)) {
       const tx = lucid.fromTx(txCBOR);
-      const spentAndProduced = findSpentAndProducedUTxOs(txCBOR);
+      const spentAndProduced = SDK.Utils.findSpentAndProducedUTxOs(txCBOR);
       db.run("BEGIN TRANSACTION;", (err) => {
         if (err) {
           res.status(400);
