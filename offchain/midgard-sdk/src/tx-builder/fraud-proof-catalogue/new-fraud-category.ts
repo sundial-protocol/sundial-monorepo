@@ -11,7 +11,7 @@ export type NewCategoryParams = {};
  */
 export const newCategoryTxBuilder = (
   lucid: LucidEvolution,
-  params: NewCategoryParams
+  params: NewCategoryParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

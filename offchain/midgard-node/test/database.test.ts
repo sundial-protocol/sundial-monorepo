@@ -143,6 +143,23 @@ describe("database", () => {
     expect(result2).toEqual(Option.some(tx1));
   });
 
+  it("retrieves txs by hashes in the mempool db", async () => {
+    const nonExistentTxHash = "1234";
+    const result1 = await mempool.retrieveTxCborsByHashes(db, [
+      nonExistentTxHash,
+    ]);
+    expect(result1).toEqual([]);
+
+    const result2 = await mempool.retrieveTxCborsByHashes(db, [tx1Hash]);
+    expect(result2).toEqual([tx1]);
+
+    const result3 = await mempool.retrieveTxCborsByHashes(db, [
+      tx1Hash,
+      tx2Hash,
+    ]);
+    expect(result3).toEqual([tx1, tx2]);
+  });
+
   it("clears the mempool db", async () => {
     const initialRows = await mempool.retrieve(db);
     expect(initialRows.length).toBe(2);
@@ -231,6 +248,23 @@ describe("database", () => {
 
     const result2 = await immutable.retrieveTxCborByHash(db, tx1Hash);
     expect(result2).toEqual(Option.some(tx1));
+  });
+
+  it("retrieves txs by hashes in the mempool db", async () => {
+    const nonExistentTxHash = "1234";
+    const result1 = await immutable.retrieveTxCborsByHashes(db, [
+      nonExistentTxHash,
+    ]);
+    expect(result1).toEqual([]);
+
+    const result2 = await immutable.retrieveTxCborsByHashes(db, [tx1Hash]);
+    expect(result2).toEqual([tx1]);
+
+    const result3 = await immutable.retrieveTxCborsByHashes(db, [
+      tx1Hash,
+      tx2Hash,
+    ]);
+    expect(result3).toEqual([tx1, tx2]);
   });
 
   it("clears the immutable db", async () => {

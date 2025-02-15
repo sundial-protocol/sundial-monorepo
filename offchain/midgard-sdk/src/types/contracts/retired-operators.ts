@@ -2,7 +2,7 @@ import { Data } from "@lucid-evolution/lucid";
 import { POSIXTimeSchema } from "./common.js";
 
 export const DatumSchema = Data.Object({
-  commitmentTime: Data.Enum([POSIXTimeSchema, Data.Literal("Empty")]),
+  commitmentTime: Data.Nullable(POSIXTimeSchema),
 });
 export type Datum = Data.Static<typeof DatumSchema>;
 export const Datum = DatumSchema as unknown as Datum;

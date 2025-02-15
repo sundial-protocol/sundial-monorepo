@@ -55,5 +55,11 @@ export const retrieveTxCborByHash = async (
 ): Promise<Option.Option<string>> =>
   utils.retrieveTxCborByHash(db, "immutable", txHash);
 
+export const retrieveTxCborsByHashes = async (
+  db: sqlite3.Database,
+  txHashes: string[]
+): Promise<string[]> =>
+  utils.retrieveTxCborsByHashes(db, "immutable", txHashes);
+
 export const clear = async (db: sqlite3.Database) =>
   clearTable(db, "immutable");

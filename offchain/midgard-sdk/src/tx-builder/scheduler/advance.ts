@@ -11,7 +11,7 @@ export type AdvanceParams = {};
  */
 export const advanceTxBuilder = (
   lucid: LucidEvolution,
-  params: AdvanceParams
+  params: AdvanceParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;
