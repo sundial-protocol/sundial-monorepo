@@ -1,5 +1,6 @@
 /**
  * Export all types and endpoints.
  */
-export * from "./types/index.js";
-export * from "./endpoints/index.js";
+export * as Types from "./types/index.js";
+export * as Endpoints from "./endpoints/index.js";
+export * as Utils from "./utils/index.js";

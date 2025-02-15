@@ -24,7 +24,7 @@ import { Redeemer } from "@/types/contracts/state-queue.js";
  */
 export const mergeTxBuilder = (
   lucid: LucidEvolution,
-  fetchConfig: FetchConfig
+  fetchConfig: FetchConfig,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
@@ -58,7 +58,7 @@ export const mergeTxBuilder = (
         data: Data.castTo(newConfirmedState, ConfirmedState),
       };
       const [nftSym, nftName, _nftQty] = yield* getSingleAssetApartFromAda(
-        firstBlockUTxO.assets
+        firstBlockUTxO.assets,
       );
       const assetsToBurn: Assets = {
         [toUnit(nftSym, nftName)]: -1n,
@@ -67,7 +67,7 @@ export const mergeTxBuilder = (
         .newTx()
         .collectFrom(
           [confirmedUTxO, firstBlockUTxO],
-          Data.to("MergeToConfirmedState", Redeemer)
+          Data.to("MergeToConfirmedState", Redeemer),
         )
         .pay.ToContract(
           fetchConfig.stateQueueAddress,
@@ -75,7 +75,7 @@ export const mergeTxBuilder = (
             kind: "inline",
             value: Data.to(newConfirmedNodeDatum, NodeDatum),
           },
-          confirmedUTxO.assets
+          confirmedUTxO.assets,
         )
         .mintAssets(assetsToBurn);
       return tx;

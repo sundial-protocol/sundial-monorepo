@@ -3,7 +3,7 @@ import { NodeDatum } from "@/types/contracts/linked-list/index.js";
 import { Data, UTxO } from "@lucid-evolution/lucid";
 
 export const getNodeDatumFromUTxO = (
-  nodeUTxO: UTxO
+  nodeUTxO: UTxO,
 ): Effect.Effect<NodeDatum, Error> => {
   const datumCBOR = nodeUTxO.datum;
   if (datumCBOR) {

@@ -11,7 +11,7 @@ export type RewindParams = {};
  */
 export const rewindTxBuilder = (
   lucid: LucidEvolution,
-  params: RewindParams
+  params: RewindParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

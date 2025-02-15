@@ -6,7 +6,7 @@ import { FetchConfig } from "@/types/state-queue.js";
 
 export const mergeToConfirmedStateProgram = (
   lucid: LucidEvolution,
-  fetchConfig: FetchConfig
+  fetchConfig: FetchConfig,
 ): Effect.Effect<TxSignBuilder, Error> =>
   Effect.gen(function* () {
     const completedTx = yield* StateQueue.mergeTxBuilder(lucid, fetchConfig);
@@ -26,6 +26,6 @@ export const mergeToConfirmedStateProgram = (
  */
 export const mergeToConfirmedState = (
   lucid: LucidEvolution,
-  fetchConfig: FetchConfig
+  fetchConfig: FetchConfig,
 ): Promise<TxSignBuilder> =>
   makeReturn(mergeToConfirmedStateProgram(lucid, fetchConfig)).unsafeRun();
