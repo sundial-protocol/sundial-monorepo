@@ -98,7 +98,14 @@ export const fetchFirstBlockTxs = (
         try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),
         catch: (e) => new Error(`${e}`),
       });
-      const txs = ImmutableDB.retrieveTxCborsByHashes(db, txHashes);
+      const txCBORs = yield* Effect.tryPromise({
+        try: () => ImmutableDB.retrieveTxCborsByHashes(db, txHashes),
+        catch: (e) => new Error(`${e}`),
+      });
+      const txs = [];
+      for (let i = 0; i < txHashes.length; i++) {
+        txs.push({txHash: txHashes[i], txCbor: txCBORs[i]});
+      }
       return { txs, headerHash };
     }
   });
