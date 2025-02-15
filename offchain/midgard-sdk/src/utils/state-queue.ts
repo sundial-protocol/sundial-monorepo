@@ -16,10 +16,9 @@ export const getHeaderFromBlockUTxO = (
 ): Effect.Effect<Header, Error> =>
   Effect.gen(function* () {
     const nodeDatum = yield* getNodeDatumFromUTxO(blockUTxO);
-    const headerProgram: Effect.Effect<Header, Error> = Effect.try({
+    const header = yield* Effect.try({
       try: () => Data.castFrom(nodeDatum.data, Header),
       catch: (e) => new Error(`Failed coercing latest block's datum: ${e}`),
     });
-    const header: Header = yield* headerProgram;
     return header;
   });
