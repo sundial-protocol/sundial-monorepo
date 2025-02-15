@@ -147,7 +147,7 @@ export const retrieveTxCborByHash = async (
 export const retrieveTxCborsByHashes = async (
   db: sqlite3.Database,
   tableName: string,
-  txHashes: string[]
+  txHashes: string[],
 ): Promise<string[]> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash IN (${txHashes
     .map(() => `(?)`)
