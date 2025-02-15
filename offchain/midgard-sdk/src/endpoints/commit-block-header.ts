@@ -8,22 +8,19 @@ export const commitBlockHeaderProgram = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
   sqCommitParams: CommitBlockParams,
-  aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams,
+  aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams
 ): Effect.Effect<TxSignBuilder, Error> =>
   Effect.gen(function* () {
     const commitTx = yield* StateQueue.commitTxBuilder(
       lucid,
       fetchConfig,
-      sqCommitParams,
+      sqCommitParams
     );
     const completedTx = yield* Effect.tryPromise({
       try: () =>
         commitTx
           .compose(
-            ActiveOperators.updateCommitmentTimeTxBuilder(
-              lucid,
-              aoUpdateParams,
-            ),
+            ActiveOperators.updateCommitmentTimeTxBuilder(lucid, aoUpdateParams)
           )
           .complete(),
       catch: (e) => new Error(`${e}`),
@@ -45,13 +42,8 @@ export const commitBlockHeader = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
   sqCommitParams: CommitBlockParams,
-  aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams,
+  aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams
 ): Promise<TxSignBuilder> =>
   makeReturn(
-    commitBlockHeaderProgram(
-      lucid,
-      fetchConfig,
-      sqCommitParams,
-      aoUpdateParams,
-    ),
+    commitBlockHeaderProgram(lucid, fetchConfig, sqCommitParams, aoUpdateParams)
   ).unsafeRun();

@@ -1,19 +1,13 @@
-import { Effect } from "effect";
 import {
   Blockfrost,
-  CML,
   Koios,
   Kupmios,
   Lucid,
   LucidEvolution,
   Maestro,
   Network,
-  OutRef,
   Provider,
-  UTxO,
-  valueToAssets,
 } from "@lucid-evolution/lucid";
-import * as SDK from "@al-ft/midgard-sdk";
 import * as chalk_ from "chalk";
 
 export const chalk = new chalk_.Chalk();
@@ -162,43 +156,6 @@ export const setupLucid = async (
   } catch (e) {
     logAbort(errorToString(e));
     process.exit(1);
-  }
-};
-
-export const findSpentAndProducedUTxOs = (
-  txCBOR: string
-): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> => {
-  try {
-    const tx = CML.Transaction.from_cbor_hex(txCBOR);
-    const txBody = tx.body();
-    const inputs = txBody.inputs();
-    const inputsCount = inputs.len();
-    const spent: OutRef[] = [];
-    for (let i = 0; i < inputsCount; i++) {
-      const input = inputs.get(i);
-      spent.push(SDK.Utils.cmlInputToOutRef(input));
-    }
-    const txHash = CML.hash_transaction(txBody).to_hex();
-    const outputs = txBody.outputs();
-    const outputsCount = outputs.len();
-    const produced: UTxO[] = [];
-    for (let i = 0; i < outputsCount; i++) {
-      const output = outputs.get(i);
-      produced.push({
-        address: output.address().to_bech32(),
-        assets: valueToAssets(output.amount()),
-        datumHash: output.datum_hash()?.to_hex(),
-        datum: output.datum()?.to_cbor_hex(),
-        scriptRef: output.script_ref()?.to_cbor_hex(),
-        txHash,
-        outputIndex: i,
-      } as UTxO);
-    }
-    return Effect.succeed({ spent, produced });
-  } catch (e) {
-    return Effect.fail(
-      new Error(`Something went wrong decoding the transaction: ${e}`)
-    );
   }
 };
 
