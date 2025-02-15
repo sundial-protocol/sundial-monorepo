@@ -91,7 +91,8 @@ export const fetchFirstBlockTxs = (
     if (!firstBlockUTxO) {
       return yield* Effect.fail(new Error("No blocks in queue"));
     } else {
-      const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
+      const blockHeader =
+        yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
       const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
       const txHashes = yield* Effect.tryPromise({
         try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),

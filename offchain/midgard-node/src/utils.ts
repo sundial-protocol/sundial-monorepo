@@ -19,7 +19,8 @@ import * as chalk_ from "chalk";
 
 export const chalk = new chalk_.Chalk();
 
-export type Result<T> = | { type: "ok"; data: T }
+export type Result<T> =
+  | { type: "ok"; data: T }
   | { type: "error"; error: Error };
 
 export function ok<T>(x: T): Result<T> {
