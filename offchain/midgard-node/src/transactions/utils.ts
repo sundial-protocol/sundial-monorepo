@@ -29,24 +29,6 @@ export const handleSignSubmit = (
   });
 
 /**
- * Build both Merkle roots (transactions and updated UTxO set).
- *
- * @param txs - An array of transaction CBORs.
- * @returns An Effect that resolves to an object containing the transaction root and UTxO root.
- */
-export const buildMerkleRoots = (txs: string[]) =>
-  Effect.gen(function* () {
-    const utxos: UTxO[] = [];
-    for (const txCBOR of txs) {
-      const { produced } = findSpentAndProducedUTxOs(txCBOR);
-      utxos.push(...produced);
-    }
-    const txRoot = yield* SDK.Utils.mptFromList(txs);
-    const utxoRoot = yield* SDK.Utils.mptFromList(utxos);
-    return { txRoot, utxoRoot };
-  });
-
-/**
  * Fetch transactions of the first block by querying BlocksDB and ImmutableDB.
  *
  * @param lucid - The LucidEvolution instance.
