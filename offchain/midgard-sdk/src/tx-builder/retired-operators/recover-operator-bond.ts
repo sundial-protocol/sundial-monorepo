@@ -11,7 +11,7 @@ export type RecoverParams = {};
  */
 export const recoverTxBuilder = (
   lucid: LucidEvolution,
-  params: RecoverParams
+  params: RecoverParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

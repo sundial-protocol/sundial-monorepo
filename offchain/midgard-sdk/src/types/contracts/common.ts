@@ -62,7 +62,7 @@ export const AddressSchema = Data.Object({
           }),
         ]),
       }),
-    ])
+    ]),
   ),
 });
 export type AddressData = Data.Static<typeof AddressSchema>;
