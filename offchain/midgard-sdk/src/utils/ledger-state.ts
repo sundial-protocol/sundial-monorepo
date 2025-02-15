@@ -1,11 +1,19 @@
-import { CML, Data, OutRef, Script, ScriptType, UTxO, valueToAssets } from "@lucid-evolution/lucid";
+import {
+  CML,
+  Data,
+  OutRef,
+  Script,
+  ScriptType,
+  UTxO,
+  valueToAssets,
+} from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { cmlInputToOutRef } from "./cml.js";
 import { Header } from "@/types/contracts/ledger-state.js";
 import { hashHexWithBlake2b224 } from "./common.js";
 
 export const findSpentAndProducedUTxOs = (
-  txCBOR: string
+  txCBOR: string,
 ): { spent: OutRef[]; produced: UTxO[] } => {
   try {
     const tx = CML.Transaction.from_cbor_hex(txCBOR);
@@ -17,7 +25,7 @@ export const findSpentAndProducedUTxOs = (
       try {
         const input = inputs.get(i);
         spent.push(cmlInputToOutRef(input));
-      } catch(e) {
+      } catch (e) {
         console.log(e);
       }
     }
@@ -34,12 +42,12 @@ export const findSpentAndProducedUTxOs = (
           const scriptRefKind = scriptRefObj.kind();
           const [scriptKind, scriptHex]: [ScriptType, string | undefined] =
             scriptRefKind === CML.ScriptKind.Native
-            ? ["Native", scriptRefObj.as_native()?.to_cbor_hex()]
-            : scriptRefKind === CML.ScriptKind.PlutusV1
-            ? ["PlutusV1", scriptRefObj.as_plutus_v1()?.to_cbor_hex()]
-            : scriptRefKind === CML.ScriptKind.PlutusV2
-            ? ["PlutusV2", scriptRefObj.as_plutus_v2()?.to_cbor_hex()]
-            : ["PlutusV3", scriptRefObj.as_plutus_v3()?.to_cbor_hex()];
+              ? ["Native", scriptRefObj.as_native()?.to_cbor_hex()]
+              : scriptRefKind === CML.ScriptKind.PlutusV1
+                ? ["PlutusV1", scriptRefObj.as_plutus_v1()?.to_cbor_hex()]
+                : scriptRefKind === CML.ScriptKind.PlutusV2
+                  ? ["PlutusV2", scriptRefObj.as_plutus_v2()?.to_cbor_hex()]
+                  : ["PlutusV3", scriptRefObj.as_plutus_v3()?.to_cbor_hex()];
           if (scriptHex) {
             scriptRef = { type: scriptKind, script: scriptHex };
           }
@@ -52,15 +60,15 @@ export const findSpentAndProducedUTxOs = (
           scriptRef,
           txHash,
           outputIndex: i,
-        }
+        };
         produced.push(theUTxO);
-      } catch(e) {
+      } catch (e) {
         console.log(e);
       }
     }
-    return ({ spent, produced });
+    return { spent, produced };
   } catch (_e) {
-      throw Error("Something went wrong decoding the transaction")
+    throw Error("Something went wrong decoding the transaction");
   }
 };
 
