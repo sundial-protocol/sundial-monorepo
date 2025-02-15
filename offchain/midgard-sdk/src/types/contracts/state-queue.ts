@@ -13,11 +13,13 @@ export const RedeemerSchema = Data.Enum([
   Data.Literal("Init"),
   Data.Literal("Deinit"),
   Data.Object({
-    CommitBlockHeader: Data.Bytes(),
+    CommitBlockHeader: Data.Object({ operator: Data.Bytes() }),
   }),
   Data.Literal("MergeToConfirmedState"),
   Data.Object({
-    RemoveFraudulentBlockHeader: Data.Bytes(),
+    RemoveFraudulentBlockHeader: Data.Object({
+      fraudulent_operator: Data.Bytes(),
+    }),
   }),
 ]);
 export type Redeemer = Data.Static<typeof RedeemerSchema>;
