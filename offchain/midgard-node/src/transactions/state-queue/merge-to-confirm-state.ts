@@ -8,45 +8,14 @@
  */
 
 import { Database } from "sqlite3";
-import * as confirmedLedger from "../../database/confirmedLedger.js";
-import { coreToTxOutput, LucidEvolution, UTxO } from "@lucid-evolution/lucid";
+import { LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect } from "effect";
-import { clearBlock } from "../../database/blocks.js";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
-
-/**
- * Apply the fetched transactions to ConfirmedLedgerDB.
- *
- * @param lucid - The LucidEvolution instance.
- * @param db - The database instance.
- * @param txs - An array of transactions to be applied.
- * @returns An Effect that resolves when the transactions are applied.
- */
-export const applyTxsToConfirmedLedger = (
-  lucid: LucidEvolution,
-  db: Database,
-  txs: { txHash: string; txCbor: string }[],
-) =>
-  Effect.gen(function* () {
-    let utxos: UTxO[] = [];
-    for (const rawTx of txs) {
-      {
-        const tx = lucid.fromTx(rawTx.txCbor);
-        const outputs = tx.toTransaction().body().outputs();
-        for (let i = 0; i < outputs.len(); i++) {
-          const utxo: UTxO = {
-            txHash: rawTx.txHash,
-            outputIndex: i,
-            ...coreToTxOutput(outputs.get(i)),
-          };
-          utxos.push(utxo);
-        }
-        return utxos;
-      }
-    }
-    Effect.tryPromise(() => confirmedLedger.insert(db, utxos));
-  });
+import { findSpentAndProducedUTxOs } from "@/utils.js";
+import * as BlocksDB from "@/database/blocks.js";
+import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
+import { modifyMultipleTables } from "@/database/utils.js";
 
 /**
  * Build and submit the merge transaction.
@@ -76,47 +45,25 @@ export const buildAndSubmitMergeTx = (
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
 
-    // Begin database transaction
-    yield* Effect.tryPromise(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          db.run("BEGIN TRANSACTION;", (err) => {
-            if (err)
-              reject(new Error(`Error starting transaction: ${err.message}`));
-            else resolve();
-          });
-        }),
-    );
-
-    try {
-      // Apply transactions to the confirmed ledger
-      yield* applyTxsToConfirmedLedger(lucid, db, firstBlockTxs);
-
-      // Remove header hashes
-      yield* Effect.tryPromise(() => clearBlock(db, headerHash));
-
-      // Commit transaction
-      yield* Effect.tryPromise(
-        () =>
-          new Promise<void>((resolve, reject) => {
-            db.run("COMMIT;", (err) => {
-              if (err)
-                reject(
-                  new Error(`Error committing transaction: ${err.message}`),
-                );
-              else resolve();
-            });
-          }),
-      );
-    } catch (error) {
-      // Rollback transaction on failure
-      yield* Effect.tryPromise(
-        () =>
-          new Promise<void>((resolve) => {
-            db.run("ROLLBACK;", () => resolve());
-          }),
-      );
-
-      return yield* Effect.fail(new Error(`Transaction failed: ${error}`));
+    const spentOutRefs: OutRef[] = [];
+    const producedUTxOs: UTxO[] = [];
+    for (const txCBOR of firstBlockTxs) {
+      const { spent, produced } = findSpentAndProducedUTxOs(txCBOR);
+      spentOutRefs.push(...spent);
+      producedUTxOs.push(...produced);
     }
+
+    // - Clear all the spent UTxOs from the confirmed ledger
+    // - Add all the produced UTxOs from the confirmed ledger
+    // - Remove all the tx hashes of the merged block from BlocksDB
+    yield* Effect.tryPromise({
+      try: () =>
+        modifyMultipleTables(
+          db,
+          [ConfirmedLedgerDB.clearUTxOs, spentOutRefs],
+          [ConfirmedLedgerDB.insert, producedUTxOs],
+          [BlocksDB.clearBlock, headerHash],
+        ),
+      catch: (e) => new Error(`Transaction failed: ${e}`),
+    });
   });

@@ -6,7 +6,7 @@ import {
   UTxO,
 } from "@lucid-evolution/lucid";
 import { Option } from "effect";
-import sqlite3 from "sqlite3";
+import sqlite3, { Database } from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
 
 export const insertUTxOs = async (
@@ -237,7 +237,7 @@ const transformAssetsToObject = (
     const assetsObject: Record<string, bigint> = {};
     assetsArray.forEach((asset) => {
       const unit =
-        asset.unit == "6C6F76656C616365"
+        asset.unit === "6C6F76656C616365"
           ? "lovelace"
           : asset.unit.toLowerCase();
       assetsObject[unit] = BigInt(asset.quantity);
@@ -247,6 +247,41 @@ const transformAssetsToObject = (
     logAbort("error parsing assets:" + error);
     return {};
   }
+};
+
+type TableModification<Args extends any[]> = (
+  db: Database,
+  ...args: Args
+) => Promise<void>;
+
+export const modifyMultipleTables = async <
+  T extends [TableModification<any[]>, ...any[]][],
+>(
+  db: Database,
+  ...modifications: T
+): Promise<void> => {
+  return new Promise<void>((resolve, reject) => {
+    db.run("BEGIN TRANSACTION;", (err: Error | null) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      Promise.all(modifications.map(([mod, ...args]) => mod(db, ...args)))
+        .then(() => {
+          db.run("COMMIT;", (commitErr: Error | null) => {
+            if (commitErr) {
+              db.run("ROLLBACK;", () => reject(commitErr));
+            } else {
+              resolve();
+            }
+          });
+        })
+        .catch((error) => {
+          db.run("ROLLBACK;", () => reject(error));
+        });
+    });
+  });
 };
 
 export interface UTxOToRow {

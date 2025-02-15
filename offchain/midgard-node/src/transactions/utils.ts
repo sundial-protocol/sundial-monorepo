@@ -1,15 +1,10 @@
-import {
-  coreToTxOutput,
-  Data,
-  LucidEvolution,
-  TxSignBuilder,
-  UTxO,
-} from "@lucid-evolution/lucid";
+import { LucidEvolution, TxSignBuilder, UTxO } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "sqlite3";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
+import { findSpentAndProducedUTxOs } from "@/utils.js";
 
 /**
  * Handle the signing and submission of a transaction.
@@ -36,37 +31,23 @@ export const handleSignSubmit = (
 /**
  * Build both Merkle roots (transactions and updated UTxO set).
  *
- * @param lucid - The LucidEvolution instance.
- * @param txs - An array of transactions.
+ * @param txs - An array of transaction CBORs.
  * @returns An Effect that resolves to an object containing the transaction root and UTxO root.
  */
-export const buildMerkleRoots = (
-  lucid: LucidEvolution,
-  txs: { txHash: string; txCbor: string }[],
-) =>
+export const buildMerkleRoots = (txs: string[]) =>
   Effect.gen(function* () {
-    let utxos: UTxO[] = [];
-    for (const rawTx of txs) {
-      {
-        const tx = lucid.fromTx(rawTx.txCbor);
-        const outputs = tx.toTransaction().body().outputs();
-        for (let i = 0; i < outputs.len(); i++) {
-          const utxo: UTxO = {
-            txHash: rawTx.txHash,
-            outputIndex: i,
-            ...coreToTxOutput(outputs.get(i)),
-          };
-          utxos.push(utxo);
-        }
-      }
+    const utxos: UTxO[] = [];
+    for (const txCBOR of txs) {
+      const { produced } = findSpentAndProducedUTxOs(txCBOR);
+      utxos.push(...produced);
     }
-    const txRoot = yield* SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
+    const txRoot = yield* SDK.Utils.mptFromList(txs);
     const utxoRoot = yield* SDK.Utils.mptFromList(utxos);
     return { txRoot, utxoRoot };
   });
 
 /**
- * Fetch transactions of the first block by querying ImmutableDB.
+ * Fetch transactions of the first block by querying BlocksDB and ImmutableDB.
  *
  * @param lucid - The LucidEvolution instance.
  * @param fetchConfig - The configuration for fetching data.
@@ -77,11 +58,7 @@ export const fetchFirstBlockTxs = (
   lucid: LucidEvolution,
   fetchConfig: SDK.Types.FetchConfig,
   db: Database,
-): Effect.Effect<
-  { txs: { txHash: string; txCbor: string }[]; headerHash: string },
-  Error,
-  unknown
-> =>
+): Effect.Effect<{ txs: string[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
     const { link: firstBlockUTxO } =
       yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
@@ -98,14 +75,10 @@ export const fetchFirstBlockTxs = (
         try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),
         catch: (e) => new Error(`${e}`),
       });
-      const txCBORs = yield* Effect.tryPromise({
+      const txs = yield* Effect.tryPromise({
         try: () => ImmutableDB.retrieveTxCborsByHashes(db, txHashes),
         catch: (e) => new Error(`${e}`),
       });
-      const txs = [];
-      for (let i = 0; i < txHashes.length; i++) {
-        txs.push({txHash: txHashes[i], txCbor: txCBORs[i]});
-      }
       return { txs, headerHash };
     }
   });
