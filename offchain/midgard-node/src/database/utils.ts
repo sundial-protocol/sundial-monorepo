@@ -140,9 +140,21 @@ export const retrieveTxCborByHash = async (
   tableName: string,
   txHash: string,
 ): Promise<Option.Option<string>> => {
-  const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ?`;
+  const result = await retrieveTxCborsByHashes(db, tableName, [txHash]);
+  return Option.fromIterable(result);
+};
+
+export const retrieveTxCborsByHashes = async (
+  db: sqlite3.Database,
+  tableName: string,
+  txHashes: string[],
+): Promise<string[]> => {
+  const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash IN (${txHashes
+    .map(() => `(?)`)
+    .join(", ")});`;
+  const values = txHashes.map((th) => fromHex(th));
   const result = await new Promise<string[]>((resolve, reject) => {
-    db.all(query, [fromHex(txHash)], (err, rows: { tx_cbor: Buffer }[]) => {
+    db.all(query, values, (err, rows: { tx_cbor: Buffer }[]) => {
       if (err) {
         logAbort(`${tableName} db: retrieving error: ${err.message}`);
         reject(err);
@@ -150,7 +162,7 @@ export const retrieveTxCborByHash = async (
       resolve(rows.map((r) => toHex(new Uint8Array(r.tx_cbor))));
     });
   });
-  return Option.fromIterable(result);
+  return result;
 };
 
 export const clearTable = async (db: sqlite3.Database, tableName: string) => {

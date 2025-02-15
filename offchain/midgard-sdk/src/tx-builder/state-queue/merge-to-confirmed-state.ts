@@ -14,7 +14,6 @@ import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { hashHeader } from "@/utils/ledger-state.js";
 import { NodeDatum } from "@/types/contracts/linked-list/index.js";
 import { Redeemer } from "@/types/contracts/state-queue.js";
-import {getHeaderFromBlockUTxO} from "@/utils/state-queue.js";
 
 /**
  * Merge
@@ -34,13 +33,17 @@ export const mergeTxBuilder = (
       return yield* Effect.fail(new Error("No blocks in queue"));
     } else {
       const confirmedNode = yield* getNodeDatumFromUTxO(confirmedUTxO);
+      const blockNodeDatum = yield* getNodeDatumFromUTxO(firstBlockUTxO);
       const currentConfirmedNodeDatum = confirmedNode;
       const currentConfirmedState: ConfirmedState = yield* Effect.try({
         try: () =>
           Data.castFrom(currentConfirmedNodeDatum.data, ConfirmedState),
         catch: (e) => new Error(`${e}`),
       });
-      const blockHeader: Header = yield* getHeaderFromBlockUTxO(firstBlockUTxO);
+      const blockHeader: Header = yield* Effect.try({
+        try: () => Data.castFrom(blockNodeDatum.data, Header),
+        catch: (e) => new Error(`${e}`),
+      });
       const headerHash = yield* hashHeader(blockHeader);
       const newConfirmedState = {
         ...currentConfirmedState,

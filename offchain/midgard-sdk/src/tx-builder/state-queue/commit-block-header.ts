@@ -1,10 +1,10 @@
+import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
 import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { CommitBlockParams, FetchConfig } from "@/types/state-queue.js";
-import { fetchLatestCommittedBlockProgram } from "@/endpoints/state-queue/fetch-latest-block.js";
+import { fetchLatestCommitedBlockProgram } from "@/endpoints/state-queue/fetch-latest-block.js";
 import { Header } from "@/types/contracts/ledger-state.js";
 import { hashHeader } from "@/utils/ledger-state.js";
-import { getHeaderFromBlockUTxO } from "@/utils/state-queue.js";
 
 /**
  * Builds portions of a tx required for submitting a new block, using the
@@ -18,11 +18,16 @@ import { getHeaderFromBlockUTxO } from "@/utils/state-queue.js";
 export const commitTxBuilder = (
   lucid: LucidEvolution,
   config: FetchConfig,
-  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams
+  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
-    const latestBlock = yield* fetchLatestCommittedBlockProgram(lucid, config);
-    const latestHeader = yield* getHeaderFromBlockUTxO(latestBlock);
+    const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
+    const latestNodeDatum = yield* getNodeDatumFromUTxO(latestBlock);
+    const latestHeaderProgram: Effect.Effect<Header, Error> = Effect.try({
+      try: () => Data.castFrom(latestNodeDatum.data, Header),
+      catch: (e) => new Error(`Failed coercing latest block's datum: ${e}`),
+    });
+    const latestHeader: Header = yield* latestHeaderProgram;
     const prevHeaderHash = yield* hashHeader(latestHeader);
     const newHeader = {
       ...latestHeader,
@@ -41,7 +46,7 @@ export const commitTxBuilder = (
       .pay.ToContract(
         config.stateQueueAddress,
         { kind: "inline", value: Data.to(newHeader, Header) },
-        latestBlock.assets
+        latestBlock.assets,
       );
     return tx;
   });
