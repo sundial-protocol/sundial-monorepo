@@ -254,6 +254,17 @@ type TableModification<Args extends any[]> = (
   ...args: Args
 ) => Promise<void>;
 
+/**
+ * Abstraction for performing multiple table modifications with proper ROLLBACK
+ * behavior.
+ *
+ * @param db - The database instance.
+ * @param ...modifications - Zero or more records (i.e. tuples, triplet, etc.)
+ * where the first element is a table modification function which takes the
+ * databse instance as its first arguement, and can take any additional
+ * arguments. The following optional elements of these records are the arguments
+ * their functions need.
+ */
 export const modifyMultipleTables = async <
   T extends [TableModification<any[]>, ...any[]][],
 >(
