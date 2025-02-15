@@ -1,10 +1,9 @@
-import { LucidEvolution, TxSignBuilder, UTxO } from "@lucid-evolution/lucid";
+import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "sqlite3";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
-import { findSpentAndProducedUTxOs } from "@/utils.js";
 
 /**
  * Handle the signing and submission of a transaction.
