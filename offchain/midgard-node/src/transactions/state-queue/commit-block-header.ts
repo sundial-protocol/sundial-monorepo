@@ -46,22 +46,22 @@ export const buildAndSubmitCommitmentBlock = (
       },
       { spentList: [], producedList: [] },
     );
-
-    yield* Effect.tryPromise({
-      try: () =>
-        modifyMultipleTables(
-          db,
-          [LatestLedgerDB.clearUTxOs, spentList],
-          [LatestLedgerDB.insert, producedList],
-          [MempoolDB.clear],
-          [ImmutableDB.insertTxs, txs],
-        ),
-      catch: (e) => new Error(`Transaction failed: ${e}`),
-    });
     const utxoList = yield* Effect.tryPromise(() =>
       LatestLedgerDB.retrieve(db),
     );
-    const utxoRoot = yield* SDK.Utils.mptFromList(utxoList);
+    // Remove spent UTxOs from utxoList
+    const filteredUTxOList = utxoList.filter(
+      (utxo) =>
+        !spentList.some(
+          (spent) =>
+            spent.txHash === utxo.txHash &&
+            spent.outputIndex === utxo.outputIndex,
+        ),
+    );
+
+    // Merge filtered utxoList with producedList
+    const newUTxOList = [...filteredUTxOList, ...producedList];
+    const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
     // Build commitment block
     const commitBlockParams: SDK.Types.CommitBlockParams = {
       newUTxOsRoot: utxoRoot.hash.toString(),
@@ -77,4 +77,15 @@ export const buildAndSubmitCommitmentBlock = (
     );
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
+    yield* Effect.tryPromise({
+      try: () =>
+        modifyMultipleTables(
+          db,
+          [LatestLedgerDB.clearUTxOs, spentList],
+          [LatestLedgerDB.insert, producedList],
+          [MempoolDB.clear],
+          [ImmutableDB.insertTxs, txs],
+        ),
+      catch: (e) => new Error(`Transaction failed: ${e}`),
+    });
   });
