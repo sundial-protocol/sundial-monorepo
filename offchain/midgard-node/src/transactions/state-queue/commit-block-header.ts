@@ -4,11 +4,7 @@ import { coreToTxOutput, LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
-import {
-  buildMerkleRoots,
-  fetchFirstBlockTxs,
-  handleSignSubmit,
-} from "../utils";
+import { buildMerkleRoots, handleSignSubmit } from "../utils.js";
 import * as latestLedger from "../../database/latestLedger.js";
 import * as mempool from "../../database/mempool.js";
 import * as immutable from "../../database/immutable.js";
@@ -115,7 +111,6 @@ export const applyTxsToLatestLedgerDB = (
           };
           utxos.push(utxo);
         }
-        return utxos;
       }
     }
     Effect.tryPromise(() => latestLedger.insert(db, utxos));
