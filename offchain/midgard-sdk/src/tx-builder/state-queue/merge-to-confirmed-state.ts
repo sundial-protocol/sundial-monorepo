@@ -11,7 +11,7 @@ import { FetchConfig } from "@/types/state-queue.js";
 import { getSingleAssetApartFromAda } from "@/utils/common.js";
 import { ConfirmedState, Header } from "@/types/contracts/ledger-state.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
-import { hashHeader } from "@/utils/ledger-state.js";
+import { getHeaderFromBlockUTxO, hashHeader } from "@/utils/ledger-state.js";
 import { NodeDatum } from "@/types/contracts/linked-list/index.js";
 import { Redeemer } from "@/types/contracts/state-queue.js";
 
@@ -33,17 +33,13 @@ export const mergeTxBuilder = (
       return yield* Effect.fail(new Error("No blocks in queue"));
     } else {
       const confirmedNode = yield* getNodeDatumFromUTxO(confirmedUTxO);
-      const blockNodeDatum = yield* getNodeDatumFromUTxO(firstBlockUTxO);
       const currentConfirmedNodeDatum = confirmedNode;
       const currentConfirmedState: ConfirmedState = yield* Effect.try({
         try: () =>
           Data.castFrom(currentConfirmedNodeDatum.data, ConfirmedState),
         catch: (e) => new Error(`${e}`),
       });
-      const blockHeader: Header = yield* Effect.try({
-        try: () => Data.castFrom(blockNodeDatum.data, Header),
-        catch: (e) => new Error(`${e}`),
-      });
+      const blockHeader: Header = yield* getHeaderFromBlockUTxO(firstBlockUTxO);
       const headerHash = yield* hashHeader(blockHeader);
       const newConfirmedState = {
         ...currentConfirmedState,

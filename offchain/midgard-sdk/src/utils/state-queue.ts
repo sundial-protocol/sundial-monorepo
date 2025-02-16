@@ -1,4 +1,4 @@
-import { ConfirmedState } from "@/types/contracts/ledger-state.js";
+import { ConfirmedState, Header } from "@/types/contracts/ledger-state.js";
 import { Data, UTxO } from "@lucid-evolution/lucid";
 import { NodeKey } from "@/types/contracts/linked-list/index.js";
 import { Effect } from "effect";
