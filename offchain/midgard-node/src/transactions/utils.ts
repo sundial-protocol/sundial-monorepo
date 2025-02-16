@@ -1,9 +1,4 @@
-import {
-  coreToTxOutput,
-  LucidEvolution,
-  TxSignBuilder,
-  UTxO,
-} from "@lucid-evolution/lucid";
+import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "sqlite3";
