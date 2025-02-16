@@ -15,7 +15,7 @@ use midgard/active_operators
 use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/settlement.{
+use midgard/settlement_queue.{
   BurnNFT, ClaimAsResolved, ConcludeSettlement, Datum, MintNFTs, MintRedeemer,
   RevokeResolvedFlag, SpendRedeemer, UpdateResolvedFlag,
 }
@@ -122,7 +122,7 @@ validator main(
                 }) = list.at(inputs, active_operators_node_input_index)
 
                 // 9. The picked active operators contract redeemer must point
-                //    to the same input found based on the settlement's
+                //    to the same input found based on the settlement queue's
                 //    redeemer.
                 expect
                   active_operators_out_ref == active_operators_spend_purpose_out_ref
@@ -146,7 +146,7 @@ validator main(
                 }: NodeDatum = cont_active_operators_node_datum_data
 
                 // 11. The key of the node must be the same as current
-                //     settlement's recorded operator validation key hash.
+                //     settlement queue's recorded operator validation key hash.
                 expect active_operators_node_key == operator_vkey
 
                 // 12. Active operator's updated datum is expected to record the
@@ -180,8 +180,8 @@ validator main(
                   utils.get_authentic_input_of(
                     reference_inputs,
                     when event_type is {
-                      settlement.Deposit -> deposit_script_hash
-                      settlement.Withdrawal -> withdrawal_script_hash
+                      settlement_queue.Deposit -> deposit_script_hash
+                      settlement_queue.Withdrawal -> withdrawal_script_hash
                     },
                     unresolved_event_asset_name,
                     unresolved_event_ref_input_index,
@@ -404,14 +404,14 @@ validator main(
             mpf_root: deposits_root,
             time_of_claimed_as_resolved: None,
             operator: Some(operator_vkey),
-            tree_content: settlement.Deposit,
+            tree_content: settlement_queue.Deposit,
           }
         let expected_produced_withdrawals_datum_data: Data =
           Datum {
             mpf_root: withdrawals_root,
             time_of_claimed_as_resolved: None,
             operator: Some(operator_vkey),
-            tree_content: settlement.Withdrawal,
+            tree_content: settlement_queue.Withdrawal,
           }
         and {
           produced_deposits_datum_data == expected_produced_deposits_datum_data,
