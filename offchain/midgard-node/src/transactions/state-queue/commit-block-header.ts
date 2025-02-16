@@ -1,13 +1,15 @@
 // Build a tx Merkle root with all the mempool txs
 
-import { coreToTxOutput, LucidEvolution, UTxO } from "@lucid-evolution/lucid";
+import { LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
-import { buildMerkleRoots, handleSignSubmit } from "../utils.js";
-import * as latestLedger from "../../database/latestLedger.js";
-import * as mempool from "../../database/mempool.js";
-import * as immutable from "../../database/immutable.js";
+import { handleSignSubmit } from "../utils.js";
+import * as LatestLedgerDB from "@/database/latestLedger.js";
+import * as MempoolDB from "@/database/mempool.js";
+import * as ImmutableDB from "@/database/immutable.js";
+import { modifyMultipleTables } from "@/database/utils.js";
+import { findSpentAndProducedUTxOs } from "@/utils.js";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -27,9 +29,39 @@ export const buildAndSubmitCommitmentBlock = (
 ) =>
   Effect.gen(function* () {
     // Fetch transactions from the first block
-    const txList = yield* Effect.tryPromise(() => mempool.retrieve(db));
+    const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
     const txs = txList.map(([txHash, txCbor]) => ({ txHash, txCbor }));
-    const { txRoot, utxoRoot } = yield* buildMerkleRoots(lucid, txs);
+    const txRoot = yield* SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
+    const txCbors = txList.map(([txHash, txCbor]) => txCbor);
+    const { spentList, producedList } = txCbors.reduce<{
+      spentList: OutRef[];
+      producedList: UTxO[];
+    }>(
+      (acc, txCbor) => {
+        const { spent, produced } = findSpentAndProducedUTxOs(txCbor);
+        return {
+          spentList: [...acc.spentList, ...spent],
+          producedList: [...acc.producedList, ...produced],
+        };
+      },
+      { spentList: [], producedList: [] },
+    );
+
+    yield* Effect.tryPromise({
+      try: () =>
+        modifyMultipleTables(
+          db,
+          [LatestLedgerDB.clearUTxOs, spentList],
+          [LatestLedgerDB.insert, producedList],
+          [MempoolDB.clear],
+          [ImmutableDB.insertTxs, txs],
+        ),
+      catch: (e) => new Error(`Transaction failed: ${e}`),
+    });
+    const utxoList = yield* Effect.tryPromise(() =>
+      LatestLedgerDB.retrieve(db),
+    );
+    const utxoRoot = yield* SDK.Utils.mptFromList(utxoList);
     // Build commitment block
     const commitBlockParams: SDK.Types.CommitBlockParams = {
       newUTxOsRoot: utxoRoot.hash.toString(),
@@ -45,73 +77,4 @@ export const buildAndSubmitCommitmentBlock = (
     );
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
-
-    try {
-      // Begin database transaction
-      yield* Effect.tryPromise(
-        () =>
-          new Promise<void>((resolve, reject) => {
-            db.run("BEGIN TRANSACTION;", (err) => {
-              if (err)
-                reject(new Error(`Error starting transaction: ${err.message}`));
-              else resolve();
-            });
-          }),
-      );
-
-      // Clear lastest ledger
-      yield* Effect.tryPromise(() => latestLedger.clear(db));
-      // Insert the new utxo set to the lastest ledger
-      yield* applyTxsToLatestLedgerDB(lucid, db, txs);
-      // Clear mempool
-      yield* Effect.tryPromise(() => mempool.clear(db));
-      // Insert the processed txs to ImmutableDB
-      yield* Effect.tryPromise(() => immutable.insertTxs(db, txs));
-      // Commit transaction
-      yield* Effect.tryPromise(
-        () =>
-          new Promise<void>((resolve, reject) => {
-            db.run("COMMIT;", (err) => {
-              if (err)
-                reject(
-                  new Error(`Error committing transaction: ${err.message}`),
-                );
-              else resolve();
-            });
-          }),
-      );
-    } catch (error) {
-      // Rollback transaction on failure
-      yield* Effect.tryPromise(
-        () =>
-          new Promise<void>((resolve) => {
-            db.run("ROLLBACK;", () => resolve());
-          }),
-      );
-      return yield* Effect.fail(new Error(`Transaction failed: ${error}`));
-    }
-  });
-
-export const applyTxsToLatestLedgerDB = (
-  lucid: LucidEvolution,
-  db: Database,
-  txs: { txHash: string; txCbor: string }[],
-) =>
-  Effect.gen(function* () {
-    let utxos: UTxO[] = [];
-    for (const rawTx of txs) {
-      {
-        const tx = lucid.fromTx(rawTx.txCbor);
-        const outputs = tx.toTransaction().body().outputs();
-        for (let i = 0; i < outputs.len(); i++) {
-          const utxo: UTxO = {
-            txHash: rawTx.txHash,
-            outputIndex: i,
-            ...coreToTxOutput(outputs.get(i)),
-          };
-          utxos.push(utxo);
-        }
-      }
-    }
-    Effect.tryPromise(() => latestLedger.insert(db, utxos));
   });

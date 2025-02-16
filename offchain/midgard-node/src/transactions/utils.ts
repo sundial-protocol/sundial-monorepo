@@ -68,35 +68,3 @@ export const fetchFirstBlockTxs = (
       return { txs, headerHash };
     }
   });
-
-/**
- * Build both Merkle roots (transactions and updated UTxO set).
- *
- * @param lucid - The LucidEvolution instance.
- * @param txs - An array of transactions.
- * @returns An Effect that resolves to an object containing the transaction root and UTxO root.
- */
-export const buildMerkleRoots = (
-  lucid: LucidEvolution,
-  txs: { txHash: string; txCbor: string }[],
-) =>
-  Effect.gen(function* () {
-    let utxos: UTxO[] = [];
-    for (const rawTx of txs) {
-      {
-        const tx = lucid.fromTx(rawTx.txCbor);
-        const outputs = tx.toTransaction().body().outputs();
-        for (let i = 0; i < outputs.len(); i++) {
-          const utxo: UTxO = {
-            txHash: rawTx.txHash,
-            outputIndex: i,
-            ...coreToTxOutput(outputs.get(i)),
-          };
-          utxos.push(utxo);
-        }
-      }
-    }
-    const txRoot = yield* SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
-    const utxoRoot = yield* SDK.Utils.mptFromList(utxos);
-    return { txRoot, utxoRoot };
-  });
