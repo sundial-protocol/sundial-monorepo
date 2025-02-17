@@ -11,7 +11,7 @@ export type DeinitParams = {};
  */
 export const deinitTxBuilder = (
   lucid: LucidEvolution,
-  params: DeinitParams
+  params: DeinitParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

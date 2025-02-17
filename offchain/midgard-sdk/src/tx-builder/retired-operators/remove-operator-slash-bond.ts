@@ -11,7 +11,7 @@ export type RemoveOperatorParams = {};
  */
 export const removeOperatorTxBuilder = (
   lucid: LucidEvolution,
-  params: RemoveOperatorParams
+  params: RemoveOperatorParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

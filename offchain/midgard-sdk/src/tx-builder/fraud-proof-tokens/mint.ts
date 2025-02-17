@@ -11,7 +11,7 @@ export type MintParams = {};
  */
 export const mintTxBuilder = (
   lucid: LucidEvolution,
-  params: MintParams
+  params: MintParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

@@ -11,7 +11,7 @@ export type RemoveDeplicateParams = {};
  */
 export const removeDeplicateTxBuilder = (
   lucid: LucidEvolution,
-  params: RemoveDeplicateParams
+  params: RemoveDeplicateParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;
