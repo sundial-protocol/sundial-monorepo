@@ -2,32 +2,26 @@ import {
   Result,
   errorToString,
   fail,
+  findSpentAndProducedUTxOs,
   isHexString,
-  logAbort,
   logInfo,
   logWarning,
   ok,
-  setupLucid,
 } from "../utils.js";
-import * as MPF from "@aiken-lang/merkle-patricia-forestry";
-import * as SDK from "@al-ft/midgard-sdk";
 import {
-  Data,
   LucidEvolution,
   OutRef,
-  ScriptType,
   UTxO,
-  CML,
   getAddressDetails,
 } from "@lucid-evolution/lucid";
 import express from "express";
 import sqlite3 from "sqlite3";
-import * as mempool from "../database/mempool.js";
-import * as mempoolLedger from "../database/mempoolLedger.js";
-import * as blocks from "../database/blocks.js";
-import * as latestLedger from "../database/latestLedger.js";
-import * as immutable from "../database/immutable.js";
+import * as MempoolDB from "../database/mempool.js";
+import * as MempoolLedgerDB from "../database/mempoolLedger.js";
+import * as BlocksDB from "../database/blocks.js";
+import * as ImmutableDB from "../database/immutable.js";
 import { Effect, Option } from "effect";
+import { modifyMultipleTables } from "@/database/utils.js";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = async (
@@ -94,13 +88,13 @@ export const listen = (
     const validLength = txHash?.length === 32;
 
     if (txIsString && isHexString(txHash) && validLength) {
-      mempool.retrieveTxCborByHash(db, txHash).then((ret) => {
+      MempoolDB.retrieveTxCborByHash(db, txHash).then((ret) => {
         Option.match(ret, {
           onSome: (retreived) => {
             res.json({ tx: retreived });
           },
           onNone: () => {
-            immutable.retrieveTxCborByHash(db, txHash).then((ret) => {
+            ImmutableDB.retrieveTxCborByHash(db, txHash).then((ret) => {
               Option.match(ret, {
                 onSome: (retreived) => {
                   res.json({ tx: retreived });
@@ -128,7 +122,7 @@ export const listen = (
       try {
         const addrDetails = getAddressDetails(addr);
         if (addrDetails.paymentCredential != undefined) {
-          mempoolLedger.retrieve(db).then((allUTxOs) => {
+          MempoolLedgerDB.retrieve(db).then((allUTxOs) => {
             res.json({
               uxtos: allUTxOs.filter(
                 (a) => a.address == addrDetails.address.bech32,
@@ -155,68 +149,39 @@ export const listen = (
     const txIsString = typeof hdrHash === "string";
     const validLength = hdrHash?.length === 32;
     if (txIsString && isHexString(hdrHash) && validLength) {
-      blocks
-        .retrieveTxHashesByBlockHash(db, hdrHash)
-        .then((hashes) => res.json({ hashes: hashes }));
+      BlocksDB.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes) =>
+        res.json({ hashes: hashes }),
+      );
     } else {
       res.status(400);
       res.json({ message: `Invalid block header hash: ${hdrHash}` });
     }
   });
 
-  app.post("/submit", (req, res) => {
+  app.post("/submit", async (req, res) => {
     res.type("text/plain");
     const txCBOR = req.query.tx_cbor;
     const txIsString = typeof txCBOR === "string";
 
     if (txIsString && isHexString(txCBOR)) {
-      const tx = lucid.fromTx(txCBOR);
-      const spentAndProduced = SDK.Utils.findSpentAndProducedUTxOs(txCBOR);
-      db.run("BEGIN TRANSACTION;", (err) => {
-        if (err) {
-          res.status(400);
-          res.json({ message: "Unable to begin transaction" });
-        }
-      });
       try {
-        latestLedger.clearUTxOs(db, spentAndProduced.spent).then(
-          (v) =>
-            latestLedger.insert(db, spentAndProduced.produced).then(
-              (v) =>
-                mempool.insert(db, tx.toHash(), txCBOR).then(
-                  (v) =>
-                    db.run("COMMIT;", (e) => {
-                      if (e) {
-                        res.status(400);
-                        res.json({ message: "Unable to commit" });
-                      }
-                      res.json({
-                        message: "Successfully submitted the transaction",
-                      });
-                    }),
-                  (r) => {
-                    db.run("ROLLBACK;");
-                    res.status(400);
-                    res.json({
-                      message: "Unable to insert the transaction hash",
-                    });
-                  },
-                ),
-              (r) => {
-                db.run("ROLLBACK;");
-                res.status(400);
-                res.json({ message: "Unable to insert produced UTxOs" });
-              },
-            ),
-          (r) => {
-            db.run("ROLLBACK;");
-            res.status(400);
-            res.json({ message: "Unable to clear spent UTxOs" });
-          },
+        const tx = lucid.fromTx(txCBOR);
+        const spentAndProducedProgram = findSpentAndProducedUTxOs(txCBOR);
+        const { spent, produced } = await Effect.runPromise(
+          spentAndProducedProgram,
         );
-      } catch (_e) {
+        await modifyMultipleTables(
+          db,
+          [MempoolDB.insert, tx.toHash(), txCBOR],
+          [MempoolLedgerDB.clearUTxOs, spent],
+          [MempoolLedgerDB.insert, produced],
+        );
+        res.json({
+          message: "Successfully submitted the transaction",
+        });
+      } catch (e) {
         res.status(400);
-        res.json({ message: "Something went wrong decoding the transaction" });
+        res.json({ message: "Something went wrong" });
       }
     } else {
       res.status(400);
@@ -255,7 +220,7 @@ export const storeTx = async (
   tx: string,
 ) => {
   const txHash = lucid.fromTx(tx).toHash();
-  await mempool.insert(db, txHash, tx);
+  await MempoolDB.insert(db, txHash, tx);
 };
 
 const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {

@@ -14,6 +14,7 @@ import {
   UTxO,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
+import { Effect } from "effect";
 
 export const chalk = new chalk_.Chalk();
 
@@ -166,7 +167,7 @@ export const setupLucid = async (
 
 export const findSpentAndProducedUTxOs = (
   txCBOR: string,
-): { spent: OutRef[]; produced: UTxO[] } => {
+): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> => {
   try {
     const spent: OutRef[] = [];
     const produced: UTxO[] = [];
@@ -194,11 +195,37 @@ export const findSpentAndProducedUTxOs = (
         console.log(e);
       }
     }
-    return { spent, produced };
+    return Effect.succeed({ spent, produced });
   } catch (_e) {
-    throw Error("Something went wrong decoding the transaction");
+    return Effect.fail(
+      new Error("Something went wrong decoding the transaction"),
+    );
   }
 };
+
+export const findAllSpentAndProducedUTxOs = (
+  txCBORs: string[],
+): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> =>
+  Effect.gen(function* () {
+    const allEffects = Effect.validateAll(findSpentAndProducedUTxOs)(txCBORs);
+    const allSpentsAndProduces = yield* Effect.mapError(
+      allEffects,
+      (errors: [Error, ...Error[]]) => {
+        return new Error(errors.map((e) => `${e}`).join("\n"));
+      },
+    );
+    return allSpentsAndProduces.reduce(
+      (
+        { spent: spentAcc, produced: producedAcc },
+        { spent: currSpent, produced: currProduced },
+      ) => {
+        return {
+          spent: [...spentAcc, ...currSpent],
+          produced: [...producedAcc, ...currProduced],
+        };
+      },
+    );
+  });
 
 export const ENV_VARS_GUIDE = `
 Make sure you first have set the environment variable for your seed phrase:

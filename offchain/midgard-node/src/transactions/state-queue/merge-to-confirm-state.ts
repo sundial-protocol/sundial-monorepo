@@ -8,11 +8,11 @@
  */
 
 import { Database } from "sqlite3";
-import { LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
+import { LucidEvolution } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect } from "effect";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
-import { findSpentAndProducedUTxOs } from "@/utils.js";
+import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import * as BlocksDB from "@/database/blocks.js";
 import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
 import { modifyMultipleTables } from "@/database/utils.js";
@@ -45,13 +45,8 @@ export const buildAndSubmitMergeTx = (
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
 
-    const spentOutRefs: OutRef[] = [];
-    const producedUTxOs: UTxO[] = [];
-    for (const txCBOR of firstBlockTxs) {
-      const { spent, produced } = findSpentAndProducedUTxOs(txCBOR);
-      spentOutRefs.push(...spent);
-      producedUTxOs.push(...produced);
-    }
+    const { spent: spentOutRefs, produced: producedUTxOs } =
+      yield* findAllSpentAndProducedUTxOs(firstBlockTxs);
 
     // - Clear all the spent UTxOs from the confirmed ledger
     // - Add all the produced UTxOs from the confirmed ledger

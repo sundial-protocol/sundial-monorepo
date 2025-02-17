@@ -1,6 +1,6 @@
 // Build a tx Merkle root with all the mempool txs
 
-import { LucidEvolution, OutRef, UTxO } from "@lucid-evolution/lucid";
+import { LucidEvolution } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
@@ -9,7 +9,7 @@ import * as LatestLedgerDB from "@/database/latestLedger.js";
 import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
 import { modifyMultipleTables } from "@/database/utils.js";
-import { findSpentAndProducedUTxOs } from "@/utils.js";
+import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -32,20 +32,9 @@ export const buildAndSubmitCommitmentBlock = (
     const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
     const txs = txList.map(([txHash, txCbor]) => ({ txHash, txCbor }));
     const txRoot = yield* SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
-    const txCbors = txList.map(([txHash, txCbor]) => txCbor);
-    const { spentList, producedList } = txCbors.reduce<{
-      spentList: OutRef[];
-      producedList: UTxO[];
-    }>(
-      (acc, txCbor) => {
-        const { spent, produced } = findSpentAndProducedUTxOs(txCbor);
-        return {
-          spentList: [...acc.spentList, ...spent],
-          producedList: [...acc.producedList, ...produced],
-        };
-      },
-      { spentList: [], producedList: [] },
-    );
+    const txCbors = txList.map(([_txHash, txCbor]) => txCbor);
+    const { spent: spentList, produced: producedList } =
+      yield* findAllSpentAndProducedUTxOs(txCbors);
     const utxoList = yield* Effect.tryPromise(() =>
       LatestLedgerDB.retrieve(db),
     );
