@@ -18,24 +18,6 @@ import { Effect } from "effect";
 
 export const chalk = new chalk_.Chalk();
 
-export type Result<T> =
-  | { type: "ok"; data: T }
-  | { type: "error"; error: Error };
-
-export function ok<T>(x: T): Result<T> {
-  return {
-    type: "ok",
-    data: x,
-  };
-}
-
-export function fail<T>(e: string): Result<T> {
-  return {
-    type: "error",
-    error: new Error(e),
-  };
-}
-
 export type ProviderName = "Blockfrost" | "Koios" | "Kupmios" | "Maestro";
 
 export const errorToString = (error: any): string => {

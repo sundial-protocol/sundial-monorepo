@@ -1,4 +1,9 @@
-import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
+import {
+  LucidEvolution,
+  OutRef,
+  TxSignBuilder,
+  UTxO,
+} from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "sqlite3";
@@ -63,3 +68,15 @@ export const fetchFirstBlockTxs = (
       return { txs, headerHash };
     }
   });
+
+export const utxoToOutRef = (utxo: UTxO): OutRef => ({
+  txHash: utxo.txHash,
+  outputIndex: utxo.outputIndex,
+});
+
+export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
+  return (
+    outRef0.txHash === outRef1.txHash &&
+    outRef0.outputIndex === outRef1.outputIndex
+  );
+};

@@ -1,12 +1,8 @@
 import {
-  Result,
-  errorToString,
-  fail,
   findSpentAndProducedUTxOs,
   isHexString,
   logInfo,
   logWarning,
-  ok,
 } from "../utils.js";
 import {
   LucidEvolution,
@@ -20,216 +16,218 @@ import * as MempoolDB from "../database/mempool.js";
 import * as MempoolLedgerDB from "../database/mempoolLedger.js";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
-import { Effect, Option } from "effect";
+import { Duration, Effect, Option, Schedule } from "effect";
 import { modifyMultipleTables } from "@/database/utils.js";
+import { User, NodeConfig } from "@/config.js";
+import { initializeDb } from "@/database.js";
+import { outRefsAreEqual, utxoToOutRef } from "@/transactions/utils.js";
 
 // TODO: Placehoder, must be imported from SDK.
-const fetchLatestBlock = async (
+const fetchLatestBlock = (
   _lucid: LucidEvolution,
-): Promise<Result<UTxO>> => {
-  return ok({
-    txHash: "",
-    outputIndex: 0,
-    address: "",
-    assets: {},
+): Effect.Effect<UTxO, never, never> =>
+  Effect.gen(function* () {
+    return {
+      txHash: "",
+      outputIndex: 0,
+      address: "",
+      assets: {},
+    };
   });
-};
 
 // TODO: Placehoder, must be imported from SDK.
-const fetchConfirmedState = async (
+const fetchConfirmedState = (
   _lucid: LucidEvolution,
-): Promise<Result<UTxO>> => {
-  return ok({
-    txHash: "",
-    outputIndex: 0,
-    address: "",
-    assets: {},
+): Effect.Effect<UTxO, never, never> =>
+  Effect.gen(function* () {
+    return {
+      txHash: "",
+      outputIndex: 0,
+      address: "",
+      assets: {},
+    };
   });
-};
 
-const readEndTimeOfConfirmedState = (utxo: UTxO): Result<number> => {
-  if (utxo.datum) {
-    // const confirmedState = Data.castFrom(
-    //   utxo.datum,
-    //   SDK.LedgerState.ConfirmedState
-    // );
-    // return ok(Number(confirmedState.endTime));
-    return ok(0);
-  } else {
-    return fail("Missing datum of the confirmed state.");
-  }
-};
-
-const utxoToOutRef = (utxo: UTxO): OutRef => ({
-  txHash: utxo.txHash,
-  outputIndex: utxo.outputIndex,
-});
-
-const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
-  return (
-    outRef0.txHash === outRef1.txHash &&
-    outRef0.outputIndex === outRef1.outputIndex
-  );
+const readEndTimeOfConfirmedState = (
+  utxo: UTxO,
+): Effect.Effect<number, string, never> => {
+  return utxo.datum
+    ? Effect.succeed(0) // Replace 0 with the actual extraction logic
+    : Effect.fail("Missing datum of the confirmed state.");
 };
 
 export const listen = (
   lucid: LucidEvolution,
   db: sqlite3.Database,
   port: number,
-  pollingInterval: number,
-  confirmedStatePollingInterval: number,
-) => {
-  const app = express();
+): Effect.Effect<void, never, never> =>
+  Effect.sync(() => {
+    const app = express();
 
-  app.get("/tx", (req, res) => {
-    res.type("text/plain");
-    const txHash = req.query.tx_hash;
-    const txIsString = typeof txHash === "string";
-    const validLength = txHash?.length === 32;
-
-    if (txIsString && isHexString(txHash) && validLength) {
-      MempoolDB.retrieveTxCborByHash(db, txHash).then((ret) => {
-        Option.match(ret, {
-          onSome: (retreived) => {
-            res.json({ tx: retreived });
-          },
-          onNone: () => {
-            ImmutableDB.retrieveTxCborByHash(db, txHash).then((ret) => {
-              Option.match(ret, {
-                onSome: (retreived) => {
-                  res.json({ tx: retreived });
-                },
-                onNone: () => {
-                  res.status(404);
-                  res.json({ message: "No matching transactions found" });
-                },
-              });
-            });
-          },
-        });
-      });
-    } else {
-      res.status(400);
-      res.json({ message: `Invalid transaction hash: ${txHash}` });
-    }
-  });
-
-  app.get("/utxos", (req, res) => {
-    res.type("text/plain");
-    const addr = req.query.addr;
-    const addrIsString = typeof addr === "string";
-    if (addrIsString) {
-      try {
-        const addrDetails = getAddressDetails(addr);
-        if (addrDetails.paymentCredential != undefined) {
-          MempoolLedgerDB.retrieve(db).then((allUTxOs) => {
-            res.json({
-              uxtos: allUTxOs.filter(
-                (a) => a.address == addrDetails.address.bech32,
-              ),
-            });
+    app.get("/tx", (req, res) => {
+      res.type("text/plain");
+      const txHash = req.query.tx_hash;
+      if (
+        typeof txHash === "string" &&
+        isHexString(txHash) &&
+        txHash.length === 32
+      ) {
+        MempoolDB.retrieveTxCborByHash(db, txHash).then((ret) => {
+          Option.match(ret, {
+            onSome: (retrieved) => res.json({ tx: retrieved }),
+            onNone: () =>
+              ImmutableDB.retrieveTxCborByHash(db, txHash).then((ret) => {
+                Option.match(ret, {
+                  onSome: (retrieved) => res.json({ tx: retrieved }),
+                  onNone: () =>
+                    res
+                      .status(404)
+                      .json({ message: "No matching transactions found" }),
+                });
+              }),
           });
-        } else {
-          res.status(400);
-          res.json({ message: `Invalid address: ${addr}` });
-        }
-      } catch {
-        res.status(400);
-        res.json({ message: `Invalid address: ${addr}` });
-      }
-    } else {
-      res.status(400);
-      res.json({ message: `Invalid address: ${addr}` });
-    }
-  });
-
-  app.get("/block", (req, res) => {
-    res.type("text/plain");
-    const hdrHash = req.query.header_hash;
-    const txIsString = typeof hdrHash === "string";
-    const validLength = hdrHash?.length === 32;
-    if (txIsString && isHexString(hdrHash) && validLength) {
-      BlocksDB.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes) =>
-        res.json({ hashes: hashes }),
-      );
-    } else {
-      res.status(400);
-      res.json({ message: `Invalid block header hash: ${hdrHash}` });
-    }
-  });
-
-  app.post("/submit", async (req, res) => {
-    res.type("text/plain");
-    const txCBOR = req.query.tx_cbor;
-    const txIsString = typeof txCBOR === "string";
-
-    if (txIsString && isHexString(txCBOR)) {
-      try {
-        const tx = lucid.fromTx(txCBOR);
-        const spentAndProducedProgram = findSpentAndProducedUTxOs(txCBOR);
-        const { spent, produced } = await Effect.runPromise(
-          spentAndProducedProgram,
-        );
-        await modifyMultipleTables(
-          db,
-          [MempoolDB.insert, tx.toHash(), txCBOR],
-          [MempoolLedgerDB.clearUTxOs, spent],
-          [MempoolLedgerDB.insert, produced],
-        );
-        res.json({
-          message: "Successfully submitted the transaction",
         });
-      } catch (e) {
-        res.status(400);
-        res.json({ message: "Something went wrong" });
+      } else {
+        res
+          .status(400)
+          .json({ message: `Invalid transaction hash: ${txHash}` });
       }
-    } else {
-      res.status(400);
-      res.json({ message: "Invalid CBOR provided" });
-    }
-  });
+    });
 
-  app.listen(port, () => {});
-  logInfo(`Server running at http://localhost:${port}`);
-};
+    app.get("/utxos", (req, res) => {
+      res.type("text/plain");
+      const addr = req.query.addr;
+      if (typeof addr === "string") {
+        try {
+          const addrDetails = getAddressDetails(addr);
+          if (addrDetails.paymentCredential) {
+            MempoolLedgerDB.retrieve(db).then((allUTxOs) =>
+              res.json({
+                utxos: allUTxOs.filter(
+                  (a) => a.address === addrDetails.address.bech32,
+                ),
+              }),
+            );
+          } else {
+            res.status(400).json({ message: `Invalid address: ${addr}` });
+          }
+        } catch {
+          res.status(400).json({ message: `Invalid address: ${addr}` });
+        }
+      } else {
+        res.status(400).json({ message: `Invalid address: ${addr}` });
+      }
+    });
+
+    app.get("/block", (req, res) => {
+      res.type("text/plain");
+      const hdrHash = req.query.header_hash;
+      if (
+        typeof hdrHash === "string" &&
+        isHexString(hdrHash) &&
+        hdrHash.length === 32
+      ) {
+        BlocksDB.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes) =>
+          res.json({ hashes }),
+        );
+      } else {
+        res
+          .status(400)
+          .json({ message: `Invalid block header hash: ${hdrHash}` });
+      }
+    });
+
+    app.post("/submit", async (req, res) => {
+      res.type("text/plain");
+      const txCBOR = req.query.tx_cbor;
+      if (typeof txCBOR === "string" && isHexString(txCBOR)) {
+        try {
+          const tx = lucid.fromTx(txCBOR);
+          const spentAndProducedProgram = findSpentAndProducedUTxOs(txCBOR);
+          const { spent, produced } = await Effect.runPromise(
+            spentAndProducedProgram,
+          );
+          await modifyMultipleTables(
+            db,
+            [MempoolDB.insert, tx.toHash(), txCBOR],
+            [MempoolLedgerDB.clearUTxOs, spent],
+            [MempoolLedgerDB.insert, produced],
+          );
+          res.json({ message: "Successfully submitted the transaction" });
+        } catch (e) {
+          res.status(400).json({ message: "Something went wrong" });
+        }
+      } else {
+        res.status(400).json({ message: "Invalid CBOR provided" });
+      }
+    });
+
+    app.listen(port, () =>
+      logInfo(`Server running at http://localhost:${port}`),
+    );
+  });
 
 const monitorStateQueue = (
   lucid: LucidEvolution,
   db: sqlite3.Database,
   pollingInterval: number,
-) => {
-  let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
-  setInterval(async () => {
-    const latestBlockOutRefRes = await fetchLatestBlock(lucid);
-    if (latestBlockOutRefRes.type === "ok") {
-      const fetchedBlocksOutRef = utxoToOutRef(latestBlockOutRefRes.data);
+) =>
+  Effect.gen(function* () {
+    let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
+    const monitor = Effect.gen(function* () {
+      logInfo("monitoring state query...");
+      const latestBlock = yield* fetchLatestBlock(lucid);
+      const fetchedBlocksOutRef = utxoToOutRef(latestBlock);
       if (!outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
         latestBlockOutRef = fetchedBlocksOutRef;
-        await submitBlock(lucid, latestBlockOutRefRes.data);
+        yield* submitBlock(lucid, latestBlock);
       }
-    } else {
-      logWarning(`Something went wrong while fetching the latest block:
-${errorToString(latestBlockOutRefRes.error)}`);
-    }
-  }, pollingInterval);
-};
+    });
+    const schedule = Schedule.addDelay(Schedule.forever, () =>
+      Duration.millis(pollingInterval),
+    );
+    yield* Effect.repeat(monitor, schedule);
+  });
 
 export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
   tx: string,
-) => {
-  const txHash = lucid.fromTx(tx).toHash();
-  await MempoolDB.insert(db, txHash, tx);
-};
+) =>
+  Effect.gen(function* () {
+    const txHash = lucid.fromTx(tx).toHash();
+    yield* Effect.tryPromise(() => MempoolDB.insert(db, txHash, tx));
+  });
 
-const submitBlock = async (lucid: LucidEvolution, latestBlock: UTxO) => {
-  logWarning("submitBlock: TODO");
-};
+const submitBlock = (_lucid: LucidEvolution, latestBlock: UTxO) =>
+  Effect.gen(function* () {
+    logWarning("submitBlock: TODO");
+  });
 
 const monitorConfirmedState = (
-  lucid: LucidEvolution,
+  _lucid: LucidEvolution,
   pollingInterval: number,
-) => {
-  logWarning("mergeOldestBlock: TODO");
-};
+) =>
+  Effect.gen(function* () {
+    const monitor = Effect.gen(function* () {
+      logWarning("monitorConfirmedState: TODO");
+    });
+    const schedule = Schedule.addDelay(Schedule.forever, () =>
+      Duration.millis(pollingInterval),
+    );
+    yield* Effect.repeat(monitor, schedule);
+  });
+
+export const runNode = Effect.gen(function* () {
+  const { user } = yield* User;
+  const nodeConfig = yield* NodeConfig;
+  const db = yield* Effect.tryPromise(() =>
+    initializeDb(nodeConfig.DATABASE_PATH),
+  );
+
+  yield* Effect.all([
+    listen(user, db, nodeConfig.PORT),
+    monitorStateQueue(user, db, nodeConfig.POLLING_INTERVAL),
+    monitorConfirmedState(user, nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
+  ]);
+});
