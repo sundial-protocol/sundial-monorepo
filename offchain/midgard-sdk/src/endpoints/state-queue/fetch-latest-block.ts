@@ -7,13 +7,13 @@ import { FetchConfig } from "@/types/state-queue.js";
 
 export const fetchLatestCommitedBlockProgram = (
   lucid: LucidEvolution,
-  config: FetchConfig
+  config: FetchConfig,
 ): Effect.Effect<UTxO, Error> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
       lucid,
       config.stateQueueAddress,
-      config.stateQueuePolicyId
+      config.stateQueuePolicyId,
     );
     const filtered = yield* Effect.allSuccesses(
       allBlocks.map((u: UTxO) => {
@@ -21,9 +21,9 @@ export const fetchLatestCommitedBlockProgram = (
         return Effect.andThen(nodeKeyEffect, (nodeKey) =>
           nodeKey === "Empty"
             ? Effect.succeed(u)
-            : Effect.fail(new Error("Not a tail node"))
+            : Effect.fail(new Error("Not a tail node")),
         );
-      })
+      }),
     );
     if (filtered.length === 1) {
       return filtered[0];
@@ -42,5 +42,5 @@ export const fetchLatestCommitedBlockProgram = (
  */
 export const fetchLatestCommitedBlock = (
   lucid: LucidEvolution,
-  config: FetchConfig
+  config: FetchConfig,
 ) => makeReturn(fetchLatestCommitedBlockProgram(lucid, config)).unsafeRun();
