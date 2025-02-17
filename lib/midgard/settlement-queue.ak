@@ -38,6 +38,8 @@ pub type Purpose {
 }
 
 pub type MintRedeemer {
+  Init
+  Deinit
   MintNFTs {
     state_queue_input_index: Int,
     hub_ref_input_index: Int,
