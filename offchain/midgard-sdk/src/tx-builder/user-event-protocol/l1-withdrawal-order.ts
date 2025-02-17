@@ -11,7 +11,7 @@ export type WithdrawalOrderParams = {};
  */
 export const withdrawalOrderTxBuilder = (
   lucid: LucidEvolution,
-  params: WithdrawalOrderParams
+  params: WithdrawalOrderParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

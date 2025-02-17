@@ -11,7 +11,7 @@ export type InitParams = {};
  */
 export const initTxBuilder = (
   lucid: LucidEvolution,
-  params: InitParams
+  params: InitParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

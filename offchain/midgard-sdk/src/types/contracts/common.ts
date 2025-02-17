@@ -22,12 +22,16 @@ export type Value = Data.Static<typeof ValueSchema>;
 export const Value = ValueSchema as unknown as Value;
 
 export const POSIXTimeSchema = Data.Integer();
+export type POSIXTime = Data.Static<typeof POSIXTimeSchema>;
+export const POSIXTime = POSIXTimeSchema as unknown as POSIXTime;
 
 export const PubKeyHashSchema = Data.Bytes({ minLength: 28, maxLength: 28 });
 
 export const PolicyIdSchema = Data.Bytes({ minLength: 28, maxLength: 28 });
 
 export const MerkleRootSchema = Data.Bytes({ minLength: 32, maxLength: 32 });
+export type MerkleRoot = Data.Static<typeof MerkleRootSchema>;
+export const MerkleRoot = MerkleRootSchema as unknown as MerkleRoot;
 
 export const CredentialSchema = Data.Enum([
   Data.Object({
@@ -58,7 +62,7 @@ export const AddressSchema = Data.Object({
           }),
         ]),
       }),
-    ])
+    ]),
   ),
 });
 export type AddressData = Data.Static<typeof AddressSchema>;
