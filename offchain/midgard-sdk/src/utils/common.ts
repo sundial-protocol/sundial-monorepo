@@ -18,12 +18,12 @@ export const isHexString = (str: string): boolean => {
 };
 
 export const getSingleAssetApartFromAda = (
-  assets: Assets
+  assets: Assets,
 ): Effect.Effect<[PolicyId, string, bigint], Error> =>
   Effect.gen(function* () {
     const flattenedAssets: [string, bigint][] = Object.entries(assets);
     const woLovelace: [string, bigint][] = flattenedAssets.filter(
-      ([unit, _qty]) => !(unit === "" || unit === "lovelace")
+      ([unit, _qty]) => !(unit === "" || unit === "lovelace"),
     );
     if (woLovelace.length === 1) {
       const explodedUnit = fromUnit(woLovelace[0][0]);
@@ -34,7 +34,7 @@ export const getSingleAssetApartFromAda = (
       ];
     } else {
       return yield* Effect.fail(
-        new Error("Expected exactly 1 additional asset apart from ADA")
+        new Error("Expected exactly 1 additional asset apart from ADA"),
       );
     }
   });
@@ -42,15 +42,13 @@ export const getSingleAssetApartFromAda = (
 export const utxosAtByNFTPolicyId = (
   lucid: LucidEvolution,
   addressOrCred: Address | Credential,
-  policyId: PolicyId
+  policyId: PolicyId,
 ): Effect.Effect<UTxO[], Error> =>
   Effect.gen(function* () {
     const allUTxOs = yield* Effect.tryPromise({
       try: () => lucid.utxosAt(addressOrCred),
       catch: (e) =>
-        new Error(
-          `Failed to fetch UTxOs at: ${addressOrCred} -- Cause: ${e}`
-        ),
+        new Error(`Failed to fetch UTxOs at: ${addressOrCred} -- Cause: ${e}`),
     });
     const nftEffects: Effect.Effect<UTxO, Error>[] = allUTxOs.map((u: UTxO) => {
       const nftsEffect = getSingleAssetApartFromAda(u.assets);
@@ -62,11 +60,11 @@ export const utxosAtByNFTPolicyId = (
           } else {
             return Effect.fail(
               new Error(
-                "UTxO doesn't have the expected NFT policy ID, or its quantity is not exactly 1"
-              )
+                "UTxO doesn't have the expected NFT policy ID, or its quantity is not exactly 1",
+              ),
             );
           }
-        }
+        },
       );
     });
     const authenticUTxOs = yield* Effect.allSuccesses(nftEffects);
@@ -76,7 +74,7 @@ export const utxosAtByNFTPolicyId = (
 const blake2bHelper = (
   hash: string,
   dkLen: number,
-  functionName: string
+  functionName: string,
 ): Effect.Effect<string, Error> => {
   if (isHexString(hash)) {
     try {
@@ -86,15 +84,15 @@ const blake2bHelper = (
     }
   } else {
     return Effect.fail(
-      new Error(`Invalid hash provided for ${functionName} function`)
+      new Error(`Invalid hash provided for ${functionName} function`),
     );
   }
 };
 
 export const hashHexWithBlake2b224 = (
-  hash: string
+  hash: string,
 ): Effect.Effect<string, Error> => blake2bHelper(hash, 28, "Blake2b224");
 
 export const hashHexWithBlake2b256 = (
-  hash: string
+  hash: string,
 ): Effect.Effect<string, Error> => blake2bHelper(hash, 32, "Blake2b256");

@@ -6,7 +6,7 @@ import { Datum } from "@/types/contracts/state-queue.js";
 import { getNodeDatumFromUTxO } from "./linked-list.js";
 
 export const getLinkFromBlockUTxO = (
-  blockUTxO: UTxO
+  blockUTxO: UTxO,
 ): Effect.Effect<NodeKey, Error> => {
   const nodeDatum = getNodeDatumFromUTxO(blockUTxO);
   return Effect.map(nodeDatum, (nd) => nd.next);
@@ -18,7 +18,7 @@ export const getLinkFromBlockUTxO = (
  * `ConfirmedState`.
  */
 export const getConfirmedStateFromUTxO = (
-  blockUTxO: UTxO
+  blockUTxO: UTxO,
 ): Effect.Effect<{ data: ConfirmedState; link: NodeKey }, Error> => {
   const datumCBOR = blockUTxO.datum;
   if (datumCBOR) {

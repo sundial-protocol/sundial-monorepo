@@ -11,7 +11,7 @@ export type BurnParams = {};
  */
 export const burnTxBuilder = (
   lucid: LucidEvolution,
-  params: BurnParams
+  params: BurnParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

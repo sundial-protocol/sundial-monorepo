@@ -11,7 +11,7 @@ export type DepositParams = {};
  */
 export const depositTxBuilder = (
   lucid: LucidEvolution,
-  params: DepositParams
+  params: DepositParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

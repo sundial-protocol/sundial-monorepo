@@ -10,13 +10,13 @@ import { FetchConfig } from "@/types/state-queue.js";
 
 export const fetchConfirmedStateAndItsLinkProgram = (
   lucid: LucidEvolution,
-  config: FetchConfig
+  config: FetchConfig,
 ): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, Error> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
       lucid,
       config.stateQueueAddress,
-      config.stateQueuePolicyId
+      config.stateQueuePolicyId,
     );
     let confirmedStateResult:
       | { data: ConfirmedState; link: NodeKey }
@@ -28,7 +28,7 @@ export const fetchConfirmedStateAndItsLinkProgram = (
           confirmedStateResult = confirmedState;
           return u;
         });
-      })
+      }),
     );
     if (filteredForConfirmedState.length === 1 && confirmedStateResult) {
       const confirmedStateUTxO = filteredForConfirmedState[0];
@@ -46,18 +46,18 @@ export const fetchConfirmedStateAndItsLinkProgram = (
               } else {
                 return Effect.fail(
                   new Error(
-                    "Link is either a root, or its key doesn't match with what the root is pointing to"
-                  )
+                    "Link is either a root, or its key doesn't match with what the root is pointing to",
+                  ),
                 );
               }
             });
-          })
+          }),
         );
         if (filteredForLink.length === 1) {
           return { confirmed: confirmedStateUTxO, link: filteredForLink[0] };
         } else {
           return yield* Effect.fail(
-            new Error("Confirmed state's link not found")
+            new Error("Confirmed state's link not found"),
           );
         }
       } else {
@@ -78,6 +78,6 @@ export const fetchConfirmedStateAndItsLinkProgram = (
  */
 export const fetchConfirmedStateAndItsLink = (
   lucid: LucidEvolution,
-  config: FetchConfig
+  config: FetchConfig,
 ) =>
   makeReturn(fetchConfirmedStateAndItsLinkProgram(lucid, config)).unsafeRun();

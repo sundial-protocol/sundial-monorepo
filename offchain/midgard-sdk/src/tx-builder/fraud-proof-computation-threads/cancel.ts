@@ -11,7 +11,7 @@ export type CancelParams = {};
  */
 export const cancelTxBuilder = (
   lucid: LucidEvolution,
-  params: CancelParams
+  params: CancelParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;
