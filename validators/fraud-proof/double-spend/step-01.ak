@@ -1,3 +1,12 @@
+//// Double Spend Fraud Proof Validator
+////
+//// This is the abstracted version of the double spend fraud proof validator that uses
+//// common utilities and patterns to reduce code duplication.
+////
+//// To see the original implementation that shows the step-by-step nature of fraud
+//// proofs without abstractions, you can view the diff at:
+//// https://github.com/Anastasia-Labs/midgard/pull/91
+
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
