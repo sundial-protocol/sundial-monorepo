@@ -4,7 +4,7 @@ import {
   TxSignBuilder,
   UTxO,
 } from "@lucid-evolution/lucid";
-import { Effect } from "effect";
+import { Effect, Schedule } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "sqlite3";
 import * as BlocksDB from "../database/blocks.js";
@@ -20,10 +20,16 @@ import * as ImmutableDB from "../database/immutable.js";
 export const handleSignSubmit = (
   lucid: LucidEvolution,
   signBuilder: TxSignBuilder,
-) =>
+): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign.withWallet().completeProgram();
-    const txHash = yield* signed.submitProgram();
+    const txHash = yield* signed
+      .submitProgram()
+      .pipe(
+        Effect.retry(
+          Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
+        ),
+      );
     yield* Effect.logDebug(`🚀 Transaction submitted: ${txHash}`);
     yield* Effect.logDebug(`Confirming Transaction...`);
     yield* Effect.tryPromise(() => lucid.awaitTx(txHash, 40_000));

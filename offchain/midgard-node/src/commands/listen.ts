@@ -147,6 +147,7 @@ export const listen = (
           const { spent, produced } = await Effect.runPromise(
             spentAndProducedProgram,
           );
+          // TODO: Avoid abstraction, dedicate a SQL command.
           await modifyMultipleTables(
             db,
             [MempoolDB.insert, tx.toHash(), txCBOR],
