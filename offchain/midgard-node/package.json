@@ -29,6 +29,7 @@
     "@lucid-evolution/lucid": "^0.4.20",
     "chalk": "^5.4.1",
     "commander": "^13.0.0",
+    "dotenv": "^16.4.5",
     "effect": "^3.12.10",
     "express": "^4.21.2",
     "sqlite3": "^5.1.7",

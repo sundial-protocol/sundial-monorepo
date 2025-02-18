@@ -66,6 +66,7 @@ export const buildAndSubmitCommitmentBlock = (
     );
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
+    // TODO: For final product, handle tx submission failures properly.
     yield* Effect.tryPromise({
       try: () =>
         modifyMultipleTables(
