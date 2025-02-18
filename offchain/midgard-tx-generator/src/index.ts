@@ -1,33 +1,30 @@
 /* eslint-disable simple-import-sort/exports */
 /**
  * Midgard Transaction Generator
- *
- * This package provides tools for generating transactions
- * that simulate user interactions with the Midgard L2 network.
- *
- * The generated transactions are in CBOR format and will be used
- * by the Midgard node for testing transaction deserialization
- * and validation functionality.
+ * Generates and submits test transactions to the Midgard L2 network
  */
+
+export {
+  generateMultiOutputTransactions,
+  generateOneToOneTransactions,
+} from './lib/generators/index.js';
+
+export type {
+  MultiOutputTransactionConfig,
+  OneToOneTransactionConfig,
+} from './lib/generators/index.js';
+
+export type { SerializedMidgardTransaction } from './lib/client/types.js';
+export * from './lib/client/types.js';
+export { MidgardNodeClient } from './lib/client/node-client.js';
+export { metrics } from './lib/scheduler/metrics.js';
 
 export {
   getPrivateKeyCborHex,
   getPublicKeyHashFromPrivateKey,
   parseUnknownKeytoBech32PrivateKey,
   serializeAssets,
-} from './core/utils.js';
+} from './utils/common.js';
 
-export type {
-  MidgardTransaction,
-  SerializedMidgardTransaction,
-} from './core/types.js';
-
-export {
-  generateMultiOutputTransactions,
-  generateOneToOneTransactions,
-} from './generators/index.js';
-
-export type {
-  MultiOutputTransactionConfig,
-  OneToOneTransactionConfig,
-} from './generators/index.js';
+// Re-export the scheduler for programmatic usage
+export { createScheduledGenerator } from './lib/scheduler/scheduler.js';

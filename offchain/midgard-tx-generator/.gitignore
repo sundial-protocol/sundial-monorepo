@@ -1,26 +1,13 @@
-# Dependencies
 node_modules/
-
-# Build output
+.direnv/
+.envrc
 dist/
-
-# Test coverage
-coverage/
-
-# Test output
-test-output/
-
-# IDE
-.vscode/
-.idea/
-
-# Logs
-*.log
-
-# Environment variables
+*.tgz
 .env
 .env.local
-
-# OS
+.eslintrc.json
 .DS_Store
-Thumbs.db 
+
+# Local stored transactions when node is not running
+generated-transactions/
+
