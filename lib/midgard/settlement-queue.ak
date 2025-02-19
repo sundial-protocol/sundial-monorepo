@@ -1,30 +1,29 @@
 use aiken/merkle_patricia_forestry as mpf
+use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName}
 use midgard/common/types.{POSIXTime, PubKeyHash}
 
-/// The `operator_vkey` is optional to model UTxOs subject to fraudulent claims.
-pub type Datum {
-  mpf_root: ByteArray,
+pub type Datum =
+  NodeDatum
+
+/// The `operator` is optional to model UTxOs subject to proven frauds..
+pub type NodeData {
+  deposits_root: ByteArray,
+  withdrawals_root: ByteArray,
   time_of_claimed_as_resolved: Option<POSIXTime>,
   operator: Option<PubKeyHash>,
-  tree_content: EventType,
-}
-
-pub type EventType {
-  Deposit
-  Withdrawal
 }
 
 pub type SpendRedeemer {
   UpdateResolvedFlag {
-    input_index: Int,
-    output_index: Int,
+    node_input_index: Int,
+    node_output_index: Int,
     hub_ref_input_index: Int,
     active_operators_node_input_index: Int,
     active_operators_redeemer_index: Int,
     purpose: Purpose,
   }
-  ConcludeSettlement { input_index: Int }
+  ConcludeSettlement { node_input_index: Int, anchor_node_input_index: Int }
 }
 
 pub type Purpose {
@@ -37,10 +36,18 @@ pub type Purpose {
   }
 }
 
+pub type EventType {
+  Deposit
+  Withdrawal
+}
+
 pub type MintRedeemer {
   Init
   Deinit
-  MintNFTs {
+  MintNFT {
+    anchor_node_input_index: Int,
+    anchor_node_output_index: Int,
+    node_output_index: Int,
     state_queue_input_index: Int,
     hub_ref_input_index: Int,
     confirmed_state_output_index: Int,
