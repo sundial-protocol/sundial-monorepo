@@ -45,7 +45,7 @@ export const initTxBuilder = (
   }
 
   tx.mintAssets(assets)
-  tx.pay.ToAddressWithData(params.address, outputDatum, assets)
+  .pay.ToAddressWithData(params.address, outputDatum, assets)
   return Effect.succeed(tx)
 };
 
