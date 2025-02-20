@@ -7,7 +7,7 @@ import {
   toUnit,
 } from "@lucid-evolution/lucid";
 import { fetchConfirmedStateAndItsLinkProgram } from "@/endpoints/state-queue/fetch-confirmed-state-and-its-link.js";
-import { FetchConfig } from "@/types/state-queue.js";
+import { FetchConfig, MergeParams } from "@/types/state-queue.js";
 import { getSingleAssetApartFromAda } from "@/utils/common.js";
 import { ConfirmedState, Header } from "@/types/contracts/ledger-state.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
@@ -25,6 +25,7 @@ import { Redeemer } from "@/types/contracts/state-queue.js";
 export const mergeTxBuilder = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
+  { stateQueueSpendingScript, stateQueueMintingScript }: MergeParams,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
@@ -73,7 +74,9 @@ export const mergeTxBuilder = (
           },
           confirmedUTxO.assets,
         )
-        .mintAssets(assetsToBurn);
+        .mintAssets(assetsToBurn)
+        .attach.Script(stateQueueSpendingScript)
+        .attach.Script(stateQueueMintingScript);
       return tx;
     }
   });

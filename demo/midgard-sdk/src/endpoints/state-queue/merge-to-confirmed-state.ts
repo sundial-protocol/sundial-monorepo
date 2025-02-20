@@ -2,14 +2,19 @@ import { makeReturn } from "@/core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue } from "@/tx-builder/index.js";
 import { Effect } from "effect";
-import { FetchConfig } from "@/types/state-queue.js";
+import { FetchConfig, MergeParams } from "@/types/state-queue.js";
 
 export const mergeToConfirmedStateProgram = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
+  mergeParams: MergeParams,
 ): Effect.Effect<TxSignBuilder, Error> =>
   Effect.gen(function* () {
-    const completedTx = yield* StateQueue.mergeTxBuilder(lucid, fetchConfig);
+    const completedTx = yield* StateQueue.mergeTxBuilder(
+      lucid,
+      fetchConfig,
+      mergeParams,
+    );
     return yield* Effect.tryPromise({
       try: () => completedTx.complete(),
       catch: (e) => new Error(`${e}`),
@@ -27,5 +32,8 @@ export const mergeToConfirmedStateProgram = (
 export const mergeToConfirmedState = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
+  mergeParams: MergeParams,
 ): Promise<TxSignBuilder> =>
-  makeReturn(mergeToConfirmedStateProgram(lucid, fetchConfig)).unsafeRun();
+  makeReturn(
+    mergeToConfirmedStateProgram(lucid, fetchConfig, mergeParams),
+  ).unsafeRun();

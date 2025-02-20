@@ -17,7 +17,12 @@ import { getHeaderFromBlockUTxO, hashHeader } from "@/utils/ledger-state.js";
 export const commitTxBuilder = (
   lucid: LucidEvolution,
   config: FetchConfig,
-  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams,
+  {
+    newUTxOsRoot,
+    transactionsRoot,
+    endTime,
+    stateQueueSpendingScript,
+  }: CommitBlockParams,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
@@ -41,6 +46,7 @@ export const commitTxBuilder = (
         config.stateQueueAddress,
         { kind: "inline", value: Data.to(newHeader, Header) },
         latestBlock.assets,
-      );
+      )
+      .attach.Script(stateQueueSpendingScript);
     return tx;
   });

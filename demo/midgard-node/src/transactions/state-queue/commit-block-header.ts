@@ -10,6 +10,7 @@ import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
 import { modifyMultipleTables } from "@/database/utils.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
+import * as Blueprint from "../../../../always-succeeds/plutus.json";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -56,6 +57,10 @@ export const buildAndSubmitCommitmentBlock = (
       newUTxOsRoot: utxoRoot.hash.toString(),
       transactionsRoot: txRoot.hash.toString(),
       endTime: BigInt(endTime),
+      stateQueueSpendingScript: {
+        type: "PlutusV3",
+        script: Blueprint.default.validators[1].compiledCode,
+      },
     };
     const aoUpdateCommitmentTimeParams = {};
     const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(

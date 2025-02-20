@@ -16,6 +16,7 @@ import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import * as BlocksDB from "@/database/blocks.js";
 import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
 import { modifyMultipleTables } from "@/database/utils.js";
+import * as Blueprint from "../../../../always-succeeds/plutus.json";
 
 /**
  * Build and submit the merge transaction.
@@ -41,7 +42,18 @@ export const buildAndSubmitMergeTx = (
     const txBuilder = yield* SDK.Endpoints.mergeToConfirmedStateProgram(
       lucid,
       fetchConfig,
+      {
+        stateQueueSpendingScript: {
+          type: "PlutusV3",
+          script: Blueprint.default.validators[1].compiledCode,
+        },
+        stateQueueMintingScript: {
+          type: "PlutusV3",
+          script: Blueprint.default.validators[0].compiledCode,
+        },
+      },
     );
+
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
 
