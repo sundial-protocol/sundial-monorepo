@@ -1,6 +1,9 @@
-import { LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
+import { LucidEvolution, TxBuilder, Assets, PolicyId, toUnit } from "@lucid-evolution/lucid";
+import { Effect } from "effect";
 
-export type InitParams = {};
+export type InitParams = {
+  policyId : PolicyId
+};
 
 /**
  * Init
@@ -11,8 +14,13 @@ export type InitParams = {};
  */
 export const initTxBuilder = (
   lucid: LucidEvolution,
-  params: InitParams,
-): TxBuilder => {
+  params: InitParams
+): Effect.Effect <TxBuilder, Error> => {
   const tx = lucid.newTx();
-  return tx;
+  const assets : Assets ={
+    [toUnit(params.policyId, "Init")]: 1n,
+   }
+
+  tx.mintAssets(assets)
+  return Effect.succeed(tx)
 };
