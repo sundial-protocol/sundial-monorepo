@@ -48,7 +48,7 @@ The \code{settlement\_queue} minting policy is statically parametrized on the \c
     \item[New Settlement.] Spawn a new node to store merged block's user events.
       Conditions:
         \begin{enumerate}
-            \item The confirmed state UTxO must be getting spent. This is synanymous to the oldest block being merged into the confirmed state.
+            \item The confirmed state utxo must be getting spent. This is synanymous to the oldest block being merged into the confirmed state.
             \item The asset name (i.e.\ key) of this NFT must be the same as the header hash of the merging block.
             \item This new node must be appended to the end of the \code{settlement\_queue} list.
             \item Current operator must be stored in the new node.
@@ -75,16 +75,16 @@ Conditions:
         \begin{enumerate}
             \item The transaction must be signed by the stored operator key.
             \item The node must not have been previously claimed as resolved.
-            \item ``Update Commitment Time'' endpoint of \code{active\_operators}'s~\ref{h:active-operators-spending-validator} is invoked for the stored operator.
-            \item The new commitment time mube be stored in the reproduce settlement node utxo.
+            \item ``Update Commitment Time'' endpoint of \code{active\_operators}'s spending validator (\ref{h:active-operators-spending-validator}) is invoked for the stored operator.
+            \item The new commitment time must be stored in the reproduce settlement node utxo.
         \end{enumerate}
     \item[Revoke Resolved Flag.] Change back the claim of resolution.
       Conditions:
         \begin{enumerate}
             \item One unprocessed event utxo must be referenced, along with a valid membership proof in its corresponding tree.
-            \item ``Remove Operator Slash Bond'' endpoint of \code{active\_operators}'s~\ref{h:retired-operators-minting-policy} must be invoked in the transaction.
-            \item The slashed operator must be the same for both scripts.
-            \item The settlement node must be reproduce in its previous position with respect to the \code{setlement\_queue} list.
+            \item ``Remove Operator Slash Bond'' endpoint of \code{active\_operators}'s minting policy (\ref{h:retired-operators-minting-policy}) must be invoked in the transaction.
+            \item The slashed operator must be the same for both the \code{settlement\_queue} and \code{active\_operators} scripts.
+            \item The settlement node must be reproduce in its previous position within the \code{setlement\_queue} list.
             \item The time of claim must be removed from the reproduced settlement node.
             \item The operator must also be removed. This node will become a permanent node of the \code{setlement\_queue} list and can't be spent.
         \end{enumerate}
