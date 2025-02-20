@@ -76,7 +76,7 @@ Conditions:
             \item The transaction must be signed by the stored operator key.
             \item The node must not have been previously claimed as resolved.
             \item ``Update Commitment Time'' endpoint of \code{active\_operators}'s spending validator (\ref{h:active-operators-spending-validator}) is invoked for the stored operator.
-            \item The new commitment time must be stored in the reproduce settlement node utxo.
+            \item The new commitment time must be stored in the reproduced settlement node utxo.
         \end{enumerate}
     \item[Revoke Resolved Flag.] Change back the claim of resolution.
       Conditions:
@@ -84,7 +84,7 @@ Conditions:
             \item One unprocessed event utxo must be referenced, along with a valid membership proof in its corresponding tree.
             \item ``Remove Operator Slash Bond'' endpoint of \code{active\_operators}'s minting policy (\ref{h:retired-operators-minting-policy}) must be invoked in the transaction.
             \item The slashed operator must be the same for both the \code{settlement\_queue} and \code{active\_operators} scripts.
-            \item The settlement node must be reproduce in its previous position within the \code{setlement\_queue} list.
+            \item The settlement node must be reproduced in its previous position within the \code{setlement\_queue} list.
             \item The time of claim must be removed from the reproduced settlement node.
             \item The operator must also be removed. This node will become a permanent node of the \code{setlement\_queue} list and can't be spent.
         \end{enumerate}
