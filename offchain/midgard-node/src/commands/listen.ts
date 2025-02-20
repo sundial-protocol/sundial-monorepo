@@ -14,6 +14,8 @@ import express from "express";
 import sqlite3 from "sqlite3";
 import * as MempoolDB from "../database/mempool.js";
 import * as MempoolLedgerDB from "../database/mempoolLedger.js";
+import * as LatestLedgerDB from "../database/latestLedger.js";
+import * as ConfirmedLedgerDB from "../database/confirmedLedger.js";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
 import { Duration, Effect, Option, Schedule } from "effect";
@@ -134,6 +136,24 @@ export const listen = (
         res
           .status(400)
           .json({ message: `Invalid block header hash: ${hdrHash}` });
+      }
+    });
+
+    app.get("/clear", async (_req, res) => {
+      res.type("text/plain");
+      try {
+        await Promise.all([
+          MempoolDB.clear(db),
+          MempoolLedgerDB.clear(db),
+          BlocksDB.clear(db),
+          ImmutableDB.clear(db),
+          LatestLedgerDB.clear(db),
+          ConfirmedLedgerDB.clear(db),
+        ]);
+      } catch (_e) {
+        res
+          .status(400)
+          .json({ message: "Failed to clear one or more tables." });
       }
     });
 
