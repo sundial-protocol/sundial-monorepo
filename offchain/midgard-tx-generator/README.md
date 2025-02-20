@@ -1,88 +1,98 @@
 # Midgard Transaction Generator
 
-A tool for generating test transactions for the Midgard L2 network. This tx generator is based on the [Hydra Transaction Generator](https://github.com/Anastasia-Labs/hydra-deployment-poc) with modifications/tweaks to support the Midgard L2 MVP.
+A transaction generator to submit test transactions to MVP Midgard node over HTTP and simulate user activity.
 
-Currently, the generator creates Cardano L1 transactions using Lucid Evolution and wraps them in a Midgard L2 envelope. The actual transaction CBOR is still in Cardano L1 format.
+## What it does
 
-To generate true Midgard L2 transactions (as per codec.cddl specification), we need:
+Generates two types of transactions in alternating cycles:
 
-1. Midgard Provider implementation in Lucid Evolution
-2. Transaction builder modifications to use Midgard format
-3. Update serialization to output proper Midgard CBOR
+1. Simple one-to-one transactions (1 input → 1 output)
+2. Complex multi-output transactions:
+   - Distribution phase: splits into multiple outputs (1 → 20)
+   - Collection phase: merges outputs back (20 → 1)
 
-## Structure
+Each complex transaction creates 2 actual transactions (distribution + collection)
+
+## Project Structure
 
 ```
-src/
-  ├── core/         # Core types and utilities
-  │   ├── types.ts  # Includes target Midgard format from codec.cddl
-  │   └── utils.ts  # Helper functions
-  ├── generators/   # Transaction generators
-  └── tests/        # Test files
+midgard-tx-generator/
+├── src/
+│   ├── bin/             
+│   │   ├── index.ts     # Main
+│   │   └── cli.ts       # CLI interface
+│   ├── lib/
+│   │   ├── client/      # Node communication
+│   │   ├── generators/  # TX generators
+│   │   └── scheduler/   # Periodic generation
+│   └── utils/          
 ```
 
-## Setup
+## Quick Start
 
 ```bash
 cd offchain/midgard-tx-generator
-```
-
-```bash
 pnpm install
+pnpm build
+pnpm start
 ```
 
-## Testing
+## Configuration
 
-Run the test suite and generate test outputs:
+Configure by creating a `.env` file (copy from `.env.example`):
 
 ```bash
-pnpm test
+# Node settings
+MIDGARD_NODE_URL=http://localhost:3000  # Your node URL
+CARDANO_NETWORK=Preview                 # Network
+TX_INTERVAL_MS=5000                     # Time between cycles
+
+# Transaction settings
+ONE_TO_ONE_TXS=10                       # Number of simple txs per cycle (default: 10)
+COMPLEX_TXS=10                          # Number of complex tx pairs per cycle (default: 10)
 ```
 
-Generated test outputs will be saved in the `offchain/midgard-tx-generator/test-output` directory.
+You can also set these as environment variables when running the command:
+
+```bash
+ONE_TO_ONE_TXS=5 COMPLEX_TXS=3 pnpm start
+```
+
+## Default Behavior
+
+With default settings, each cycle generates:
+
+- 10 simple one-to-one transactions
+- 20 complex transactions (from 10 COMPLEX_TXS):
+  - 10 distribution transactions (1→20)
+  - 10 collection transactions (20→1)
+- Total: 30 transactions per cycle
+
+## Node Interaction
+
+1. If node is available:
+   - Transactions are submitted directly
+   - Stats are shown in console
+
+2. If node is unavailable:
+   - Transactions are saved to `generated-transactions/`
+   - Files are named with timestamp and type
 
 ## Output Format
 
-Both transaction generators output in the Midgard L2 format:
+Each transaction follows this structure:
 
 ```typescript
-interface SerializedMidgardTransaction {
-  type: 'Midgard L2 User Transaction';
-  description: string; // Transaction type specific description
-  cborHex: string; // CBOR serialized transaction
-  txId: string; // tx hash
+{
+  cborHex: string; // CBOR-encoded transaction
+  description: string;
+  txId: string; // Transaction hash
+  type: string; 
 }
 ```
 
-## TX Generators
+## Basic Telemetry
 
-### One-to-One Transactions
-
-- Simple single-input, single-output transfers
-- Basic transaction format for testing Midgard node functionality
-
-### Multi-Output Transactions
-
-Generates 100 emulated test accounts and performs two transaction phases:
-
-1. Distribution: Splits funds into 20 outputs per transaction, sending to random test accounts
-2. Collection: Merges back 20 outputs into single transactions, returning funds to source
-
-## Customization
-
-To modify the number of transactions generated in tests, update both fields in test examples:
-
-```typescript
-const result = await generateMockUserTransactions({
-  // ... other config
-  txsCount: 100, // change this number
-});
-
-expect(txs).toHaveLength(100); // change to match txsCount
-```
-
-## Info
-
-- MVP implementation focuses on basic transaction capabilities
-- Uses simplified transaction format (no staking, DReps)
-- Outputs CBOR-serialized transactions for midgard-node testing
+- Success/failure rates
+- Submission latency
+- Total transactions
