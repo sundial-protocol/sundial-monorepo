@@ -10,6 +10,8 @@ pub type Datum =
 pub type NodeData {
   deposits_root: ByteArray,
   withdrawals_root: ByteArray,
+  start_time: POSIXTime,
+  end_time: POSIXTime,
   time_of_claimed_as_resolved: Option<POSIXTime>,
   operator: Option<PubKeyHash>,
 }

@@ -4,7 +4,9 @@ use aiken/collection/list
 use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
 use aiken_design_patterns/linked_list/ordered
-use aiken_design_patterns/linked_list/unordered.{Key, NodeDatum, get_node_outputs}
+use aiken_design_patterns/linked_list/unordered.{
+  Key, NodeDatum, get_node_outputs,
+}
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/address.{Address, Script}
@@ -17,14 +19,16 @@ use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue.{
-  RemoveSettlement, ClaimAsResolved, ConcludeSettlement, Datum, SpawnSettlement, MintRedeemer,
-  NodeData, RevokeResolvedFlag, SpendRedeemer, UpdateResolvedFlag,
+  ClaimAsResolved, ConcludeSettlement, Datum, MintRedeemer, NodeData,
+  RemoveSettlement, RevokeResolvedFlag, SpawnSettlement, SpendRedeemer,
+  UpdateResolvedFlag,
 }
 use midgard/state_queue
 use midgard/user_events
 
-validator main(
+validator spend (
   hub_oracle: ScriptHash,
+  settlement_policy_id: ScriptHash,
   plutarch_phas_validator_hash: ScriptHash,
 ) {
   spend(
@@ -40,6 +44,7 @@ validator main(
       withdrawals_root,
       time_of_claimed_as_resolved,
       operator,
+      ..
     } as node_data = node_datum.data
 
     when redeemer is {
@@ -70,7 +75,8 @@ validator main(
         // Using the singular one-to-one indexer design pattern.
         singular_utxo_indexer.spend(
           fn(in_ix, input, spend_purpose, out_ix, output) {
-            // 1. Prevent double satisfaction (TODO: is this needed?).
+            // 1. Prevent double satisfaction (TODO: this is probably not
+            //    needed).
             expect in_ix == out_ix
 
             let Input {
@@ -310,6 +316,7 @@ validator main(
       }
     }
   }
+}
 
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
     when redeemer is {
@@ -350,22 +357,24 @@ validator main(
           ..
         } = confirmed_state_datum_data
 
-
         expect Some(Input {
           output: Output {
-            address: Address { payment_credential: Script(input_anchor_script_hash), .. },
+            address: Address {
+              payment_credential: Script(input_anchor_script_hash),
+              ..
+            },
             value: input_anchor_value,
             ..
           } as input_anchor_output,
-          ..,
+          ..
         }) = inputs |> list.at(anchor_node_input_index)
         let (input_anchor_nft_sym, _input_anchor_nft_tn, input_anchor_nft_qty) =
           utils.get_single_asset_from_value_apart_from_ada(input_anchor_value)
         expect and {
-          input_anchor_script_hash == own_policy,
-          input_anchor_nft_sym == own_policy,
-          input_anchor_nft_qty == 1,
-        }
+            input_anchor_script_hash == own_policy,
+            input_anchor_nft_sym == own_policy,
+            input_anchor_nft_qty == 1,
+          }
 
         // 3. Validate appending to the end of linked list.
         expect
@@ -375,7 +384,7 @@ validator main(
             anchor_node_output_index: anchor_node_output_index,
             node_inputs: [input_anchor_output],
             node_outputs: get_node_outputs(outputs, own_policy),
-            node_mint: tokens(mint, own_policy),
+            node_mint: assets.tokens(mint, own_policy),
           )
 
         // 4. Only 2 UTxOs must be produced at own script address. It is
@@ -472,9 +481,6 @@ validator main(
           produced_withdrawals_datum_data == expected_produced_withdrawals_datum_data,
         }
       }
-      // TODO: Is validation on the state queue redeemer needed? I.e. are
-      // there any scenarios for spending the confirmed state other than the
-      // merging tx?
       RemoveSettlement -> {
         expect [Input { .. }] =
           tx.inputs
