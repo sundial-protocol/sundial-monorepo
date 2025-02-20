@@ -318,6 +318,7 @@ validator spend (
   }
 }
 
+validator mint (hub_oracle: ScriptHash) {
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
     when redeemer is {
       SpawnSettlement {
