@@ -46,6 +46,8 @@ const makeConfig = Effect.gen(function* ($) {
     Config.integer("CONFIRMED_STATE_POLLING_INTERVAL").pipe(
       Config.withDefault(60000),
     ),
+    Config.integer("PROMETHEUS_PORT").pipe(Config.withDefault(9000)),
+    Config.integer("OTLP_PORT").pipe(Config.withDefault(4318)),
   ]);
   return {
     BLOCKFROST_API_URL: config[0],
@@ -56,6 +58,8 @@ const makeConfig = Effect.gen(function* ($) {
     PORT: config[5],
     POLLING_INTERVAL: config[6],
     CONFIRMED_STATE_POLLING_INTERVAL: config[7],
+    PROMETHEUS_PORT: config[8],
+    OTLP_PORT: config[9],
   };
 }).pipe(Effect.orDie);
 
@@ -70,6 +74,8 @@ export class NodeConfig extends Context.Tag("NodeConfig")<
     PORT: number;
     POLLING_INTERVAL: number;
     CONFIRMED_STATE_POLLING_INTERVAL: number;
+    PROMETHEUS_PORT: number;
+    OTLP_PORT: number;
   }
 >() {
   static readonly layer = Layer.effect(NodeConfig, makeConfig);
