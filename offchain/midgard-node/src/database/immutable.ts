@@ -31,6 +31,36 @@ export const insert = async (
   });
 };
 
+export const insertTxs = async (
+  db: sqlite3.Database,
+  txs: { txHash: string; txCbor: string }[],
+): Promise<void> => {
+  const query = `INSERT INTO immutable (tx_hash, tx_cbor) VALUES (?, ?)`;
+
+  await new Promise<void>((resolve, reject) => {
+    const stmt = db.prepare(query);
+
+    for (const { txHash, txCbor } of txs) {
+      stmt.run([txHash, txCbor], function (err) {
+        if (err) {
+          logAbort(`immutable db: error inserting tx: ${err.message}`);
+          reject(err);
+          return;
+        }
+        logInfo(`immutable db: tx stored with rowid ${this.lastID}`);
+      });
+    }
+
+    stmt.finalize((err) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+};
+
 export const retrieve = async (db: sqlite3.Database) => {
   const query = `SELECT * FROM immutable`;
   const result = await new Promise<[string, string][]>((resolve, reject) => {
@@ -57,7 +87,7 @@ export const retrieveTxCborByHash = async (
 
 export const retrieveTxCborsByHashes = async (
   db: sqlite3.Database,
-  txHashes: string[]
+  txHashes: string[],
 ): Promise<string[]> =>
   utils.retrieveTxCborsByHashes(db, "immutable", txHashes);
 

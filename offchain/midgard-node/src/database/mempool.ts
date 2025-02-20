@@ -39,7 +39,7 @@ export const retrieveTxCborByHash = async (
 
 export const retrieveTxCborsByHashes = async (
   db: sqlite3.Database,
-  txHashes: string[]
+  txHashes: string[],
 ): Promise<string[]> => utils.retrieveTxCborsByHashes(db, "mempool", txHashes);
 
 export const retrieve = async (db: sqlite3.Database) => {

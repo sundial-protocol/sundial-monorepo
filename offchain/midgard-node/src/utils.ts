@@ -1,34 +1,22 @@
 import {
   Blockfrost,
+  CML,
+  coreToOutRef,
+  coreToTxOutput,
   Koios,
   Kupmios,
   Lucid,
   LucidEvolution,
   Maestro,
   Network,
+  OutRef,
   Provider,
+  UTxO,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
+import { Effect } from "effect";
 
 export const chalk = new chalk_.Chalk();
-
-export type Result<T> =
-  | { type: "ok"; data: T }
-  | { type: "error"; error: Error };
-
-export function ok<T>(x: T): Result<T> {
-  return {
-    type: "ok",
-    data: x,
-  };
-}
-
-export function fail<T>(e: string): Result<T> {
-  return {
-    type: "error",
-    error: new Error(e),
-  };
-}
 
 export type ProviderName = "Blockfrost" | "Koios" | "Kupmios" | "Maestro";
 
@@ -158,6 +146,68 @@ export const setupLucid = async (
     process.exit(1);
   }
 };
+
+export const findSpentAndProducedUTxOs = (
+  txCBOR: string,
+): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> => {
+  try {
+    const spent: OutRef[] = [];
+    const produced: UTxO[] = [];
+    const tx = CML.Transaction.from_cbor_hex(txCBOR);
+    const txBody = tx.body();
+    const inputs = txBody.inputs();
+    const outputs = txBody.outputs();
+    for (let i = 0; i < inputs.len(); i++) {
+      try {
+        spent.push(coreToOutRef(inputs.get(i)));
+      } catch (e) {
+        console.log(e);
+      }
+    }
+    const txHash = CML.hash_transaction(txBody).to_hex();
+    for (let i = 0; i < outputs.len(); i++) {
+      try {
+        const utxo: UTxO = {
+          txHash: txHash,
+          outputIndex: i,
+          ...coreToTxOutput(outputs.get(i)),
+        };
+        produced.push(utxo);
+      } catch (e) {
+        console.log(e);
+      }
+    }
+    return Effect.succeed({ spent, produced });
+  } catch (_e) {
+    return Effect.fail(
+      new Error("Something went wrong decoding the transaction"),
+    );
+  }
+};
+
+export const findAllSpentAndProducedUTxOs = (
+  txCBORs: string[],
+): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> =>
+  Effect.gen(function* () {
+    const allEffects = Effect.validateAll(findSpentAndProducedUTxOs)(txCBORs);
+    const allSpentsAndProduces = yield* Effect.mapError(
+      allEffects,
+      (errors: [Error, ...Error[]]) => {
+        return new Error(errors.map((e) => `${e}`).join("\n"));
+      },
+    );
+    return allSpentsAndProduces.reduce(
+      (
+        { spent: spentAcc, produced: producedAcc },
+        { spent: currSpent, produced: currProduced },
+      ) => {
+        return {
+          spent: [...spentAcc, ...currSpent],
+          produced: [...producedAcc, ...currProduced],
+        };
+      },
+    );
+  });
 
 export const ENV_VARS_GUIDE = `
 Make sure you first have set the environment variable for your seed phrase:
