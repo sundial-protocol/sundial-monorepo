@@ -44,7 +44,7 @@ pub type EventType {
 pub type MintRedeemer {
   Init
   Deinit
-  MintNFT {
+  SpawnSettlement {
     anchor_node_input_index: Int,
     anchor_node_output_index: Int,
     node_output_index: Int,
@@ -52,5 +52,5 @@ pub type MintRedeemer {
     hub_ref_input_index: Int,
     confirmed_state_output_index: Int,
   }
-  BurnNFT
+  RemoveSettlement
 }

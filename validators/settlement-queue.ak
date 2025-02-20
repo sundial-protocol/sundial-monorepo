@@ -17,7 +17,7 @@ use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue.{
-  BurnNFT, ClaimAsResolved, ConcludeSettlement, Datum, MintNFT, MintRedeemer,
+  RemoveSettlement, ClaimAsResolved, ConcludeSettlement, Datum, SpawnSettlement, MintRedeemer,
   NodeData, RevokeResolvedFlag, SpendRedeemer, UpdateResolvedFlag,
 }
 use midgard/state_queue
@@ -162,7 +162,7 @@ validator main(
                   new_commitment_time,
                 )}: active_operators.Datum = active_operators_data
 
-                // 13. The only change in the updated time must be the addition
+                // 13. The only change in the updated datum must be the addition
                 //     of the new commitment time as the moment of claim.
                 let expected_cont_output_datum_data: Data =
                   NodeDatum {
@@ -257,13 +257,14 @@ validator main(
                 expect slashed_active_operator_key == operator_vkey
 
                 // 8. The only change in the datum should be removal of the
-                //    claim.
+                //    claim, and also removal of the operator.
                 let expected_cont_output_datum_data: Data =
                   NodeDatum {
                     ..node_datum,
                     data: NodeData {
                       ..node_data,
                       time_of_claimed_as_resolved: None,
+                      operator: None,
                     },
                   }
                 cont_output_datum_data == expected_cont_output_datum_data
@@ -298,7 +299,7 @@ validator main(
         // expect _own_nft_qty == 1
         // 3. The spending NFT must be burnt. Since there are only 2 endpoints
         //    available in the minting logic, one of which expects the mint
-        //    quantity to be 2, this automatically validates the other endpoint
+        //    quantity to be 1, this automatically validates the other endpoint
         //    is invoked (i.e. the burning endpoint).
         expect [Pair(burnt_asset_name, burn_qty)] =
           mint |> assets.tokens(own_hash) |> dict.to_pairs
@@ -312,7 +313,7 @@ validator main(
 
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
     when redeemer is {
-      MintNFT {
+      SpawnSettlement {
         anchor_node_input_index,
         anchor_node_output_index,
         node_output_index,
@@ -474,7 +475,7 @@ validator main(
       // TODO: Is validation on the state queue redeemer needed? I.e. are
       // there any scenarios for spending the confirmed state other than the
       // merging tx?
-      BurnNFT -> {
+      RemoveSettlement -> {
         expect [Input { .. }] =
           tx.inputs
             |> list.filter(
