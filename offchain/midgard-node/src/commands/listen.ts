@@ -18,11 +18,15 @@ import * as LatestLedgerDB from "../database/latestLedger.js";
 import * as ConfirmedLedgerDB from "../database/confirmedLedger.js";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
-import { Duration, Effect, Option, Schedule } from "effect";
+import { Duration, Effect, Option, Schedule, Metric } from "effect";
 import { modifyMultipleTables } from "@/database/utils.js";
 import { User, NodeConfig } from "@/config.js";
 import { initializeDb } from "@/database.js";
 import { outRefsAreEqual, utxoToOutRef } from "@/transactions/utils.js";
+import { NodeSdk } from "@effect/opentelemetry";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = (
@@ -65,7 +69,11 @@ export const listen = (
 ): Effect.Effect<void, never, never> =>
   Effect.sync(() => {
     const app = express();
-
+    const txCounter = Metric.counter("tx_count", {
+      description: "A counter for tracking transactions",
+      bigint: true,
+      incremental: true,
+    }).pipe(Metric.tagged("environment", lucid.config().network!));
     app.get("/tx", (req, res) => {
       res.type("text/plain");
       const txHash = req.query.tx_hash;
@@ -174,6 +182,7 @@ export const listen = (
             [MempoolLedgerDB.clearUTxOs, spent],
             [MempoolLedgerDB.insert, produced],
           );
+          await Effect.runPromise(txCounter(Effect.succeed(1n)));
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
           res.status(400).json({ message: "Something went wrong" });
@@ -245,10 +254,23 @@ export const runNode = Effect.gen(function* () {
   const db = yield* Effect.tryPromise(() =>
     initializeDb(nodeConfig.DATABASE_PATH),
   );
+  const MetricsLive = NodeSdk.layer(() => ({
+    resource: { serviceName: "midgard-node" },
+    spanProcessor: new BatchSpanProcessor(
+      new OTLPTraceExporter({
+        url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
+      }),
+    ),
+    metricReader: new PrometheusExporter({ port: nodeConfig.PROMETHEUS_PORT }),
+  }));
 
   yield* Effect.all([
     listen(user, db, nodeConfig.PORT),
     monitorStateQueue(user, db, nodeConfig.POLLING_INTERVAL),
     monitorConfirmedState(user, nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
-  ]);
+  ]).pipe(
+    Effect.withSpan("midgard-node"),
+    Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
+    Effect.provide(MetricsLive),
+  );
 });
