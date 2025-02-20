@@ -1,4 +1,4 @@
-import { Address, PolicyId } from "@lucid-evolution/lucid";
+import { Address, PolicyId, Script } from "@lucid-evolution/lucid";
 import { MerkleRoot, POSIXTime } from "@/types/contracts/common.js";
 
 export type FetchConfig = {
@@ -10,4 +10,10 @@ export type CommitBlockParams = {
   newUTxOsRoot: MerkleRoot;
   transactionsRoot: MerkleRoot;
   endTime: POSIXTime;
+  stateQueueSpendingScript: Script;
+};
+
+export type MergeParams = {
+  stateQueueSpendingScript: Script;
+  stateQueueMintingScript: Script;
 };
