@@ -1,6 +1,6 @@
 import { ConfirmedState } from "@/types/contracts/ledger-state.js";
 import { NodeDatum } from "@/types/contracts/linked-list/index.js";
-import { LucidEvolution, TxBuilder, Assets, PolicyId, toUnit, Address, Data } from "@lucid-evolution/lucid";
+import { LucidEvolution, TxBuilder, Assets, PolicyId, toUnit, Address, Data, OutputDatum } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 
 export type InitParams = {
@@ -35,10 +35,10 @@ export const initTxBuilder = (
   const datum : NodeDatum = {
     key: { Key: { key: "" } },
     next: { Key: { key: "" } },
-    data: Data.Object(confirmedState)
+    data: Data.to<Data>(confirmedState)
   }
 
   tx.mintAssets(assets)
-  tx.pay.ToAddressWithData(params.address, datum, assets)
+  .pay.ToAddressWithData(params.address, datum, assets)
   return Effect.succeed(tx)
 };
