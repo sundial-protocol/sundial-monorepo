@@ -21,7 +21,7 @@ The timestamp in the operator's node in the Operator Directory should be updated
 \tipbox{Perhaps resolving a settlement node should also release to the operator the user fees collected for processing the deposits and withdrawals in the node.
 This would incentivize the operator to promptly resolve settlement nodes.}
 
-The linked list structure here allows for refunds whenever an event has not been included in the confirmed state (an example scenario would be fraudulent exclusion of an event that goes unnoticed). With an unordered linked list, along with captured time ranges block commitments in settlement nodes, time gaps in this queue and missing events can be validated for refunds. Therefore, the refund process can be broken down as such:
+The linked list structure here allows for refunds whenever an event has not been included in the confirmed state (an example scenario would be fraudulent exclusion of an event that goes unnoticed). With an unordered linked list, along with captured time ranges of block commitments in settlement nodes, time gaps in this queue and missing events can be validated for refunds. Therefore, the refund process can be broken down as such:
 \begin{itemize}
   \item Inclusion time of the event must be behind confirmed state's end time.
   \item If the inclusion time falls in one of the time gaps of settlement queue, refund request is valid.
