@@ -6,27 +6,41 @@ This directory contains the documentation website for Midgard, built with [Nextr
 
 To start the development server:
 
-```bash
-# Install dependencies
+```
 pnpm install
+```
 
-# Start development server
+```
 pnpm dev
 ```
 
-The site will be available at [http://localhost:3000](http://localhost:3000).
+> Local development server will be available at [http://localhost:3000](http://localhost:3000).
 
 ## Structure
 
 ```
-docs/
-├── app/           # Next.js app directory
-├── content/       # Documentation content (MDX files)
-├── components/    # React components
-├── public/        # Static assets
-└── styles/        # CSS styles
+documentation/
+├── app/
+├── components/
+├── content/          # Documentation content (MDX files)
+│   ├── index.mdx     # Landing page
+│   ├── user-facing/
+│   └── architectural-decision-records/
+│       └── 000-example-adr.mdx # ADR template
+│
+├── public/
+└── styles/
 ```
 
-## Adding Content
+## Writing Documentation
 
-Documentation content is written in MDX and stored in the `content` directory. The sidebar navigation is automatically generated from the file structure.
+### Regular Documentation
+
+Add your `.mdx` files to the appropriate directory under `content/`.Documentation content is written in MDX with optional Nextra components and stored in the `content` directory. The sidebar navigation is automatically generated from the file structure.
+
+### Architectural Decisions
+
+For new ADRs, copy the template from `content/architectural-decision-records/000-example-adr.mdx`:
+
+1. Create a new file: `content/architectural-decision-records/00X-title.mdx`
+2. Fill in the sections
