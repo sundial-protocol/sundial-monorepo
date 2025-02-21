@@ -18,7 +18,7 @@ importers:
         specifier: ^0.44.2
         version: 0.44.2(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.28.0)(effect@3.13.2)
       '@lucid-evolution/lucid':
-        specifier: ^0.4.20
+        specifier: ^0.4.23
         version: 0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)
       '@opentelemetry/exporter-prometheus':
         specifier: ^0.57.2
@@ -39,13 +39,13 @@ importers:
         specifier: ^5.4.1
         version: 5.4.1
       commander:
-        specifier: ^13.0.0
+        specifier: ^13.1.0
         version: 13.1.0
       dotenv:
-        specifier: ^16.4.5
+        specifier: ^16.4.7
         version: 16.4.7
       effect:
-        specifier: ^3.12.10
+        specifier: ^3.13.2
         version: 3.13.2
       express:
         specifier: ^4.21.2
@@ -54,23 +54,23 @@ importers:
         specifier: ^5.1.7
         version: 5.1.7
       vitest:
-        specifier: ^3.0.3
+        specifier: ^3.0.6
         version: 3.0.6(@types/node@22.13.4)
     devDependencies:
       '@commander-js/extra-typings':
-        specifier: ^13.0.0
+        specifier: ^13.1.0
         version: 13.1.0(commander@13.1.0)
       '@types/express':
         specifier: ^5.0.0
         version: 5.0.0
       '@types/node':
-        specifier: ^22.10.7
+        specifier: ^22.13.4
         version: 22.13.4
       prettier:
-        specifier: ^3.2.5
+        specifier: ^3.5.1
         version: 3.5.1
       tsup:
-        specifier: ^8.3.5
+        specifier: ^8.3.6
         version: 8.3.6(postcss@8.5.3)(typescript@5.7.3)
       typescript:
         specifier: ^5.7.3
@@ -82,7 +82,7 @@ packages:
     resolution: {integrity: sha512-yEie4HFRoQS+ShbEYGNcVEQKFvnClXHFEysYT7lqoL1FGVxwvWWTBsctsEXolUIvusslztzrnJyUG67KGljBKw==}
 
   '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-pderQ082cuJV/kPnEgRUYuad3qqEyKoeuj43FFggGXXfX4EXFVtTigf2xxRYZsFKNoy4UpNXJUwoRrgjPqQqtg==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-ny/9PD6u2d7ukC/KUxrcn33yzI+GKtZ+F7NNgICtW23Pm2sPuw37rBgCWWsnRy5rbAF/WnaUOfppFDkwNefv6g==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
     version: 0.1.0
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2':

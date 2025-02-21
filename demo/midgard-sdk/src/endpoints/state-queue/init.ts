@@ -1,20 +1,27 @@
 import { makeReturn } from "@/core.js";
-import { LucidEvolution, TxBuilder, Assets, PolicyId, toUnit, TxSignBuilder } from "@lucid-evolution/lucid";
+import {
+  LucidEvolution,
+  TxBuilder,
+  Assets,
+  PolicyId,
+  toUnit,
+  TxSignBuilder,
+} from "@lucid-evolution/lucid";
 import { initTxBuilder } from "@/tx-builder/state-queue/init.js";
 import { Effect } from "effect";
 import { InitParams } from "@/types/state-queue.js";
 
 export const initTxProgram = (
-    lucid: LucidEvolution,
-    initParams: InitParams,
-  ): Effect.Effect<TxSignBuilder, Error> =>
-    Effect.gen(function* () {
-      const completedTx = yield* initTxBuilder(lucid, initParams);
-      return yield* Effect.tryPromise({
-        try: () => completedTx.complete(),
-        catch: (e) => new Error(`${e}`),
-      });
+  lucid: LucidEvolution,
+  initParams: InitParams,
+): Effect.Effect<TxSignBuilder, Error> =>
+  Effect.gen(function* () {
+    const completedTx = yield* initTxBuilder(lucid, initParams);
+    return yield* Effect.tryPromise({
+      try: () => completedTx.complete(),
+      catch: (e) => new Error(`${e}`),
     });
+  });
 
 /**
  * Builds completed tx for iniitalizing the state queue.
@@ -25,8 +32,7 @@ export const initTxProgram = (
  */
 
 export const initTx = (
-      lucid: LucidEvolution,
-      initParams: InitParams,
-    ): Promise<TxSignBuilder> =>
-      makeReturn(initTxProgram(lucid, initParams)
-    ).unsafeRun();
+  lucid: LucidEvolution,
+  initParams: InitParams,
+): Promise<TxSignBuilder> =>
+  makeReturn(initTxProgram(lucid, initParams)).unsafeRun();

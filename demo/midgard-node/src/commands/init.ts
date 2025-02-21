@@ -1,13 +1,10 @@
-import {
-    LucidEvolution,
-    Address,
-  } from "@lucid-evolution/lucid";
+import { LucidEvolution, Address } from "@lucid-evolution/lucid";
 import { Effect, Option } from "effect";
 import { stateQueueInit } from "@/transactions/state-queue/init.js";
 import { User } from "@/config.js";
 
-export const init = (
-  ) => Effect.gen(function* () {
+export const init = () =>
+  Effect.gen(function* () {
     const { user } = yield* User;
-    stateQueueInit(user)
+    stateQueueInit(user);
   });
