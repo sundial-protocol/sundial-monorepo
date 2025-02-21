@@ -13,11 +13,11 @@ import { Effect } from "effect";
  */
 export const initTxBuilder = (
   lucid: LucidEvolution,
-  params: InitParams
+  { policyId, address, stateQueueMintingScript }: InitParams
 ): Effect.Effect <TxBuilder, Error> => {
   const tx = lucid.newTx();
   const assets : Assets = {
-    [toUnit(params.policyId, "Node")]: 1n,
+    [toUnit(policyId, "Node")]: 1n,
    }
 
   const confirmedState: ConfirmedState =  {
@@ -40,7 +40,8 @@ export const initTxBuilder = (
   }
 
   tx.mintAssets(assets)
-  .pay.ToAddressWithData(params.address, outputDatum, assets)
+  .pay.ToAddressWithData(address, outputDatum, assets)
+  .attach.Script(stateQueueMintingScript)
   return Effect.succeed(tx)
 };
 

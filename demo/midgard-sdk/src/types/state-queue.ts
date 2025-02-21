@@ -19,6 +19,7 @@ export type MergeParams = {
 };
 
 export type InitParams = {
-  policyId : PolicyId
-, address : Address
+  policyId : PolicyId;
+  address : Address;
+  stateQueueMintingScript: Script
 };
