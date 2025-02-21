@@ -5,7 +5,7 @@ use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
 use aiken_design_patterns/linked_list/ordered
 use aiken_design_patterns/linked_list/unordered.{
-  Key, NodeDatum, get_node_outputs,
+  Key, NodeDatum, get_node_outputs, serialize_key,
 }
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
@@ -380,7 +380,7 @@ validator mint (hub_oracle: ScriptHash) {
         // 3. Validate appending to the end of linked list.
         expect
           unordered.append_unsafe(
-            key_to_append: Key(confirmed_state_header_hash),
+            key_to_append: Key(serialize_key(confirmed_state_header_hash)),
             appended_node_index: node_output_index,
             anchor_node_output_index: anchor_node_output_index,
             node_inputs: [input_anchor_output],
@@ -462,13 +462,17 @@ validator mint (hub_oracle: ScriptHash) {
           ..
         } = block_datum.data
 
-        // 8. Validate the produced output datums.
-        let expected_produced_deposits_datum_data: Data =
+        // 8. Validate the produced output datum.
+        let expected_produced_node_datum_data: Data =
           NodeDatum {
-            mpf_root: deposits_root,
-            time_of_claimed_as_resolved: None,
-            operator: Some(operator_vkey),
-            tree_content: settlement_queue.Deposit,
+            data: NodeData {
+              mpf_root: deposits_root,
+              time_of_claimed_as_resolved: None,
+              operator: Some(operator_vkey),
+              tree_content: settlement_queue.Deposit,
+            },
+            link: Empty,
+            key: Key(),
           }
         let expected_produced_withdrawals_datum_data: Data =
           Datum {
