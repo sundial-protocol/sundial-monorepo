@@ -11,7 +11,7 @@ export type TransactionRequestParams = {};
  */
 export const transactionRequestTxBuilder = (
   lucid: LucidEvolution,
-  params: TransactionRequestParams
+  params: TransactionRequestParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

@@ -11,7 +11,7 @@ export type RetireParams = {};
  */
 export const retireTxBuilder = (
   lucid: LucidEvolution,
-  params: RetireParams
+  params: RetireParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

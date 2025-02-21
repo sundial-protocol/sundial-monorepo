@@ -18,15 +18,14 @@ import { hashHeader } from "@/utils/ledger-state.js";
 export const commitTxBuilder = (
   lucid: LucidEvolution,
   config: FetchConfig,
-  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams
+  { newUTxOsRoot, transactionsRoot, endTime }: CommitBlockParams,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
     const latestNodeDatum = yield* getNodeDatumFromUTxO(latestBlock);
     const latestHeaderProgram: Effect.Effect<Header, Error> = Effect.try({
       try: () => Data.castFrom(latestNodeDatum.data, Header),
-      catch: (e) =>
-        new Error(`Failed coercing latest block's datum: ${e}`),
+      catch: (e) => new Error(`Failed coercing latest block's datum: ${e}`),
     });
     const latestHeader: Header = yield* latestHeaderProgram;
     const prevHeaderHash = yield* hashHeader(latestHeader);
@@ -47,7 +46,7 @@ export const commitTxBuilder = (
       .pay.ToContract(
         config.stateQueueAddress,
         { kind: "inline", value: Data.to(newHeader, Header) },
-        latestBlock.assets
+        latestBlock.assets,
       );
     return tx;
   });

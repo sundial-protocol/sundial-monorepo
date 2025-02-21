@@ -11,7 +11,7 @@ export type RegisterParams = {};
  */
 export const registerTxBuilder = (
   lucid: LucidEvolution,
-  params: RegisterParams
+  params: RegisterParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;

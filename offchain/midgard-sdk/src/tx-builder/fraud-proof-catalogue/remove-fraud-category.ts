@@ -11,7 +11,7 @@ export type RemoveCategoryParams = {};
  */
 export const removeCategoryTxBuilder = (
   lucid: LucidEvolution,
-  params: RemoveCategoryParams
+  params: RemoveCategoryParams,
 ): TxBuilder => {
   const tx = lucid.newTx();
   return tx;
