@@ -7,6 +7,7 @@ import * as packageJson from "../package.json";
 import { Effect, pipe } from "effect";
 import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
+import { init } from "./commands/init.js";
 
 dotenv.config();
 const VERSION = packageJson.default.version;
@@ -56,6 +57,12 @@ program.command("listen").action(async () => {
     Effect.provide(User.layer),
     Effect.provide(NodeConfig.layer),
   );
+
+  await Effect.runPromiseExit(program);
+});
+
+program.command("init").action(async () => {
+  const program = pipe(init, Effect.provide(User.layer));
 
   await Effect.runPromiseExit(program);
 });

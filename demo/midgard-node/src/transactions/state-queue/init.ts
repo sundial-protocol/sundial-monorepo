@@ -1,6 +1,5 @@
 import {
   LucidEvolution,
-  Address,
   validatorToAddress,
   Script,
 } from "@lucid-evolution/lucid";
@@ -19,7 +18,7 @@ export const stateQueueInit = (lucid: LucidEvolution) =>
       type: "PlutusV3",
       script: Blueprint.default.validators[0].compiledCode,
     };
-    const networkType = lucid.config().network ?? "Preprod"
+    const networkType = lucid.config().network ?? "Preprod";
     const initParams: SDK.Types.InitParams = {
       address: validatorToAddress(networkType, spendingScript),
       policyId: Blueprint.default.validators[0].hash,

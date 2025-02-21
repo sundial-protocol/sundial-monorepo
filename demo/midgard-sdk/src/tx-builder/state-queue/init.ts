@@ -4,13 +4,10 @@ import { InitParams } from "@/types/state-queue.js";
 import {
   LucidEvolution,
   TxBuilder,
-  PolicyId,
-  Address,
   Assets,
   toUnit,
   Data,
   OutputDatum,
-  CBORHex,
 } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 
@@ -25,7 +22,6 @@ export const initTxBuilder = (
   lucid: LucidEvolution,
   { policyId, address, stateQueueMintingScript }: InitParams,
 ): Effect.Effect<TxBuilder, Error> => {
-  const tx = lucid.newTx();
   const assets: Assets = {
     [toUnit(policyId, "Node")]: 1n,
   };
@@ -49,7 +45,9 @@ export const initTxBuilder = (
     value: Data.to(datum, NodeDatum),
   };
 
-  tx.mintAssets(assets)
+  const tx = lucid
+    .newTx()
+    .mintAssets(assets)
     .pay.ToAddressWithData(address, outputDatum, assets)
     .attach.Script(stateQueueMintingScript);
   return Effect.succeed(tx);
