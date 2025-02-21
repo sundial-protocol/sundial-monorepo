@@ -1,3 +1,5 @@
+import { Writable } from 'node:stream';
+
 import { Assets, CML, Data, walletFromSeed } from '@lucid-evolution/lucid';
 
 /**
@@ -60,3 +62,18 @@ export const getPrivateKeyCborHex = (privateKey: string): string => {
     )
   );
 };
+
+/**
+ * Ensures the writable stream is ready before writing
+ * @param writable - The writable stream to check
+ * @returns Promise that resolves when the stream is writable
+ */
+const waitWritable = (writable: Writable): Promise<void> => {
+  return new Promise((resolve) => {
+    setInterval(() => {
+      if (writable.writable) resolve();
+    }, 10);
+  });
+};
+
+export { waitWritable };
