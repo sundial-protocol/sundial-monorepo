@@ -1,6 +1,5 @@
 import { Effect } from "effect";
-import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
-import { utxosAtByNFTPolicyId } from "@/utils/common.js";
+import { LucidEvolution, UTxO, toUnit } from "@lucid-evolution/lucid";
 import { makeReturn } from "@/core.js";
 import { getConfirmedStateFromUTxO } from "@/utils/state-queue.js";
 import { ConfirmedState } from "@/types/contracts/ledger-state.js";
@@ -17,7 +16,7 @@ export const fetchConfirmedStateAndItsLinkProgram = (
       try: () =>
         lucid.utxosAtWithUnit(
           config.stateQueueAddress,
-          config.stateQueuePolicyId + "4e6f6465", // "Node" in hex
+          toUnit(config.stateQueuePolicyId, "Node"),
         ),
       catch: (e) => new Error(`Failed to fetch root UTxOs: ${e}`),
     });
