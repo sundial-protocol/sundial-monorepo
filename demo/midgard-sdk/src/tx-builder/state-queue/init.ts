@@ -1,13 +1,8 @@
 import { ConfirmedState } from "@/types/contracts/ledger-state.js";
 import { NodeDatum } from "@/types/contracts/linked-list/index.js";
+import { InitParams } from "@/types/state-queue.js";
 import { LucidEvolution, TxBuilder, PolicyId, Address, Assets, toUnit, Data, OutputDatum, CBORHex } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
-
-
-export type InitParams = {
-    policyId : PolicyId
-  , address : Address
-};
 
 /**
  * Init
@@ -22,7 +17,7 @@ export const initTxBuilder = (
 ): Effect.Effect <TxBuilder, Error> => {
   const tx = lucid.newTx();
   const assets : Assets = {
-    [toUnit(params.policyId, "Init")]: 1n,
+    [toUnit(params.policyId, "Node")]: 1n,
    }
 
   const confirmedState: ConfirmedState =  {

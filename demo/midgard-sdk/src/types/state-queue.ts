@@ -17,3 +17,8 @@ export type MergeParams = {
   stateQueueSpendingScript: Script;
   stateQueueMintingScript: Script;
 };
+
+export type InitParams = {
+  policyId : PolicyId
+, address : Address
+};
