@@ -182,7 +182,7 @@ export const listen = (
             [MempoolLedgerDB.clearUTxOs, spent],
             [MempoolLedgerDB.insert, produced],
           );
-          await Effect.runPromise(txCounter(Effect.succeed(1n)));
+          Effect.runSync(Metric.increment(txCounter));
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
           res.status(400).json({ message: "Something went wrong" });
@@ -261,7 +261,9 @@ export const runNode = Effect.gen(function* () {
         url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
       }),
     ),
-    metricReader: new PrometheusExporter({ port: nodeConfig.PROMETHEUS_PORT }),
+    metricReader: new PrometheusExporter({
+      port: nodeConfig.PROM_METRICS_PORT,
+    }),
   }));
 
   yield* Effect.all([

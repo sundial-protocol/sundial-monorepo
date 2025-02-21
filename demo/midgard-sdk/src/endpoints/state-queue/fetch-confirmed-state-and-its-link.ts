@@ -1,6 +1,5 @@
 import { Effect } from "effect";
-import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
-import { utxosAtByNFTPolicyId } from "@/utils/common.js";
+import { LucidEvolution, UTxO, toUnit } from "@lucid-evolution/lucid";
 import { makeReturn } from "@/core.js";
 import { getConfirmedStateFromUTxO } from "@/utils/state-queue.js";
 import { ConfirmedState } from "@/types/contracts/ledger-state.js";
@@ -13,16 +12,19 @@ export const fetchConfirmedStateAndItsLinkProgram = (
   config: FetchConfig,
 ): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, Error> =>
   Effect.gen(function* () {
-    const allBlocks = yield* utxosAtByNFTPolicyId(
-      lucid,
-      config.stateQueueAddress,
-      config.stateQueuePolicyId,
-    );
+    const rootUTxOs = yield* Effect.tryPromise({
+      try: () =>
+        lucid.utxosAtWithUnit(
+          config.stateQueueAddress,
+          toUnit(config.stateQueuePolicyId, "Node"),
+        ),
+      catch: (e) => new Error(`Failed to fetch root UTxOs: ${e}`),
+    });
     let confirmedStateResult:
       | { data: ConfirmedState; link: NodeKey }
       | undefined;
     const filteredForConfirmedState = yield* Effect.allSuccesses(
-      allBlocks.map((u: UTxO) => {
+      rootUTxOs.map((u: UTxO) => {
         const confirmedStateEffect = getConfirmedStateFromUTxO(u);
         return Effect.map(confirmedStateEffect, (confirmedState) => {
           confirmedStateResult = confirmedState;
@@ -35,7 +37,7 @@ export const fetchConfirmedStateAndItsLinkProgram = (
       if (confirmedStateResult.link !== "Empty") {
         const firstLink = confirmedStateResult.link.Key;
         const filteredForLink = yield* Effect.allSuccesses(
-          allBlocks.map((u: UTxO) => {
+          rootUTxOs.map((u: UTxO) => {
             const nodeDatumEffect = getNodeDatumFromUTxO(u);
             return Effect.andThen(nodeDatumEffect, (nodeDatum) => {
               if (
