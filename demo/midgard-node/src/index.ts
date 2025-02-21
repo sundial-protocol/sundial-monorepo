@@ -62,7 +62,11 @@ program.command("listen").action(async () => {
 });
 
 program.command("init").action(async () => {
-  const program = pipe(init, Effect.provide(User.layer));
+  const program = pipe(
+    init,
+    Effect.provide(User.layer),
+    Effect.provide(NodeConfig.layer),
+  );
 
   await Effect.runPromiseExit(program);
 });
