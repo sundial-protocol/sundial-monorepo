@@ -1,9 +1,4 @@
-import {
-  LucidEvolution,
-  validatorToAddress,
-  Script,
-} from "@lucid-evolution/lucid";
-import { Console, Effect } from "effect";
+import { Effect } from "effect";
 import { handleSignSubmit } from "../utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
