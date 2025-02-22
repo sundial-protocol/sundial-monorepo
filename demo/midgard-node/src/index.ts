@@ -3,14 +3,15 @@
 import { Command } from "commander";
 import { ENV_VARS_GUIDE, chalk } from "./utils.js";
 import { runNode } from "./commands/listen.js";
-import * as packageJson from "../package.json";
+import packageJson from "../package.json" with { type: "json" };
 import { Effect, pipe } from "effect";
 import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
-import { init } from "./commands/init.js";
+import { AlwaysSucceedsContract } from "./services/always-succeeds.js";
+import { stateQueueInit } from "./transactions/state-queue/init.js";
 
 dotenv.config();
-const VERSION = packageJson.default.version;
+const VERSION = packageJson.version;
 
 const program = new Command();
 
@@ -63,8 +64,9 @@ program.command("listen").action(async () => {
 
 program.command("init").action(async () => {
   const program = pipe(
-    init,
+    stateQueueInit,
     Effect.provide(User.layer),
+    Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
   );
 

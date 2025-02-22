@@ -3,29 +3,23 @@ import {
   validatorToAddress,
   Script,
 } from "@lucid-evolution/lucid";
-import { Effect } from "effect";
+import { Console, Effect } from "effect";
 import { handleSignSubmit } from "../utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import * as Blueprint from "../../../../always-succeeds/plutus.json";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { User } from "@/config.js";
 
-export const stateQueueInit = (lucid: LucidEvolution) =>
-  Effect.gen(function* () {
-    const spendingScript: Script = {
-      type: "PlutusV3",
-      script: Blueprint.default.validators[1].compiledCode,
-    };
-    const mintingScript: Script = {
-      type: "PlutusV3",
-      script: Blueprint.default.validators[0].compiledCode,
-    };
-    const networkType = lucid.config().network ?? "Preprod";
-    const initParams: SDK.Types.InitParams = {
-      address: validatorToAddress(networkType, spendingScript),
-      policyId: Blueprint.default.validators[0].hash,
-      stateQueueMintingScript: mintingScript,
-    };
+export const stateQueueInit = Effect.gen(function* () {
+  const { user: lucid } = yield* User;
+  const { spendScriptAddress, mintScript, policyId } =
+    yield* AlwaysSucceedsContract;
+  const initParams: SDK.Types.InitParams = {
+    address: spendScriptAddress,
+    policyId: policyId,
+    stateQueueMintingScript: mintScript,
+  };
 
-    const txBuilder = yield* SDK.Endpoints.initTxProgram(lucid, initParams);
+  const txBuilder = yield* SDK.Endpoints.initTxProgram(lucid, initParams);
 
-    yield* handleSignSubmit(lucid, txBuilder);
-  });
+  yield* handleSignSubmit(lucid, txBuilder);
+});

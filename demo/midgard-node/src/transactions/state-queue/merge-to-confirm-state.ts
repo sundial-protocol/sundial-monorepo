@@ -16,7 +16,7 @@ import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import * as BlocksDB from "@/database/blocks.js";
 import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
 import { modifyMultipleTables } from "@/database/utils.js";
-import * as Blueprint from "../../../../always-succeeds/plutus.json";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 
 /**
  * Build and submit the merge transaction.
@@ -38,19 +38,14 @@ export const buildAndSubmitMergeTx = (
       fetchFirstBlockTxs(lucid, fetchConfig, db),
     );
 
+    const { mintScript, spendScript } = yield* AlwaysSucceedsContract;
     // Build the transaction
     const txBuilder = yield* SDK.Endpoints.mergeToConfirmedStateProgram(
       lucid,
       fetchConfig,
       {
-        stateQueueSpendingScript: {
-          type: "PlutusV3",
-          script: Blueprint.default.validators[1].compiledCode,
-        },
-        stateQueueMintingScript: {
-          type: "PlutusV3",
-          script: Blueprint.default.validators[0].compiledCode,
-        },
+        stateQueueSpendingScript: spendScript,
+        stateQueueMintingScript: mintScript,
       },
     );
 
