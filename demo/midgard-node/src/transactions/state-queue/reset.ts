@@ -1,23 +1,18 @@
 import * as SDK from "@al-ft/midgard-sdk";
 import { LucidEvolution, Script, UTxO, toUnit } from "@lucid-evolution/lucid";
-import * as Blueprint from "../../../../always-succeeds/plutus.json" with { type: "json" };
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { User } from "@/config.js";
 import { Effect } from "effect";
 import { handleSignSubmit } from "../utils.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
   fetchConfig: SDK.Types.FetchConfig,
+  stateQueueSpendingScript: Script,
+  stateQueueMintingScript: Script,
   utxosAndAssetNames: { utxo: UTxO; assetName: string }[],
 ): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
-    const stateQueueMintingScript: Script = {
-      type: "PlutusV3",
-      script: Blueprint.default.validators[0].compiledCode,
-    };
-    const stateQueueSpendingScript: Script = {
-      type: "PlutusV3",
-      script: Blueprint.default.validators[1].compiledCode,
-    };
     const tx = lucid.newTx();
     utxosAndAssetNames.map(({ utxo, assetName }) => {
       tx.collectFrom([utxo], "d87980") // TODO: Placeholder redeemer.
@@ -33,17 +28,30 @@ const collectAndBurnStateQueueNodesProgram = (
     return yield* handleSignSubmit(lucid, completed);
   });
 
-export const resetStateQueue = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
-) =>
-  Effect.gen(function* () {
-    const allUTxOsAndAssetNames =
-      yield* SDK.Endpoints.fetchAllStateQueueUTxOsProgram(lucid, fetchConfig);
-    // Collect and burn 10 UTxOs and asset names at a time:
-    const batchSize = 10;
-    for (let i = 0; i < allUTxOsAndAssetNames.length; i += batchSize) {
-      const batch = allUTxOsAndAssetNames.slice(i, i + batchSize);
-      yield* collectAndBurnStateQueueNodesProgram(lucid, fetchConfig, batch);
-    }
-  });
+//   lucid: LucidEvolution,
+//   fetchConfig: SDK.Types.FetchConfig,
+// ) =>
+export const resetStateQueue = Effect.gen(function* () {
+  const { user: lucid } = yield* User;
+  const alwaysSucceeds = yield* AlwaysSucceedsContract;
+  const fetchConfig: SDK.Types.FetchConfig = {
+    stateQueuePolicyId: alwaysSucceeds.policyId,
+    stateQueueAddress: alwaysSucceeds.spendScriptAddress,
+  }
+
+  const allUTxOsAndAssetNames =
+    yield* SDK.Endpoints.fetchAllStateQueueUTxOsProgram(lucid, fetchConfig);
+
+  // Collect and burn 10 UTxOs and asset names at a time:
+  const batchSize = 10;
+  for (let i = 0; i < allUTxOsAndAssetNames.length; i += batchSize) {
+    const batch = allUTxOsAndAssetNames.slice(i, i + batchSize);
+    yield* collectAndBurnStateQueueNodesProgram(
+      lucid,
+      fetchConfig,
+      alwaysSucceeds.spendScript,
+      alwaysSucceeds.mintScript,
+      batch,
+    );
+  }
+});

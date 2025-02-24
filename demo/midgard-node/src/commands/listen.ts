@@ -30,6 +30,7 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { stateQueueInit } from "@/transactions/state-queue/init.js";
+import {resetStateQueue} from "@/transactions/state-queue/reset.js";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = (
@@ -146,8 +147,22 @@ export const listen = (
       }
     });
 
-    app.get("/clear", async (_req, res) => {
+    app.get("/reset", async (_req, res) => {
       res.type("text/plain");
+      try {
+        const program = pipe(
+          resetStateQueue,
+          Effect.provide(User.layer),
+          Effect.provide(AlwaysSucceedsContract.layer),
+          Effect.provide(NodeConfig.layer),
+        );
+        await Effect.runPromise(program);
+        res.json({ message: "Collected all UTxOs successfully!" });
+      } catch(_e) {
+        res
+          .status(400)
+          .json({ message: "Failed to collect one or more UTxOs. Please try again." });
+      }
       try {
         await Promise.all([
           MempoolDB.clear(db),
@@ -157,10 +172,11 @@ export const listen = (
           LatestLedgerDB.clear(db),
           ConfirmedLedgerDB.clear(db),
         ]);
+        res.json({ message: "Cleared all tables successfully!" });
       } catch (_e) {
         res
           .status(400)
-          .json({ message: "Failed to clear one or more tables." });
+          .json({ message: "Failed to clear one or more tables. Please try again." });
       }
     });
 
