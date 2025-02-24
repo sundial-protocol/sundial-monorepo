@@ -2,7 +2,6 @@ import { findSpentAndProducedUTxOs, isHexString, logInfo } from "../utils.js";
 import {
   LucidEvolution,
   OutRef,
-  UTxO,
   getAddressDetails,
 } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
@@ -28,6 +27,7 @@ import { stateQueueInit } from "@/transactions/state-queue/init.js";
 import { resetStateQueue } from "@/transactions/state-queue/reset.js";
 import { buildAndSubmitCommitmentBlock } from "@/transactions/state-queue/commit-block-header.js";
 import { buildAndSubmitMergeTx } from "@/transactions/state-queue/merge-to-confirm-state.js";
+import {logError} from "effect/Effect";
 
 export const listen = (
   lucid: LucidEvolution,
@@ -122,10 +122,14 @@ export const listen = (
           Effect.provide(AlwaysSucceedsContract.layer),
           Effect.provide(NodeConfig.layer),
         );
-        await Effect.runPromise(program);
-        res.json({ message: "Initiation successful!" });
+        const txHash = await Effect.runPromise(program);
+        res.json({ message: `Initiation successful: ${txHash}` });
       } catch (e) {
-        res.status(400).json({ message: "Initiation failed" });
+        logError("Error during initialization:", e);
+
+        res.status(500).json({
+          message: "Initiation failed.",
+        });
       }
     });
 
@@ -141,9 +145,11 @@ export const listen = (
         await Effect.runPromise(program);
         res.json({ message: "Collected all UTxOs successfully!" });
       } catch (_e) {
-        res.status(400).json({
-          message: "Failed to collect one or more UTxOs. Please try again.",
-        });
+        res
+          .status(400)
+          .json({
+            message: "Failed to collect one or more UTxOs. Please try again.",
+          });
       }
       try {
         await Promise.all([
@@ -156,9 +162,11 @@ export const listen = (
         ]);
         res.json({ message: "Cleared all tables successfully!" });
       } catch (_e) {
-        res.status(400).json({
-          message: "Failed to clear one or more tables. Please try again.",
-        });
+        res
+          .status(400)
+          .json({
+            message: "Failed to clear one or more tables. Please try again.",
+          });
       }
     });
 
