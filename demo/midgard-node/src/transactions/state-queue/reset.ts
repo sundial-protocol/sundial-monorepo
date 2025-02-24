@@ -37,7 +37,7 @@ export const resetStateQueue = Effect.gen(function* () {
   const fetchConfig: SDK.Types.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
-  }
+  };
 
   const allUTxOsAndAssetNames =
     yield* SDK.Endpoints.fetchAllStateQueueUTxOsProgram(lucid, fetchConfig);
