@@ -8,7 +8,6 @@ import { Effect, pipe } from "effect";
 import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
 import { AlwaysSucceedsContract } from "./services/always-succeeds.js";
-import { stateQueueInit } from "./transactions/state-queue/init.js";
 
 dotenv.config();
 const VERSION = packageJson.version;
@@ -55,16 +54,6 @@ program.version(VERSION).description(
 program.command("listen").action(async () => {
   const program = pipe(
     runNode,
-    Effect.provide(User.layer),
-    Effect.provide(NodeConfig.layer),
-  );
-
-  await Effect.runPromiseExit(program);
-});
-
-program.command("init").action(async () => {
-  const program = pipe(
-    stateQueueInit,
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
