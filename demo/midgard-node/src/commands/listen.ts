@@ -129,7 +129,7 @@ export const listen = (
         const txHash = await Effect.runPromise(program);
         res.json({ message: `Initiation successful: ${txHash}` });
       } catch (e) {
-        logWarning(`Initialization failed: ${e}`);
+        logWarning(`Initiation failed: ${e}`);
         res.status(500).json({
           message: "Initiation failed.",
         });
