@@ -1,9 +1,4 @@
-import {
-  findSpentAndProducedUTxOs,
-  isHexString,
-  logInfo,
-  logWarning,
-} from "../utils.js";
+import { findSpentAndProducedUTxOs, isHexString, logInfo } from "../utils.js";
 import {
   LucidEvolution,
   OutRef,
@@ -30,20 +25,9 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { stateQueueInit } from "@/transactions/state-queue/init.js";
-import {resetStateQueue} from "@/transactions/state-queue/reset.js";
-
-// TODO: Placehoder, must be imported from SDK.
-const fetchLatestBlock = (
-  _lucid: LucidEvolution,
-): Effect.Effect<UTxO, never, never> =>
-  Effect.gen(function* () {
-    return {
-      txHash: "",
-      outputIndex: 0,
-      address: "",
-      assets: {},
-    };
-  });
+import { resetStateQueue } from "@/transactions/state-queue/reset.js";
+import { buildAndSubmitCommitmentBlock } from "@/transactions/state-queue/commit-block-header.js";
+import { buildAndSubmitMergeTx } from "@/transactions/state-queue/merge-to-confirm-state.js";
 
 export const listen = (
   lucid: LucidEvolution,
@@ -140,10 +124,8 @@ export const listen = (
         );
         await Effect.runPromise(program);
         res.json({ message: "Initiation successful!" });
-      } catch(e) {
-        res
-          .status(400)
-          .json({ message: "Initiation failed" });
+      } catch (e) {
+        res.status(400).json({ message: "Initiation failed" });
       }
     });
 
@@ -158,10 +140,10 @@ export const listen = (
         );
         await Effect.runPromise(program);
         res.json({ message: "Collected all UTxOs successfully!" });
-      } catch(_e) {
-        res
-          .status(400)
-          .json({ message: "Failed to collect one or more UTxOs. Please try again." });
+      } catch (_e) {
+        res.status(400).json({
+          message: "Failed to collect one or more UTxOs. Please try again.",
+        });
       }
       try {
         await Promise.all([
@@ -174,9 +156,9 @@ export const listen = (
         ]);
         res.json({ message: "Cleared all tables successfully!" });
       } catch (_e) {
-        res
-          .status(400)
-          .json({ message: "Failed to clear one or more tables. Please try again." });
+        res.status(400).json({
+          message: "Failed to clear one or more tables. Please try again.",
+        });
       }
     });
 
@@ -214,18 +196,27 @@ export const listen = (
 
 const monitorStateQueue = (
   lucid: LucidEvolution,
+  fetchConfig: SDK.Types.FetchConfig,
   db: sqlite3.Database,
   pollingInterval: number,
 ) =>
   Effect.gen(function* () {
     let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
     const monitor = Effect.gen(function* () {
-      logInfo("monitoring state query...");
-      const latestBlock = yield* fetchLatestBlock(lucid);
+      logInfo("Monitoring state queue...");
+      const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
+        lucid,
+        fetchConfig,
+      );
       const fetchedBlocksOutRef = utxoToOutRef(latestBlock);
       if (!outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
         latestBlockOutRef = fetchedBlocksOutRef;
-        yield* submitBlock(lucid, latestBlock);
+        yield* buildAndSubmitCommitmentBlock(
+          lucid,
+          db,
+          fetchConfig,
+          Date.now(),
+        );
       }
     });
     const schedule = Schedule.addDelay(Schedule.forever, () =>
@@ -244,34 +235,29 @@ export const storeTx = async (
     yield* Effect.tryPromise(() => MempoolDB.insert(db, txHash, tx));
   });
 
-const submitBlock = (_lucid: LucidEvolution, latestBlock: UTxO) =>
-  Effect.gen(function* () {
-    logWarning("submitBlock: TODO");
-  });
-
 const monitorConfirmedState = (
-  _lucid: LucidEvolution,
+  lucid: LucidEvolution,
+  fetchConfig: SDK.Types.FetchConfig,
+  db: sqlite3.Database,
   pollingInterval: number,
 ) =>
   Effect.gen(function* () {
-    const monitor = Effect.gen(function* () {
-      logWarning("monitorConfirmedState: TODO");
-    });
     const schedule = Schedule.addDelay(Schedule.forever, () =>
       Duration.millis(pollingInterval),
     );
-    yield* Effect.repeat(monitor, schedule);
+    yield* Effect.repeat(
+      buildAndSubmitMergeTx(lucid, db, fetchConfig),
+      schedule,
+    );
   });
 
 export const runNode = Effect.gen(function* () {
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const { spendScriptAddress, mintScript, policyId } =
-    yield* AlwaysSucceedsContract;
-  const initParams: SDK.Types.InitParams = {
-    address: spendScriptAddress,
-    policyId: policyId,
-    stateQueueMintingScript: mintScript,
+  const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
+  const fetchConfig: SDK.Types.FetchConfig = {
+    stateQueueAddress: spendScriptAddress,
+    stateQueuePolicyId: policyId,
   };
   const db = yield* Effect.tryPromise(() =>
     initializeDb(nodeConfig.DATABASE_PATH),
@@ -290,8 +276,13 @@ export const runNode = Effect.gen(function* () {
 
   yield* Effect.all([
     listen(user, db, nodeConfig.PORT),
-    monitorStateQueue(user, db, nodeConfig.POLLING_INTERVAL),
-    monitorConfirmedState(user, nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
+    monitorStateQueue(user, fetchConfig, db, nodeConfig.POLLING_INTERVAL),
+    monitorConfirmedState(
+      user,
+      fetchConfig,
+      db,
+      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
+    ),
   ]).pipe(
     Effect.withSpan("midgard-node"),
     Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
