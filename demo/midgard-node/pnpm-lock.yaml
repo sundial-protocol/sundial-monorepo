@@ -13,13 +13,13 @@ importers:
         version: 1.2.0
       '@al-ft/midgard-sdk':
         specifier: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz
-        version: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)
+        version: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)
       '@effect/opentelemetry':
         specifier: ^0.44.2
-        version: 0.44.2(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.30.0)(effect@3.13.2)
+        version: 0.44.2(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.28.0)(effect@3.13.2)
       '@lucid-evolution/lucid':
         specifier: ^0.4.20
-        version: 0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)
+        version: 0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)
       '@opentelemetry/exporter-prometheus':
         specifier: ^0.57.2
         version: 0.57.2(@opentelemetry/api@1.9.0)
@@ -82,7 +82,7 @@ packages:
     resolution: {integrity: sha512-yEie4HFRoQS+ShbEYGNcVEQKFvnClXHFEysYT7lqoL1FGVxwvWWTBsctsEXolUIvusslztzrnJyUG67KGljBKw==}
 
   '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-YPKR2rDjybV+njmbPdlCxs8ItzYSTo/7zfJ7AxtjfjsE2LcCbPo+aV/4McCF1RDxoeTadsUjkFC8+D6/S7aRKg==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-kqxfeaNc3IHWD2DFaKAEc3DWjmfSdxwgZjOxUQyu75crgH5AjUCs5fsu8GTn1sAKjaFQd5ESOAiJOkRu8QGV1A==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
     version: 0.1.0
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2':
@@ -395,8 +395,9 @@ packages:
   '@harmoniclabs/bytestring@1.0.0':
     resolution: {integrity: sha512-d5m10O0okKc6QNX0pSRriFTkk/kNMnMBGbo5X3kEZwKaXTI4tDVoTZBL7bwbYHwOEdSxWJjVtlO9xtB7ZrYZNg==}
 
-  '@harmoniclabs/cbor@1.6.1':
-    resolution: {integrity: sha512-lPJ/prurUWWM9c66eC0s1hHS46fdwfPBpko2/AkHh6h39z9eJz/fmJax/ZsbD2YiaPsK4Gkk/Z4L55XqDg3JuQ==}
+  '@harmoniclabs/cbor@1.5.0':
+    resolution: {integrity: sha512-/TaUfh2POR88KJDtJvRokBgEu9QP+u3LSp92UenLizaFr9proKrb45jzC1IYeMvI9LWKo3zWtf6ea35TKq4ibQ==}
+    deprecated: update to 1.6.0
 
   '@harmoniclabs/crypto@0.2.5':
     resolution: {integrity: sha512-t2saWMFWBx8tOHotiYTTfQKhPGpWT4AMLXxq3u0apShVXNV0vgL0gEgSMudBjES/wrKByCqa2xmU70gadz26hA==}
@@ -595,10 +596,6 @@ packages:
 
   '@opentelemetry/semantic-conventions@1.28.0':
     resolution: {integrity: sha512-lp4qAiMTD4sNWW4DbKLBkfiMZ4jbAboJIGOQr5DvciMRI494OapieI9qiODpOt0XBr1LjIDy1xAGAnVs5supTA==}
-    engines: {node: '>=14'}
-
-  '@opentelemetry/semantic-conventions@1.30.0':
-    resolution: {integrity: sha512-4VlGgo32k2EQ2wcCY3vEU28A0O13aOtHz3Xt2/2U5FAh9EfhD6t6DqL5Z6yAnRCntbTFDU4YfbpyzSlHNWycPw==}
     engines: {node: '>=14'}
 
   '@pkgjs/parseargs@0.11.0':
@@ -2355,10 +2352,10 @@ snapshots:
       blake2b: 2.1.4
       level: 8.0.1
 
-  '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)':
+  '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)':
     dependencies:
       '@aiken-lang/merkle-patricia-forestry': 1.2.0
-      '@lucid-evolution/lucid': 0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)
+      '@lucid-evolution/lucid': 0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)
       '@noble/hashes': 1.7.1
       effect: 3.13.2
     transitivePeerDependencies:
@@ -2486,11 +2483,11 @@ snapshots:
     dependencies:
       commander: 13.1.0
 
-  '@effect/opentelemetry@0.44.2(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.30.0)(effect@3.13.2)':
+  '@effect/opentelemetry@0.44.2(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.28.0)(effect@3.13.2)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/semantic-conventions': 1.30.0
+      '@opentelemetry/semantic-conventions': 1.28.0
       effect: 3.13.2
     optionalDependencies:
       '@opentelemetry/sdk-metrics': 1.30.1(@opentelemetry/api@1.9.0)
@@ -2612,7 +2609,7 @@ snapshots:
     dependencies:
       '@harmoniclabs/uint8array-utils': 1.0.3
 
-  '@harmoniclabs/cbor@1.6.1':
+  '@harmoniclabs/cbor@1.5.0':
     dependencies:
       '@harmoniclabs/bytestring': 1.0.0
       '@harmoniclabs/obj-utils': 1.0.0
@@ -2627,24 +2624,24 @@ snapshots:
 
   '@harmoniclabs/pair@1.0.0': {}
 
-  '@harmoniclabs/plutus-data@1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)':
+  '@harmoniclabs/plutus-data@1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)':
     dependencies:
       '@harmoniclabs/biguint': 1.0.0
       '@harmoniclabs/bytestring': 1.0.0
-      '@harmoniclabs/cbor': 1.6.1
+      '@harmoniclabs/cbor': 1.5.0
       '@harmoniclabs/crypto': 0.2.5
       '@harmoniclabs/uint8array-utils': 1.0.3
 
   '@harmoniclabs/uint8array-utils@1.0.3': {}
 
-  '@harmoniclabs/uplc@1.4.0(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(@harmoniclabs/plutus-data@1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1))':
+  '@harmoniclabs/uplc@1.4.0(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(@harmoniclabs/plutus-data@1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0))':
     dependencies:
       '@harmoniclabs/bigint-utils': 1.0.0
       '@harmoniclabs/bytestring': 1.0.0
-      '@harmoniclabs/cbor': 1.6.1
+      '@harmoniclabs/cbor': 1.5.0
       '@harmoniclabs/crypto': 0.2.5
       '@harmoniclabs/pair': 1.0.0
-      '@harmoniclabs/plutus-data': 1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)
+      '@harmoniclabs/plutus-data': 1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)
       '@harmoniclabs/uint8array-utils': 1.0.3
 
   '@isaacs/cliui@8.0.2':
@@ -2687,7 +2684,7 @@ snapshots:
 
   '@lucid-evolution/crc8@0.1.8': {}
 
-  '@lucid-evolution/lucid@0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)':
+  '@lucid-evolution/lucid@0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(encoding@0.1.13)(fast-check@3.23.2)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
@@ -2697,11 +2694,11 @@ snapshots:
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
       '@lucid-evolution/plutus': 0.1.29
-      '@lucid-evolution/provider': 0.1.87(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
+      '@lucid-evolution/provider': 0.1.87(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
       '@lucid-evolution/sign_data': 0.1.25
       '@lucid-evolution/uplc': 0.2.19
-      '@lucid-evolution/utils': 0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
-      '@lucid-evolution/wallet': 0.1.70(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
+      '@lucid-evolution/utils': 0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
+      '@lucid-evolution/wallet': 0.1.70(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
       effect: 3.13.2
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
@@ -2725,7 +2722,7 @@ snapshots:
       '@lucid-evolution/core-utils': 0.1.16
       '@sinclair/typebox': 0.32.35
 
-  '@lucid-evolution/provider@0.1.87(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)':
+  '@lucid-evolution/provider@0.1.87(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
@@ -2733,8 +2730,8 @@ snapshots:
       '@effect/schema': 0.68.27(effect@3.13.2)
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
-      '@lucid-evolution/utils': 0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
-      '@lucid-evolution/wallet': 0.1.70(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
+      '@lucid-evolution/utils': 0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
+      '@lucid-evolution/wallet': 0.1.70(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
       effect: 3.13.2
     transitivePeerDependencies:
       - '@harmoniclabs/bytestring'
@@ -2753,13 +2750,13 @@ snapshots:
 
   '@lucid-evolution/uplc@0.2.19': {}
 
-  '@lucid-evolution/utils@0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)':
+  '@lucid-evolution/utils@0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
       '@effect/schema': 0.68.27(effect@3.13.2)
-      '@harmoniclabs/plutus-data': 1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)
-      '@harmoniclabs/uplc': 1.4.0(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(@harmoniclabs/plutus-data@1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1))
+      '@harmoniclabs/plutus-data': 1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)
+      '@harmoniclabs/uplc': 1.4.0(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(@harmoniclabs/plutus-data@1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0))
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
       '@lucid-evolution/crc8': 0.1.8
@@ -2774,14 +2771,14 @@ snapshots:
       - '@harmoniclabs/crypto'
       - '@harmoniclabs/pair'
 
-  '@lucid-evolution/wallet@0.1.70(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)':
+  '@lucid-evolution/wallet@0.1.70(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
       '@lucid-evolution/sign_data': 0.1.25
-      '@lucid-evolution/utils': 0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.1)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
+      '@lucid-evolution/utils': 0.1.64(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.5.0)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
       bip39: 3.1.0
     transitivePeerDependencies:
       - '@harmoniclabs/bytestring'
@@ -2928,8 +2925,6 @@ snapshots:
       '@opentelemetry/semantic-conventions': 1.28.0
 
   '@opentelemetry/semantic-conventions@1.28.0': {}
-
-  '@opentelemetry/semantic-conventions@1.30.0': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true

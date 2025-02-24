@@ -10,6 +10,7 @@ import {
   UTxO,
   getAddressDetails,
 } from "@lucid-evolution/lucid";
+import * as SDK from "@al-ft/midgard-sdk";
 import express from "express";
 import sqlite3 from "sqlite3";
 import * as MempoolDB from "../database/mempool.js";
@@ -18,15 +19,17 @@ import * as LatestLedgerDB from "../database/latestLedger.js";
 import * as ConfirmedLedgerDB from "../database/confirmedLedger.js";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
-import { Duration, Effect, Option, Schedule, Metric } from "effect";
+import { Duration, Effect, Option, Schedule, Metric, pipe } from "effect";
 import { modifyMultipleTables } from "@/database/utils.js";
 import { User, NodeConfig } from "@/config.js";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { initializeDb } from "@/database.js";
 import { outRefsAreEqual, utxoToOutRef } from "@/transactions/utils.js";
 import { NodeSdk } from "@effect/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { stateQueueInit } from "@/transactions/state-queue/init.js";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = (
@@ -40,27 +43,6 @@ const fetchLatestBlock = (
       assets: {},
     };
   });
-
-// TODO: Placehoder, must be imported from SDK.
-const fetchConfirmedState = (
-  _lucid: LucidEvolution,
-): Effect.Effect<UTxO, never, never> =>
-  Effect.gen(function* () {
-    return {
-      txHash: "",
-      outputIndex: 0,
-      address: "",
-      assets: {},
-    };
-  });
-
-const readEndTimeOfConfirmedState = (
-  utxo: UTxO,
-): Effect.Effect<number, string, never> => {
-  return utxo.datum
-    ? Effect.succeed(0) // Replace 0 with the actual extraction logic
-    : Effect.fail("Missing datum of the confirmed state.");
-};
 
 export const listen = (
   lucid: LucidEvolution,
@@ -144,6 +126,23 @@ export const listen = (
         res
           .status(400)
           .json({ message: `Invalid block header hash: ${hdrHash}` });
+      }
+    });
+
+    app.get("/init", async (_req, res) => {
+      try {
+        const program = pipe(
+          stateQueueInit,
+          Effect.provide(User.layer),
+          Effect.provide(AlwaysSucceedsContract.layer),
+          Effect.provide(NodeConfig.layer),
+        );
+        await Effect.runPromise(program);
+        res.json({ message: "Initiation successful!" });
+      } catch(e) {
+        res
+          .status(400)
+          .json({ message: "Initiation failed" });
       }
     });
 
@@ -251,6 +250,13 @@ const monitorConfirmedState = (
 export const runNode = Effect.gen(function* () {
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
+  const { spendScriptAddress, mintScript, policyId } =
+    yield* AlwaysSucceedsContract;
+  const initParams: SDK.Types.InitParams = {
+    address: spendScriptAddress,
+    policyId: policyId,
+    stateQueueMintingScript: mintScript,
+  };
   const db = yield* Effect.tryPromise(() =>
     initializeDb(nodeConfig.DATABASE_PATH),
   );

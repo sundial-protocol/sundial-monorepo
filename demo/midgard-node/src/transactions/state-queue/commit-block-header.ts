@@ -10,7 +10,7 @@ import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
 import { modifyMultipleTables } from "@/database/utils.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
-import * as Blueprint from "../../../../always-succeeds/plutus.json";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -52,15 +52,13 @@ export const buildAndSubmitCommitmentBlock = (
     // Merge filtered utxoList with producedList
     const newUTxOList = [...filteredUTxOList, ...producedList];
     const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
+    const { spendScript } = yield* AlwaysSucceedsContract;
     // Build commitment block
     const commitBlockParams: SDK.Types.CommitBlockParams = {
       newUTxOsRoot: utxoRoot.hash.toString(),
       transactionsRoot: txRoot.hash.toString(),
       endTime: BigInt(endTime),
-      stateQueueSpendingScript: {
-        type: "PlutusV3",
-        script: Blueprint.default.validators[1].compiledCode,
-      },
+      stateQueueSpendingScript: spendScript,
     };
     const aoUpdateCommitmentTimeParams = {};
     const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
