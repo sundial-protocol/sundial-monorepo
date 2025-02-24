@@ -203,7 +203,6 @@ const monitorStateQueue = (
   Effect.gen(function* () {
     let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
     const monitor = Effect.gen(function* () {
-      logInfo("Monitoring state queue...");
       const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
         lucid,
         fetchConfig,
@@ -211,6 +210,7 @@ const monitorStateQueue = (
       const fetchedBlocksOutRef = utxoToOutRef(latestBlock);
       if (!outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
         latestBlockOutRef = fetchedBlocksOutRef;
+        logInfo("Committing a new block...");
         yield* buildAndSubmitCommitmentBlock(
           lucid,
           db,
