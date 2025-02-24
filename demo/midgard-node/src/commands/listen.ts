@@ -30,7 +30,8 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { stateQueueInit } from "@/transactions/state-queue/init.js";
-import {resetStateQueue} from "@/transactions/state-queue/reset.js";
+import { resetStateQueue } from "@/transactions/state-queue/reset.js";
+import { logError } from "effect/Effect";
 
 // TODO: Placehoder, must be imported from SDK.
 const fetchLatestBlock = (
@@ -138,12 +139,15 @@ export const listen = (
           Effect.provide(AlwaysSucceedsContract.layer),
           Effect.provide(NodeConfig.layer),
         );
-        await Effect.runPromise(program);
-        res.json({ message: "Initiation successful!" });
-      } catch(e) {
-        res
-          .status(400)
-          .json({ message: "Initiation failed" });
+        const txHash = await Effect.runPromise(program);
+        res.json({ message: `Initiation successful: ${txHash}` });
+      } catch (e) {
+        logError("Error during initialization:", e);
+
+        res.status(500).json({
+          message: "Initiation failed",
+          error: e instanceof Error ? e.message : `Unknown error: ${e}`,
+        });
       }
     });
 
@@ -158,10 +162,12 @@ export const listen = (
         );
         await Effect.runPromise(program);
         res.json({ message: "Collected all UTxOs successfully!" });
-      } catch(_e) {
+      } catch (_e) {
         res
           .status(400)
-          .json({ message: "Failed to collect one or more UTxOs. Please try again." });
+          .json({
+            message: "Failed to collect one or more UTxOs. Please try again.",
+          });
       }
       try {
         await Promise.all([
@@ -176,7 +182,9 @@ export const listen = (
       } catch (_e) {
         res
           .status(400)
-          .json({ message: "Failed to clear one or more tables. Please try again." });
+          .json({
+            message: "Failed to clear one or more tables. Please try again.",
+          });
       }
     });
 

@@ -20,7 +20,7 @@ import * as ImmutableDB from "../database/immutable.js";
 export const handleSignSubmit = (
   lucid: LucidEvolution,
   signBuilder: TxSignBuilder,
-): Effect.Effect<void, Error> =>
+): Effect.Effect<string, Error> =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign.withWallet().completeProgram();
     const txHash = yield* signed
@@ -36,6 +36,31 @@ export const handleSignSubmit = (
     yield* Effect.logDebug(`✅ Transaction confirmed: ${txHash}`);
     yield* Effect.logDebug("Pausing for 10 seconds...");
     yield* Effect.sleep("10 seconds");
+    return txHash;
+  });
+
+/**
+ * Handle the signing and submission of a transaction without waiting for the transaction to be confirmed.
+ *
+ * @param lucid - The LucidEvolution instance.
+ * @param signBuilder - The transaction sign builder.
+ * @returns An Effect that resolves when the transaction is signed, submitted, and confirmed.
+ */
+export const handleSignSubmitWithoutConfirmation = (
+  lucid: LucidEvolution,
+  signBuilder: TxSignBuilder,
+): Effect.Effect<string, Error> =>
+  Effect.gen(function* () {
+    const signed = yield* signBuilder.sign.withWallet().completeProgram();
+    const txHash = yield* signed
+      .submitProgram()
+      .pipe(
+        Effect.retry(
+          Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
+        ),
+      );
+    yield* Effect.logDebug(`🚀 Transaction submitted: ${txHash}`);
+    return txHash;
   });
 
 /**
