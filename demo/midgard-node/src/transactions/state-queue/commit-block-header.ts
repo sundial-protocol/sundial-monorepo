@@ -5,12 +5,14 @@ import { Effect } from "effect";
 import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
 import { handleSignSubmit } from "../utils.js";
-import * as LatestLedgerDB from "@/database/latestLedger.js";
-import * as MempoolDB from "@/database/mempool.js";
-import * as ImmutableDB from "@/database/immutable.js";
-import { modifyMultipleTables } from "@/database/utils.js";
+import {
+  LatestLedgerDB,
+  MempoolDB,
+  ImmutableDB,
+  UtilsDB,
+} from "@/database/index.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
-import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { AlwaysSucceeds } from "@/services/index.js";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -52,7 +54,7 @@ export const buildAndSubmitCommitmentBlock = (
     // Merge filtered utxoList with producedList
     const newUTxOList = [...filteredUTxOList, ...producedList];
     const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
-    const { spendScript } = yield* AlwaysSucceedsContract;
+    const { spendScript } = yield* AlwaysSucceeds.AlwaysSucceedsContract;
     // Build commitment block
     const commitBlockParams: SDK.Types.CommitBlockParams = {
       newUTxOsRoot: utxoRoot.hash.toString(),
@@ -72,7 +74,7 @@ export const buildAndSubmitCommitmentBlock = (
     // TODO: For final product, handle tx submission failures properly.
     yield* Effect.tryPromise({
       try: () =>
-        modifyMultipleTables(
+        UtilsDB.modifyMultipleTables(
           db,
           [LatestLedgerDB.clearUTxOs, spentList],
           [LatestLedgerDB.insert, producedList],

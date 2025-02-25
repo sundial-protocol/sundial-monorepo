@@ -1,6 +1,6 @@
 import * as SDK from "@al-ft/midgard-sdk";
 import { LucidEvolution, Script, UTxO, toUnit } from "@lucid-evolution/lucid";
-import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { AlwaysSucceeds } from "@/services/index.js";
 import { User } from "@/config.js";
 import { Effect } from "effect";
 import { handleSignSubmit } from "../utils.js";
@@ -28,12 +28,9 @@ const collectAndBurnStateQueueNodesProgram = (
     return yield* handleSignSubmit(lucid, completed);
   });
 
-//   lucid: LucidEvolution,
-//   fetchConfig: SDK.Types.FetchConfig,
-// ) =>
 export const resetStateQueue = Effect.gen(function* () {
   const { user: lucid } = yield* User;
-  const alwaysSucceeds = yield* AlwaysSucceedsContract;
+  const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
   const fetchConfig: SDK.Types.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
