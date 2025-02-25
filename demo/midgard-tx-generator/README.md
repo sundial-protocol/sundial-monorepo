@@ -18,14 +18,14 @@ Each complex transaction creates 2 actual transactions (distribution + collectio
 ```
 midgard-tx-generator/
 ├── src/
-│   ├── bin/             
+│   ├── bin/
 │   │   ├── index.ts     # Main
 │   │   └── cli.ts       # CLI interface
 │   ├── lib/
 │   │   ├── client/      # Node communication
 │   │   ├── generators/  # TX generators
 │   │   └── scheduler/   # Periodic generation
-│   └── utils/          
+│   └── utils/
 ```
 
 ## Quick Start
@@ -71,6 +71,7 @@ With default settings, each cycle generates:
 ## Node Interaction
 
 1. If node is available:
+
    - Transactions are submitted directly
    - Stats are shown in console
 
@@ -87,7 +88,7 @@ Each transaction follows this structure:
   cborHex: string; // CBOR-encoded transaction
   description: string;
   txId: string; // Transaction hash
-  type: string; 
+  type: string;
 }
 ```
 

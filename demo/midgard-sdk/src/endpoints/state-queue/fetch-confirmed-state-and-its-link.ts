@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import { LucidEvolution, UTxO, fromText, toUnit } from "@lucid-evolution/lucid";
-import { makeReturn } from "@/core.js";
-import { getConfirmedStateFromUTxO } from "@/utils/state-queue.js";
-import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
-import { LedgerState, LinkedList, StateQueue } from "@/tx-builder/index.js";
+import { makeReturn } from "../../core.js";
+import { getConfirmedStateFromUTxO } from "../../utils/state-queue.js";
+import { getNodeDatumFromUTxO } from "../../utils/linked-list.js";
+import { LedgerState, LinkedList, StateQueue } from "../../tx-builder/index.js";
 
 export const fetchConfirmedStateAndItsLinkProgram = (
   lucid: LucidEvolution,
