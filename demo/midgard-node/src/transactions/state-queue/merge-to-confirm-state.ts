@@ -28,7 +28,7 @@ import { AlwaysSucceeds } from "@/services/index.js";
 export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
   db: Database,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
 ) =>
   Effect.gen(function* ($) {
     // Fetch transactions from the first block

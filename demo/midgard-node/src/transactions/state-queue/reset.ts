@@ -7,7 +7,7 @@ import { handleSignSubmit } from "../utils.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   stateQueueSpendingScript: Script,
   stateQueueMintingScript: Script,
   utxosAndAssetNames: { utxo: UTxO; assetName: string }[],
@@ -31,7 +31,7 @@ const collectAndBurnStateQueueNodesProgram = (
 export const resetStateQueue = Effect.gen(function* () {
   const { user: lucid } = yield* User;
   const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
-  const fetchConfig: SDK.Types.FetchConfig = {
+  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };

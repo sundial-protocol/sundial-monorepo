@@ -8,7 +8,7 @@ export const stateQueueInit = Effect.gen(function* () {
   const { user: lucid } = yield* User;
   const { spendScriptAddress, mintScript, policyId } =
     yield* AlwaysSucceeds.AlwaysSucceedsContract;
-  const initParams: SDK.Types.InitParams = {
+  const initParams: SDK.TxBuilder.StateQueue.InitParams = {
     address: spendScriptAddress,
     policyId: policyId,
     stateQueueMintingScript: mintScript,

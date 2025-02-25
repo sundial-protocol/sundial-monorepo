@@ -1,8 +1,8 @@
 import { Data, LucidEvolution, TxBuilder } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
-import { CommitBlockParams, FetchConfig } from "@/types/state-queue.js";
+import { CommitBlockParams, FetchConfig } from "./types.js";
 import { fetchLatestCommitedBlockProgram } from "@/endpoints/state-queue/fetch-latest-block.js";
-import { Header } from "@/types/contracts/ledger-state.js";
+import { Header } from "../ledger-state.js";
 import { getHeaderFromBlockUTxO, hashHeader } from "@/utils/ledger-state.js";
 
 /**

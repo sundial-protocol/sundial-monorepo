@@ -1,6 +1,6 @@
 import { Data, UTxO } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
-import { Header } from "@/types/contracts/ledger-state.js";
+import { Header } from "@/tx-builder/ledger-state.js";
 import { hashHexWithBlake2b224 } from "./common.js";
 import { getNodeDatumFromUTxO } from "./linked-list.js";
 

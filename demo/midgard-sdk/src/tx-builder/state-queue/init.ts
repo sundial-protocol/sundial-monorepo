@@ -1,6 +1,6 @@
-import { ConfirmedState } from "@/types/contracts/ledger-state.js";
-import { NodeDatum } from "@/types/contracts/linked-list/index.js";
-import { InitParams } from "@/types/state-queue.js";
+import { ConfirmedState } from "../ledger-state.js";
+import { NodeDatum } from "../linked-list.js";
+import { InitParams } from "./types.js";
 import {
   LucidEvolution,
   TxBuilder,

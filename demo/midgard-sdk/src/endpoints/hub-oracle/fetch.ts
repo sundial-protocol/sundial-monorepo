@@ -8,7 +8,7 @@ import {
   toUnit,
 } from "@lucid-evolution/lucid";
 import { makeReturn } from "@/core.js";
-import { Datum } from "@/types/contracts/hub-oracle.js";
+import { HubOracle } from "@/tx-builder/index.js";
 
 export type Config = {
   hubOracleAddress: Address;
@@ -21,7 +21,7 @@ export const hubOracleAssetName = "";
 export const fetchHubOracleUTxOProgram = (
   lucid: LucidEvolution,
   config: Config,
-): Effect.Effect<{ utxo: UTxO; datum: Datum }, Error> =>
+): Effect.Effect<{ utxo: UTxO; datum: HubOracle.Datum }, Error> =>
   Effect.gen(function* () {
     const hubOracleUTxOs = yield* Effect.tryPromise({
       try: async () => {
@@ -37,7 +37,7 @@ export const fetchHubOracleUTxOProgram = (
       const datum = yield* Effect.try({
         try: () => {
           if (utxo.datum) {
-            const coerced = Data.from(utxo.datum, Datum);
+            const coerced = Data.from(utxo.datum, HubOracle.Datum);
             return coerced;
           } else {
             throw new Error();

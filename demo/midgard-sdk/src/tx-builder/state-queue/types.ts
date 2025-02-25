@@ -1,6 +1,11 @@
-import { Data } from "@lucid-evolution/lucid";
-import { OutputReferenceSchema, POSIXTimeSchema } from "./common.js";
-import { NodeDatumSchema } from "./linked-list/index.js";
+import { Address, PolicyId, Script, Data } from "@lucid-evolution/lucid";
+import {
+  MerkleRoot,
+  OutputReferenceSchema,
+  POSIXTime,
+  POSIXTimeSchema,
+} from "../common.js";
+import { NodeDatumSchema } from "../linked-list.js";
 
 export const ConfigSchema = Data.Object({
   initUTxO: OutputReferenceSchema,
@@ -27,3 +32,26 @@ export const Redeemer = RedeemerSchema as unknown as Redeemer;
 
 export type Datum = Data.Static<typeof NodeDatumSchema>;
 export const Datum = NodeDatumSchema as unknown as Datum;
+
+export type FetchConfig = {
+  stateQueueAddress: Address;
+  stateQueuePolicyId: PolicyId;
+};
+
+export type CommitBlockParams = {
+  newUTxOsRoot: MerkleRoot;
+  transactionsRoot: MerkleRoot;
+  endTime: POSIXTime;
+  stateQueueSpendingScript: Script;
+};
+
+export type MergeParams = {
+  stateQueueSpendingScript: Script;
+  stateQueueMintingScript: Script;
+};
+
+export type InitParams = {
+  policyId: PolicyId;
+  address: Address;
+  stateQueueMintingScript: Script;
+};

@@ -2,14 +2,12 @@ import { Effect } from "effect";
 import { LucidEvolution, UTxO, fromText, toUnit } from "@lucid-evolution/lucid";
 import { makeReturn } from "@/core.js";
 import { getConfirmedStateFromUTxO } from "@/utils/state-queue.js";
-import { ConfirmedState } from "@/types/contracts/ledger-state.js";
-import { NodeKey } from "@/types/contracts/linked-list/index.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
-import { FetchConfig } from "@/types/state-queue.js";
+import { LedgerState, LinkedList, StateQueue } from "@/tx-builder/index.js";
 
 export const fetchConfirmedStateAndItsLinkProgram = (
   lucid: LucidEvolution,
-  config: FetchConfig,
+  config: StateQueue.FetchConfig,
 ): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, Error> =>
   Effect.gen(function* () {
     const rootUTxOs = yield* Effect.tryPromise({
@@ -21,7 +19,7 @@ export const fetchConfirmedStateAndItsLinkProgram = (
       catch: (e) => new Error(`Failed to fetch root UTxOs: ${e}`),
     });
     let confirmedStateResult:
-      | { data: ConfirmedState; link: NodeKey }
+      | { data: LedgerState.ConfirmedState; link: LinkedList.NodeKey }
       | undefined;
     const filteredForConfirmedState = yield* Effect.allSuccesses(
       rootUTxOs.map((u: UTxO) => {
@@ -80,6 +78,6 @@ export const fetchConfirmedStateAndItsLinkProgram = (
  */
 export const fetchConfirmedStateAndItsLink = (
   lucid: LucidEvolution,
-  config: FetchConfig,
+  config: StateQueue.FetchConfig,
 ) =>
   makeReturn(fetchConfirmedStateAndItsLinkProgram(lucid, config)).unsafeRun();

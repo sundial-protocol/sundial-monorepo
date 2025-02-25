@@ -200,7 +200,7 @@ export const listen = (
 
 const monitorStateQueue = (
   lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   db: sqlite3.Database,
   pollingInterval: number,
 ) =>
@@ -241,7 +241,7 @@ export const storeTx = async (
 
 const monitorConfirmedState = (
   lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   db: sqlite3.Database,
   pollingInterval: number,
 ) =>
@@ -259,7 +259,7 @@ export const runNode = Effect.gen(function* () {
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
   const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
-  const fetchConfig: SDK.Types.FetchConfig = {
+  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueueAddress: spendScriptAddress,
     stateQueuePolicyId: policyId,
   };

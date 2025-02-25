@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { NodeDatum } from "@/types/contracts/linked-list/index.js";
+import { NodeDatum } from "@/tx-builder/linked-list.js";
 import { Data, UTxO } from "@lucid-evolution/lucid";
 
 export const getNodeDatumFromUTxO = (

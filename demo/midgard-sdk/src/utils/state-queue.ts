@@ -1,8 +1,8 @@
-import { ConfirmedState, Header } from "@/types/contracts/ledger-state.js";
+import { ConfirmedState } from "@/tx-builder/ledger-state.js";
 import { Data, UTxO } from "@lucid-evolution/lucid";
-import { NodeKey } from "@/types/contracts/linked-list/index.js";
+import { NodeKey } from "@/tx-builder/linked-list.js";
 import { Effect } from "effect";
-import { Datum } from "@/types/contracts/state-queue.js";
+import { StateQueue } from "@/tx-builder/index.js";
 import { getNodeDatumFromUTxO } from "./linked-list.js";
 
 export const getLinkFromBlockUTxO = (
@@ -23,7 +23,7 @@ export const getConfirmedStateFromUTxO = (
   const datumCBOR = blockUTxO.datum;
   if (datumCBOR) {
     try {
-      const nodeDatum = Data.from(datumCBOR, Datum);
+      const nodeDatum = Data.from(datumCBOR, StateQueue.Datum);
       if (nodeDatum.key === "Empty") {
         const confirmedState = Data.castFrom(nodeDatum.data, ConfirmedState);
         return Effect.succeed({ data: confirmedState, link: nodeDatum.next });

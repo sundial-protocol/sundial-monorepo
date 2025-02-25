@@ -27,7 +27,7 @@ import { AlwaysSucceeds } from "@/services/index.js";
 export const buildAndSubmitCommitmentBlock = (
   lucid: LucidEvolution,
   db: Database,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   endTime: number,
 ) =>
   Effect.gen(function* () {
@@ -56,7 +56,7 @@ export const buildAndSubmitCommitmentBlock = (
     const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
     const { spendScript } = yield* AlwaysSucceeds.AlwaysSucceedsContract;
     // Build commitment block
-    const commitBlockParams: SDK.Types.CommitBlockParams = {
+    const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
       newUTxOsRoot: utxoRoot.hash.toString(),
       transactionsRoot: txRoot.hash.toString(),
       endTime: BigInt(endTime),
