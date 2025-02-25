@@ -1,4 +1,4 @@
-name: CI
+name: Node Demo
 
 on:
   pull_request:
