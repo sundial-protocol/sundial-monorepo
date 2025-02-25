@@ -1,0 +1,9 @@
+.env
+.envrc
+.eslintrc.json
+node_modules
+dist
+*.tgz
+.direnv
+db/**
+/prometheus-data
