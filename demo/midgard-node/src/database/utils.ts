@@ -8,6 +8,33 @@ import {
 import { Option } from "effect";
 import sqlite3, { Database } from "sqlite3";
 import { logAbort, logInfo } from "../utils.js";
+import * as blocks from "./blocks.js";
+import * as confirmedLedger from "./confirmedLedger.js";
+import * as immutable from "./immutable.js";
+import * as latestLedger from "./latestLedger.js";
+import * as mempool from "./mempool.js";
+import * as mempoolLedger from "./mempoolLedger.js";
+
+export async function initializeDb(dbFilePath: string) {
+  const db = new sqlite3.Database(dbFilePath, (err) => {
+    if (err) {
+      logAbort(`Error opening database: ${err.message}`);
+    } else {
+      logInfo("Connected to the SQLite database");
+    }
+  });
+  db.exec(`
+      PRAGMA foreign_keys = ON;
+      PRAGMA read_uncommitted=false;
+  `);
+  db.exec(blocks.createQuery);
+  db.exec(mempool.createQuery);
+  db.exec(mempoolLedger.createQuery);
+  db.exec(immutable.createQuery);
+  db.exec(confirmedLedger.createQuery);
+  db.exec(latestLedger.createQuery);
+  return db;
+}
 
 export const insertUTxOs = async (
   db: sqlite3.Database,

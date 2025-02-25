@@ -3,11 +3,11 @@ import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
 import { getLinkFromBlockUTxO } from "@/utils/state-queue.js";
-import { FetchConfig } from "@/types/state-queue.js";
+import { StateQueue } from "@/tx-builder/index.js";
 
 export const fetchLatestCommitedBlockProgram = (
   lucid: LucidEvolution,
-  config: FetchConfig,
+  config: StateQueue.FetchConfig,
 ): Effect.Effect<UTxO, Error> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
@@ -42,5 +42,5 @@ export const fetchLatestCommitedBlockProgram = (
  */
 export const fetchLatestCommitedBlock = (
   lucid: LucidEvolution,
-  config: FetchConfig,
+  config: StateQueue.FetchConfig,
 ) => makeReturn(fetchLatestCommitedBlockProgram(lucid, config)).unsafeRun();

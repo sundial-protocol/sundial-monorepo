@@ -2,12 +2,12 @@
 
 import { Command } from "commander";
 import { ENV_VARS_GUIDE, chalk } from "./utils.js";
-import { runNode } from "./commands/listen.js";
+import { runNode } from "./commands/index.js";
 import packageJson from "../package.json" with { type: "json" };
 import { Effect, pipe } from "effect";
 import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
-import { AlwaysSucceedsContract } from "./services/always-succeeds.js";
+import { AlwaysSucceeds } from "./services/index.js";
 
 dotenv.config();
 const VERSION = packageJson.version;
@@ -55,7 +55,7 @@ program.command("listen").action(async () => {
   const program = pipe(
     runNode,
     Effect.provide(User.layer),
-    Effect.provide(AlwaysSucceedsContract.layer),
+    Effect.provide(AlwaysSucceeds.AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
   );
 

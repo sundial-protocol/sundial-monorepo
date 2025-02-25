@@ -12,26 +12,23 @@ import {
 import * as SDK from "@al-ft/midgard-sdk";
 import express from "express";
 import sqlite3 from "sqlite3";
-import * as MempoolDB from "../database/mempool.js";
-import * as MempoolLedgerDB from "../database/mempoolLedger.js";
-import * as LatestLedgerDB from "../database/latestLedger.js";
-import * as ConfirmedLedgerDB from "../database/confirmedLedger.js";
-import * as BlocksDB from "../database/blocks.js";
-import * as ImmutableDB from "../database/immutable.js";
+import {
+  MempoolDB,
+  MempoolLedgerDB,
+  LatestLedgerDB,
+  ConfirmedLedgerDB,
+  BlocksDB,
+  ImmutableDB,
+  UtilsDB,
+} from "../database/index.js";
 import { Duration, Effect, Option, Schedule, Metric, pipe } from "effect";
-import { modifyMultipleTables } from "@/database/utils.js";
 import { User, NodeConfig } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
-import { initializeDb } from "@/database.js";
-import { outRefsAreEqual, utxoToOutRef } from "@/transactions/utils.js";
 import { NodeSdk } from "@effect/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { stateQueueInit } from "@/transactions/state-queue/init.js";
-import { resetStateQueue } from "@/transactions/state-queue/reset.js";
-import { buildAndSubmitCommitmentBlock } from "@/transactions/state-queue/commit-block-header.js";
-import { buildAndSubmitMergeTx } from "@/transactions/state-queue/merge-to-confirm-state.js";
+import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
 
 export const listen = (
   lucid: LucidEvolution,
@@ -121,7 +118,7 @@ export const listen = (
     app.get("/init", async (_req, res) => {
       try {
         const program = pipe(
-          stateQueueInit,
+          StateQueueTx.stateQueueInit,
           Effect.provide(User.layer),
           Effect.provide(AlwaysSucceedsContract.layer),
           Effect.provide(NodeConfig.layer),
@@ -140,7 +137,7 @@ export const listen = (
       res.type("text/plain");
       try {
         const program = pipe(
-          resetStateQueue,
+          StateQueueTx.resetStateQueue,
           Effect.provide(User.layer),
           Effect.provide(AlwaysSucceedsContract.layer),
           Effect.provide(NodeConfig.layer),
@@ -180,7 +177,7 @@ export const listen = (
             spentAndProducedProgram,
           );
           // TODO: Avoid abstraction, dedicate a SQL command.
-          await modifyMultipleTables(
+          await UtilsDB.modifyMultipleTables(
             db,
             [MempoolDB.insert, tx.toHash(), txCBOR],
             [MempoolLedgerDB.clearUTxOs, spent],
@@ -203,7 +200,7 @@ export const listen = (
 
 const monitorStateQueue = (
   lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   db: sqlite3.Database,
   pollingInterval: number,
 ) =>
@@ -214,11 +211,11 @@ const monitorStateQueue = (
         lucid,
         fetchConfig,
       );
-      const fetchedBlocksOutRef = utxoToOutRef(latestBlock);
-      if (!outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
+      const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
+      if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
         latestBlockOutRef = fetchedBlocksOutRef;
         logInfo("Committing a new block...");
-        yield* buildAndSubmitCommitmentBlock(
+        yield* StateQueueTx.buildAndSubmitCommitmentBlock(
           lucid,
           db,
           fetchConfig,
@@ -244,7 +241,7 @@ export const storeTx = async (
 
 const monitorConfirmedState = (
   lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   db: sqlite3.Database,
   pollingInterval: number,
 ) =>
@@ -253,7 +250,7 @@ const monitorConfirmedState = (
       Duration.millis(pollingInterval),
     );
     yield* Effect.repeat(
-      buildAndSubmitMergeTx(lucid, db, fetchConfig),
+      StateQueueTx.buildAndSubmitMergeTx(lucid, db, fetchConfig),
       schedule,
     );
   });
@@ -262,12 +259,12 @@ export const runNode = Effect.gen(function* () {
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
   const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
-  const fetchConfig: SDK.Types.FetchConfig = {
+  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueueAddress: spendScriptAddress,
     stateQueuePolicyId: policyId,
   };
   const db = yield* Effect.tryPromise(() =>
-    initializeDb(nodeConfig.DATABASE_PATH),
+    UtilsDB.initializeDb(nodeConfig.DATABASE_PATH),
   );
   const MetricsLive = NodeSdk.layer(() => ({
     resource: { serviceName: "midgard-node" },

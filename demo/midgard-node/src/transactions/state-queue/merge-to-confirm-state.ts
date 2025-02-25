@@ -13,10 +13,8 @@ import * as SDK from "@al-ft/midgard-sdk";
 import { Effect } from "effect";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
-import * as BlocksDB from "@/database/blocks.js";
-import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
-import { modifyMultipleTables } from "@/database/utils.js";
-import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { BlocksDB, ConfirmedLedgerDB, UtilsDB } from "@/database/index.js";
+import { AlwaysSucceeds } from "@/services/index.js";
 
 /**
  * Build and submit the merge transaction.
@@ -30,7 +28,7 @@ import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
   db: Database,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
 ) =>
   Effect.gen(function* ($) {
     // Fetch transactions from the first block
@@ -38,7 +36,8 @@ export const buildAndSubmitMergeTx = (
       fetchFirstBlockTxs(lucid, fetchConfig, db),
     );
 
-    const { mintScript, spendScript } = yield* AlwaysSucceedsContract;
+    const { mintScript, spendScript } =
+      yield* AlwaysSucceeds.AlwaysSucceedsContract;
     // Build the transaction
     const txBuilder = yield* SDK.Endpoints.mergeToConfirmedStateProgram(
       lucid,
@@ -60,7 +59,7 @@ export const buildAndSubmitMergeTx = (
     // - Remove all the tx hashes of the merged block from BlocksDB
     yield* Effect.tryPromise({
       try: () =>
-        modifyMultipleTables(
+        UtilsDB.modifyMultipleTables(
           db,
           [ConfirmedLedgerDB.clearUTxOs, spentOutRefs],
           [ConfirmedLedgerDB.insert, producedUTxOs],

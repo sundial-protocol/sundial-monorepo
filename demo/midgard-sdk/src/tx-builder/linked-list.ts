@@ -1,5 +1,5 @@
 import { Data } from "@lucid-evolution/lucid";
-import { ValueSchema } from "../common.js";
+import { ValueSchema } from "./common.js";
 
 export const NodeKeySchema = Data.Enum([
   Data.Object({ Key: Data.Object({ key: Data.Bytes() }) }),

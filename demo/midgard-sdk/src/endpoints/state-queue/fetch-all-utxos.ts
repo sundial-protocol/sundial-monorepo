@@ -1,5 +1,5 @@
 import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
-import { FetchConfig } from "@/types/state-queue.js";
+import { StateQueue } from "@/tx-builder/index.js";
 import { Effect } from "effect";
 import {
   getSingleAssetApartFromAda,
@@ -9,7 +9,7 @@ import { makeReturn } from "@/core.js";
 
 export const fetchAllStateQueueUTxOsProgram = (
   lucid: LucidEvolution,
-  config: FetchConfig,
+  config: StateQueue.FetchConfig,
 ): Effect.Effect<{ utxo: UTxO; assetName: string }[], Error> =>
   Effect.gen(function* () {
     const allUTxOs = yield* utxosAtByNFTPolicyId(
@@ -37,5 +37,5 @@ export const fetchAllStateQueueUTxOsProgram = (
  */
 export const fetchAllStateQueueUTxOs = (
   lucid: LucidEvolution,
-  config: FetchConfig,
+  config: StateQueue.FetchConfig,
 ) => makeReturn(fetchAllStateQueueUTxOsProgram(lucid, config)).unsafeRun();

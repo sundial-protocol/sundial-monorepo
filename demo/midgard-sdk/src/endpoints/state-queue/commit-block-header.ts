@@ -2,12 +2,11 @@ import { makeReturn } from "@/core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue, ActiveOperators } from "@/tx-builder/index.js";
 import { Effect } from "effect";
-import { CommitBlockParams, FetchConfig } from "@/types/state-queue.js";
 
 export const commitBlockHeaderProgram = (
   lucid: LucidEvolution,
-  fetchConfig: FetchConfig,
-  sqCommitParams: CommitBlockParams,
+  fetchConfig: StateQueue.FetchConfig,
+  sqCommitParams: StateQueue.CommitBlockParams,
   aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams,
 ): Effect.Effect<TxSignBuilder, Error> =>
   Effect.gen(function* () {
@@ -43,8 +42,8 @@ export const commitBlockHeaderProgram = (
  */
 export const commitBlockHeader = (
   lucid: LucidEvolution,
-  fetchConfig: FetchConfig,
-  sqCommitParams: CommitBlockParams,
+  fetchConfig: StateQueue.FetchConfig,
+  sqCommitParams: StateQueue.CommitBlockParams,
   aoUpdateParams: ActiveOperators.UpdateCommitmentTimeParams,
 ): Promise<TxSignBuilder> =>
   makeReturn(
