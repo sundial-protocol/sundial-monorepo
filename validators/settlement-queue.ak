@@ -1,15 +1,13 @@
 use aiken/builtin
-use aiken/collection/dict
 use aiken/collection/list
-use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
+use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/linked_list/ordered
 use aiken_design_patterns/linked_list/unordered.{
-  Key, NodeDatum, get_node_outputs, list_state_transition, serialize_key,
+  Key, NodeDatum, get_node_inputs, get_node_outputs, list_state_transition,
 }
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
-use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
@@ -19,9 +17,9 @@ use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue.{
-  ClaimAsResolved, ConcludeSettlement, Datum, ListStateTransition, MintRedeemer,
-  NodeData, RemoveSettlement, RevokeResolvedFlag, SpawnSettlement, SpendRedeemer,
-  UpdateResolvedFlag,
+  ClaimAsResolved, ConcludeSettlement, Datum, Deinit, Init, ListStateTransition,
+  MintRedeemer, NodeData, RemoveSettlement, RevokeResolvedFlag, SpawnSettlement,
+  SpendRedeemer, UpdateResolvedFlag, settlement_resolution_duration,
 }
 use midgard/state_queue
 use midgard/user_events
@@ -286,7 +284,7 @@ validator spend(
           tx,
         )
       }
-      ConcludeSettlement { node_input_index, anchor_node_input_index } ->
+      ConcludeSettlement ->
         list_state_transition(assets.tokens(tx.mint, settlement_policy_id))
     }
   }
@@ -298,41 +296,48 @@ validator spend(
 
 validator mint(hub_oracle: ScriptHash) {
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
+    let Transaction {
+      inputs,
+      reference_inputs,
+      outputs,
+      mint,
+      redeemers,
+      extra_signatories,
+      validity_range,
+      ..
+    } = tx
+
+    let node_in_outputs = get_node_inputs(inputs, own_policy)
+    let node_outputs = get_node_outputs(outputs, own_policy)
+    let node_mint = assets.tokens(mint, own_policy)
+
     when redeemer is {
+      Init -> and {
+          assets.quantity_of(mint, hub_oracle, hub.asset_name) == 1,
+          unordered.init(node_outputs, node_mint, own_policy),
+        }
+      Deinit -> and {
+          assets.quantity_of(mint, hub_oracle, hub.asset_name) == -1,
+          unordered.deinit(node_in_outputs, node_mint, own_policy),
+        }
       SpawnSettlement {
-        anchor_node_input_index,
         anchor_node_output_index,
         node_output_index,
         state_queue_merge_redeemer_index,
         hub_ref_input_index,
       } -> {
-        let Transaction {
-          inputs,
-          reference_inputs,
-          outputs,
-          mint,
-          redeemers,
-          ..
-        } = tx
-
-        let hub.Datum {
-          state_queue,
-          state_queue_addr,
-          settlement_queue_addr,
-          ..
-        } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+        let hub.Datum { state_queue, state_queue_addr, .. } =
+          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         // 1. Ensure merge endpoint of state queue is present in the tx.
-        expect Some(Pair(Mint(
-          state_queue_redeemer_minting_policy,
-          state_queue_redeemer_data,
-        ))) = redeemers |> list.at(state_queue_merge_redeemer_index)
-        expect state_queue_redeemer_minting_policy == state_queue
+        expect Some(state_queue_redeemer_pair) =
+          redeemers |> list.at(state_queue_merge_redeemer_index)
+        expect state_queue_redeemer_pair.1st == Mint(state_queue)
         expect state_queue.MergeToConfirmedState {
           header_node_input_index,
           confirmed_state_node_output_index,
           ..
-        }: state_queue.MintRedeemer = state_queue_redeemer_data
+        }: state_queue.MintRedeemer = state_queue_redeemer_pair.2nd
 
         // 2. Grab the header hash of the new confirmed state to use as the
         //    asset name of the settlement authentication NFTs.
@@ -344,10 +349,6 @@ validator mint(hub_oracle: ScriptHash) {
           header_hash: confirmed_state_header_hash,
           ..
         } = confirmed_state_datum_data
-
-        let node_in_outputs = get_node_inputs(inputs, own_policy)
-        let node_outputs = get_node_outputs(outputs, own_policy)
-        let node_mint = tokens(mint, own_policy)
 
         // 3. Validate appending to the end of settlement queue.
         expect
@@ -373,7 +374,7 @@ validator mint(hub_oracle: ScriptHash) {
             state_queue.block_asset_name,
             header_node_input_index,
           )
-        expect block_datum: NodeDatum = block_datum_data
+        expect block_datum: state_queue.Datum = block_datum_data
         expect ledger_state.Header {
           operator_vkey,
           deposits_root,
@@ -384,14 +385,12 @@ validator mint(hub_oracle: ScriptHash) {
         } = block_datum.data
 
         // 5. Validate the produced output datum.
-        expect Some(
-          Output {
-            datum: InlineDatum(settlement_output_datum_data),
-            ..
-          }
-        ) = list.at(node_outputs, node_output_index)
-        expect parsed_settlement_output_datum: Datum = settlement_output_datum_data
-        expect parsed_settlement_output_node_data: NodeData = parsed_settlement_output_datum.data
+        expect Some(Output {
+          datum: InlineDatum(settlement_output_datum_data),
+          ..
+        }) = list.at(node_outputs, node_output_index)
+        expect parsed_settlement_output_datum: Datum =
+          settlement_output_datum_data
         let expected_produced_node_data: Data =
           NodeData {
             deposits_root,
@@ -403,18 +402,34 @@ validator mint(hub_oracle: ScriptHash) {
           }
         parsed_settlement_output_datum.data == expected_produced_node_data
       }
-      RemoveSettlement -> {
-        expect [Input { .. }] =
-          tx.inputs
-            |> list.filter(
-                fn(i) {
-                  when i.output.address.payment_credential is {
-                    Script(script_hash) -> script_hash == own_policy
-                    _ -> False
-                  }
-                },
-              )
-        todo
+      RemoveSettlement {
+        key_to_remove,
+        removed_node_input_index,
+        anchor_node_input_index,
+      } -> {
+        expect Finite(valid_from) = validity_range.lower_bound.bound_type
+        expect Some(Output { datum: InlineDatum(removed_node_datum_data), .. }) =
+          node_in_outputs |> list.at(removed_node_input_index)
+        expect parsed_removed_node_datum: Datum = removed_node_datum_data
+        expect NodeData {
+          time_of_claimed_as_resolved: Some(
+            unwrapped_time_of_claimed_as_resolved,
+          ),
+          operator: Some(operator_vkey),
+          ..
+        }: NodeData = parsed_removed_node_datum.data
+        and {
+          unordered.remove(
+            Key(key_to_remove),
+            removed_node_input_index,
+            anchor_node_input_index,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
+          ),
+          operator_vkey |> utils.has_signed(extra_signatories),
+          unwrapped_time_of_claimed_as_resolved + settlement_resolution_duration <= valid_from,
+        }
       }
     }
   }

@@ -59,7 +59,8 @@ validator spend(
 
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect CommitBlockHeader { operator } = state_queue_redeemer_pair.2nd
+        expect CommitBlockHeader { operator, .. }: state_queue.MintRedeemer =
+          state_queue_redeemer_pair.2nd
         and {
           no_active_operators_minted(
             self.mint,
@@ -165,7 +166,7 @@ validator mint(
         expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
         expect Some(state_queue_redeemer_pair) =
           list.at(self.redeemers, state_queue_redeemer_index)
-        expect RemoveFraudulentBlockHeader { fraudulent_operator } =
+        expect RemoveFraudulentBlockHeader { fraudulent_operator, .. }: state_queue.MintRedeemer =
           state_queue_redeemer_pair.2nd
         and {
           quantity_of(

@@ -26,7 +26,7 @@ pub type SpendRedeemer {
     active_operators_redeemer_index: Int,
     purpose: Purpose,
   }
-  ConcludeSettlement { node_input_index: Int, anchor_node_input_index: Int }
+  ConcludeSettlement
 }
 
 pub type Purpose {
@@ -48,11 +48,16 @@ pub type MintRedeemer {
   Init
   Deinit
   SpawnSettlement {
-    anchor_node_input_index: Int,
     anchor_node_output_index: Int,
     node_output_index: Int,
     state_queue_merge_redeemer_index: Int,
     hub_ref_input_index: Int,
   }
-  RemoveSettlement
+  RemoveSettlement {
+    key_to_remove: ByteArray,
+    removed_node_input_index: Int,
+    anchor_node_input_index: Int,
+  }
 }
+
+pub const settlement_resolution_duration: Int = 0
