@@ -51,9 +51,8 @@ pub type MintRedeemer {
     anchor_node_input_index: Int,
     anchor_node_output_index: Int,
     node_output_index: Int,
-    state_queue_input_index: Int,
+    state_queue_merge_redeemer_index: Int,
     hub_ref_input_index: Int,
-    confirmed_state_output_index: Int,
   }
   RemoveSettlement
 }

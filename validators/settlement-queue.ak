@@ -286,36 +286,8 @@ validator spend(
           tx,
         )
       }
-      ConcludeSettlement { node_input_index, anchor_node_input_index } -> {
-        let Transaction { inputs, mint, .. } = tx
-
-        // Grab own script hash.
-        expect Output {
-          address: Address { payment_credential: Script(own_hash), .. },
-          value: own_value,
-          ..
-        } = utils.get_own_input_at(inputs, own_out_ref, node_input_index)
-
-        // 1. Only one NFT is expected in the spending UTxO.
-        let (own_nft_policy_id, own_nft_asset_name, _own_nft_qty) =
-          utils.get_single_asset_from_value_apart_from_ada(own_value)
-
-        // 2. The NFT must have the same policy ID as the spending script.
-        expect own_nft_policy_id == own_hash
-
-        // TODO: Is this needed?
-        // expect _own_nft_qty == 1
-        // 3. The spending NFT must be burnt. Since there are only 2 endpoints
-        //    available in the minting logic, one of which expects the mint
-        //    quantity to be 1, this automatically validates the other endpoint
-        //    is invoked (i.e. the burning endpoint).
-        expect [Pair(burnt_asset_name, burn_qty)] =
-          mint |> assets.tokens(own_hash) |> dict.to_pairs
-        and {
-          burnt_asset_name == own_nft_asset_name,
-          burn_qty == -1,
-        }
-      }
+      ConcludeSettlement { node_input_index, anchor_node_input_index } ->
+        list_state_transition(assets.tokens(tx.mint, settlement_policy_id))
     }
   }
 
@@ -331,9 +303,8 @@ validator mint(hub_oracle: ScriptHash) {
         anchor_node_input_index,
         anchor_node_output_index,
         node_output_index,
-        state_queue_input_index,
+        state_queue_merge_redeemer_index,
         hub_ref_input_index,
-        confirmed_state_output_index,
       } -> {
         let Transaction {
           inputs,
@@ -344,78 +315,53 @@ validator mint(hub_oracle: ScriptHash) {
           ..
         } = tx
 
-        let hub.Datum { state_queue, state_queue_addr, settlement_queue_addr, .. } =
-          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+        let hub.Datum {
+          state_queue,
+          state_queue_addr,
+          settlement_queue_addr,
+          ..
+        } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         // 1. Ensure merge endpoint of state queue is present in the tx.
-        expect Some(state_queue_redeemer_data) =
-          redeemers |> pairs.get_first(Mint(state_queue))
-        expect state_queue.MergeToConfirmedState: state_queue.MintRedeemer =
-          state_queue_redeemer_data
+        expect Some(Pair(Mint(
+          state_queue_redeemer_minting_policy,
+          state_queue_redeemer_data,
+        ))) = redeemers |> list.at(state_queue_merge_redeemer_index)
+        expect state_queue_redeemer_minting_policy == state_queue
+        expect state_queue.MergeToConfirmedState {
+          header_node_input_index,
+          confirmed_state_node_output_index,
+          ..
+        }: state_queue.MintRedeemer = state_queue_redeemer_data
 
         // 2. Grab the header hash of the new confirmed state to use as the
         //    asset name of the settlement authentication NFTs.
         expect Some(Output {
           datum: InlineDatum(confirmed_state_datum_data),
           ..
-        }) = outputs |> list.at(confirmed_state_output_index)
+        }) = outputs |> list.at(confirmed_state_node_output_index)
         expect ledger_state.ConfirmedState {
           header_hash: confirmed_state_header_hash,
           ..
         } = confirmed_state_datum_data
 
-        expect Some(Input {
-          output: Output {
-            address: input_anchor_address,
-            value: input_anchor_value,
-            ..
-          } as input_anchor_output,
-          ..
-        }) = inputs |> list.at(anchor_node_input_index)
-        let (input_anchor_nft_sym, _input_anchor_nft_tn, input_anchor_nft_qty) =
-          utils.get_single_asset_from_value_apart_from_ada(input_anchor_value)
-        expect and {
-            input_anchor_address == settlement_queue_addr,
-            input_anchor_nft_sym == own_policy,
-            // input_anchor_nft_qty == 1,
-          }
-
+        let node_in_outputs = get_node_inputs(inputs, own_policy)
         let node_outputs = get_node_outputs(outputs, own_policy)
-        let key_to_append = Key(confirmed_state_header_hash)
-        let expected_mint_name = serialize_key(key_to_append)
+        let node_mint = tokens(mint, own_policy)
 
-        // 3. Validate appending to the end of linked list.
+        // 3. Validate appending to the end of settlement queue.
         expect
           unordered.append_unsafe(
-            key_to_append: key_to_append,
-            appended_node_index: node_output_index,
-            anchor_node_output_index: anchor_node_output_index,
-            node_inputs: [input_anchor_output],
-            node_outputs: node_outputs,
-            node_mint: assets.tokens(mint, own_policy),
+            Key(confirmed_state_header_hash),
+            node_output_index,
+            anchor_node_output_index,
+            node_in_outputs,
+            node_outputs,
+            node_mint,
           )
 
-        // 4. Only 1 UTxO must be produced at own script address. Staking parts
-        //    are not validated (TODO?).
-        expect Some(Output {
-          value: produced_nodes_value,
-          datum: InlineDatum(produced_nodes_datum_data),
-          reference_script: None,
-          ..
-        }) = node_outputs |> list.at(node_output_index)
-
-        // 5. Validate produced UTxOs contain authentication NFTs.
-        let produced_nodes_nft_triplet =
-          utils.get_single_asset_from_value_apart_from_ada(produced_nodes_value)
-        expect 
-            produced_nodes_nft_triplet == (
-              own_policy,
-              expected_mint_name,
-              1,
-            )
-
-        // 6. Fetch the state commitment UTxO that's being spent in order to be
-        //    merged into the confirmed state.
+        // 4. Fetch the state commitment UTxO that's being merged into the
+        //    confirmed state.
         expect Input {
           output: Output { datum: InlineDatum(block_datum_data), .. },
           ..
@@ -425,43 +371,37 @@ validator mint(hub_oracle: ScriptHash) {
             state_queue_addr,
             state_queue,
             state_queue.block_asset_name,
-            state_queue_input_index,
+            header_node_input_index,
           )
-        expect block_datum: state_queue.Datum = block_datum_data
+        expect block_datum: NodeDatum = block_datum_data
         expect ledger_state.Header {
           operator_vkey,
           deposits_root,
           withdrawals_root,
           start_time,
-          end_time
+          end_time,
           ..
         } = block_datum.data
 
-        // 8. Validate the produced output datum.
-        let expected_produced_node_datum_data: Data =
-          NodeDatum {
-            data: NodeData {
-              deposits_root,
-              withdrawals_root,
-              start_time,
-              end_time,
-              time_of_claimed_as_resolved: None,
-              operator: Some(operator_vkey),
-            },
-            link: Empty,
-            key: Key(),
+        // 5. Validate the produced output datum.
+        expect Some(
+          Output {
+            datum: InlineDatum(settlement_output_datum_data),
+            ..
           }
-        let expected_produced_withdrawals_datum_data: Data =
-          Datum {
-            mpf_root: withdrawals_root,
+        ) = list.at(node_outputs, node_output_index)
+        expect parsed_settlement_output_datum: Datum = settlement_output_datum_data
+        expect parsed_settlement_output_node_data: NodeData = parsed_settlement_output_datum.data
+        let expected_produced_node_data: Data =
+          NodeData {
+            deposits_root,
+            withdrawals_root,
+            start_time,
+            end_time,
             time_of_claimed_as_resolved: None,
             operator: Some(operator_vkey),
-            tree_content: settlement_queue.Withdrawal,
           }
-        and {
-          produced_deposits_datum_data == expected_produced_deposits_datum_data,
-          produced_withdrawals_datum_data == expected_produced_withdrawals_datum_data,
-        }
+        parsed_settlement_output_datum.data == expected_produced_node_data
       }
       RemoveSettlement -> {
         expect [Input { .. }] =
