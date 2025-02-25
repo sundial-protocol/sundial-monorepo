@@ -1,0 +1,31 @@
+{
+  "preamble": {
+    "title": "anastasia-labs/aiken-always-succeeds",
+    "description": "Aiken contracts for project 'anastasia-labs/aiken-always-succeeds'",
+    "version": "0.0.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.9+2217206"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "always_succeeds.mint.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "compiledCode": "587201010032323232322533300232323232325330084901154d6964676172642044656d6f20e28093204d696e740014a2601260140066010004600e004600e00260086ea800452615330034911856616c696461746f722072657475726e65642066616c736500136565734ae7155cf2ba157441",
+      "hash": "9cb66d9a22466d94a18203da987d461e81db7b2b81e5cb237ae34382"
+    },
+    {
+      "title": "always_succeeds.spend.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "compiledCode": "587301010032323232322533300232323232325330084901164d6964676172642044656d6f20e28093205370656e640014a2601260140066010004600e004600e00260086ea800452615330034911856616c696461746f722072657475726e65642066616c736500136565734ae7155cf2ba157441",
+      "hash": "2ea1afb33e2cc2d4c9bf4db8b2496a1c0dd62c201a96b5ad8c84fd19"
+    }
+  ]
+}
