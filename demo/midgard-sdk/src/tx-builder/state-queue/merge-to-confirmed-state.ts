@@ -6,11 +6,14 @@ import {
   TxBuilder,
   toUnit,
 } from "@lucid-evolution/lucid";
-import { fetchConfirmedStateAndItsLinkProgram } from "@/endpoints/state-queue/fetch-confirmed-state-and-its-link.js";
-import { getSingleAssetApartFromAda } from "@/utils/common.js";
+import { fetchConfirmedStateAndItsLinkProgram } from "../../endpoints/state-queue/fetch-confirmed-state-and-its-link.js";
+import { getSingleAssetApartFromAda } from "../../utils/common.js";
 import { ConfirmedState, Header } from "../ledger-state.js";
-import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
-import { getHeaderFromBlockUTxO, hashHeader } from "@/utils/ledger-state.js";
+import { getNodeDatumFromUTxO } from "../../utils/linked-list.js";
+import {
+  getHeaderFromBlockUTxO,
+  hashHeader,
+} from "../../utils/ledger-state.js";
 import { NodeDatum } from "../linked-list.js";
 import { Redeemer, FetchConfig, MergeParams } from "./types.js";
 

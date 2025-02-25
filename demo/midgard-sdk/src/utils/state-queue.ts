@@ -1,8 +1,8 @@
-import { ConfirmedState } from "@/tx-builder/ledger-state.js";
+import { ConfirmedState } from "../tx-builder/ledger-state.js";
 import { Data, UTxO } from "@lucid-evolution/lucid";
-import { NodeKey } from "@/tx-builder/linked-list.js";
+import { NodeKey } from "../tx-builder/linked-list.js";
 import { Effect } from "effect";
-import { StateQueue } from "@/tx-builder/index.js";
+import { StateQueue } from "../tx-builder/index.js";
 import { getNodeDatumFromUTxO } from "./linked-list.js";
 
 export const getLinkFromBlockUTxO = (

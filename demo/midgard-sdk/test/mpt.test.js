@@ -1,4 +1,4 @@
-import { fromHeaderHashes } from "../src/utils/index";
+import { mptFromList } from "../src/utils/index";
 import { Trie } from "@aiken-lang/merkle-patricia-forestry";
 import { Effect } from "effect";
 import { describe, expect } from "vitest";
@@ -11,7 +11,7 @@ describe("fromHeaderHashes", () => {
         "f8077201b61484c91171f5910a4a8f9225a4599b804ba53745538c83bfa699ec"
       ];
 
-      const trie = yield* fromHeaderHashes(headerHashes);
+      const trie = yield* mptFromList(headerHashes);
       const key = yield* Effect.promise(() =>
         trie.get("225a4599b804ba53745538c83bfa699ecf8077201b61484c91171f5910a4a8f9")
       );

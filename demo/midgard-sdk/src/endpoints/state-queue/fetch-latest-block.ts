@@ -1,9 +1,11 @@
 import { Effect } from "effect";
 import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
-import { utxosAtByNFTPolicyId } from "@/utils/common.js";
-import { makeReturn } from "@/core.js";
-import { getLinkFromBlockUTxO } from "@/utils/state-queue.js";
-import { StateQueue } from "@/tx-builder/index.js";
+import {
+  utxosAtByNFTPolicyId,
+  getLinkFromBlockUTxO,
+} from "../../utils/index.js";
+import { makeReturn } from "../../core.js";
+import { StateQueue } from "../../tx-builder/index.js";
 
 export const fetchLatestCommitedBlockProgram = (
   lucid: LucidEvolution,
