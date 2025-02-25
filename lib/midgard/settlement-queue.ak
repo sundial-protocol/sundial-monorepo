@@ -17,6 +17,7 @@ pub type NodeData {
 }
 
 pub type SpendRedeemer {
+  ListStateTransition
   UpdateResolvedFlag {
     node_input_index: Int,
     node_output_index: Int,

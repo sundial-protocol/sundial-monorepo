@@ -5,7 +5,7 @@ use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
 use aiken_design_patterns/linked_list/ordered
 use aiken_design_patterns/linked_list/unordered.{
-  Key, NodeDatum, get_node_outputs, serialize_key,
+  Key, NodeDatum, get_node_outputs, list_state_transition, serialize_key,
 }
 use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
@@ -19,14 +19,14 @@ use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue.{
-  ClaimAsResolved, ConcludeSettlement, Datum, MintRedeemer, NodeData,
-  RemoveSettlement, RevokeResolvedFlag, SpawnSettlement, SpendRedeemer,
+  ClaimAsResolved, ConcludeSettlement, Datum, ListStateTransition, MintRedeemer,
+  NodeData, RemoveSettlement, RevokeResolvedFlag, SpawnSettlement, SpendRedeemer,
   UpdateResolvedFlag,
 }
 use midgard/state_queue
 use midgard/user_events
 
-validator spend (
+validator spend(
   hub_oracle: ScriptHash,
   settlement_policy_id: ScriptHash,
   plutarch_phas_validator_hash: ScriptHash,
@@ -48,6 +48,8 @@ validator spend (
     } as node_data = node_datum.data
 
     when redeemer is {
+      ListStateTransition ->
+        list_state_transition(assets.tokens(tx.mint, settlement_policy_id))
       UpdateResolvedFlag {
         node_input_index,
         node_output_index,
@@ -316,9 +318,13 @@ validator spend (
       }
     }
   }
+
+  else(_) {
+    fail
+  }
 }
 
-validator mint (hub_oracle: ScriptHash) {
+validator mint(hub_oracle: ScriptHash) {
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
     when redeemer is {
       SpawnSettlement {
@@ -338,7 +344,7 @@ validator mint (hub_oracle: ScriptHash) {
           ..
         } = tx
 
-        let hub.Datum { state_queue, state_queue_addr, .. } =
+        let hub.Datum { state_queue, state_queue_addr, settlement_queue_addr, .. } =
           hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         // 1. Ensure merge endpoint of state queue is present in the tx.
@@ -360,10 +366,7 @@ validator mint (hub_oracle: ScriptHash) {
 
         expect Some(Input {
           output: Output {
-            address: Address {
-              payment_credential: Script(input_anchor_script_hash),
-              ..
-            },
+            address: input_anchor_address,
             value: input_anchor_value,
             ..
           } as input_anchor_output,
@@ -372,76 +375,46 @@ validator mint (hub_oracle: ScriptHash) {
         let (input_anchor_nft_sym, _input_anchor_nft_tn, input_anchor_nft_qty) =
           utils.get_single_asset_from_value_apart_from_ada(input_anchor_value)
         expect and {
-            input_anchor_script_hash == own_policy,
+            input_anchor_address == settlement_queue_addr,
             input_anchor_nft_sym == own_policy,
-            input_anchor_nft_qty == 1,
+            // input_anchor_nft_qty == 1,
           }
+
+        let node_outputs = get_node_outputs(outputs, own_policy)
+        let key_to_append = Key(confirmed_state_header_hash)
+        let expected_mint_name = serialize_key(key_to_append)
 
         // 3. Validate appending to the end of linked list.
         expect
           unordered.append_unsafe(
-            key_to_append: Key(serialize_key(confirmed_state_header_hash)),
+            key_to_append: key_to_append,
             appended_node_index: node_output_index,
             anchor_node_output_index: anchor_node_output_index,
             node_inputs: [input_anchor_output],
-            node_outputs: get_node_outputs(outputs, own_policy),
+            node_outputs: node_outputs,
             node_mint: assets.tokens(mint, own_policy),
           )
 
-        // 4. Only 2 UTxOs must be produced at own script address. It is
-        //    expected that the deposits UTxO is produced at the smaller output
-        //    index. Staking parts are not validated (TODO?).
-        expect [
-          Output {
-            value: produced_deposits_value,
-            datum: InlineDatum(produced_deposits_datum_data),
-            reference_script: None,
-            ..
-          },
-          Output {
-            value: produced_withdrawals_value,
-            datum: InlineDatum(produced_withdrawals_datum_data),
-            reference_script: None,
-            ..
-          },
-        ] =
-          outputs
-            |> list.filter(
-                fn(o) {
-                  when o.address.payment_credential is {
-                    Script(script_hash) -> script_hash == own_policy
-                    _ -> False
-                  }
-                },
-              )
+        // 4. Only 1 UTxO must be produced at own script address. Staking parts
+        //    are not validated (TODO?).
+        expect Some(Output {
+          value: produced_nodes_value,
+          datum: InlineDatum(produced_nodes_datum_data),
+          reference_script: None,
+          ..
+        }) = node_outputs |> list.at(node_output_index)
 
         // 5. Validate produced UTxOs contain authentication NFTs.
-        let produced_deposits_nft_triplet =
-          utils.get_single_asset_from_value_apart_from_ada(
-            produced_deposits_value,
-          )
-        let produced_withdrawals_nft_triplet =
-          utils.get_single_asset_from_value_apart_from_ada(
-            produced_withdrawals_value,
-          )
-        expect and {
-            produced_deposits_nft_triplet == (
+        let produced_nodes_nft_triplet =
+          utils.get_single_asset_from_value_apart_from_ada(produced_nodes_value)
+        expect 
+            produced_nodes_nft_triplet == (
               own_policy,
-              confirmed_state_header_hash,
+              expected_mint_name,
               1,
-            ),
-            produced_withdrawals_nft_triplet == produced_deposits_nft_triplet,
-          }
+            )
 
-        // 6. Ensure the two NFTs are minted.
-        expect [Pair(minted_name, minted_qty)] =
-          mint |> assets.tokens(own_policy) |> dict.to_pairs
-        expect and {
-            minted_name == confirmed_state_header_hash,
-            minted_qty == 2,
-          }
-
-        // 7. Fetch the state commitment UTxO that's being spent in order to be
+        // 6. Fetch the state commitment UTxO that's being spent in order to be
         //    merged into the confirmed state.
         expect Input {
           output: Output { datum: InlineDatum(block_datum_data), .. },
@@ -459,6 +432,8 @@ validator mint (hub_oracle: ScriptHash) {
           operator_vkey,
           deposits_root,
           withdrawals_root,
+          start_time,
+          end_time
           ..
         } = block_datum.data
 
@@ -466,10 +441,12 @@ validator mint (hub_oracle: ScriptHash) {
         let expected_produced_node_datum_data: Data =
           NodeDatum {
             data: NodeData {
-              mpf_root: deposits_root,
+              deposits_root,
+              withdrawals_root,
+              start_time,
+              end_time,
               time_of_claimed_as_resolved: None,
               operator: Some(operator_vkey),
-              tree_content: settlement_queue.Deposit,
             },
             link: Empty,
             key: Key(),
