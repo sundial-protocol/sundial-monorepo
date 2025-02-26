@@ -5,6 +5,9 @@ import {
   stopTxCommand,
   txStatusCommand,
 } from "./commands/generate-tx.js";
+import { run } from "./Cli.js";
+import { NodeContext, NodeRuntime } from "@effect/platform-node";
+import { Effect } from "effect";
 
 // Main CLI
 const cli = Command.make("midgard-manager")
@@ -24,7 +27,9 @@ const cli = Command.make("midgard-manager")
   );
 
 // Run the CLI
-Command.run(cli, {
-  name: "midgard-manager",
-  version: "0.1.0",
-});
+Effect.runPromise(
+  run(process.argv).pipe(
+    Effect.provide(NodeContext.layer),
+    NodeRuntime.runMain({ disableErrorReporting: true })
+  )
+);

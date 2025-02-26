@@ -6,10 +6,16 @@
     "enabled": true,
     "maxConcurrent": 10,
     "batchSize": 100,
-    "intervalMs": 1000
+    "intervalMs": 1000,
+    "transactionType": "mixed",
+    "oneToOneRatio": 70,
+    "defaultWallet": "test"
   },
   "logging": {
     "level": "info",
     "format": "pretty"
+  },
+  "wallets": {
+    "directory": "~/.midgard-manager/wallets"
   }
-}
+} 

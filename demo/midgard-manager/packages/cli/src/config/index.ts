@@ -1,50 +1,71 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { Effect, pipe } from "effect";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+import { Effect } from "effect";
 import * as S from "@effect/schema/Schema";
-import { config } from "dotenv";
-import { MidgardConfig } from "../types/config.js";
+import { configSchema, defaultConfig, type MidgardConfig } from "./schema.js";
 import { MidgardError } from "../utils/errors.js";
 
-// Load environment variables
-config();
+// Get the directory path relative to the monorepo
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const MONOREPO_ROOT = join(__dirname, "../../../../../..");
+const PROJECT_ROOT = join(MONOREPO_ROOT, "demo/midgard-manager");
 
-// Default configuration based on environment variables
-const defaultConfig: S.Schema.To<typeof MidgardConfig> = {
-  nodeEndpoint: process.env.NODE_ENDPOINT || "http://localhost:3000",
-  txGenerator: {
-    enabled: process.env.TX_GENERATOR_ENABLED === "true",
-    interval: parseInt(process.env.TX_GENERATOR_INTERVAL || "5000", 10),
-  },
-  settings: {
-    debug: false,
-    logLevel: "info",
-  },
-};
+// Store all configuration in the project's config directory
+const CONFIG_DIR = join(PROJECT_ROOT, "config");
+const CONFIG_PATH = join(CONFIG_DIR, "settings.json");
 
-// Load configuration
-export const loadConfig = Effect.try({
+// Ensure config directory exists
+const ensureConfigDir = Effect.try({
   try: () => {
-    if (!existsSync("./config.json")) {
-      writeFileSync("./config.json", JSON.stringify(defaultConfig, null, 2));
-      return defaultConfig;
+    if (!existsSync(CONFIG_DIR)) {
+      mkdirSync(CONFIG_DIR, { recursive: true });
     }
-
-    const configFile = readFileSync("./config.json", "utf-8");
-    return pipe(JSON.parse(configFile), S.parseSync(MidgardConfig));
   },
   catch: (error) => {
-    throw MidgardError.config(`Failed to load config: ${error}`);
+    throw MidgardError.config(`Failed to create config directory: ${error}`);
   },
 });
 
+// Load configuration
+export const loadConfig = Effect.gen(function* (_) {
+  yield* _(ensureConfigDir);
+
+  return yield* _(
+    Effect.try({
+      try: () => {
+        if (!existsSync(CONFIG_PATH)) {
+          writeFileSync(CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
+          return defaultConfig;
+        }
+
+        const configFile = readFileSync(CONFIG_PATH, "utf-8");
+        const parsedConfig = JSON.parse(configFile);
+        return S.decodeSync(configSchema)(parsedConfig);
+      },
+      catch: (error) => {
+        throw MidgardError.config(`Failed to load config: ${error}`);
+      },
+    })
+  );
+});
+
 // Save configuration
-export const saveConfig = (config: S.Schema.To<typeof MidgardConfig>) =>
-  Effect.try({
-    try: () => {
-      writeFileSync("./config.json", JSON.stringify(config, null, 2));
-      return config;
-    },
-    catch: (error) => {
-      throw MidgardError.config(`Failed to save config: ${error}`);
-    },
+export const saveConfig = (config: MidgardConfig) =>
+  Effect.gen(function* (_) {
+    yield* _(ensureConfigDir);
+
+    return yield* _(
+      Effect.try({
+        try: () => {
+          writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+          return config;
+        },
+        catch: (error) => {
+          throw MidgardError.config(`Failed to save config: ${error}`);
+        },
+      })
+    );
   });

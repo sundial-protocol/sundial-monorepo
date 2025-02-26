@@ -4,14 +4,20 @@ import chalk from "chalk";
 import ora from "ora-classic";
 import { getWallet, listWallets } from "../../config/wallets.js";
 import fs from "fs/promises";
-import path from "path";
-import { homedir } from "os";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import cron from "node-cron";
 import { startGenerator, stopGenerator } from "@midgard-manager/tx-generator";
 
-// Define schedule storage paths
-const CONFIG_DIR = path.join(homedir(), ".midgard-manager");
-const SCHEDULE_CONFIG_PATH = path.join(CONFIG_DIR, "schedule.json");
+// Get the directory path relative to the monorepo
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const MONOREPO_ROOT = join(__dirname, "../../../../../../..");
+const PROJECT_ROOT = join(MONOREPO_ROOT, "demo/midgard-manager");
+
+// Store schedule configuration in the project's config directory
+const CONFIG_DIR = join(PROJECT_ROOT, "config");
+const SCHEDULE_CONFIG_PATH = join(CONFIG_DIR, "schedules.json");
 
 // Available transaction types
 const transactionTypes = ["one-to-one", "multi-output", "mixed"];

@@ -1,8 +1,7 @@
-import { Effect } from "effect";
 import * as S from "@effect/schema/Schema";
 
 // Schema for our configuration
-const configSchema = S.Struct({
+export const configSchema = S.Struct({
   // Node configuration
   node: S.Struct({
     endpoint: S.String.pipe(S.pattern(/^https?:\/\/.+/)),
@@ -48,22 +47,3 @@ export class ConfigError {
   readonly _tag = "ConfigError";
   constructor(readonly message: string, readonly cause?: unknown) {}
 }
-
-// Load and validate configuration
-export const loadConfig = Effect.gen(function* (_) {
-  // Load config from environment
-  const { loadConfigFromEnv } = yield* _(
-    Effect.promise(() => import("./env.js"))
-  );
-  const config = yield* _(loadConfigFromEnv);
-
-  // Validate with schema
-  try {
-    const result = S.decodeSync(configSchema)(config);
-    return result;
-  } catch (error) {
-    return yield* _(
-      Effect.fail(new ConfigError("Invalid configuration", error))
-    );
-  }
-});

@@ -21,6 +21,25 @@ import {
 } from "../../utils/common.js";
 import { MidgardNodeClient } from "../client/node-client.js";
 
+/**
+ * Configuration for generating multi-output transactions.
+ * These transactions simulate complex transfers with multiple recipients.
+ */
+export interface MultiOutputTransactionConfig {
+  network: Network;
+  initialUTxO: UTxO;
+  utxosCount: number;
+  finalUtxosCount?: number;
+  walletSeedOrPrivateKey: string;
+  writable?: Writable;
+  nodeClient?: MidgardNodeClient;
+  nodeConfig?: {
+    retryAttempts?: number;
+    retryDelay?: number;
+    enableLogs?: boolean;
+  };
+}
+
 // Constants
 const TOTAL_ACCOUNT_COUNT = 100;
 const OUTPUT_UTXOS_CHUNK = 20;
@@ -28,32 +47,14 @@ const GC_PAUSE_INTERVAL = 250; // number of transactions before GC pause
 const ACCOUNT_GENERATION_CONCURRENCY = 10;
 const MIN_LOVELACE_OUTPUT = 1_000_000n; // Minimum lovelace per output
 
-interface MultiOutputTransactionConfig {
-  network: Network;
-  initialUTxO: UTxO;
-  utxosCount: number; // number of UTxOs to generate
-  finalUtxosCount?: number; // number of UTxOs to consolidate into at the end (default: 1)
-  walletSeedOrPrivateKey: string;
-  writable?: Writable;
-  nodeClient?: MidgardNodeClient;
-}
-
+/**
+ * Validates the configuration parameters
+ * @throws Error if configuration is invalid
+ */
 const validateConfig = (config: MultiOutputTransactionConfig): void => {
-  const {
-    initialUTxO,
-    utxosCount,
-    finalUtxosCount = 1,
-    walletSeedOrPrivateKey,
-  } = config;
+  const { initialUTxO, walletSeedOrPrivateKey, utxosCount, finalUtxosCount } = config;
 
-  if (finalUtxosCount > utxosCount / OUTPUT_UTXOS_CHUNK) {
-    throw new Error(
-      `Final UTxO Count can be ${Math.floor(
-        utxosCount / OUTPUT_UTXOS_CHUNK
-      )} at maximum`
-    );
-  }
-
+  // Validate wallet key
   const privateKey = parseUnknownKeytoBech32PrivateKey(walletSeedOrPrivateKey);
   const publicKeyHash = getPublicKeyHashFromPrivateKey(privateKey);
   const initialUTxOAddressPubKeyHash = paymentCredentialOf(
@@ -64,10 +65,33 @@ const validateConfig = (config: MultiOutputTransactionConfig): void => {
     throw new Error("Payment Key is not valid to spend Initial UTxO");
   }
 
-  const outputLovelace =
-    (initialUTxO.assets.lovelace - MIN_LOVELACE_OUTPUT) / BigInt(utxosCount);
+  // Validate UTxO amount
+  if (initialUTxO.assets.lovelace < MIN_LOVELACE_OUTPUT) {
+    throw new Error("Initial UTxO must have at least 1 ADA");
+  }
+
+  // Calculate output lovelace and validate
+  const outputLovelace = calculateOutputLovelace(initialUTxO.assets.lovelace, utxosCount);
   if (outputLovelace < MIN_LOVELACE_OUTPUT) {
     throw new Error("Not enough Lovelace to distribute");
+  }
+
+  // Validate UTxO counts
+  if (utxosCount < 1) {
+    throw new Error("UTxO count must be at least 1");
+  }
+
+  if (finalUtxosCount !== undefined) {
+    if (finalUtxosCount < 1) {
+      throw new Error("Final UTxO count must be at least 1");
+    }
+    if (finalUtxosCount > utxosCount / OUTPUT_UTXOS_CHUNK) {
+      throw new Error(
+        `Final UTxO Count can be ${Math.floor(
+          utxosCount / OUTPUT_UTXOS_CHUNK
+        )} at maximum`
+      );
+    }
   }
 };
 
@@ -293,4 +317,3 @@ const generateMultiOutputTransactions = async (
 };
 
 export { generateMultiOutputTransactions };
-export type { MultiOutputTransactionConfig };

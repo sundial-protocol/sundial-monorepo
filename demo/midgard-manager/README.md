@@ -7,6 +7,62 @@ Tools for managing Midgard MVP L2 node and generating test transactions.
 - **CLI** (`packages/cli`): Command-line interface for Midgard nodes
 - **TX Generator** (`packages/tx-generator`): Transaction generator for testing
 
+## Configuration
+
+Midgard Manager uses a centralized configuration system with a single source of truth:
+
+1. **Central Configuration**: Located at `config.json` in the root directory
+2. **Command-line Arguments**: Can override specific settings per command
+
+The configuration can be modified either by directly editing the `config.json` file or through the interactive CLI commands, which will update the file automatically.
+
+### Configuration Structure
+
+```json
+{
+  "node": {
+    "endpoint": "http://localhost:3000"
+  },
+  "generator": {
+    "enabled": true,
+    "maxConcurrent": 10,
+    "batchSize": 100,
+    "intervalMs": 1000,
+    "transactionType": "mixed",
+    "oneToOneRatio": 70,
+    "defaultWallet": "test"
+  },
+  "logging": {
+    "level": "info",
+    "format": "pretty"
+  },
+  "wallets": {
+    "directory": "~/.midgard-manager/wallets"
+  }
+}
+```
+
+### Configuration Fields
+
+- **node**: Node connection settings
+  - `endpoint`: The Midgard node endpoint URL
+
+- **generator**: Transaction generator settings
+  - `enabled`: Whether the generator is currently running
+  - `maxConcurrent`: Maximum number of concurrent transactions
+  - `batchSize`: Number of transactions per batch
+  - `intervalMs`: Interval between batches in milliseconds
+  - `transactionType`: Type of transactions to generate ("one-to-one", "multi-output", or "mixed")
+  - `oneToOneRatio`: For mixed type, percentage of one-to-one transactions (0-100)
+  - `defaultWallet`: Default wallet to use for signing transactions
+
+- **logging**: Logging configuration
+  - `level`: Log level (debug, info, warn, error)
+  - `format`: Log format (pretty, json)
+
+- **wallets**: Wallet management settings
+  - `directory`: Directory to store wallet information
+
 ## Quick Start
 
 ```bash
@@ -16,6 +72,9 @@ pnpm install
 
 # Build all packages
 pnpm build
+
+# Start the CLI in interactive mode
+pnpm start interactive
 ```
 
 ## Available Tools
@@ -34,37 +93,45 @@ pnpm start --help
 
 ### 2. Transaction Generator
 
-A dedicated tool for generating test transactions. You can use it in two ways:
+Generate test transactions in various patterns:
 
 ```bash
-# 1. Using the dedicated tx-generator command
-pnpm tx-generator --help                    # Show all commands
-pnpm tx-generator start --test-wallet       # Start with test wallet
-pnpm tx-generator status                    # Check generator status
+# Using the CLI
+pnpm start generate-tx --interactive  # Interactively configure and start generator
+pnpm start tx-status                 # Check generator status
+pnpm start stop-tx                   # Stop the generator
 
-# 2. Using the main CLI (alternative)
-pnpm start tx generate --interactive        # Interactive mode
-pnpm start tx status                       # Check status
+# Direct generator usage
+pnpm tx-generator --help
 ```
 
-#### Transaction Generator Options
+### 3. Wallet Management
+
+Manage wallets for transaction signing:
 
 ```bash
-# Start with custom configuration
-pnpm tx-generator start \
-  --type mixed \                # one-to-one, multi-output, or mixed
-  --ratio 80 \                 # % of one-to-one transactions
-  --batch-size 20 \            # transactions per batch
-  --interval 10 \              # seconds between batches
-  --concurrency 3 \            # parallel batches
-  --endpoint http://localhost:3000 \
-  --test-wallet               # or use --private-key
-
-# Check current status
-pnpm tx-generator status
+pnpm start wallet add <NAME> --private-key <key>
+pnpm start wallet list
+pnpm start wallet details <NAME>
+pnpm start wallet remove <NAME>
 ```
 
-For detailed documentation:
-- Transaction Generator: [tx-generator README](packages/tx-generator/README.md)
-- Interactive CLI: [cli README](packages/cli/README.md)
+### 4. Node Operations
+
+Configure and monitor the Midgard node:
+
+```bash
+pnpm start node-status
+pnpm start configure-node --interactive
+```
+
+## Development
+
+To add new features or modify existing ones:
+
+1. Make changes in the relevant package
+2. Run `pnpm build` to rebuild all packages
+3. Test your changes using the CLI
+
+For more detailed development information, see the README in each package directory.
 

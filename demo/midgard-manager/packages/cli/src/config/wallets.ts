@@ -1,22 +1,34 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-import { homedir } from "os";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
-const CONFIG_DIR = join(homedir(), ".midgard-manager");
-const WALLET_CONFIG_PATH = join(CONFIG_DIR, "wallets.json");
+// Get the directory path relative to the monorepo
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const MONOREPO_ROOT = join(__dirname, "../../../../../..");  // Fixed path to reach the actual monorepo root
+const PROJECT_ROOT = join(MONOREPO_ROOT, "demo/midgard-manager");
 
-// Default test wallet that works out of the box
+// Store wallets in a standard location within the project structure
+const CONFIG_DIR = join(PROJECT_ROOT, "config/wallets");
+const WALLET_CONFIG_PATH = join(CONFIG_DIR, "default.json");
+
+// Default test wallet that's always available for transaction generation
+// WARNING: This is only for testing/development - never use with real funds!
+
 const DEFAULT_WALLETS = {
   test: {
-    // This is a valid formatted test private key (though not functional - DO NOT USE FOR REAL TRANSACTIONS)
-    privateKey:
-      "ed25519_sk1lqglg27l7j7u80y488z352yxjr7auzm9wgwctf9mdsceq4qruqus0u2td6",
-  },
+    privateKey: "ed25519_sk1lqglg27l7j7u80y488z352yxjr7auzm9wgwctf9mdsceq4qruqus0u2td6",
+    description: "Default test wallet for transaction generation",
+    isTestOnly: true
+  }
 };
 
 export interface WalletConfig {
   [name: string]: {
     privateKey: string;
+    description?: string;
+    isTestOnly: boolean;
   };
 }
 
@@ -26,8 +38,16 @@ export interface WalletConfig {
  */
 export const loadWallets = async (): Promise<WalletConfig> => {
   try {
+    // Ensure the test-wallets directory exists
+    await mkdir(CONFIG_DIR, { recursive: true });
+    
     const data = await readFile(WALLET_CONFIG_PATH, "utf-8");
-    return JSON.parse(data);
+    const wallets = JSON.parse(data);
+    
+    // Always ensure the default test wallet exists and can't be modified
+    wallets.test = DEFAULT_WALLETS.test;
+    
+    return wallets;
   } catch (error) {
     // If file doesn't exist, create default
     await saveWallets(DEFAULT_WALLETS);
@@ -38,33 +58,43 @@ export const loadWallets = async (): Promise<WalletConfig> => {
 /**
  * Save wallet configuration to disk
  */
-export const saveWallets = async (wallets: WalletConfig): Promise<void> => {
-  try {
-    // Ensure directory exists
-    await mkdir(CONFIG_DIR, { recursive: true });
-    await writeFile(WALLET_CONFIG_PATH, JSON.stringify(wallets, null, 2));
-  } catch (error) {
-    console.error("Failed to save wallet configuration:", error);
-    throw error;
-  }
+const saveWallets = async (wallets: WalletConfig): Promise<void> => {
+  // Always ensure the default test wallet exists and can't be modified
+  wallets.test = DEFAULT_WALLETS.test;
+  
+  await mkdir(CONFIG_DIR, { recursive: true });
+  await writeFile(WALLET_CONFIG_PATH, JSON.stringify(wallets, null, 2));
 };
 
 /**
- * Add a wallet to the configuration
+ * Add a test wallet to the configuration
  */
 export const addWallet = async (
   name: string,
-  privateKey: string
+  privateKey: string,
+  description?: string
 ): Promise<void> => {
+  if (name === 'test') {
+    throw new Error("Cannot modify the default test wallet");
+  }
+  
   const wallets = await loadWallets();
-  wallets[name] = { privateKey };
+  wallets[name] = { 
+    privateKey, 
+    description,
+    isTestOnly: true 
+  };
   await saveWallets(wallets);
 };
 
 /**
- * Remove a wallet from the configuration
+ * Remove a test wallet from the configuration
  */
 export const removeWallet = async (name: string): Promise<void> => {
+  if (name === 'test') {
+    throw new Error("Cannot remove the default test wallet");
+  }
+  
   const wallets = await loadWallets();
   delete wallets[name];
   await saveWallets(wallets);
@@ -75,7 +105,7 @@ export const removeWallet = async (name: string): Promise<void> => {
  */
 export const getWallet = async (
   name: string
-): Promise<{ privateKey: string } | null> => {
+): Promise<{ privateKey: string; description?: string; isTestOnly: boolean } | null> => {
   const wallets = await loadWallets();
   return wallets[name] || null;
 };

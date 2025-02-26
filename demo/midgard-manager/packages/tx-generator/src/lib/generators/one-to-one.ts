@@ -22,21 +22,19 @@ import {
 /**
  * Configuration for generating one-to-one transactions.
  * These transactions simulate simple transfers between addresses.
- * @interface OneToOneTransactionConfig
- * @property {Network} network - The network configuration (testnet/mainnet)
- * @property {UTxO} initialUTxO - The initial UTxO to use for transaction generation
- * @property {number} txsCount - Number of transactions to generate
- * @property {string} walletSeedOrPrivateKey - Wallet seed phrase or private key for signing
- * @property {Writable} [writable] - Optional writable stream for test output
- * @property {MidgardNodeClient} [nodeClient] - Optional node client for submitting transactions
  */
-interface OneToOneTransactionConfig {
+export interface OneToOneTransactionConfig {
   network: Network;
   initialUTxO: UTxO;
   txsCount: number;
   walletSeedOrPrivateKey: string;
   writable?: Writable;
   nodeClient?: MidgardNodeClient;
+  nodeConfig?: {
+    retryAttempts?: number;
+    retryDelay?: number;
+    enableLogs?: boolean;
+  };
 }
 
 // Constants for transaction generation
@@ -45,12 +43,12 @@ const MIN_LOVELACE_OUTPUT = 1_000_000n; // Minimum lovelace per output
 
 /**
  * Validates the configuration parameters
- * @param config - Transaction generation configuration
  * @throws Error if configuration is invalid
  */
 const validateConfig = (config: OneToOneTransactionConfig): void => {
   const { initialUTxO, walletSeedOrPrivateKey } = config;
 
+  // Validate wallet key
   const privateKey = parseUnknownKeytoBech32PrivateKey(walletSeedOrPrivateKey);
   const publicKeyHash = getPublicKeyHashFromPrivateKey(privateKey);
   const initialUTxOAddressPubKeyHash = paymentCredentialOf(
@@ -61,8 +59,14 @@ const validateConfig = (config: OneToOneTransactionConfig): void => {
     throw new Error("Payment Key is not valid to spend Initial UTxO");
   }
 
+  // Validate UTxO amount
   if (initialUTxO.assets.lovelace < MIN_LOVELACE_OUTPUT) {
     throw new Error("Initial UTxO must have at least 1 ADA");
+  }
+
+  // Validate transaction count
+  if (config.txsCount < 1) {
+    throw new Error("Transaction count must be at least 1");
   }
 };
 
@@ -182,4 +186,3 @@ const generateOneToOneTransactions = async (
 };
 
 export { generateOneToOneTransactions };
-export type { OneToOneTransactionConfig };

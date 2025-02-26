@@ -3,11 +3,18 @@ import { Effect, pipe } from "effect";
 import chalk from "chalk";
 import ora from "ora-classic";
 import fs from "fs/promises";
-import { homedir } from "os";
-import path from "path";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
-const CONFIG_DIR = path.join(homedir(), ".midgard-manager");
-const NODE_CONFIG_PATH = path.join(CONFIG_DIR, "node-config.json");
+// Get the directory path relative to the monorepo
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const MONOREPO_ROOT = join(__dirname, "../../../../../..");
+const PROJECT_ROOT = join(MONOREPO_ROOT, "demo/midgard-manager");
+
+// Store node configuration in the project's config directory
+const CONFIG_DIR = join(PROJECT_ROOT, "config");
+const NODE_CONFIG_PATH = join(CONFIG_DIR, "node.json");
 
 /**
  * Check the status of the Midgard node

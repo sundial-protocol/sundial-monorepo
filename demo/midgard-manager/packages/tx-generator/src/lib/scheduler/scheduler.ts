@@ -6,7 +6,7 @@ import {
   generateOneToOneTransactions,
 } from "../generators/index.js";
 import { Network, UTxO } from "@lucid-evolution/lucid";
-import { TransactionGeneratorConfig, DEFAULT_CONFIG } from "../types.js";
+import { TransactionGeneratorConfig, DEFAULT_CONFIG, validateGeneratorConfig } from "../types.js";
 
 // Internal constants for multi-output transactions
 const OUTPUTS_PER_DISTRIBUTION = 20;
@@ -94,11 +94,15 @@ export const startGenerator = (
     ...config,
   };
 
-  // Set up node client
+  // Validate the configuration
+  validateGeneratorConfig(fullConfig);
+
+  // Set up node client with the new configuration structure
   const nodeClient = new MidgardNodeClient({
     baseUrl: fullConfig.nodeEndpoint,
-    retryAttempts: 3,
-    retryDelay: 1000,
+    retryAttempts: fullConfig.nodeRetryAttempts,
+    retryDelay: fullConfig.nodeRetryDelay,
+    enableLogs: fullConfig.nodeEnableLogs,
   });
 
   // Create a limiter for concurrency
@@ -119,8 +123,20 @@ export const startGenerator = (
     scriptRef: null,
   };
 
-  // Log start
-  console.log(`Starting transaction generator (${fullConfig.transactionType})`);
+  // Log start with more configuration details
+  console.log("\nStarting transaction generator with configuration:");
+  console.log(`• Type: ${fullConfig.transactionType}`);
+  if (fullConfig.transactionType === "mixed") {
+    console.log(`• One-to-One Ratio: ${fullConfig.oneToOneRatio}%`);
+  }
+  console.log(`• Batch Size: ${fullConfig.batchSize}`);
+  console.log(`• Interval: ${fullConfig.interval}s`);
+  console.log(`• Concurrency: ${fullConfig.concurrency}`);
+  console.log(`• Node Endpoint: ${fullConfig.nodeEndpoint}`);
+  if (fullConfig.autoStopAfterBatch) {
+    console.log("• Auto-stop: Enabled (will stop after one batch)");
+  }
+  console.log();
 
   // Define the transaction generation function
   const generateTransactions = async () => {

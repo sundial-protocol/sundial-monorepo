@@ -11,13 +11,17 @@ export interface SerializedMidgardTransaction {
   txId: string;
 }
 
-export interface TransactionGeneratorConfig {
+/**
+ * Configuration for node-specific transaction generation
+ */
+export interface NodeTransactionConfig {
   network: string;
   initialUTxO: UTxO;
   nodeConfig: {
     baseUrl: string;
     retryAttempts?: number;
     retryDelay?: number;
+    enableLogs?: boolean;
   };
 }
 

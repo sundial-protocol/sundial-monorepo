@@ -13,6 +13,7 @@ import path from "path";
 import fs from "fs/promises";
 import { homedir } from "os";
 import { displayStatus } from "../utils/display.js";
+import { fileURLToPath, dirname, join } from "path";
 
 // Transaction types supported by the generator
 const transactionTypes = ["one-to-one", "multi-output", "mixed"];
@@ -521,10 +522,16 @@ export const txStatusCommand = Command.make("tx-status", {}, () => {
       const spinner = ora("Fetching transaction generator status...").start();
 
       try {
-        // Load the configuration
-        const configDir = path.join(homedir(), ".midgard-manager");
-        const configFilePath = path.join(configDir, "config.json");
-        const nodeConfigPath = path.join(configDir, "node-config.json");
+        // Get the directory path relative to the monorepo
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const MONOREPO_ROOT = join(__dirname, "../../../../../..");
+        const PROJECT_ROOT = join(MONOREPO_ROOT, "demo/midgard-manager");
+
+        // Load configurations from project's config directory
+        const CONFIG_DIR = join(PROJECT_ROOT, "config");
+        const settingsPath = join(CONFIG_DIR, "settings.json");
+        const nodeConfigPath = join(CONFIG_DIR, "node.json");
 
         // Load node config
         let nodeConfig = { endpoint: "http://localhost:3000" };
@@ -548,7 +555,7 @@ export const txStatusCommand = Command.make("tx-status", {}, () => {
           );
         }
 
-        // Load generator config
+        // Load generator config from settings.json
         let generatorConfig = {
           enabled: true,
           maxConcurrent: 10,
@@ -557,12 +564,12 @@ export const txStatusCommand = Command.make("tx-status", {}, () => {
         };
         try {
           const configExists = await fs
-            .access(configFilePath)
+            .access(settingsPath)
             .then(() => true)
             .catch(() => false);
 
           if (configExists) {
-            const configData = await fs.readFile(configFilePath, "utf-8");
+            const configData = await fs.readFile(settingsPath, "utf-8");
             const fullConfig = JSON.parse(configData);
             if (fullConfig.generator) {
               generatorConfig = fullConfig.generator;

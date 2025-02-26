@@ -13,30 +13,59 @@ import { scheduleTxCommand } from "./commands/scheduler/schedule-tx.js";
  * Main CLI help text
  */
 const helpText = `Midgard Manager - CLI tool for Cardano development
-  
+
+CONFIGURATION:
+
+Configuration is stored in the project's config directory:
+- Main settings: config/settings.json
+- Wallet configs: config/wallets/default.json
+
+Example configuration structure:
+{
+  "node": {
+    "endpoint": "http://localhost:3000"
+  },
+  "generator": {
+    "enabled": true,
+    "maxConcurrent": 10,
+    "batchSize": 100,
+    "intervalMs": 1000,
+    "transactionType": "mixed",
+    "oneToOneRatio": 70,
+    "defaultWallet": "test"
+  },
+  "logging": {
+    "level": "info",
+    "format": "pretty"
+  }
+}
+
 EXAMPLES:
   
-# Interactive mode (recommended for new users)
-$ midgard interactive
+# Interactive mode
+$ pnpm start interactive
   
 # Wallet management
-$ midgard wallet list
-$ midgard wallet details test
-$ midgard wallet add myWallet --private-key ed25519_sk...
+$ pnpm start wallet list                                 # List all wallets
+$ pnpm start wallet details test                         # Show wallet details
+$ pnpm start wallet add myWallet --private-key <key>     # Add a new wallet
+$ pnpm start wallet remove myWallet                      # Remove a wallet
   
 # Transaction generation
-$ midgard tx generate --interactive
-$ midgard tx status
-$ midgard tx stop
+$ pnpm start tx generate --interactive                   # Interactive setup
+$ pnpm start tx generate --type mixed --batch-size 10    # Direct configuration
+$ pnpm start tx status                                   # Check generator status
+$ pnpm start tx stop                                     # Stop the generator
   
 # Scheduled transactions
-$ midgard tx schedule add --name "Hourly Test" --interactive
-$ midgard tx schedule list
+$ pnpm start tx schedule add --name "Hourly Test" --interactive    # Add schedule
+$ pnpm start tx schedule list                                      # List schedules
+$ pnpm start tx schedule toggle <id>                               # Enable/disable
+$ pnpm start tx schedule remove <id>                               # Remove schedule
   
 # Node commands
-$ midgard node status
-$ midgard node configure --interactive
-`;
+$ pnpm start node status                                # Check node status
+$ pnpm start node configure --interactive               # Configure node settings`;
 
 /**
  * Group transaction commands

@@ -14,7 +14,7 @@ import {
 } from "../../utils/display.js";
 import { waitForKeypress } from "../../utils/input.js";
 import { menu } from "./menu.js";
-import { loadConfig } from "../../config/schema.js";
+import { loadConfig } from "../../config/index.js";
 import type { MidgardConfig } from "../../types/config.js";
 
 const BACK_OPTION = {
