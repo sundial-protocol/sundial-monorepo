@@ -10,6 +10,7 @@ A user deposits funds into Midgard by submitting an L1 transaction that performs
     \item Spend an input \code{l1\_nonce}, which uniquely identifies this deposit transaction.
     \item Register a staking script credential to witness the deposit.
       The script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the deposit whenever the credential is \emph{not} registered.\footnote{Cardano's ledger lacks a more direct method to disprove the existence of a utxo to a Plutus script.}
+    \item If any tokens are included in the deposit, they must be withheld until maturity. However, all the tokens must be burnt when transferring deposits to the Midgard reserve.
     \item Mint a deposit auth token to verify the following datum:
         \begin{equation*}
         \T{DepositDatum} \coloneq \left\{
