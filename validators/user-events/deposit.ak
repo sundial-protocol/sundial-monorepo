@@ -34,18 +34,24 @@ validator main(
       deposit_datum
     let SpendRedeemer {
       hub_ref_input_index,
-      mpf_ref_input_index,
+      settlement_ref_input_index,
+      settlement_node_asset_name,
       membership_proof,
       purpose,
     } = redeemer
-    let hub.Datum { settlement, reserve_addr, .. } =
-      hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+    let hub.Datum {
+      settlement_queue: settlement_queue_policy_id,
+      settlement_queue_addr,
+      reserve_addr,
+      ..
+    } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
     let Input { .. } =
-      utils.get_authentic_input_of(
+      utils.get_authentic_input_with_policy_at_address(
         reference_inputs,
-        settlement,
-        #"",
-        mpf_ref_input_index,
+        settlement_queue_addr,
+        settlement_queue_policy_id,
+        settlement_node_asset_name,
+        settlement_ref_input_index,
       )
     todo
   }
