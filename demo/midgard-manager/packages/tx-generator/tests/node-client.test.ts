@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { MidgardNodeClient } from "../src/lib/client/node-client";
 import { Effect } from "effect";
 
