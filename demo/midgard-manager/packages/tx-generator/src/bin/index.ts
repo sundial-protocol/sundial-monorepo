@@ -1,63 +1,98 @@
 #!/usr/bin/env node
 
-import { Network } from "@lucid-evolution/lucid";
+import { Command } from "commander";
+import chalk from "chalk";
 import { MidgardNodeClient } from "../lib/client/node-client.js";
-import { startGenerator } from "../lib/scheduler/scheduler.js";
+import { startGenerator, stopGenerator, getGeneratorStatus } from "../lib/scheduler/scheduler.js";
 import { generateTestWallet } from "../utils/test-utils.js";
 
-async function main() {
-  try {
-    const { privateKey, testUTxO } = await generateTestWallet();
-
-    // Initialize node client
-    const nodeEndpoint =
-      process.env.MIDGARD_NODE_URL || "http://localhost:3000";
-
-    // Parse transaction configuration
-    const batchSize = parseInt(process.env.BATCH_SIZE || "10", 10);
-    const interval = parseInt(process.env.INTERVAL_SECONDS || "5", 10);
-    const concurrency = parseInt(process.env.CONCURRENCY || "5", 10);
-    const transactionType = process.env.TX_TYPE || "mixed";
-    const oneToOneRatio = parseInt(process.env.ONE_TO_ONE_RATIO || "70", 10);
-
-    // Start the generator
-    await startGenerator({
-      nodeEndpoint,
-      walletPrivateKey: privateKey,
-      batchSize,
-      interval,
-      concurrency,
-      transactionType: transactionType as
-        | "one-to-one"
-        | "multi-output"
-        | "mixed",
-      oneToOneRatio,
-    });
-
-    console.log(`Transaction generator started with configuration:
- - Type: ${transactionType}${
-      transactionType === "mixed"
-        ? ` (${oneToOneRatio}% one-to-one, ${
-            100 - oneToOneRatio
-          }% multi-output)`
-        : ""
-    }
- - Batch Size: ${batchSize}
- - Interval: ${interval} seconds
- - Concurrency: ${concurrency}
- - Node Endpoint: ${nodeEndpoint}
- 
-Use Ctrl+C to stop the generator`);
-
-    // Keep process running
-    process.on("SIGINT", () => {
-      console.log("\nStopping generator...");
-      process.exit(0);
-    });
-  } catch (error) {
-    console.error("Failed to start generator:", error);
-    process.exit(1);
-  }
+interface GeneratorOptions {
+  endpoint: string;
+  type: "one-to-one" | "multi-output" | "mixed";
+  ratio: string;
+  batchSize: string;
+  interval: string;
+  concurrency: string;
+  testWallet: boolean;
+  privateKey?: string;
 }
 
-main();
+const program = new Command();
+
+// Setup CLI metadata
+program
+  .name("midgard-tx-generator")
+  .description("Transaction generator for Midgard L2")
+  .version("0.1.0");
+
+// Start command
+program
+  .command("start")
+  .description("Start the transaction generator")
+  .option("-e, --endpoint <url>", "Node endpoint URL", "http://localhost:3000")
+  .option("-t, --type <type>", "Transaction type (one-to-one, multi-output, mixed)", "mixed")
+  .option("-r, --ratio <number>", "Percentage of one-to-one transactions in mixed mode", "70")
+  .option("-b, --batch-size <number>", "Number of transactions per batch", "10")
+  .option("-i, --interval <seconds>", "Interval between batches in seconds", "5")
+  .option("-c, --concurrency <number>", "Number of concurrent batches", "5")
+  .option("--test-wallet", "Generate a test wallet for transactions", false)
+  .option("-k, --private-key <key>", "Wallet private key (required if --test-wallet is not used)")
+  .action(async (options: GeneratorOptions) => {
+    try {
+      let privateKey = options.privateKey;
+      
+      if (options.testWallet) {
+        console.log(chalk.yellow("Generating test wallet..."));
+        const { privateKey: testKey } = await generateTestWallet();
+        privateKey = testKey;
+      } else if (!privateKey) {
+        console.error(chalk.red("Error: Either --private-key or --test-wallet must be provided"));
+        process.exit(1);
+      }
+
+      console.log(chalk.blue("\nStarting transaction generator with configuration:"));
+      console.log(chalk.gray(`Node Endpoint: ${options.endpoint}`));
+      console.log(chalk.gray(`Transaction Type: ${options.type}`));
+      if (options.type === "mixed") {
+        console.log(chalk.gray(`One-to-One Ratio: ${options.ratio}%`));
+      }
+      console.log(chalk.gray(`Batch Size: ${options.batchSize}`));
+      console.log(chalk.gray(`Interval: ${options.interval} seconds`));
+      console.log(chalk.gray(`Concurrency: ${options.concurrency}\n`));
+
+      await startGenerator({
+        nodeEndpoint: options.endpoint,
+        walletPrivateKey: privateKey,
+        transactionType: options.type,
+        oneToOneRatio: parseInt(options.ratio),
+        batchSize: parseInt(options.batchSize),
+        interval: parseInt(options.interval) * 1000,
+        concurrency: parseInt(options.concurrency),
+      });
+
+      console.log(chalk.green("\nGenerator started successfully!"));
+      console.log(chalk.gray("Press Ctrl+C to stop"));
+
+      process.on("SIGINT", async () => {
+        console.log(chalk.yellow("\nStopping generator..."));
+        await stopGenerator();
+        process.exit(0);
+      });
+    } catch (error) {
+      console.error(chalk.red("\nFailed to start generator:"), error);
+      process.exit(1);
+    }
+  });
+
+// Status command
+program
+  .command("status")
+  .description("Get the current status of the transaction generator")
+  .action(() => {
+    const status = getGeneratorStatus();
+    console.log(chalk.blue("\nTransaction Generator Status:"));
+    console.log(chalk.gray(JSON.stringify(status, null, 2)));
+  });
+
+// Parse command line arguments
+program.parse();

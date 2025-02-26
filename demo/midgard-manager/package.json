@@ -11,7 +11,9 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
-    "clean": "turbo clean"
+    "clean": "turbo clean",
+    "start": "pnpm --filter @midgard-manager/cli start",
+    "tx-generator": "pnpm --filter @midgard-manager/tx-generator start"
   },
   "devDependencies": {
     "turbo": "^2.3.4"

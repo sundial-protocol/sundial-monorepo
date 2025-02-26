@@ -8,8 +8,58 @@ Generate test transactions for Midgard L2.
   - `one-to-one`: Simple transfers (1→1)
   - `multi-output`: Complex transactions (1→many)
   - `mixed`: Combination with configurable ratio
+- CLI interface for easy usage
+- Programmatic API for integration
+- Real-time status monitoring
+- Test wallet generation
 
 ## Usage
+
+You can use the transaction generator in two ways:
+
+### 1. Command Line Interface (CLI)
+
+From the project root:
+```bash
+# Show available commands
+pnpm tx-generator --help
+
+# Show detailed options for start command
+pnpm tx-generator start --help
+
+# Start with test wallet (quickest way to begin)
+pnpm tx-generator start --test-wallet
+
+# Start with custom configuration
+pnpm tx-generator start \
+  --endpoint http://localhost:3000 \
+  --type mixed \
+  --ratio 80 \
+  --batch-size 20 \
+  --interval 10 \
+  --concurrency 3 \
+  --private-key your-private-key
+
+# Monitor status
+pnpm tx-generator status
+```
+
+#### Available Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-e, --endpoint <url>` | Node endpoint URL | http://localhost:3000 |
+| `-t, --type <type>` | Transaction type (one-to-one, multi-output, mixed) | mixed |
+| `-r, --ratio <number>` | % of one-to-one txs in mixed mode | 70 |
+| `-b, --batch-size <number>` | Transactions per batch | 10 |
+| `-i, --interval <seconds>` | Time between batches | 5 |
+| `-c, --concurrency <number>` | Parallel transaction batches | 5 |
+| `--test-wallet` | Generate a test wallet | false |
+| `-k, --private-key <key>` | Wallet private key | required if no test wallet |
+
+### 2. Programmatic API
+
+Import and use in your TypeScript/JavaScript code:
 
 ```typescript
 import {
@@ -20,12 +70,12 @@ import {
 
 // Start generator
 await startGenerator({
-  nodeEndpoint: "http://localhost:8545",
+  nodeEndpoint: "http://localhost:3000",
   walletPrivateKey: "your-private-key",
   transactionType: "mixed",
   oneToOneRatio: 70,
   batchSize: 10,
-  interval: 5000,
+  interval: 5000, // milliseconds
   concurrency: 5,
 });
 
@@ -34,24 +84,6 @@ const status = getGeneratorStatus();
 
 // Stop generator
 await stopGenerator();
-```
-
-## Options
-
-| Option            | Description                              | Default                 |
-| ----------------- | ---------------------------------------- | ----------------------- |
-| `nodeEndpoint`    | Node URL                                 | `http://localhost:3000` |
-| `transactionType` | `one-to-one`, `multi-output`, or `mixed` | `mixed`                 |
-| `oneToOneRatio`   | % of one-to-one txs (0-100)              | 70                      |
-| `batchSize`       | Transactions per batch                   | 10                      |
-| `interval`        | Time between batches (ms)                | 5000                    |
-| `concurrency`     | Parallel transaction batches             | 5                       |
-
-## Install & Build
-
-```bash
-pnpm install
-pnpm build
 ```
 
 ## Transaction Types
@@ -71,8 +103,14 @@ A combination of one-to-one and multi-output transactions with a configurable ra
 ## Development
 
 ```bash
-# Build
+# Install dependencies
+pnpm install
+
+# Build the package
 pnpm build
+
+# Run tests
+pnpm test
 ```
 
 ## Project Structure
@@ -80,28 +118,17 @@ pnpm build
 ```
 midgard-tx-generator/
 ├── src/
-│   ├── bin/
-│   │   ├── index.ts     # Main
-│   │   └── cli.ts       # CLI interface
+│   ├── bin/           # CLI implementation
 │   ├── lib/
-│   │   ├── client/      # Node communication
-│   │   ├── generators/  # TX generators
-│   │   └── scheduler/   # Periodic generation
-│   └── utils/
+│   │   ├── client/    # Node communication
+│   │   ├── generators/# TX generators
+│   │   └── scheduler/ # Periodic generation
+│   └── utils/         # Utility functions
 ```
 
-## Quick Start
+## Environment Variables
 
-```bash
-cd offchain/midgard-tx-generator
-pnpm install
-pnpm build
-pnpm start
-```
-
-## Configuration
-
-Configure by creating a `.env` file (copy from `.env.example`):
+You can configure the generator using environment variables:
 
 ```bash
 # Node settings
@@ -110,52 +137,46 @@ CARDANO_NETWORK=Preview                 # Network
 TX_INTERVAL_MS=5000                     # Time between cycles
 
 # Transaction settings
-ONE_TO_ONE_TXS=10                       # Number of simple txs per cycle (default: 10)
-COMPLEX_TXS=10                          # Number of complex tx pairs per cycle (default: 10)
+ONE_TO_ONE_TXS=10                      # Number of simple txs per cycle
+COMPLEX_TXS=10                         # Number of complex tx pairs per cycle
 ```
-
-You can also set these as environment variables when running the command:
-
-```bash
-ONE_TO_ONE_TXS=5 COMPLEX_TXS=3 pnpm start
-```
-
-## Default Behavior
-
-With default settings, each cycle generates:
-
-- 10 simple one-to-one transactions
-- 20 complex transactions (from 10 COMPLEX_TXS):
-  - 10 distribution transactions (1→20)
-  - 10 collection transactions (20→1)
-- Total: 30 transactions per cycle
-
-## Node Interaction
-
-1. If node is available:
-
-   - Transactions are submitted directly
-   - Stats are shown in console
-
-2. If node is unavailable:
-   - Transactions are saved to `generated-transactions/`
-   - Files are named with timestamp and type
 
 ## Output Format
 
-Each transaction follows this structure:
+Each generated transaction follows this structure:
 
 ```typescript
 {
-  cborHex: string; // CBOR-encoded transaction
+  cborHex: string;    // CBOR-encoded transaction
   description: string;
-  txId: string; // Transaction hash
+  txId: string;       // Transaction hash
   type: string;
 }
 ```
 
-## Basic Telemetry
+## Telemetry
 
+The generator provides basic telemetry:
 - Success/failure rates
 - Submission latency
 - Total transactions
+- Batch processing times
+
+## Troubleshooting
+
+1. **Command not found**
+   ```bash
+   # Make sure you've built the package
+   pnpm build
+   ```
+
+2. **Permission denied**
+   ```bash
+   # Make the CLI executable
+   chmod +x ./dist/bin/index.js
+   ```
+
+3. **Node connection failed**
+   - Check if the node is running
+   - Verify the endpoint URL
+   - Check network connectivity
