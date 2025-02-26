@@ -7,20 +7,21 @@ use aiken_design_patterns/parameter_validation as pv
 use cardano/address.{Address, Credential}
 use cardano/assets.{PolicyId}
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
-use cardano/transaction.{Input, OutputReference, Redeemer, Transaction}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Redeemer, Transaction,
+}
 use midgard/common/utils
 use midgard/hub_oracle as hub
+use midgard/user_events
 use midgard/user_events/deposit.{
-  AuthenticateDeposit, BurnDepositNFT, Datum, Event, MintRedeemer,
-  ObserverRedeemer, SpendRedeemer,
+  AuthenticateDeposit, BurnDepositNFT, Datum, Event, MintRedeemer, SpendRedeemer, Info,
 }
 
-validator main(
-  observer_script: ScriptHash,
+validator spend(
   hub_oracle: ScriptHash,
-  midgard_reserve: Address,
-  mpf_validator: ScriptHash,
-  unapplied_witness_script_prefix: ByteArray,
+  reserve: Address,
+  plutarch_phas_validator_hash: ScriptHash,
+  deposit_policy_id: PolicyId,
 ) {
   spend(
     datum: Option<Datum>,
@@ -33,6 +34,7 @@ validator main(
     let Datum { event, inclusion_time, witness, refund_address, refund_datum } =
       deposit_datum
     let SpendRedeemer {
+      input_index,
       hub_ref_input_index,
       settlement_ref_input_index,
       settlement_node_asset_name,
@@ -53,23 +55,8 @@ validator main(
         settlement_node_asset_name,
         settlement_ref_input_index,
       )
+    let Output { .. } = utils.get_own_input_at(inputs, own_out_ref, input_index)
     todo
-  }
-
-  mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
-    when redeemer is {
-      AuthenticateDeposit { nonce } -> {
-        let expected_witness_script_hash =
-          pv.apply_prehashed_param_2(
-            version: 3,
-            prefix: unapplied_witness_script_prefix,
-            param_0: own_policy,
-            param_1: cbor.serialise(nonce) |> blake2b_224,
-          )
-        todo
-      }
-      BurnDepositNFT -> todo
-    }
   }
 
   else(_) {
@@ -77,21 +64,53 @@ validator main(
   }
 }
 
-validator observer(
-  state_queue: ScriptHash,
-  midgard_reserve: Address,
+validator mint(
+  hub_oracle: ScriptHash,
   unapplied_witness_script_prefix: ByteArray,
 ) {
-  withdraw(redeemer: ObserverRedeemer, _own_cred: Credential, tx: Transaction) {
-    todo
-  }
+  mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
+    let Transaction { inputs, outputs, reference_inputs, .. } = tx
+    when redeemer is {
+      AuthenticateDeposit {
+        nonce_input_index,
+        deposit_output_index,
+        hub_ref_input_index,
+      } -> {
+        // Grab hub oracle datum.
+        let hub.Datum { deposit_addr, .. } =
+          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-  publish(_redeemer: Redeemer, certificate: Certificate, _tx: Transaction) {
-    when certificate is {
-      // No constraints on registration
-      RegisterCredential { .. } -> True
-      // No other certificates allowed
-      _ -> False
+        expect Some(Input { output_reference: nonce, .. }) =
+          inputs |> list.at(nonce_input_index)
+
+        let expected_witness_script_hash =
+          pv.apply_prehashed_param_2(
+            version: 3,
+            prefix: unapplied_witness_script_prefix,
+            param_0: own_policy,
+            param_1: cbor.serialise(nonce) |> blake2b_224,
+          )
+
+        expect Some(Output {
+          address: output_deposit_address,
+          value: output_deposit_value,
+          datum: InlineDatum(output_deposit_datum_data),
+          reference_script: None,
+        }) = outputs |> list.at(deposit_output_index)
+
+        expect Datum {
+          event: user_events.Event {
+            id: output_deposit_id,
+            info: Info { tokens: output_deposit_tokens, .. },
+          },
+          inclusion_time: output_deposit_inclusion_time,
+          witness: output_deposit_witness,
+          ..
+        }: Datum = output_deposit_datum_data
+
+        todo
+      }
+      BurnDepositNFT -> todo
     }
   }
 
@@ -108,19 +127,23 @@ validator witness(
     pv.prehashed_param_no_datum_wrapper_2(
       validator_function: fn(
         deposit_minting_policy: PolicyId,
-        _nonce: Hash<Blake2b_224, ByteArray>,
+        nonce: Hash<Blake2b_224, ByteArray>,
         _redeemer: Redeemer,
         cert: Certificate,
         tx: Transaction,
       ) -> Bool {
         when cert is {
-          RegisterCredential { .. } | UnregisterCredential { .. } ->
-            when
-              tx.mint |> assets.tokens(deposit_minting_policy) |> dict.to_pairs
-            is {
-              [] -> False
-              _ -> True
+          RegisterCredential { .. } | UnregisterCredential { .. } -> {
+            let deposit_mints_is_empty =
+              tx.mint
+                |> assets.tokens(deposit_minting_policy)
+                |> dict.is_empty
+
+            and {
+              !deposit_mints_is_empty,
+              nonce == nonce,
             }
+          }
           _ -> False
         }
       },

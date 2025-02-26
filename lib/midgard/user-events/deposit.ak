@@ -2,7 +2,6 @@ use aiken/crypto.{ScriptHash}
 use aiken/merkle_patricia_forestry as mpf
 use cardano/address.{Address}
 use cardano/assets.{AssetName}
-use cardano/transaction.{OutputReference}
 use midgard/common/types.{POSIXTime, Tokens}
 use midgard/user_events
 
@@ -23,13 +22,8 @@ pub type Datum {
   refund_datum: Option<Data>,
 }
 
-pub type SpendPurpose {
-  FundWithdrawal
-  TransferToReserve
-  Refund
-}
-
 pub type SpendRedeemer {
+  input_index: Int,
   hub_ref_input_index: Int,
   settlement_ref_input_index: Int,
   settlement_node_asset_name: AssetName,
@@ -37,11 +31,17 @@ pub type SpendRedeemer {
   purpose: SpendPurpose,
 }
 
-pub type MintRedeemer {
-  AuthenticateDeposit { nonce: OutputReference }
-  BurnDepositNFT
+pub type SpendPurpose {
+  FundWithdrawal
+  TransferToReserve
+  Refund
 }
 
-pub type ObserverRedeemer {
-  ObserverRedeemer
+pub type MintRedeemer {
+  AuthenticateDeposit {
+    nonce_input_index: Int,
+    deposit_output_index: Int,
+    hub_ref_input_index: Int,
+  }
+  BurnDepositNFT
 }
