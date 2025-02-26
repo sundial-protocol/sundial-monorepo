@@ -13,7 +13,8 @@
     "check": "tsc -b tsconfig.json",
     "lint": "eslint . --max-warnings=0",
     "start": "node dist/bin.js",
-    "copy-package-json": "tsx scripts/copy-package-json.ts"
+    "copy-package-json": "tsx scripts/copy-package-json.ts",
+    "test": "echo 'No tests yet' && exit 0"
   },
   "dependencies": {
     "@effect/cli": "latest",

@@ -13,13 +13,7 @@
     "lint": "turbo lint",
     "clean": "turbo clean",
     "start": "pnpm --filter @midgard-manager/cli start",
-    "tx-generator": "pnpm --filter @midgard-manager/tx-generator start"
-  },
-  "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^7.1.0",
-    "@typescript-eslint/parser": "^7.1.0",
-    "eslint": "^8.57.0",
-    "eslint-plugin-simple-import-sort": "^12.0.0",
-    "turbo": "^2.3.4"
+    "tx-generator": "pnpm --filter @midgard-manager/tx-generator start",
+    "test": "turbo test"
   }
 }
