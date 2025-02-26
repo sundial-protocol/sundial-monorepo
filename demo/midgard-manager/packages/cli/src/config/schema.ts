@@ -1,4 +1,4 @@
-import * as S from "@effect/schema/Schema";
+import * as S from '@effect/schema/Schema';
 
 // Schema for our configuration
 export const configSchema = S.Struct({
@@ -17,8 +17,8 @@ export const configSchema = S.Struct({
 
   // Logging configuration
   logging: S.Struct({
-    level: S.Literal("debug", "info", "warn", "error"),
-    format: S.Literal("json", "pretty"),
+    level: S.Literal('debug', 'info', 'warn', 'error'),
+    format: S.Literal('json', 'pretty'),
   }),
 });
 
@@ -28,7 +28,7 @@ export type MidgardConfig = S.Schema.Type<typeof configSchema>;
 // Default configuration
 export const defaultConfig: MidgardConfig = {
   node: {
-    endpoint: "http://localhost:3000",
+    endpoint: 'http://localhost:3000',
   },
   generator: {
     enabled: true,
@@ -37,13 +37,16 @@ export const defaultConfig: MidgardConfig = {
     intervalMs: 1000,
   },
   logging: {
-    level: "info",
-    format: "pretty",
+    level: 'info',
+    format: 'pretty',
   },
 };
 
 // Configuration errors
 export class ConfigError {
-  readonly _tag = "ConfigError";
-  constructor(readonly message: string, readonly cause?: unknown) {}
+  readonly _tag = 'ConfigError';
+  constructor(
+    readonly message: string,
+    readonly cause?: unknown
+  ) {}
 }

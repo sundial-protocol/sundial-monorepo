@@ -1,4 +1,4 @@
-import { Writable } from "node:stream";
+import { Writable } from 'node:stream';
 
 import {
   Emulator,
@@ -10,16 +10,16 @@ import {
   paymentCredentialOf,
   PROTOCOL_PARAMETERS_DEFAULT,
   UTxO,
-} from "@lucid-evolution/lucid";
-import pLimit from "p-limit";
+} from '@lucid-evolution/lucid';
+import pLimit from 'p-limit';
 
-import { SerializedMidgardTransaction } from "../client/types.js";
 import {
   getPublicKeyHashFromPrivateKey,
   parseUnknownKeytoBech32PrivateKey,
   waitWritable,
-} from "../../utils/common.js";
-import { MidgardNodeClient } from "../client/node-client.js";
+} from '../../utils/common.js';
+import { MidgardNodeClient } from '../client/node-client.js';
+import { SerializedMidgardTransaction } from '../client/types.js';
 
 /**
  * Configuration for generating multi-output transactions.
@@ -57,48 +57,41 @@ const validateConfig = (config: MultiOutputTransactionConfig): void => {
   // Validate wallet key
   const privateKey = parseUnknownKeytoBech32PrivateKey(walletSeedOrPrivateKey);
   const publicKeyHash = getPublicKeyHashFromPrivateKey(privateKey);
-  const initialUTxOAddressPubKeyHash = paymentCredentialOf(
-    initialUTxO.address
-  ).hash;
+  const initialUTxOAddressPubKeyHash = paymentCredentialOf(initialUTxO.address).hash;
 
   if (publicKeyHash !== initialUTxOAddressPubKeyHash) {
-    throw new Error("Payment Key is not valid to spend Initial UTxO");
+    throw new Error('Payment Key is not valid to spend Initial UTxO');
   }
 
   // Validate UTxO amount
   if (initialUTxO.assets.lovelace < MIN_LOVELACE_OUTPUT) {
-    throw new Error("Initial UTxO must have at least 1 ADA");
+    throw new Error('Initial UTxO must have at least 1 ADA');
   }
 
   // Calculate output lovelace and validate
   const outputLovelace = calculateOutputLovelace(initialUTxO.assets.lovelace, utxosCount);
   if (outputLovelace < MIN_LOVELACE_OUTPUT) {
-    throw new Error("Not enough Lovelace to distribute");
+    throw new Error('Not enough Lovelace to distribute');
   }
 
   // Validate UTxO counts
   if (utxosCount < 1) {
-    throw new Error("UTxO count must be at least 1");
+    throw new Error('UTxO count must be at least 1');
   }
 
   if (finalUtxosCount !== undefined) {
     if (finalUtxosCount < 1) {
-      throw new Error("Final UTxO count must be at least 1");
+      throw new Error('Final UTxO count must be at least 1');
     }
     if (finalUtxosCount > utxosCount / OUTPUT_UTXOS_CHUNK) {
       throw new Error(
-        `Final UTxO Count can be ${Math.floor(
-          utxosCount / OUTPUT_UTXOS_CHUNK
-        )} at maximum`
+        `Final UTxO Count can be ${Math.floor(utxosCount / OUTPUT_UTXOS_CHUNK)} at maximum`
       );
     }
   }
 };
 
-const initializeLucid = async (
-  emulator: Emulator,
-  network: Network
-): Promise<LucidEvolution> => {
+const initializeLucid = async (emulator: Emulator, network: Network): Promise<LucidEvolution> => {
   return await Lucid(emulator, network, {
     presetProtocolParameters: {
       ...PROTOCOL_PARAMETERS_DEFAULT,
@@ -111,21 +104,14 @@ const initializeLucid = async (
   });
 };
 
-const generateTestAccounts = async (
-  count: number
-): Promise<EmulatorAccount[]> => {
+const generateTestAccounts = async (count: number): Promise<EmulatorAccount[]> => {
   const limit = pLimit(ACCOUNT_GENERATION_CONCURRENCY);
   return Promise.all(
-    Array.from({ length: count }, () =>
-      limit(() => generateEmulatorAccountFromPrivateKey({}))
-    )
+    Array.from({ length: count }, () => limit(() => generateEmulatorAccountFromPrivateKey({})))
   );
 };
 
-const calculateOutputLovelace = (
-  totalLovelace: bigint,
-  utxosCount: number
-): bigint => {
+const calculateOutputLovelace = (totalLovelace: bigint, utxosCount: number): bigint => {
   return (totalLovelace - MIN_LOVELACE_OUTPUT) / BigInt(utxosCount);
 };
 
@@ -136,23 +122,14 @@ const calculateOutputLovelace = (
 const generateMultiOutputTransactions = async (
   config: MultiOutputTransactionConfig
 ): Promise<SerializedMidgardTransaction[]> => {
-  const {
-    network,
-    initialUTxO,
-    utxosCount,
-    finalUtxosCount = 1,
-    writable,
-    nodeClient,
-  } = config;
+  const { network, initialUTxO, utxosCount, finalUtxosCount = 1, writable, nodeClient } = config;
 
   validateConfig(config);
-  const privateKey = parseUnknownKeytoBech32PrivateKey(
-    config.walletSeedOrPrivateKey
-  );
+  const privateKey = parseUnknownKeytoBech32PrivateKey(config.walletSeedOrPrivateKey);
 
   // Setup emulator env
   const mainAccount: EmulatorAccount = {
-    seedPhrase: "",
+    seedPhrase: '',
     address: initialUTxO.address,
     assets: initialUTxO.assets,
     privateKey,
@@ -176,10 +153,7 @@ const generateMultiOutputTransactions = async (
   let currentUtxosCount = 1;
   let currentTxsCount = 0;
   const rollBackers: { utxos: UTxO[]; privateKey: string }[] = [];
-  const outputLovelace = calculateOutputLovelace(
-    initialUTxO.assets.lovelace,
-    utxosCount
-  );
+  const outputLovelace = calculateOutputLovelace(initialUTxO.assets.lovelace, utxosCount);
 
   // Store all generated transactions
   const transactions: SerializedMidgardTransaction[] = [];
@@ -187,8 +161,7 @@ const generateMultiOutputTransactions = async (
   try {
     // Distribution phase: Generate transactions with multiple outputs
     while (currentUtxosCount < utxosCount) {
-      const randomAccount =
-        accounts[Math.floor(Math.random() * TOTAL_ACCOUNT_COUNT)];
+      const randomAccount = accounts[Math.floor(Math.random() * TOTAL_ACCOUNT_COUNT)];
       const txBuilder = lucid.newTx();
 
       // create multiple outputs in single transaction
@@ -198,11 +171,8 @@ const generateMultiOutputTransactions = async (
         })
       );
 
-      const [newWalletUTxOs, derivedOutputs, txSignBuilder] =
-        await txBuilder.chain();
-      let txSigned = await txSignBuilder.sign
-        .withPrivateKey(privateKey)
-        .complete();
+      const [newWalletUTxOs, derivedOutputs, txSignBuilder] = await txBuilder.chain();
+      const txSigned = await txSignBuilder.sign.withPrivateKey(privateKey).complete();
 
       // Create serialized transaction in Midgard format
       const txHash = txSigned.toHash();
@@ -210,7 +180,7 @@ const generateMultiOutputTransactions = async (
         cborHex: txSigned.toCBOR(),
         description: `Multi-Output Distribution (1-to-${OUTPUT_UTXOS_CHUNK})`,
         txId: txHash,
-        type: "Midgard L2 User Transaction",
+        type: 'Midgard L2 User Transaction',
       };
 
       // Submit to node if client provided
@@ -223,7 +193,7 @@ const generateMultiOutputTransactions = async (
       // Write to test output if writable provided
       if (writable) {
         await waitWritable(writable);
-        writable.write(JSON.stringify(tx, null, 2) + "\n");
+        writable.write(JSON.stringify(tx, null, 2) + '\n');
       }
 
       currentUtxosCount += OUTPUT_UTXOS_CHUNK;
@@ -256,9 +226,7 @@ const generateMultiOutputTransactions = async (
       const txBuilder = lucid.newTx();
 
       // Add inputs from each rollbacker
-      chunk.forEach(({ utxos }) =>
-        utxos.forEach((utxo) => txBuilder.collectFrom([utxo]))
-      );
+      chunk.forEach(({ utxos }) => utxos.forEach((utxo) => txBuilder.collectFrom([utxo])));
 
       // Add single output back to main account
       txBuilder.pay.ToAddress(mainAccount.address, {
@@ -268,9 +236,7 @@ const generateMultiOutputTransactions = async (
       const [newWalletUTxOs, , txSignBuilder] = await txBuilder.chain();
 
       // Sign with main key and all rollbacker keys
-      const txSigned = await txSignBuilder.sign
-        .withPrivateKey(privateKey)
-        .complete();
+      const txSigned = await txSignBuilder.sign.withPrivateKey(privateKey).complete();
 
       // Create serialized transaction
       const txHash = txSigned.toHash();
@@ -278,7 +244,7 @@ const generateMultiOutputTransactions = async (
         cborHex: txSigned.toCBOR(),
         description: `Multi-Output Collection (${OUTPUT_UTXOS_CHUNK}-to-1)`,
         txId: txHash,
-        type: "Midgard L2 User Transaction",
+        type: 'Midgard L2 User Transaction',
       };
 
       // Submit to node if client provided
@@ -292,7 +258,7 @@ const generateMultiOutputTransactions = async (
       // Write to test output if writable provided
       if (writable) {
         await waitWritable(writable);
-        writable.write(JSON.stringify(tx, null, 2) + "\n");
+        writable.write(JSON.stringify(tx, null, 2) + '\n');
       }
 
       // Update UTxO state
@@ -309,7 +275,7 @@ const generateMultiOutputTransactions = async (
       }
     }
   } catch (error) {
-    console.error("Error generating transactions:", error);
+    console.error('Error generating transactions:', error);
     throw error;
   }
 

@@ -1,19 +1,16 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { txTest } from "./setup";
-import {
-  startGenerator,
-  stopGenerator,
-  getGeneratorStatus,
-} from "../src/lib/scheduler/scheduler";
-import { TransactionGeneratorConfig } from "../src/lib/types";
-import { MidgardNodeClient } from "../src/lib/client/node-client";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { MidgardNodeClient } from '../src/lib/client/node-client';
+import { getGeneratorStatus, startGenerator, stopGenerator } from '../src/lib/scheduler/scheduler';
+import { TransactionGeneratorConfig } from '../src/lib/types';
+import { txTest } from './setup';
 
 // Mock the node client
-vi.mock("../src/lib/client/node-client", () => {
+vi.mock('../src/lib/client/node-client', () => {
   return {
     MidgardNodeClient: vi.fn().mockImplementation(() => {
       return {
-        submitTransaction: vi.fn().mockResolvedValue({ txId: "mock_tx_id" }),
+        submitTransaction: vi.fn().mockResolvedValue({ txId: 'mock_tx_id' }),
         isAvailable: vi.fn().mockResolvedValue(true),
       };
     }),
@@ -21,20 +18,20 @@ vi.mock("../src/lib/client/node-client", () => {
 });
 
 // Mock the transaction generation functions
-vi.mock("../src/lib/generators/index.js", () => {
+vi.mock('../src/lib/generators/index.js', () => {
   return {
     generateOneToOneTransactions: vi.fn().mockResolvedValue([
-      { txId: "test_tx_1", cborHex: "mock_cbor_1", type: "one-to-one" },
-      { txId: "test_tx_2", cborHex: "mock_cbor_2", type: "one-to-one" },
+      { txId: 'test_tx_1', cborHex: 'mock_cbor_1', type: 'one-to-one' },
+      { txId: 'test_tx_2', cborHex: 'mock_cbor_2', type: 'one-to-one' },
     ]),
     generateMultiOutputTransactions: vi.fn().mockResolvedValue([
-      { txId: "test_tx_3", cborHex: "mock_cbor_3", type: "multi-output" },
-      { txId: "test_tx_4", cborHex: "mock_cbor_4", type: "multi-output" },
+      { txId: 'test_tx_3', cborHex: 'mock_cbor_3', type: 'multi-output' },
+      { txId: 'test_tx_4', cborHex: 'mock_cbor_4', type: 'multi-output' },
     ]),
   };
 });
 
-describe("Transaction Generator", () => {
+describe('Transaction Generator', () => {
   // Reset mocks before each test
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,12 +42,12 @@ describe("Transaction Generator", () => {
     await stopGenerator();
   });
 
-  it("should start and stop the generator correctly", async () => {
+  it('should start and stop the generator correctly', async () => {
     // Default minimal config for testing
     const config: Partial<TransactionGeneratorConfig> = {
-      walletPrivateKey: "test_private_key",
-      nodeEndpoint: "http://localhost:3000",
-      transactionType: "one-to-one",
+      walletPrivateKey: 'test_private_key',
+      nodeEndpoint: 'http://localhost:3000',
+      transactionType: 'one-to-one',
       batchSize: 2,
       interval: 0.1,
       concurrency: 1,
@@ -71,12 +68,12 @@ describe("Transaction Generator", () => {
     expect(finalStatus.running).toBe(false);
   });
 
-  it("should handle different transaction types", async () => {
+  it('should handle different transaction types', async () => {
     // Test with one-to-one type
     const oneToOneConfig: Partial<TransactionGeneratorConfig> = {
-      walletPrivateKey: "test_private_key",
-      nodeEndpoint: "http://localhost:3000",
-      transactionType: "one-to-one",
+      walletPrivateKey: 'test_private_key',
+      nodeEndpoint: 'http://localhost:3000',
+      transactionType: 'one-to-one',
       batchSize: 2,
       interval: 0.1,
     };
@@ -94,9 +91,9 @@ describe("Transaction Generator", () => {
 
     // Test with multi-output type
     const multiOutputConfig: Partial<TransactionGeneratorConfig> = {
-      walletPrivateKey: "test_private_key",
-      nodeEndpoint: "http://localhost:3000",
-      transactionType: "multi-output",
+      walletPrivateKey: 'test_private_key',
+      nodeEndpoint: 'http://localhost:3000',
+      transactionType: 'multi-output',
       batchSize: 2,
       interval: 0.1,
     };
@@ -113,12 +110,12 @@ describe("Transaction Generator", () => {
     await stopGenerator();
   });
 
-  it("should report accurate metrics", async () => {
+  it('should report accurate metrics', async () => {
     // Config with a short interval for quick testing
     const config: Partial<TransactionGeneratorConfig> = {
-      walletPrivateKey: "test_private_key",
-      nodeEndpoint: "http://localhost:3000",
-      transactionType: "one-to-one",
+      walletPrivateKey: 'test_private_key',
+      nodeEndpoint: 'http://localhost:3000',
+      transactionType: 'one-to-one',
       batchSize: 3,
       interval: 0.1,
     };

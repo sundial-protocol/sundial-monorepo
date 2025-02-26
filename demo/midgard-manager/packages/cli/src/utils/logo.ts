@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import chalk from 'chalk';
 
 /**
  * Logo display options
@@ -13,11 +13,11 @@ export interface LogoOptions {
  */
 export function displayLogo(options: LogoOptions = {}): void {
   const { headerText } = options;
-  const treeEmoji = "🌳";
+  const treeEmoji = '🌳';
 
-  console.log(`┌─ ${treeEmoji} ${chalk.bold.green("MIDGARD MANAGER")} `);
-  console.log(`│ ${chalk.dim("MVP")} · CLI Tool for Testing/Demo`);
-  console.log("└────────────");
+  console.log(`┌─ ${treeEmoji} ${chalk.bold.green('MIDGARD MANAGER')} `);
+  console.log(`│ ${chalk.dim('MVP')} · CLI Tool for Testing/Demo`);
+  console.log('└────────────');
 
   // Show header text if provided
   if (headerText) {

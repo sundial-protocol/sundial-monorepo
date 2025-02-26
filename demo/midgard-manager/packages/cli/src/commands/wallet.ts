@@ -1,12 +1,8 @@
-import { Command, Options, Args } from "@effect/cli";
-import { Effect, pipe } from "effect";
-import {
-  addWallet,
-  removeWallet,
-  listWallets,
-  getWallet,
-} from "../config/wallets.js";
-import chalk from "chalk";
+import { Args, Command, Options } from '@effect/cli';
+import chalk from 'chalk';
+import { Effect, pipe } from 'effect';
+
+import { addWallet, getWallet, listWallets, removeWallet } from '../config/wallets.js';
 
 // Validate ed25519 private key format
 const PRIVATE_KEY_REGEX = /^ed25519_sk[a-zA-Z0-9]+$/;
@@ -15,31 +11,25 @@ const PRIVATE_KEY_REGEX = /^ed25519_sk[a-zA-Z0-9]+$/;
  * Add a new wallet
  */
 const addCommand = Command.make(
-  "add",
+  'add',
   {
-    name: Args.text("NAME").pipe(
-      Args.withDescription("Name of the wallet to add")
-    ),
-    privateKey: Options.text("private-key").pipe(
-      Options.withDescription("Private key for the wallet (ed25519 format)")
+    name: Args.text('NAME').pipe(Args.withDescription('Name of the wallet to add')),
+    privateKey: Options.text('private-key').pipe(
+      Options.withDescription('Private key for the wallet (ed25519 format)')
     ),
   },
   ({ name, privateKey }) => {
     return pipe(
       Effect.tryPromise(async () => {
         // Validate wallet name
-        if (!name || name.trim() === "") {
-          console.error(chalk.red("❌ Wallet name cannot be empty"));
+        if (!name || name.trim() === '') {
+          console.error(chalk.red('❌ Wallet name cannot be empty'));
           return;
         }
 
         // Validate private key format
         if (!PRIVATE_KEY_REGEX.test(privateKey)) {
-          console.error(
-            chalk.red(
-              "❌ Invalid private key format. Expected ed25519_sk format"
-            )
-          );
+          console.error(chalk.red('❌ Invalid private key format. Expected ed25519_sk format'));
           return;
         }
 
@@ -48,7 +38,7 @@ const addCommand = Command.make(
         if (existingWallet) {
           const overwrite = await Effect.runPromise(
             Effect.tryPromise(() =>
-              import("@inquirer/prompts").then(({ confirm }) =>
+              import('@inquirer/prompts').then(({ confirm }) =>
                 confirm({
                   message: `Wallet '${name}' already exists. Overwrite?`,
                   default: false,
@@ -58,7 +48,7 @@ const addCommand = Command.make(
           );
 
           if (!overwrite) {
-            console.log(chalk.yellow("⚠️ Operation cancelled"));
+            console.log(chalk.yellow('⚠️ Operation cancelled'));
             return;
           }
         }
@@ -75,17 +65,15 @@ const addCommand = Command.make(
  * Usage: midgard-manager wallet remove <name>
  */
 const removeCommand = Command.make(
-  "remove",
+  'remove',
   {
-    name: Args.text("NAME").pipe(
-      Args.withDescription("Name of the wallet to remove")
-    ),
+    name: Args.text('NAME').pipe(Args.withDescription('Name of the wallet to remove')),
   },
   ({ name }) => {
     return pipe(
       Effect.tryPromise(async () => {
-        if (name === "test") {
-          console.error(chalk.red("❌ Cannot remove the default test wallet"));
+        if (name === 'test') {
+          console.error(chalk.red('❌ Cannot remove the default test wallet'));
           return;
         }
 
@@ -99,7 +87,7 @@ const removeCommand = Command.make(
         // Confirm deletion
         const confirm = await Effect.runPromise(
           Effect.tryPromise(() =>
-            import("@inquirer/prompts").then(({ confirm }) =>
+            import('@inquirer/prompts').then(({ confirm }) =>
               confirm({
                 message: `Are you sure you want to remove wallet '${name}'?`,
                 default: false,
@@ -109,7 +97,7 @@ const removeCommand = Command.make(
         );
 
         if (!confirm) {
-          console.log(chalk.yellow("⚠️ Operation cancelled"));
+          console.log(chalk.yellow('⚠️ Operation cancelled'));
           return;
         }
 
@@ -124,28 +112,24 @@ const removeCommand = Command.make(
  * Command to list all wallets
  * Usage: midgard-manager wallet list
  */
-const listCommand = Command.make("list", {}, () => {
+const listCommand = Command.make('list', {}, () => {
   return pipe(
     Effect.tryPromise(async () => {
       const wallets = await listWallets();
 
       if (wallets.length === 0) {
-        console.log(chalk.yellow("⚠️ No wallets configured"));
+        console.log(chalk.yellow('⚠️ No wallets configured'));
         return;
       }
 
-      console.log(chalk.blue("Available wallets:"));
+      console.log(chalk.blue('Available wallets:'));
       wallets.forEach((name) => {
-        const isDefault = name === "test";
-        console.log(
-          ` ${chalk.green("•")} ${name}${
-            isDefault ? chalk.gray(" (default)") : ""
-          }`
-        );
+        const isDefault = name === 'test';
+        console.log(` ${chalk.green('•')} ${name}${isDefault ? chalk.gray(' (default)') : ''}`);
       });
 
       console.log();
-      console.log(chalk.gray("For details on a specific wallet, use:"));
+      console.log(chalk.gray('For details on a specific wallet, use:'));
       console.log(chalk.gray(`$ midgard-manager wallet details <name>`));
     })
   );
@@ -156,11 +140,9 @@ const listCommand = Command.make("list", {}, () => {
  * Usage: midgard-manager wallet details <name>
  */
 const detailsCommand = Command.make(
-  "details",
+  'details',
   {
-    name: Args.text("NAME").pipe(
-      Args.withDescription("Name of the wallet to show details for")
-    ),
+    name: Args.text('NAME').pipe(Args.withDescription('Name of the wallet to show details for')),
   },
   ({ name }) => {
     return pipe(
@@ -177,17 +159,13 @@ const detailsCommand = Command.make(
         // Show masked private key for security
         const maskedKey =
           wallet.privateKey.substring(0, 10) +
-          "..." +
+          '...' +
           wallet.privateKey.substring(wallet.privateKey.length - 5);
 
         console.log(chalk.gray(`Private Key: ${maskedKey}`));
         console.log();
-        console.log(
-          chalk.gray("To use this wallet with transaction generation:")
-        );
-        console.log(
-          chalk.gray(`$ midgard-manager generate-tx --wallet ${name}`)
-        );
+        console.log(chalk.gray('To use this wallet with transaction generation:'));
+        console.log(chalk.gray(`$ midgard-manager generate-tx --wallet ${name}`));
       })
     );
   }
@@ -197,13 +175,6 @@ const detailsCommand = Command.make(
  * Main wallet command group
  * Usage: midgard-manager wallet <subcommand>
  */
-export const walletCommand = Command.make("wallet")
-  .pipe(Command.withDescription("Manage wallets for transaction signing"))
-  .pipe(
-    Command.withSubcommands([
-      addCommand,
-      removeCommand,
-      listCommand,
-      detailsCommand,
-    ])
-  );
+export const walletCommand = Command.make('wallet')
+  .pipe(Command.withDescription('Manage wallets for transaction signing'))
+  .pipe(Command.withSubcommands([addCommand, removeCommand, listCommand, detailsCommand]));

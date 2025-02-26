@@ -1,60 +1,61 @@
-import { Command } from "@effect/cli";
-import { Effect, pipe } from "effect";
-import { select } from "@inquirer/prompts";
-import chalk from "chalk";
-import ora from "ora-classic";
-import { sleep } from "../../utils/sleep.js";
+import { Command } from '@effect/cli';
+import { select } from '@inquirer/prompts';
+import chalk from 'chalk';
+import { Effect, pipe } from 'effect';
+import ora from 'ora-classic';
+
+import { loadConfig } from '../../config/index.js';
+import type { MidgardConfig } from '../../types/config.js';
 import {
-  displayHeader,
-  displaySuccess,
-  displayError,
   displayContinuePrompt,
-  displayStatus,
+  displayError,
+  displayHeader,
   displayKeyboardHints,
-} from "../../utils/display.js";
-import { waitForKeypress } from "../../utils/input.js";
-import { menu } from "./menu.js";
-import { loadConfig } from "../../config/index.js";
-import type { MidgardConfig } from "../../types/config.js";
+  displayStatus,
+  displaySuccess,
+} from '../../utils/display.js';
+import { waitForKeypress } from '../../utils/input.js';
+import { sleep } from '../../utils/sleep.js';
+import { menu } from './menu.js';
 
 const BACK_OPTION = {
-  name: `${chalk.dim("←")} ${chalk.green("Back to main menu")}`,
-  value: "__back",
-  description: "",
+  name: `${chalk.dim('←')} ${chalk.green('Back to main menu')}`,
+  value: '__back',
+  description: '',
 };
 
-export const interactiveCommand = Command.make("interactive", {}, () => {
+export const interactiveCommand = Command.make('interactive', {}, () => {
   return pipe(
     Effect.tryPromise(async () => {
       const spinner = ora({
-        text: "Loading configuration...",
-        color: "green",
+        text: 'Loading configuration...',
+        color: 'green',
       }).start();
       try {
         const config = await Effect.runPromise(loadConfig);
-        spinner.succeed("Configuration loaded");
+        spinner.succeed('Configuration loaded');
         const manualCommandImpl = new ManualCommandImpl(config);
 
         // Ensure proper cleanup on process exit
-        process.once("SIGINT", () => {
+        process.once('SIGINT', () => {
           manualCommandImpl.cleanup();
-          console.log("\n\nExiting Midgard CLI...\n");
+          console.log('\n\nExiting Midgard CLI...\n');
           process.exit(0);
         });
 
         await sleep(500); // Brief pause for UX
-        displayHeader("Interactive Mode");
+        displayHeader('Interactive Mode');
         await manualCommandImpl.loop();
 
         // Clean up resources if we exit the loop normally
         manualCommandImpl.cleanup();
       } catch (error) {
-        spinner.fail("Failed to load configuration");
+        spinner.fail('Failed to load configuration');
         throw error;
       }
     }),
     Effect.catchAll((error) => {
-      displayError("Error starting interactive mode", error);
+      displayError('Error starting interactive mode', error);
       return Effect.succeed(0);
     })
   );
@@ -74,18 +75,18 @@ class ManualCommandImpl {
     this._sigintHandler = () => {
       // Only abort if prompt is active, otherwise let the normal exit happen
       if (this._isPromptActive) {
-        console.log("\n"); // Add a new line for better appearance
+        console.log('\n'); // Add a new line for better appearance
         this._abortController.abort();
         // Create a new abort controller for the next prompt
         this._abortController = new AbortController();
       } else {
         // If no prompt is active, exit normally with a goodbye message
-        console.log("\n\nExiting Midgard CLI...\n");
+        console.log('\n\nExiting Midgard CLI...\n');
         process.exit(0);
       }
     };
 
-    process.on("SIGINT", this._sigintHandler);
+    process.on('SIGINT', this._sigintHandler);
   }
 
   /**
@@ -94,7 +95,7 @@ class ManualCommandImpl {
   cleanup(): void {
     // Remove our SIGINT handler to prevent memory leaks
     if (this._sigintHandler) {
-      process.off("SIGINT", this._sigintHandler);
+      process.off('SIGINT', this._sigintHandler);
       this._sigintHandler = null;
     }
 
@@ -111,18 +112,16 @@ class ManualCommandImpl {
   async loop() {
     while (true) {
       try {
-        displayHeader("Main Menu");
+        displayHeader('Main Menu');
         await displayStatus(this._config);
         displayKeyboardHints();
 
         this._isPromptActive = true;
         const section = await select(
           {
-            message: chalk.bold.green("Select a section:"),
+            message: chalk.bold.green('Select a section:'),
             choices: menu.sections.map((section) => ({
-              name: `${chalk.white.bold(section.name)} ${chalk.dim(
-                "- " + section.description
-              )}`,
+              name: `${chalk.white.bold(section.name)} ${chalk.dim('- ' + section.description)}`,
               value: section.name,
             })),
           },
@@ -144,9 +143,7 @@ class ManualCommandImpl {
               choices: [
                 BACK_OPTION,
                 ...sectionMenu.actions.map((action) => ({
-                  name: `${chalk.white.bold(action.name)} ${chalk.dim(
-                    "- " + action.description
-                  )}`,
+                  name: `${chalk.white.bold(action.name)} ${chalk.dim('- ' + action.description)}`,
                   value: action.name,
                 })),
               ],
@@ -156,11 +153,9 @@ class ManualCommandImpl {
           this._isPromptActive = false;
 
           // If user selected back, break the inner loop to return to section selection
-          if (action === "__back") break;
+          if (action === '__back') break;
 
-          const selectedAction = sectionMenu.actions.find(
-            (a) => a.name === action
-          );
+          const selectedAction = sectionMenu.actions.find((a) => a.name === action);
           if (!selectedAction) continue;
 
           displayHeader(`${sectionMenu.name} > ${selectedAction.name}`);
@@ -176,11 +171,11 @@ class ManualCommandImpl {
 
             // Only show spinner for config refresh
             const configSpinner = ora({
-              text: "Refreshing configuration...",
-              color: "green",
+              text: 'Refreshing configuration...',
+              color: 'green',
             }).start();
             this._config = await Effect.runPromise(loadConfig);
-            configSpinner.succeed("Configuration updated");
+            configSpinner.succeed('Configuration updated');
 
             displaySuccess(result.message);
             displayContinuePrompt();
@@ -188,15 +183,13 @@ class ManualCommandImpl {
             await waitForKeypress();
           } catch (error) {
             this._isPromptActive = false;
-            if (error instanceof Error && error.name === "AbortPromptError") {
+            if (error instanceof Error && error.name === 'AbortPromptError') {
               // Show a clearer message when a prompt is cancelled
-              console.log(
-                `\n\n${chalk.green("✓ Action cancelled")} - Returning to menu\n`
-              );
+              console.log(`\n\n${chalk.green('✓ Action cancelled')} - Returning to menu\n`);
               // Wait a moment before returning to the menu for better UX
               await sleep(500);
             } else {
-              displayError("Error executing action", error);
+              displayError('Error executing action', error);
             }
             displayContinuePrompt();
             // Wait for user to press a key before continuing
@@ -205,15 +198,13 @@ class ManualCommandImpl {
         }
       } catch (error) {
         this._isPromptActive = false;
-        if (error instanceof Error && error.name === "AbortPromptError") {
+        if (error instanceof Error && error.name === 'AbortPromptError') {
           // Show a clearer message when a prompt is cancelled
-          console.log(
-            `\n\n${chalk.green("✓ Action cancelled")} - Returning to menu\n`
-          );
+          console.log(`\n\n${chalk.green('✓ Action cancelled')} - Returning to menu\n`);
           // Wait a moment before returning to the menu for better UX
           await sleep(500);
         } else {
-          displayError("Error in command loop", error);
+          displayError('Error in command loop', error);
         }
       }
     }

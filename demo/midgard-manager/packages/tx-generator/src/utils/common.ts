@@ -20,9 +20,7 @@ export const serializeAssets = (assets: Assets): SerializedAssets => {
 /**
  * Parses a key into bech32 private key format
  */
-export const parseUnknownKeytoBech32PrivateKey = (
-  unknownKey: unknown
-): string => {
+export const parseUnknownKeytoBech32PrivateKey = (unknownKey: unknown): string => {
   if (typeof unknownKey !== 'string')
     throw new Error('Expected a string value for the private key');
 
@@ -57,9 +55,7 @@ export const getPublicKeyHashFromPrivateKey = (privateKey: string): string => {
  */
 export const getPrivateKeyCborHex = (privateKey: string): string => {
   return Data.to(
-    Buffer.from(CML.PrivateKey.from_bech32(privateKey).to_raw_bytes()).toString(
-      'hex'
-    )
+    Buffer.from(CML.PrivateKey.from_bech32(privateKey).to_raw_bytes()).toString('hex')
   );
 };
 

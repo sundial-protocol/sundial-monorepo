@@ -1,4 +1,4 @@
-import { Writable } from "node:stream";
+import { Writable } from 'node:stream';
 
 import {
   Emulator,
@@ -9,15 +9,15 @@ import {
   paymentCredentialOf,
   PROTOCOL_PARAMETERS_DEFAULT,
   UTxO,
-} from "@lucid-evolution/lucid";
+} from '@lucid-evolution/lucid';
 
-import { SerializedMidgardTransaction } from "../client/types.js";
-import { MidgardNodeClient } from "../client/node-client.js";
 import {
   getPublicKeyHashFromPrivateKey,
   parseUnknownKeytoBech32PrivateKey,
   waitWritable,
-} from "../../utils/common.js";
+} from '../../utils/common.js';
+import { MidgardNodeClient } from '../client/node-client.js';
+import { SerializedMidgardTransaction } from '../client/types.js';
 
 /**
  * Configuration for generating one-to-one transactions.
@@ -51,22 +51,20 @@ const validateConfig = (config: OneToOneTransactionConfig): void => {
   // Validate wallet key
   const privateKey = parseUnknownKeytoBech32PrivateKey(walletSeedOrPrivateKey);
   const publicKeyHash = getPublicKeyHashFromPrivateKey(privateKey);
-  const initialUTxOAddressPubKeyHash = paymentCredentialOf(
-    initialUTxO.address
-  ).hash;
+  const initialUTxOAddressPubKeyHash = paymentCredentialOf(initialUTxO.address).hash;
 
   if (publicKeyHash !== initialUTxOAddressPubKeyHash) {
-    throw new Error("Payment Key is not valid to spend Initial UTxO");
+    throw new Error('Payment Key is not valid to spend Initial UTxO');
   }
 
   // Validate UTxO amount
   if (initialUTxO.assets.lovelace < MIN_LOVELACE_OUTPUT) {
-    throw new Error("Initial UTxO must have at least 1 ADA");
+    throw new Error('Initial UTxO must have at least 1 ADA');
   }
 
   // Validate transaction count
   if (config.txsCount < 1) {
-    throw new Error("Transaction count must be at least 1");
+    throw new Error('Transaction count must be at least 1');
   }
 };
 
@@ -76,10 +74,7 @@ const validateConfig = (config: OneToOneTransactionConfig): void => {
  * @param network - Network configuration
  * @returns Configured Lucid instance
  */
-const initializeLucid = async (
-  emulator: Emulator,
-  network: Network
-): Promise<LucidEvolution> => {
+const initializeLucid = async (emulator: Emulator, network: Network): Promise<LucidEvolution> => {
   return await Lucid(emulator, network, {
     presetProtocolParameters: {
       ...PROTOCOL_PARAMETERS_DEFAULT,
@@ -103,13 +98,11 @@ const generateOneToOneTransactions = async (
 
   // Validate configuration
   validateConfig(config);
-  const privateKey = parseUnknownKeytoBech32PrivateKey(
-    config.walletSeedOrPrivateKey
-  );
+  const privateKey = parseUnknownKeytoBech32PrivateKey(config.walletSeedOrPrivateKey);
 
   // Setup emulator environment
   const account: EmulatorAccount = {
-    seedPhrase: "",
+    seedPhrase: '',
     address: initialUTxO.address,
     assets: initialUTxO.assets,
     privateKey,
@@ -137,17 +130,15 @@ const generateOneToOneTransactions = async (
         .ToAddress(initialUTxO.address, initialUTxO.assets)
         .chain();
 
-      const txSigned = await txSignBuilder.sign
-        .withPrivateKey(privateKey)
-        .complete();
+      const txSigned = await txSignBuilder.sign.withPrivateKey(privateKey).complete();
 
       // Create serialized transaction in Midgard format
       const txHash = txSigned.toHash();
       const tx: SerializedMidgardTransaction = {
         cborHex: txSigned.toCBOR(),
-        description: "One-to-One Self Transfer",
+        description: 'One-to-One Self Transfer',
         txId: txHash,
-        type: "Midgard L2 User Transaction",
+        type: 'Midgard L2 User Transaction',
       };
 
       // Submit to node if client provided
@@ -161,7 +152,7 @@ const generateOneToOneTransactions = async (
       // Write to test output if writable provided
       if (writable) {
         await waitWritable(writable);
-        writable.write(JSON.stringify(tx, null, 2) + "\n");
+        writable.write(JSON.stringify(tx, null, 2) + '\n');
       }
 
       // Update wallet state for next transaction
@@ -178,7 +169,7 @@ const generateOneToOneTransactions = async (
       }
     }
   } catch (error) {
-    console.error("Error generating transactions:", error);
+    console.error('Error generating transactions:', error);
     throw error;
   }
 

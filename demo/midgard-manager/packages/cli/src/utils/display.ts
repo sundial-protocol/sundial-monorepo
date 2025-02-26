@@ -1,8 +1,9 @@
-import chalk from "chalk";
-import type { MidgardConfig } from "../types/config.js";
-import { getGeneratorStatus } from "@midgard-manager/tx-generator";
-import { displayLogo } from "./logo.js";
-import { MidgardNodeClient } from "@midgard-manager/tx-generator";
+import { getGeneratorStatus } from '@midgard-manager/tx-generator';
+import { MidgardNodeClient } from '@midgard-manager/tx-generator';
+import chalk from 'chalk';
+
+import type { MidgardConfig } from '../types/config.js';
+import { displayLogo } from './logo.js';
 
 /**
  * Clears the terminal screen and displays a header
@@ -10,11 +11,11 @@ import { MidgardNodeClient } from "@midgard-manager/tx-generator";
  */
 export function displayHeader(title?: string) {
   // Clear the terminal screen
-  process.stdout.write("\x1Bc");
+  process.stdout.write('\x1Bc');
 
   // Display the Midgard logo with the title if provided
   displayLogo({
-    variant: "small",
+    variant: 'small',
     headerText: title,
   });
 }
@@ -44,26 +45,26 @@ export async function displayStatus(config: MidgardConfig) {
   }
 
   // Minimalist left-aligned border style
-  console.log("\n┌─ NODE");
+  console.log('\n┌─ NODE');
 
   // Show node status with connection indicator
-  const nodeStatusSymbol = nodeConnected ? chalk.green("●") : chalk.red("●");
-  const nodeStatusText = nodeConnected ? "Connected" : "Disconnected";
+  const nodeStatusSymbol = nodeConnected ? chalk.green('●') : chalk.red('●');
+  const nodeStatusText = nodeConnected ? 'Connected' : 'Disconnected';
 
   console.log(`│  ${nodeStatusSymbol} ${nodeStatusText}`);
   console.log(`│  ${config.node.endpoint}`);
-  console.log("│");
-  console.log("├─ TRANSACTION GENERATOR");
+  console.log('│');
+  console.log('├─ TRANSACTION GENERATOR');
 
   // Status with simple color indicators
-  const statusSymbol = isRunning ? chalk.green("●") : chalk.red("●");
-  const statusText = isRunning ? "Running" : "Not Running";
+  const statusSymbol = isRunning ? chalk.green('●') : chalk.red('●');
+  const statusText = isRunning ? 'Running' : 'Not Running';
 
   console.log(`│  ${statusSymbol} ${statusText}`);
 
   if (config.generator.enabled) {
-    console.log("│");
-    console.log(`│  ${chalk.dim("Default Configuration")}`);
+    console.log('│');
+    console.log(`│  ${chalk.dim('Default Configuration')}`);
     console.log(
       `│  Concurrency: ${config.generator.maxConcurrent}   Batch: ${config.generator.batchSize}`
     );
@@ -71,49 +72,49 @@ export async function displayStatus(config: MidgardConfig) {
 
     // Only show statistics if running
     if (isRunning) {
-      console.log("│");
-      console.log(`│  ${chalk.dim("Transactions")}`);
+      console.log('│');
+      console.log(`│  ${chalk.dim('Transactions')}`);
       console.log(`│  Generated: ${generatorStatus.transactionsGenerated}`);
       console.log(`│  Submitted: ${generatorStatus.transactionsSubmitted}`);
     }
   } else {
-    console.log("│  Configure options from the menu to get started");
+    console.log('│  Configure options from the menu to get started');
   }
 
   // Version footer
-  console.log("│");
-  console.log(`└─ Version ${process.env.npm_package_version || "0.1.0"}`);
-  console.log("");
+  console.log('│');
+  console.log(`└─ Version ${process.env.npm_package_version || '0.1.0'}`);
+  console.log('');
 }
 
 /**
  * Displays keyboard navigation hints in a minimalist format
  */
 export function displayKeyboardHints() {
-  console.log("┌─ CONTROLS");
+  console.log('┌─ CONTROLS');
   console.log(
-    `│  ${chalk.bold("↑/↓")}: Navigate   ${chalk.bold(
-      "Enter"
-    )}: Select   ${chalk.bold("Ctrl+C")}: Cancel/Exit`
+    `│  ${chalk.bold('↑/↓')}: Navigate   ${chalk.bold(
+      'Enter'
+    )}: Select   ${chalk.bold('Ctrl+C')}: Cancel/Exit`
   );
-  console.log("└────────────");
+  console.log('└────────────');
 }
 
 /**
  * Displays a success message with simple styling
  */
 export function displaySuccess(message: string) {
-  console.log(`\n${chalk.green("✓")} ${chalk.bold(message)}`);
-  console.log("─────────────");
+  console.log(`\n${chalk.green('✓')} ${chalk.bold(message)}`);
+  console.log('─────────────');
 }
 
 /**
  * Displays an error message with stable styling
  */
 export function displayError(message: string | Error, details?: unknown) {
-  const errorMessage = typeof message === "string" ? message : message.message;
+  const errorMessage = typeof message === 'string' ? message : message.message;
 
-  console.log("\n┌─ ERROR");
+  console.log('\n┌─ ERROR');
   console.log(`│  ${chalk.bold(errorMessage)}`);
 
   if (details) {
@@ -122,20 +123,20 @@ export function displayError(message: string | Error, details?: unknown) {
   }
 
   // Add recovery hint when possible
-  if (typeof message === "string") {
-    if (message.includes("endpoint")) {
-      console.log(`│  ${chalk.dim("Check network or node status")}`);
-    } else if (message.includes("config")) {
-      console.log(`│  ${chalk.dim("Check config file permissions")}`);
+  if (typeof message === 'string') {
+    if (message.includes('endpoint')) {
+      console.log(`│  ${chalk.dim('Check network or node status')}`);
+    } else if (message.includes('config')) {
+      console.log(`│  ${chalk.dim('Check config file permissions')}`);
     }
   }
 
-  console.log("└────────────");
+  console.log('└────────────');
 }
 
 /**
  * Displays a "Press Enter to continue" message
  */
 export function displayContinuePrompt() {
-  console.log(`\nPress ${chalk.bold("Enter")} to continue...`);
+  console.log(`\nPress ${chalk.bold('Enter')} to continue...`);
 }

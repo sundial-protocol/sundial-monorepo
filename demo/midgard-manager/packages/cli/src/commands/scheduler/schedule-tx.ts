@@ -1,36 +1,37 @@
-import { Command, Options, Args } from "@effect/cli";
-import { Effect, pipe } from "effect";
-import chalk from "chalk";
-import ora from "ora-classic";
-import { getWallet, listWallets } from "../../config/wallets.js";
-import fs from "fs/promises";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import cron from "node-cron";
-import { startGenerator, stopGenerator } from "@midgard-manager/tx-generator";
+import { Args, Command, Options } from '@effect/cli';
+import { startGenerator, stopGenerator } from '@midgard-manager/tx-generator';
+import chalk from 'chalk';
+import { Effect, pipe } from 'effect';
+import fs from 'fs/promises';
+import cron from 'node-cron';
+import ora from 'ora-classic';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+import { getWallet, listWallets } from '../../config/wallets.js';
 
 // Get the directory path relative to the monorepo
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const MONOREPO_ROOT = join(__dirname, "../../../../../../..");
-const PROJECT_ROOT = join(MONOREPO_ROOT, "demo/midgard-manager");
+const MONOREPO_ROOT = join(__dirname, '../../../../../../..');
+const PROJECT_ROOT = join(MONOREPO_ROOT, 'demo/midgard-manager');
 
 // Store schedule configuration in the project's config directory
-const CONFIG_DIR = join(PROJECT_ROOT, "config");
-const SCHEDULE_CONFIG_PATH = join(CONFIG_DIR, "schedules.json");
+const CONFIG_DIR = join(PROJECT_ROOT, 'config');
+const SCHEDULE_CONFIG_PATH = join(CONFIG_DIR, 'schedules.json');
 
 // Available transaction types
-const transactionTypes = ["one-to-one", "multi-output", "mixed"];
+const transactionTypes = ['one-to-one', 'multi-output', 'mixed'];
 
 // Available schedule presets
 const schedulePresets = {
-  hourly: "0 * * * *",
-  daily: "0 0 * * *",
-  weekday: "0 9 * * 1-5",
-  weekend: "0 10 * * 0,6",
-  "every-minute": "* * * * *", // For testing
-  "every-5-minutes": "*/5 * * * *",
-  "every-30-minutes": "*/30 * * * *",
+  hourly: '0 * * * *',
+  daily: '0 0 * * *',
+  weekday: '0 9 * * 1-5',
+  weekend: '0 10 * * 0,6',
+  'every-minute': '* * * * *', // For testing
+  'every-5-minutes': '*/5 * * * *',
+  'every-30-minutes': '*/30 * * * *',
 };
 
 interface ScheduleConfig {
@@ -43,7 +44,7 @@ interface Schedule {
   cronExpression: string;
   enabled: boolean;
   transactionConfig: {
-    transactionType: "one-to-one" | "multi-output" | "mixed";
+    transactionType: 'one-to-one' | 'multi-output' | 'mixed';
     oneToOneRatio?: number;
     batchSize: number;
     interval: number;
@@ -65,15 +66,12 @@ const loadSchedules = async (): Promise<ScheduleConfig> => {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
 
     try {
-      const data = await fs.readFile(SCHEDULE_CONFIG_PATH, "utf-8");
+      const data = await fs.readFile(SCHEDULE_CONFIG_PATH, 'utf-8');
       return JSON.parse(data);
     } catch (error) {
       // If file doesn't exist, create empty config
       const emptyConfig: ScheduleConfig = { schedules: [] };
-      await fs.writeFile(
-        SCHEDULE_CONFIG_PATH,
-        JSON.stringify(emptyConfig, null, 2)
-      );
+      await fs.writeFile(SCHEDULE_CONFIG_PATH, JSON.stringify(emptyConfig, null, 2));
       return emptyConfig;
     }
   } catch (error) {
@@ -118,28 +116,20 @@ const startScheduledJob = async (schedule: Schedule): Promise<void> => {
 
   // Validate the CRON expression
   if (!cron.validate(schedule.cronExpression)) {
-    console.error(
-      chalk.red(`Invalid CRON expression: ${schedule.cronExpression}`)
-    );
+    console.error(chalk.red(`Invalid CRON expression: ${schedule.cronExpression}`));
     return;
   }
 
   // Get the wallet private key
   const wallet = await getWallet(schedule.transactionConfig.wallet);
   if (!wallet) {
-    console.error(
-      chalk.red(`Wallet '${schedule.transactionConfig.wallet}' not found`)
-    );
+    console.error(chalk.red(`Wallet '${schedule.transactionConfig.wallet}' not found`));
     return;
   }
 
   // Schedule the job
   const task = cron.schedule(schedule.cronExpression, async () => {
-    console.log(
-      chalk.blue(
-        `⏰ Running scheduled transaction generation: ${schedule.name}`
-      )
-    );
+    console.log(chalk.blue(`⏰ Running scheduled transaction generation: ${schedule.name}`));
 
     try {
       await startGenerator({
@@ -179,50 +169,44 @@ const initSchedules = async (): Promise<void> => {
  * Command to add a new transaction schedule
  */
 const addScheduleCommand = Command.make(
-  "add",
+  'add',
   {
-    name: Options.text("name").pipe(
-      Options.withDescription("Name for this schedule")
-    ),
+    name: Options.text('name').pipe(Options.withDescription('Name for this schedule')),
 
-    preset: Options.choice("preset", Object.keys(schedulePresets))
-      .pipe(Options.withDescription("Schedule preset (e.g., hourly, daily)"))
+    preset: Options.choice('preset', Object.keys(schedulePresets))
+      .pipe(Options.withDescription('Schedule preset (e.g., hourly, daily)'))
       .pipe(Options.optional),
 
-    cronExpression: Options.text("cron")
+    cronExpression: Options.text('cron')
       .pipe(
-        Options.withDescription(
-          "Custom CRON expression (e.g., '0 9 * * 1-5' for weekdays at 9am)"
-        )
+        Options.withDescription("Custom CRON expression (e.g., '0 9 * * 1-5' for weekdays at 9am)")
       )
       .pipe(Options.optional),
 
-    type: Options.choice("type", transactionTypes)
-      .pipe(Options.withDescription("Type of transactions to generate"))
-      .pipe(Options.withDefault("mixed")),
+    type: Options.choice('type', transactionTypes)
+      .pipe(Options.withDescription('Type of transactions to generate'))
+      .pipe(Options.withDefault('mixed')),
 
-    batchSize: Options.integer("batch-size")
-      .pipe(Options.withDescription("Number of transactions per batch"))
+    batchSize: Options.integer('batch-size')
+      .pipe(Options.withDescription('Number of transactions per batch'))
       .pipe(Options.withDefault(10)),
 
-    wallet: Options.text("wallet")
-      .pipe(Options.withDescription("Wallet to use for transaction signing"))
-      .pipe(Options.withDefault("test")),
+    wallet: Options.text('wallet')
+      .pipe(Options.withDescription('Wallet to use for transaction signing'))
+      .pipe(Options.withDefault('test')),
 
-    oneToOneRatio: Options.integer("one-to-one-ratio")
+    oneToOneRatio: Options.integer('one-to-one-ratio')
       .pipe(
-        Options.withDescription(
-          "For 'mixed' type: Percentage of one-to-one transactions (0-100)"
-        )
+        Options.withDescription("For 'mixed' type: Percentage of one-to-one transactions (0-100)")
       )
       .pipe(Options.withDefault(70)),
 
-    nodeEndpoint: Options.text("node-endpoint")
-      .pipe(Options.withDescription("Midgard node endpoint URL"))
-      .pipe(Options.withDefault("http://localhost:3000")),
+    nodeEndpoint: Options.text('node-endpoint')
+      .pipe(Options.withDescription('Midgard node endpoint URL'))
+      .pipe(Options.withDefault('http://localhost:3000')),
 
-    interactive: Options.boolean("interactive")
-      .pipe(Options.withDescription("Use interactive mode for configuration"))
+    interactive: Options.boolean('interactive')
+      .pipe(Options.withDescription('Use interactive mode for configuration'))
       .pipe(Options.withDefault(false)),
   },
   ({
@@ -238,14 +222,13 @@ const addScheduleCommand = Command.make(
   }) => {
     return pipe(
       Effect.tryPromise(async () => {
-        let schedule: Schedule = {
+        const schedule: Schedule = {
           id: generateId(),
-          name: name || "Unnamed Schedule",
-          cronExpression:
-            cronExpression || (preset ? schedulePresets[preset] : "0 * * * *"), // Default to hourly
+          name: name || 'Unnamed Schedule',
+          cronExpression: cronExpression || (preset ? schedulePresets[preset] : '0 * * * *'), // Default to hourly
           enabled: true,
           transactionConfig: {
-            transactionType: type as "one-to-one" | "multi-output" | "mixed",
+            transactionType: type as 'one-to-one' | 'multi-output' | 'mixed',
             oneToOneRatio,
             batchSize,
             interval: 5, // Default interval in seconds
@@ -257,28 +240,26 @@ const addScheduleCommand = Command.make(
 
         // Interactive mode
         if (interactive) {
-          const { input, select, number, confirm } = await import(
-            "@inquirer/prompts"
-          );
+          const { input, select, number, confirm } = await import('@inquirer/prompts');
 
           // Step 1: Basic schedule info
           schedule.name = await input({
-            message: "Enter a name for this schedule:",
+            message: 'Enter a name for this schedule:',
             default: schedule.name,
           });
 
           // Step 2: Schedule timing
           const timingType = await select({
-            message: "How do you want to set the schedule?",
+            message: 'How do you want to set the schedule?',
             choices: [
-              { value: "preset", name: "Use a preset schedule" },
-              { value: "custom", name: "Enter a custom CRON expression" },
+              { value: 'preset', name: 'Use a preset schedule' },
+              { value: 'custom', name: 'Enter a custom CRON expression' },
             ],
           });
 
-          if (timingType === "preset") {
+          if (timingType === 'preset') {
             const selectedPreset = await select({
-              message: "Select a schedule preset:",
+              message: 'Select a schedule preset:',
               choices: Object.entries(schedulePresets).map(([key, value]) => ({
                 value: key,
                 name: `${key} (${value})`,
@@ -288,83 +269,75 @@ const addScheduleCommand = Command.make(
             schedule.cronExpression = schedulePresets[selectedPreset];
           } else {
             schedule.cronExpression = await input({
-              message:
-                "Enter a CRON expression (e.g., '0 9 * * 1-5' for weekdays at 9am):",
+              message: "Enter a CRON expression (e.g., '0 9 * * 1-5' for weekdays at 9am):",
               default: schedule.cronExpression,
               validate: (value) =>
                 cron.validate(value) ||
-                "Invalid CRON expression. See https://crontab.guru/ for help.",
+                'Invalid CRON expression. See https://crontab.guru/ for help.',
             });
           }
 
           // Step 3: Transaction configuration
           schedule.transactionConfig.transactionType = (await select({
-            message: "Select transaction type:",
+            message: 'Select transaction type:',
             choices: [
-              { value: "one-to-one", name: "One-to-one (single output)" },
+              { value: 'one-to-one', name: 'One-to-one (single output)' },
               {
-                value: "multi-output",
-                name: "Multi-output (multiple recipients)",
+                value: 'multi-output',
+                name: 'Multi-output (multiple recipients)',
               },
-              { value: "mixed", name: "Mixed (combination of both types)" },
+              { value: 'mixed', name: 'Mixed (combination of both types)' },
             ],
             default: schedule.transactionConfig.transactionType,
-          })) as "one-to-one" | "multi-output" | "mixed";
+          })) as 'one-to-one' | 'multi-output' | 'mixed';
 
-          if (schedule.transactionConfig.transactionType === "mixed") {
+          if (schedule.transactionConfig.transactionType === 'mixed') {
             const ratioResult = await number({
-              message: "Percentage of one-to-one transactions (0-100):",
+              message: 'Percentage of one-to-one transactions (0-100):',
               default: schedule.transactionConfig.oneToOneRatio,
               validate: (value: number | undefined) =>
                 (value !== undefined && value >= 0 && value <= 100) ||
-                "Must be a percentage between 0 and 100",
+                'Must be a percentage between 0 and 100',
             });
             schedule.transactionConfig.oneToOneRatio =
-              ratioResult !== undefined
-                ? ratioResult
-                : schedule.transactionConfig.oneToOneRatio;
+              ratioResult !== undefined ? ratioResult : schedule.transactionConfig.oneToOneRatio;
           }
 
           const batchSizeResult = await number({
-            message: "Number of transactions per batch:",
+            message: 'Number of transactions per batch:',
             default: schedule.transactionConfig.batchSize,
             validate: (value: number | undefined) =>
-              (value !== undefined && value > 0) || "Must be greater than 0",
+              (value !== undefined && value > 0) || 'Must be greater than 0',
           });
           schedule.transactionConfig.batchSize =
-            batchSizeResult !== undefined
-              ? batchSizeResult
-              : schedule.transactionConfig.batchSize;
+            batchSizeResult !== undefined ? batchSizeResult : schedule.transactionConfig.batchSize;
 
           // Wallet selection
           const wallets = await listWallets();
           if (wallets.length === 0) {
-            console.error(
-              chalk.red("❌ No wallets configured. Please add a wallet first.")
-            );
+            console.error(chalk.red('❌ No wallets configured. Please add a wallet first.'));
             return;
           }
 
           schedule.transactionConfig.wallet = await select({
-            message: "Select wallet for transaction signing:",
+            message: 'Select wallet for transaction signing:',
             choices: wallets.map((w) => ({
               value: w,
-              name: `${w}${w === "test" ? " (default test wallet)" : ""}`,
+              name: `${w}${w === 'test' ? ' (default test wallet)' : ''}`,
             })),
             default: schedule.transactionConfig.wallet,
           });
 
           // Node endpoint
           schedule.transactionConfig.nodeEndpoint = await input({
-            message: "Midgard node endpoint URL:",
+            message: 'Midgard node endpoint URL:',
             default: schedule.transactionConfig.nodeEndpoint,
             validate: (value) =>
-              /^https?:\/\//.test(value) ||
-              "Must be a valid URL starting with http:// or https://",
+              /^https?:\/\//.test(value) || 'Must be a valid URL starting with http:// or https://',
           });
 
           // Confirm configuration
-          console.log(chalk.yellow.bold("\nSchedule Summary:"));
+          console.log(chalk.yellow.bold('\nSchedule Summary:'));
           console.log(chalk.yellow(`• Name: ${schedule.name}`));
           console.log(chalk.yellow(`• Schedule: ${schedule.cronExpression}`));
           console.log(
@@ -379,34 +352,26 @@ const addScheduleCommand = Command.make(
           );
           console.log(
             chalk.yellow(
-              `• Transaction Type: ${
-                schedule.transactionConfig.transactionType
-              }${
-                schedule.transactionConfig.transactionType === "mixed"
+              `• Transaction Type: ${schedule.transactionConfig.transactionType}${
+                schedule.transactionConfig.transactionType === 'mixed'
                   ? ` (${schedule.transactionConfig.oneToOneRatio}% one-to-one)`
-                  : ""
+                  : ''
               }`
             )
           );
           console.log(
-            chalk.yellow(
-              `• Batch Size: ${schedule.transactionConfig.batchSize} transactions`
-            )
+            chalk.yellow(`• Batch Size: ${schedule.transactionConfig.batchSize} transactions`)
           );
-          console.log(
-            chalk.yellow(`• Wallet: ${schedule.transactionConfig.wallet}`)
-          );
-          console.log(
-            chalk.yellow(`• Node: ${schedule.transactionConfig.nodeEndpoint}`)
-          );
+          console.log(chalk.yellow(`• Wallet: ${schedule.transactionConfig.wallet}`));
+          console.log(chalk.yellow(`• Node: ${schedule.transactionConfig.nodeEndpoint}`));
 
           const confirmed = await confirm({
-            message: "Create this schedule?",
+            message: 'Create this schedule?',
             default: true,
           });
 
           if (!confirmed) {
-            console.log(chalk.yellow("⚠️ Schedule creation cancelled"));
+            console.log(chalk.yellow('⚠️ Schedule creation cancelled'));
             return;
           }
         } else {
@@ -414,14 +379,8 @@ const addScheduleCommand = Command.make(
           if (cronExpression) {
             // Validate custom CRON expression if provided
             if (!cron.validate(cronExpression)) {
-              console.error(
-                chalk.red(`❌ Invalid CRON expression: ${cronExpression}`)
-              );
-              console.log(
-                chalk.gray(
-                  "See https://crontab.guru/ for help with CRON syntax"
-                )
-              );
+              console.error(chalk.red(`❌ Invalid CRON expression: ${cronExpression}`));
+              console.log(chalk.gray('See https://crontab.guru/ for help with CRON syntax'));
               return;
             }
           } else if (preset) {
@@ -429,11 +388,7 @@ const addScheduleCommand = Command.make(
             if (!schedulePresets[preset]) {
               console.error(chalk.red(`❌ Unknown schedule preset: ${preset}`));
               console.log(
-                chalk.gray(
-                  `Available presets: ${Object.keys(schedulePresets).join(
-                    ", "
-                  )}`
-                )
+                chalk.gray(`Available presets: ${Object.keys(schedulePresets).join(', ')}`)
               );
               return;
             }
@@ -445,18 +400,14 @@ const addScheduleCommand = Command.make(
           // Double-check final CRON expression
           if (!cron.validate(schedule.cronExpression)) {
             console.error(
-              chalk.red(
-                `❌ Final CRON expression invalid: ${schedule.cronExpression}`
-              )
+              chalk.red(`❌ Final CRON expression invalid: ${schedule.cronExpression}`)
             );
             return;
           }
 
           // Validate oneToOneRatio for mixed type
-          if (type === "mixed" && (oneToOneRatio < 0 || oneToOneRatio > 100)) {
-            console.error(
-              chalk.red("❌ one-to-one-ratio must be between 0 and 100")
-            );
+          if (type === 'mixed' && (oneToOneRatio < 0 || oneToOneRatio > 100)) {
+            console.error(chalk.red('❌ one-to-one-ratio must be between 0 and 100'));
             return;
           }
 
@@ -469,7 +420,7 @@ const addScheduleCommand = Command.make(
         }
 
         // Save the schedule
-        const spinner = ora("Saving transaction schedule...").start();
+        const spinner = ora('Saving transaction schedule...').start();
 
         try {
           const config = await loadSchedules();
@@ -479,7 +430,7 @@ const addScheduleCommand = Command.make(
           // Start the schedule
           await startScheduledJob(schedule);
 
-          spinner.succeed("Transaction schedule created and activated");
+          spinner.succeed('Transaction schedule created and activated');
 
           // Display next run time
           const nextRunDate = new Date(
@@ -490,27 +441,17 @@ const addScheduleCommand = Command.make(
           );
           console.log(
             chalk.green(
-              `\n✓ Schedule "${
-                schedule.name
-              }" will next run at: ${nextRunDate.toLocaleString()}`
+              `\n✓ Schedule "${schedule.name}" will next run at: ${nextRunDate.toLocaleString()}`
             )
           );
 
           // Display helper commands
-          console.log(chalk.gray("\nUseful commands:"));
-          console.log(
-            chalk.gray(`• List schedules: midgard-manager schedule-tx list`)
-          );
-          console.log(
-            chalk.gray(
-              `• Enable/disable: midgard-manager schedule-tx toggle <ID>`
-            )
-          );
-          console.log(
-            chalk.gray(`• Remove: midgard-manager schedule-tx remove <ID>`)
-          );
+          console.log(chalk.gray('\nUseful commands:'));
+          console.log(chalk.gray(`• List schedules: midgard-manager schedule-tx list`));
+          console.log(chalk.gray(`• Enable/disable: midgard-manager schedule-tx toggle <ID>`));
+          console.log(chalk.gray(`• Remove: midgard-manager schedule-tx remove <ID>`));
         } catch (error) {
-          spinner.fail("Failed to create schedule");
+          spinner.fail('Failed to create schedule');
           console.error(chalk.red(`Error: ${error.message}`));
         }
       })
@@ -521,25 +462,23 @@ const addScheduleCommand = Command.make(
 /**
  * Command to list all transaction schedules
  */
-const listSchedulesCommand = Command.make("list", {}, () => {
+const listSchedulesCommand = Command.make('list', {}, () => {
   return pipe(
     Effect.tryPromise(async () => {
-      const spinner = ora("Loading schedules...").start();
+      const spinner = ora('Loading schedules...').start();
 
       try {
         const config = await loadSchedules();
-        spinner.succeed("Schedules loaded");
+        spinner.succeed('Schedules loaded');
 
         if (config.schedules.length === 0) {
-          console.log(chalk.yellow("No transaction schedules configured"));
-          console.log(chalk.gray("To create a schedule:"));
-          console.log(
-            chalk.gray("$ midgard-manager schedule-tx add --interactive")
-          );
+          console.log(chalk.yellow('No transaction schedules configured'));
+          console.log(chalk.gray('To create a schedule:'));
+          console.log(chalk.gray('$ midgard-manager schedule-tx add --interactive'));
           return;
         }
 
-        console.log(chalk.blue.bold("\n📅 Transaction Schedules\n"));
+        console.log(chalk.blue.bold('\n📅 Transaction Schedules\n'));
 
         config.schedules.forEach((schedule) => {
           const nextRun = new Date(
@@ -552,44 +491,26 @@ const listSchedulesCommand = Command.make("list", {}, () => {
           console.log(
             chalk.white(
               `${
-                schedule.enabled ? chalk.green("●") : chalk.gray("○")
+                schedule.enabled ? chalk.green('●') : chalk.gray('○')
               } ${chalk.cyan(schedule.name)} (ID: ${schedule.id})`
             )
           );
           console.log(chalk.gray(`  Schedule: ${schedule.cronExpression}`));
           console.log(
-            chalk.gray(
-              `  Next run: ${
-                schedule.enabled ? nextRun.toLocaleString() : "Disabled"
-              }`
-            )
+            chalk.gray(`  Next run: ${schedule.enabled ? nextRun.toLocaleString() : 'Disabled'}`)
           );
-          console.log(
-            chalk.gray(
-              `  Tx Type: ${schedule.transactionConfig.transactionType}`
-            )
-          );
-          console.log(
-            chalk.gray(`  Batch Size: ${schedule.transactionConfig.batchSize}`)
-          );
+          console.log(chalk.gray(`  Tx Type: ${schedule.transactionConfig.transactionType}`));
+          console.log(chalk.gray(`  Batch Size: ${schedule.transactionConfig.batchSize}`));
           console.log();
         });
 
         // Helper commands
-        console.log(chalk.gray("Commands:"));
-        console.log(
-          chalk.gray(
-            "• Enable/disable: midgard-manager schedule-tx toggle <ID>"
-          )
-        );
-        console.log(
-          chalk.gray("• Remove: midgard-manager schedule-tx remove <ID>")
-        );
-        console.log(
-          chalk.gray("• Add new: midgard-manager schedule-tx add --interactive")
-        );
+        console.log(chalk.gray('Commands:'));
+        console.log(chalk.gray('• Enable/disable: midgard-manager schedule-tx toggle <ID>'));
+        console.log(chalk.gray('• Remove: midgard-manager schedule-tx remove <ID>'));
+        console.log(chalk.gray('• Add new: midgard-manager schedule-tx add --interactive'));
       } catch (error) {
-        spinner.fail("Failed to load schedules");
+        spinner.fail('Failed to load schedules');
         console.error(chalk.red(`Error: ${error.message}`));
       }
     })
@@ -600,21 +521,19 @@ const listSchedulesCommand = Command.make("list", {}, () => {
  * Command to toggle a schedule on/off
  */
 const toggleScheduleCommand = Command.make(
-  "toggle",
+  'toggle',
   {
-    id: Args.text("ID").pipe(
-      Args.withDescription("ID of the schedule to toggle")
-    ),
+    id: Args.text('ID').pipe(Args.withDescription('ID of the schedule to toggle')),
   },
   ({ id }) => {
     return pipe(
       Effect.tryPromise(async () => {
         if (!id) {
-          console.error(chalk.red("❌ Schedule ID is required"));
+          console.error(chalk.red('❌ Schedule ID is required'));
           return;
         }
 
-        const spinner = ora("Updating schedule...").start();
+        const spinner = ora('Updating schedule...').start();
 
         try {
           const config = await loadSchedules();
@@ -626,8 +545,7 @@ const toggleScheduleCommand = Command.make(
           }
 
           // Toggle the enabled status
-          config.schedules[scheduleIndex].enabled =
-            !config.schedules[scheduleIndex].enabled;
+          config.schedules[scheduleIndex].enabled = !config.schedules[scheduleIndex].enabled;
 
           // Save the updated config
           await saveSchedules(config);
@@ -635,21 +553,17 @@ const toggleScheduleCommand = Command.make(
           // Update the running jobs
           if (config.schedules[scheduleIndex].enabled) {
             await startScheduledJob(config.schedules[scheduleIndex]);
-            spinner.succeed(
-              `Schedule '${config.schedules[scheduleIndex].name}' enabled`
-            );
+            spinner.succeed(`Schedule '${config.schedules[scheduleIndex].name}' enabled`);
           } else {
             // Stop the job if it's running
             if (activeJobs.has(id)) {
               activeJobs.get(id)?.stop();
               activeJobs.delete(id);
             }
-            spinner.succeed(
-              `Schedule '${config.schedules[scheduleIndex].name}' disabled`
-            );
+            spinner.succeed(`Schedule '${config.schedules[scheduleIndex].name}' disabled`);
           }
         } catch (error) {
-          spinner.fail("Failed to update schedule");
+          spinner.fail('Failed to update schedule');
           console.error(chalk.red(`Error: ${error.message}`));
         }
       })
@@ -661,21 +575,19 @@ const toggleScheduleCommand = Command.make(
  * Command to remove a schedule
  */
 const removeScheduleCommand = Command.make(
-  "remove",
+  'remove',
   {
-    id: Args.text("ID").pipe(
-      Args.withDescription("ID of the schedule to remove")
-    ),
+    id: Args.text('ID').pipe(Args.withDescription('ID of the schedule to remove')),
   },
   ({ id }) => {
     return pipe(
       Effect.tryPromise(async () => {
         if (!id) {
-          console.error(chalk.red("❌ Schedule ID is required"));
+          console.error(chalk.red('❌ Schedule ID is required'));
           return;
         }
 
-        const spinner = ora("Removing schedule...").start();
+        const spinner = ora('Removing schedule...').start();
 
         try {
           const config = await loadSchedules();
@@ -702,7 +614,7 @@ const removeScheduleCommand = Command.make(
 
           spinner.succeed(`Schedule '${scheduleName}' removed`);
         } catch (error) {
-          spinner.fail("Failed to remove schedule");
+          spinner.fail('Failed to remove schedule');
           console.error(chalk.red(`Error: ${error.message}`));
         }
       })
@@ -713,24 +625,16 @@ const removeScheduleCommand = Command.make(
 /**
  * Main schedule-tx command
  */
-export const scheduleTxCommand = Command.make("schedule-tx")
-  .pipe(
-    Command.withDescription("Schedule transaction generation using CRON syntax")
-  )
+export const scheduleTxCommand = Command.make('schedule-tx')
+  .pipe(Command.withDescription('Schedule transaction generation using CRON syntax'))
   .pipe(
     Command.withSubcommands([
-      addScheduleCommand.pipe(
-        Command.withDescription("Add a new transaction schedule")
-      ),
-      listSchedulesCommand.pipe(
-        Command.withDescription("List all transaction schedules")
-      ),
+      addScheduleCommand.pipe(Command.withDescription('Add a new transaction schedule')),
+      listSchedulesCommand.pipe(Command.withDescription('List all transaction schedules')),
       toggleScheduleCommand.pipe(
-        Command.withDescription("Enable or disable a transaction schedule")
+        Command.withDescription('Enable or disable a transaction schedule')
       ),
-      removeScheduleCommand.pipe(
-        Command.withDescription("Remove a transaction schedule")
-      ),
+      removeScheduleCommand.pipe(Command.withDescription('Remove a transaction schedule')),
     ])
   );
 

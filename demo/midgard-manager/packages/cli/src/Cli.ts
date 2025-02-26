@@ -1,13 +1,10 @@
-import * as Command from "@effect/cli/Command";
-import { interactiveCommand } from "./cli/interactive/index.js";
-import { walletCommand } from "./commands/wallet.js";
-import {
-  generateTxCommand,
-  stopTxCommand,
-  txStatusCommand,
-} from "./commands/generate-tx.js";
-import { nodeStatusCommand, configureNodeCommand } from "./commands/node.js";
-import { scheduleTxCommand } from "./commands/scheduler/schedule-tx.js";
+import * as Command from '@effect/cli/Command';
+
+import { interactiveCommand } from './cli/interactive/index.js';
+import { generateTxCommand, stopTxCommand, txStatusCommand } from './commands/generate-tx.js';
+import { configureNodeCommand, nodeStatusCommand } from './commands/node.js';
+import { scheduleTxCommand } from './commands/scheduler/schedule-tx.js';
+import { walletCommand } from './commands/wallet.js';
 
 /**
  * Main CLI help text
@@ -70,8 +67,8 @@ $ pnpm start node configure --interactive               # Configure node setting
 /**
  * Group transaction commands
  */
-const txCommands = Command.make("tx")
-  .pipe(Command.withDescription("Transaction generator operations"))
+const txCommands = Command.make('tx')
+  .pipe(Command.withDescription('Transaction generator operations'))
   .pipe(
     Command.withSubcommands([
       // Instead of renaming, we'll use the original commands since they have the right functionality
@@ -85,14 +82,14 @@ const txCommands = Command.make("tx")
 /**
  * Group node commands
  */
-const nodeCommands = Command.make("node")
-  .pipe(Command.withDescription("Midgard node operations"))
+const nodeCommands = Command.make('node')
+  .pipe(Command.withDescription('Midgard node operations'))
   .pipe(Command.withSubcommands([nodeStatusCommand, configureNodeCommand]));
 
 /**
  * Create the main command with subcommands
  */
-const mainCommand = Command.make("midgard-manager")
+const mainCommand = Command.make('midgard-manager')
   .pipe(Command.withDescription(helpText))
   .pipe(
     Command.withSubcommands([
@@ -110,6 +107,6 @@ const mainCommand = Command.make("midgard-manager")
  * Export the run function
  */
 export const run = Command.run(mainCommand, {
-  name: "Midgard Manager",
-  version: "0.1.0",
+  name: 'Midgard Manager',
+  version: '0.1.0',
 });

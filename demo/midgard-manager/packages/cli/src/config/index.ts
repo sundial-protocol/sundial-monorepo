@@ -1,21 +1,23 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-import { Effect } from "effect";
-import * as S from "@effect/schema/Schema";
-import { configSchema, defaultConfig, type MidgardConfig } from "./schema.js";
-import { MidgardError } from "../utils/errors.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import * as S from '@effect/schema/Schema';
+import { Effect } from 'effect';
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+import { MidgardError } from '../utils/errors.js';
+import { configSchema, defaultConfig, type MidgardConfig } from './schema.js';
 
 // Get the directory path relative to the monorepo
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const MONOREPO_ROOT = join(__dirname, "../../../../../..");
-const PROJECT_ROOT = join(MONOREPO_ROOT, "demo/midgard-manager");
+const MONOREPO_ROOT = join(__dirname, '../../../../../..');
+const PROJECT_ROOT = join(MONOREPO_ROOT, 'demo/midgard-manager');
 
 // Store all configuration in the project's config directory
-const CONFIG_DIR = join(PROJECT_ROOT, "config");
-const CONFIG_PATH = join(CONFIG_DIR, "settings.json");
+const CONFIG_DIR = join(PROJECT_ROOT, 'config');
+const CONFIG_PATH = join(CONFIG_DIR, 'settings.json');
 
 // Ensure config directory exists
 const ensureConfigDir = Effect.try({
@@ -41,7 +43,7 @@ export const loadConfig = Effect.gen(function* (_) {
           return defaultConfig;
         }
 
-        const configFile = readFileSync(CONFIG_PATH, "utf-8");
+        const configFile = readFileSync(CONFIG_PATH, 'utf-8');
         const parsedConfig = JSON.parse(configFile);
         return S.decodeSync(configSchema)(parsedConfig);
       },

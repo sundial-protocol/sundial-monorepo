@@ -12,7 +12,7 @@ export interface TransactionGeneratorConfig {
   walletPrivateKey: string;
 
   // Transaction settings
-  transactionType: "one-to-one" | "multi-output" | "mixed";
+  transactionType: 'one-to-one' | 'multi-output' | 'mixed';
   oneToOneRatio?: number; // Percentage of one-to-one transactions (0-100) when using 'mixed' type
 
   // Batch settings
@@ -29,16 +29,16 @@ export interface TransactionGeneratorConfig {
  */
 export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
   // Node defaults
-  nodeEndpoint: "http://localhost:3000",
+  nodeEndpoint: 'http://localhost:3000',
   nodeRetryAttempts: 3,
   nodeRetryDelay: 1000,
   nodeEnableLogs: true,
 
   // Wallet defaults
-  walletPrivateKey: "", // Will be filled from wallet config
+  walletPrivateKey: '', // Will be filled from wallet config
 
   // Transaction defaults
-  transactionType: "mixed",
+  transactionType: 'mixed',
   oneToOneRatio: 70, // 70% one-to-one, 30% multi-output
 
   // Batch defaults
@@ -55,41 +55,41 @@ export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
 export const validateGeneratorConfig = (config: TransactionGeneratorConfig): void => {
   // Node validation
   if (!config.nodeEndpoint) {
-    throw new Error("Node endpoint is required");
+    throw new Error('Node endpoint is required');
   }
-  if (!config.nodeEndpoint.startsWith("http")) {
-    throw new Error("Node endpoint must start with http:// or https://");
+  if (!config.nodeEndpoint.startsWith('http')) {
+    throw new Error('Node endpoint must start with http:// or https://');
   }
   if (config.nodeRetryAttempts !== undefined && config.nodeRetryAttempts < 0) {
-    throw new Error("Node retry attempts must be non-negative");
+    throw new Error('Node retry attempts must be non-negative');
   }
   if (config.nodeRetryDelay !== undefined && config.nodeRetryDelay < 0) {
-    throw new Error("Node retry delay must be non-negative");
+    throw new Error('Node retry delay must be non-negative');
   }
 
   // Wallet validation
   if (!config.walletPrivateKey) {
-    throw new Error("Wallet private key is required");
+    throw new Error('Wallet private key is required');
   }
 
   // Transaction validation
   if (config.oneToOneRatio !== undefined) {
     if (config.oneToOneRatio < 0 || config.oneToOneRatio > 100) {
-      throw new Error("One-to-one ratio must be between 0 and 100");
+      throw new Error('One-to-one ratio must be between 0 and 100');
     }
   }
 
   // Batch validation
   if (config.batchSize < 1) {
-    throw new Error("Batch size must be at least 1");
+    throw new Error('Batch size must be at least 1');
   }
   if (config.interval < 0) {
-    throw new Error("Interval must be non-negative");
+    throw new Error('Interval must be non-negative');
   }
   if (config.concurrency < 1) {
-    throw new Error("Concurrency must be at least 1");
+    throw new Error('Concurrency must be at least 1');
   }
   if (config.concurrency > 20) {
-    throw new Error("Concurrency must not exceed 20");
+    throw new Error('Concurrency must not exceed 20');
   }
 };

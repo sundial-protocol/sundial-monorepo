@@ -1,4 +1,4 @@
-import * as S from "@effect/schema/Schema";
+import * as S from '@effect/schema/Schema';
 
 // Simple URL validation
 const isValidUrl = (url: string) => {
@@ -26,8 +26,8 @@ export const MidgardConfig = S.Struct({
 
   // Logging configuration
   logging: S.Struct({
-    level: S.Literal("debug", "info", "warn", "error"),
-    format: S.Literal("json", "pretty"),
+    level: S.Literal('debug', 'info', 'warn', 'error'),
+    format: S.Literal('json', 'pretty'),
   }),
 });
 

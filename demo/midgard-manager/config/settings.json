@@ -16,6 +16,6 @@
     "format": "pretty"
   },
   "wallets": {
-    "directory": "~/.midgard-manager/wallets"
+    "directory": "./config/wallets"
   }
-} 
+}

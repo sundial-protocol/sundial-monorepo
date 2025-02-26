@@ -6,9 +6,9 @@ export function waitForKeypress(): Promise<void> {
   return new Promise((resolve) => {
     process.stdin.setRawMode(true);
     process.stdin.resume();
-    process.stdin.once("data", (data) => {
+    process.stdin.once('data', (data) => {
       // Ctrl+C should exit the process
-      if (data.toString() === "\u0003") {
+      if (data.toString() === '\u0003') {
         process.exit(0);
       }
       process.stdin.setRawMode(false);

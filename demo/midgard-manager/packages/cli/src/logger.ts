@@ -1,18 +1,17 @@
-import { Effect, Logger, LogLevel } from "effect";
-import type { MidgardConfig } from "./config/schema.js";
+import { Effect, Logger, LogLevel } from 'effect';
+
+import type { MidgardConfig } from './config/schema.js';
 
 // Convert log level to Effect's LogLevel
-const toEffectLogLevel = (
-  level: MidgardConfig["logging"]["level"]
-): LogLevel => {
+const toEffectLogLevel = (level: MidgardConfig['logging']['level']): LogLevel => {
   switch (level) {
-    case "debug":
+    case 'debug':
       return LogLevel.Debug;
-    case "info":
+    case 'info':
       return LogLevel.Info;
-    case "warn":
+    case 'warn':
       return LogLevel.Warning;
-    case "error":
+    case 'error':
       return LogLevel.Error;
   }
 };
@@ -25,7 +24,7 @@ export const createLogger = (config: MidgardConfig) => {
     if (messageLevel >= logLevel) {
       const timestamp = new Date().toISOString();
 
-      if (config.logging.format === "json") {
+      if (config.logging.format === 'json') {
         console.log(
           JSON.stringify({
             timestamp,
@@ -34,11 +33,7 @@ export const createLogger = (config: MidgardConfig) => {
           })
         );
       } else {
-        console.log(
-          `[${timestamp}] ${LogLevel.toString(messageLevel).padEnd(
-            5
-          )} ${message}`
-        );
+        console.log(`[${timestamp}] ${LogLevel.toString(messageLevel).padEnd(5)} ${message}`);
       }
     }
 

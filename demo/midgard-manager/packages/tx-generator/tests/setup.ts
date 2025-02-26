@@ -1,6 +1,6 @@
-import { Lucid, Network, UTxO } from "@lucid-evolution/lucid";
-import { CML } from "@lucid-evolution/lucid";
-import { test } from "vitest";
+import { Lucid, Network, UTxO } from '@lucid-evolution/lucid';
+import { CML } from '@lucid-evolution/lucid';
+import { test } from 'vitest';
 
 /**
  * Creates a test setup for transaction generator tests
@@ -13,16 +13,14 @@ const setup = async () => {
   // Create a mock address
   const address = CML.EnterpriseAddress.new(
     0, // Testnet
-    CML.Credential.new_pub_key(
-      CML.PrivateKey.from_bech32(privateKey).to_public().hash()
-    )
+    CML.Credential.new_pub_key(CML.PrivateKey.from_bech32(privateKey).to_public().hash())
   )
     .to_address()
     .to_bech32();
 
   // Create a mock UTxO for testing
   const mockInitialUtxo: UTxO = {
-    txHash: "0000000000000000000000000000000000000000000000000000000000000000",
+    txHash: '0000000000000000000000000000000000000000000000000000000000000000',
     outputIndex: 0,
     assets: {
       lovelace: 1_000_000_000_000n,
@@ -36,9 +34,7 @@ const setup = async () => {
   // Create a mock node client that just logs actions but doesn't actually submit transactions
   const mockNodeClient = {
     submitTransaction: async (cborHex: string) => {
-      console.log(
-        `Mock submitting transaction: ${cborHex.substring(0, 32)}...`
-      );
+      console.log(`Mock submitting transaction: ${cborHex.substring(0, 32)}...`);
       return { txId: `mock_${Date.now()}` };
     },
     isAvailable: async () => true,
@@ -53,13 +49,13 @@ const setup = async () => {
     },
     utxos: () => Promise.resolve([mockInitialUtxo]),
     provider: {
-      network: () => Promise.resolve("Testnet" as Network),
+      network: () => Promise.resolve('Testnet' as Network),
       getUtxosByOutRef: () => Promise.resolve([mockInitialUtxo]),
     },
     newTx: () => ({
       payToAddress: () => ({
         complete: () => ({
-          sign: () => ({ submit: () => Promise.resolve("mock_tx_id") }),
+          sign: () => ({ submit: () => Promise.resolve('mock_tx_id') }),
         }),
       }),
     }),
@@ -70,7 +66,7 @@ const setup = async () => {
     lucid,
     mockInitialUtxo,
     mockNodeClient,
-    network: "Testnet" as Network,
+    network: 'Testnet' as Network,
   };
 };
 

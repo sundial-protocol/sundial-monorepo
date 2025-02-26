@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import chalk from 'chalk';
 
 /**
  * Interface for a transaction log entry
@@ -7,7 +7,7 @@ export interface TransactionLogEntry {
   txId: string;
   timestamp: Date;
   type: string;
-  status: "submitted" | "failed";
+  status: 'submitted' | 'failed';
   details?: string;
 }
 
@@ -32,7 +32,7 @@ class TransactionLogger {
   /**
    * Add a transaction to the log
    */
-  addLog(entry: Omit<TransactionLogEntry, "timestamp">): TransactionLogEntry {
+  addLog(entry: Omit<TransactionLogEntry, 'timestamp'>): TransactionLogEntry {
     const logEntry: TransactionLogEntry = {
       ...entry,
       timestamp: new Date(),
@@ -56,24 +56,21 @@ class TransactionLogger {
    * Display a formatted log entry in the console
    */
   private displayLogEntry(entry: TransactionLogEntry): void {
-    const timestamp = entry.timestamp
-      .toISOString()
-      .replace("T", " ")
-      .substring(0, 19);
+    const timestamp = entry.timestamp.toISOString().replace('T', ' ').substring(0, 19);
     const shortTxId = `${entry.txId.substring(0, 8)}...${entry.txId.substring(
       entry.txId.length - 8
     )}`;
 
-    let statusSymbol = "";
+    let statusSymbol = '';
     let statusColor = chalk.white;
 
     switch (entry.status) {
-      case "submitted":
-        statusSymbol = "✓";
+      case 'submitted':
+        statusSymbol = '✓';
         statusColor = chalk.green;
         break;
-      case "failed":
-        statusSymbol = "✗";
+      case 'failed':
+        statusSymbol = '✗';
         statusColor = chalk.red;
         break;
     }
@@ -82,7 +79,7 @@ class TransactionLogger {
       `${chalk.gray(timestamp)} ${statusColor(statusSymbol)} ${chalk.cyan(
         entry.type
       )} ${chalk.white(shortTxId)} ${statusColor(entry.status)}${
-        entry.details ? ` (${entry.details})` : ""
+        entry.details ? ` (${entry.details})` : ''
       }`
     );
   }
@@ -108,15 +105,11 @@ export const txLogger = TransactionLogger.getInstance();
 /**
  * Log a submitted transaction
  */
-export const logSubmittedTransaction = (
-  txId: string,
-  type: string,
-  details?: string
-): void => {
+export const logSubmittedTransaction = (txId: string, type: string, details?: string): void => {
   txLogger.addLog({
     txId,
     type,
-    status: "submitted",
+    status: 'submitted',
     details,
   });
 };
@@ -124,15 +117,11 @@ export const logSubmittedTransaction = (
 /**
  * Log a failed transaction
  */
-export const logFailedTransaction = (
-  txId: string,
-  type: string,
-  details?: string
-): void => {
+export const logFailedTransaction = (txId: string, type: string, details?: string): void => {
   txLogger.addLog({
     txId,
     type,
-    status: "failed",
+    status: 'failed',
     details,
   });
 };

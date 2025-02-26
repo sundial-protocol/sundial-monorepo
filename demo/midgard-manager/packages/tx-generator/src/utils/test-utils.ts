@@ -1,7 +1,4 @@
-import {
-  generateEmulatorAccountFromPrivateKey,
-  UTxO,
-} from '@lucid-evolution/lucid';
+import { generateEmulatorAccountFromPrivateKey, UTxO } from '@lucid-evolution/lucid';
 
 export interface TestWallet {
   privateKey: string;

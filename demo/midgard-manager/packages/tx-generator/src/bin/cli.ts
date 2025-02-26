@@ -1,11 +1,13 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import { Network } from '@lucid-evolution/lucid';
-import { generateTestWallet } from '../utils/test-utils.js';
+
 import {
-  generateOneToOneTransactions,
   generateMultiOutputTransactions,
+  generateOneToOneTransactions,
 } from '../lib/generators/index.js';
+import { generateTestWallet } from '../utils/test-utils.js';
 
 const DEFAULT_CONFIG = {
   network: 'Preview' as Network,

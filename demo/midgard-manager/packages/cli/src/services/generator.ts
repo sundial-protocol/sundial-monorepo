@@ -1,24 +1,18 @@
-import { Effect, pipe } from "effect";
-import {
-  createScheduledGenerator,
-  MidgardNodeClient,
-} from "@midgard-manager/tx-generator";
-import type { Config, GeneratorConfig } from "../config/schema.js";
+import { createScheduledGenerator, MidgardNodeClient } from '@midgard-manager/tx-generator';
+import { Effect, pipe } from 'effect';
+
+import type { Config, GeneratorConfig } from '../config/schema.js';
 
 // Error types
 export class GeneratorError {
-  readonly _tag = "GeneratorError";
+  readonly _tag = 'GeneratorError';
   constructor(readonly message: string) {}
 }
 
 // Service interface
 export interface GeneratorService {
-  generateBatch: (
-    config: GeneratorConfig
-  ) => Effect.Effect<never, GeneratorError, void>;
-  startScheduled: (
-    config: GeneratorConfig
-  ) => Effect.Effect<never, GeneratorError, void>;
+  generateBatch: (config: GeneratorConfig) => Effect.Effect<never, GeneratorError, void>;
+  startScheduled: (config: GeneratorConfig) => Effect.Effect<never, GeneratorError, void>;
 }
 
 // Service implementation

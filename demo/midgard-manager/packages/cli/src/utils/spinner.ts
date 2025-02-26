@@ -1,4 +1,4 @@
-import ora from "ora-classic";
+import ora from 'ora-classic';
 
 /**
  * Creates and returns a spinner with the given message
@@ -8,7 +8,7 @@ import ora from "ora-classic";
 export function createSpinner(message: string) {
   return ora({
     text: message,
-    spinner: "dots", // Uses a nice clean looking spinner
-    color: "green",
+    spinner: 'dots', // Uses a nice clean looking spinner
+    color: 'green',
   });
 }

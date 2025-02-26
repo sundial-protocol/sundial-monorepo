@@ -20,6 +20,7 @@ You can use the transaction generator in two ways:
 ### 1. Command Line Interface (CLI)
 
 From the project root:
+
 ```bash
 # Show available commands
 pnpm tx-generator --help
@@ -46,33 +47,29 @@ pnpm tx-generator status
 
 #### Available Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-e, --endpoint <url>` | Node endpoint URL | http://localhost:3000 |
-| `-t, --type <type>` | Transaction type (one-to-one, multi-output, mixed) | mixed |
-| `-r, --ratio <number>` | % of one-to-one txs in mixed mode | 70 |
-| `-b, --batch-size <number>` | Transactions per batch | 10 |
-| `-i, --interval <seconds>` | Time between batches | 5 |
-| `-c, --concurrency <number>` | Parallel transaction batches | 5 |
-| `--test-wallet` | Generate a test wallet | false |
-| `-k, --private-key <key>` | Wallet private key | required if no test wallet |
+| Option                       | Description                                        | Default                    |
+| ---------------------------- | -------------------------------------------------- | -------------------------- |
+| `-e, --endpoint <url>`       | Node endpoint URL                                  | http://localhost:3000      |
+| `-t, --type <type>`          | Transaction type (one-to-one, multi-output, mixed) | mixed                      |
+| `-r, --ratio <number>`       | % of one-to-one txs in mixed mode                  | 70                         |
+| `-b, --batch-size <number>`  | Transactions per batch                             | 10                         |
+| `-i, --interval <seconds>`   | Time between batches                               | 5                          |
+| `-c, --concurrency <number>` | Parallel transaction batches                       | 5                          |
+| `--test-wallet`              | Generate a test wallet                             | false                      |
+| `-k, --private-key <key>`    | Wallet private key                                 | required if no test wallet |
 
 ### 2. Programmatic API
 
 Import and use in your TypeScript/JavaScript code:
 
 ```typescript
-import {
-  startGenerator,
-  stopGenerator,
-  getGeneratorStatus,
-} from "@midgard-manager/tx-generator";
+import { startGenerator, stopGenerator, getGeneratorStatus } from '@midgard-manager/tx-generator';
 
 // Start generator
 await startGenerator({
-  nodeEndpoint: "http://localhost:3000",
-  walletPrivateKey: "your-private-key",
-  transactionType: "mixed",
+  nodeEndpoint: 'http://localhost:3000',
+  walletPrivateKey: 'your-private-key',
+  transactionType: 'mixed',
   oneToOneRatio: 70,
   batchSize: 10,
   interval: 5000, // milliseconds
@@ -90,7 +87,7 @@ await stopGenerator();
 
 ### One-to-One Transactions
 
-Simple transactions with one input and one output.  
+Simple transactions with one input and one output.
 
 ### Multi-Output Transactions
 
@@ -98,7 +95,7 @@ Complex transactions with one input and multiple outputs.
 
 ### Mixed Transactions
 
-A combination of one-to-one and multi-output transactions with a configurable ratio. 
+A combination of one-to-one and multi-output transactions with a configurable ratio.
 
 ## Development
 
@@ -147,9 +144,9 @@ Each generated transaction follows this structure:
 
 ```typescript
 {
-  cborHex: string;    // CBOR-encoded transaction
+  cborHex: string; // CBOR-encoded transaction
   description: string;
-  txId: string;       // Transaction hash
+  txId: string; // Transaction hash
   type: string;
 }
 ```
@@ -157,6 +154,7 @@ Each generated transaction follows this structure:
 ## Telemetry
 
 The generator provides basic telemetry:
+
 - Success/failure rates
 - Submission latency
 - Total transactions
@@ -165,12 +163,14 @@ The generator provides basic telemetry:
 ## Troubleshooting
 
 1. **Command not found**
+
    ```bash
    # Make sure you've built the package
    pnpm build
    ```
 
 2. **Permission denied**
+
    ```bash
    # Make the CLI executable
    chmod +x ./dist/bin/index.js

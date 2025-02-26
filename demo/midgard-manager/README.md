@@ -11,10 +11,11 @@ Tools for managing Midgard MVP L2 node and generating test transactions.
 
 Midgard Manager uses a centralized configuration system with a single source of truth:
 
-1. **Central Configuration**: Located at `config.json` in the root directory
+1. **Central Configuration**: Located at `config/settings.json`
 2. **Command-line Arguments**: Can override specific settings per command
+3. **Wallet Storage**: Located at `config/wallets/default.json`
 
-The configuration can be modified either by directly editing the `config.json` file or through the interactive CLI commands, which will update the file automatically.
+The configuration can be modified either by directly editing the `config/settings.json` file or through the interactive CLI commands, which will update the file automatically.
 
 ### Configuration Structure
 
@@ -37,7 +38,7 @@ The configuration can be modified either by directly editing the `config.json` f
     "format": "pretty"
   },
   "wallets": {
-    "directory": "~/.midgard-manager/wallets"
+    "directory": "./config/wallets"
   }
 }
 ```
@@ -45,9 +46,11 @@ The configuration can be modified either by directly editing the `config.json` f
 ### Configuration Fields
 
 - **node**: Node connection settings
+
   - `endpoint`: The Midgard node endpoint URL
 
 - **generator**: Transaction generator settings
+
   - `enabled`: Whether the generator is currently running
   - `maxConcurrent`: Maximum number of concurrent transactions
   - `batchSize`: Number of transactions per batch
@@ -57,6 +60,7 @@ The configuration can be modified either by directly editing the `config.json` f
   - `defaultWallet`: Default wallet to use for signing transactions
 
 - **logging**: Logging configuration
+
   - `level`: Log level (debug, info, warn, error)
   - `format`: Log format (pretty, json)
 
@@ -134,4 +138,3 @@ To add new features or modify existing ones:
 3. Test your changes using the CLI
 
 For more detailed development information, see the README in each package directory.
-
