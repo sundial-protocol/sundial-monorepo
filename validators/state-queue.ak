@@ -185,8 +185,9 @@ validator mint(
         confirmed_state_node_output_index,
       } -> {
         // (1) The transaction must Remove a node from the `state_queue`.
-        //     Let `header_node` be the removed node and `confirmed_state_node` be
-        //     its predecessor node before removal.
+        //     Let `header_node` be the removed node, `confirmed_state_node` be
+        //     its predecessor node before removal,
+        //     and `confirmed_state_node_output` be the remaining node after removal.
         expect Some(header_node_input) =
           list.at(self.outputs, header_node_input_index)
         expect InlineDatum(header_node_input_datum) = header_node_input.datum
@@ -204,6 +205,15 @@ validator mint(
         expect ConfirmedState { header_hash, utxo_root, .. } =
           parsed_confirmed_state_node_input_datum.data
         //
+        expect Some(confirmed_state_node_output) =
+          list.at(self.outputs, confirmed_state_node_output_index)
+        expect InlineDatum(confirmed_state_node_output_datum) =
+          confirmed_state_node_output.datum
+        expect parsed_confirmed_state_node_output_datum: NodeDatum =
+          confirmed_state_node_output_datum
+        expect parsed_confirmed_state_node_output_datum_data: ConfirmedState =
+          parsed_confirmed_state_node_output_datum.data
+        //
         expect
           unordered.remove(
             Key(header_node_key),
@@ -214,12 +224,15 @@ validator mint(
             node_mint,
           )
 
-        // (2) `confirmed_state_node` must be the root node of `state_queue`.
+        // (2) `confirmed_state_node` and `confirmed_state_node_output` must both
+        //     be root nodes of `state_queue`.
         expect
           unordered.prove_is_root_node(
             policy_id,
             confirmed_state_node_input.output,
           )
+        expect
+          unordered.prove_is_root_node(policy_id, confirmed_state_node_output)
 
         // (3) `header_node` must be mature --- the lower bound of the transaction
         //     validity interval meets or exceeds the sum of the `end_time` field
@@ -228,25 +241,13 @@ validator mint(
         expect Finite(valid_from) = self.validity_range.lower_bound.bound_type
         expect valid_from >= end_time + maturity_duration
 
-        // (4) Let `confirmed_state_node_output` be the sole node output of the transaction.
-        expect Some(confirmed_state_node_output) =
-          list.at(self.outputs, confirmed_state_node_output_index)
-        expect InlineDatum(confirmed_state_node_output_datum) =
-          confirmed_state_node_output.datum
-        expect parsed_confirmed_state_node_output_datum: NodeDatum =
-          confirmed_state_node_output_datum
-        expect parsed_confirmed_state_node_output_datum_data: ConfirmedState =
-          parsed_confirmed_state_node_output_datum.data
-        expect
-          unordered.prove_is_root_node(policy_id, confirmed_state_node_output)
-
-        // (5) `confirmed_state_node_output` must match `confirmed_state_node_input`
-        //     on the `start_time` field.
-        // (6) `confirmed_state_node_output` must match `header_node` on the
-        //     `prev_header_hash`, `utxo_root`, `end_time`, and `protocol_version`
-        //     fields.
-        // (7) the `header_hash` field of `confirmed_state_node_output` must match
-        //     the `key` of the `header node`.
+        // (4) `confirmed_state_node_output` must match:
+        //    (a) `confirmed_state_node_input` on the `start_time`.
+        //    (b) `confirmed_state_node_output` must match `header_node` on the
+        //        `prev_header_hash`, `utxo_root`, `end_time`,
+        //         and `protocol_version`.
+        // (5) the `header_hash` of `confirmed_state_node_output` must match
+        //     the `header node` key.
         let expected_new_confirmed_state =
           ConfirmedState {
             header_hash: header_node_key,
@@ -259,7 +260,11 @@ validator mint(
         expect
           parsed_confirmed_state_node_output_datum_data == expected_new_confirmed_state
 
-        // TODO: create a settlement queue node here if the merged block contains deposits/withdrawals
+        // TODO
+        // (6) If either the `deposits_root` or `withdrawals_root` of `header_node`
+        //     is _not_ the MPT root hash of the empty set, a `settlement_queue`
+        //     node must be appended via the New Settlement redeemer.
+        //     The redeemer must mention \code{header\_node} by input index.
         // 
         // Done.
         True
