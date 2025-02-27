@@ -27,6 +27,7 @@ pub type SpendRedeemer {
   hub_ref_input_index: Int,
   settlement_ref_input_index: Int,
   settlement_node_asset_name: AssetName,
+  mint_redeemer_index: Int,
   membership_proof: mpf.Proof,
   purpose: SpendPurpose,
 }
@@ -44,5 +45,5 @@ pub type MintRedeemer {
     hub_ref_input_index: Int,
     witness_registration_redeemer_index: Int,
   }
-  BurnDepositNFT
+  BurnDepositNFT { l2_id: AssetName }
 }

@@ -97,6 +97,17 @@ pub fn has_signed(
   extra_signatories |> list.has(signer)
 }
 
+pub fn get_single_asset_from_value(
+  v: Value,
+) -> (PolicyId, AssetName, Int) {
+  expect [Pair(sym, tn_qty_pairs)] =
+    v
+      |> assets.to_dict
+      |> dict.to_pairs
+  expect [Pair(tn, qty)] = tn_qty_pairs |> dict.to_pairs
+  (sym, tn, qty)
+}
+
 pub fn get_single_asset_from_value_apart_from_ada(
   v: Value,
 ) -> (PolicyId, AssetName, Int) {

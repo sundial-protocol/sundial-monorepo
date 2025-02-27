@@ -8,7 +8,7 @@ use cardano/address.{Address, Credential, Script}
 use cardano/assets.{PolicyId}
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Publish, Redeemer, Transaction,
+  InlineDatum, Input, Output, OutputReference, Publish, Redeemer, Transaction, Mint,
 }
 use midgard/common/parameter_validation
 use midgard/common/utils
@@ -21,8 +21,6 @@ use midgard/user_events/deposit.{
 
 validator spend(
   hub_oracle: ScriptHash,
-  reserve: Address,
-  plutarch_phas_validator_hash: ScriptHash,
   deposit_policy_id: PolicyId,
 ) {
   spend(
@@ -31,24 +29,46 @@ validator spend(
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    let Transaction { inputs, reference_inputs, .. } = tx
-    expect Some(deposit_datum) = datum
-    let Datum { event, inclusion_time, witness, refund_address, refund_datum } =
-      deposit_datum
+    let Transaction { inputs, reference_inputs, redeemers, .. } = tx
+
     let SpendRedeemer {
       input_index,
       hub_ref_input_index,
       settlement_ref_input_index,
       settlement_node_asset_name,
+      mint_redeemer_index,
       membership_proof,
       purpose,
     } = redeemer
+
     let hub.Datum {
+      deposit: deposit_policy_id,
       settlement_queue: settlement_queue_policy_id,
       settlement_queue_addr,
       reserve_addr,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+
+    expect Some(deposit_datum) = datum
+    let Datum {
+      event: user_events.Event {
+        id,
+        info: Info {
+          tokens: deposited_tokens,
+          ..
+        },
+      },
+      inclusion_time,
+      witness,
+      refund_address,
+      refund_datum
+    } = deposit_datum
+
+    let Output {
+      value: own_value,
+      ..
+    } = utils.get_own_input_at(inputs, own_out_ref, input_index)
+
     let Input { .. } =
       utils.get_authentic_input_with_policy_at_address(
         reference_inputs,
@@ -57,7 +77,21 @@ validator spend(
         settlement_node_asset_name,
         settlement_ref_input_index,
       )
-    let Output { .. } = utils.get_own_input_at(inputs, own_out_ref, input_index)
+
+    expect BurnDepositNFT { l2_id: burn_asset_name }: MintRedeemer =
+      utils.get_redeemer_at(
+        redeemers,
+        Mint(deposit_policy_id),
+        mint_redeemer_index,
+      )
+
+    expect utils.authentic_value_has_tokens(
+      own_value,
+      deposit_policy_id,
+      burn_asset_name,
+      deposited_tokens
+    )
+
     todo
   }
 
@@ -139,7 +173,8 @@ validator mint(hub_oracle: ScriptHash) {
             //    from hub oracle.
             output_deposit_address == deposit_addr,
             // 2. Specified list of tokens in the deposit event must be included
-            //    in the value of the deposit UTxO.
+            //    in the value of the deposit UTxO (along with its NFT). No
+            //    validation on ADA (TODO?).
             utils.authentic_value_has_tokens(
               output_deposit_value,
               own_policy,
@@ -181,7 +216,8 @@ validator mint(hub_oracle: ScriptHash) {
           witness_registration_redeemer == own_policy,
         }
       }
-      BurnDepositNFT -> todo
+      BurnDepositNFT { l2_id } ->
+        assets.quantity_of(tx.mint, own_policy, l2_id) == -1
     }
   }
 
