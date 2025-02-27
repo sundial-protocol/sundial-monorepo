@@ -8,12 +8,12 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "turbo build",
-    "dev": "turbo dev",
-    "lint": "turbo lint",
-    "clean": "turbo clean",
+    "build": "pnpm --filter @midgard-manager/* build",
+    "dev": "pnpm --filter @midgard-manager/* dev",
+    "lint": "pnpm --filter @midgard-manager/* lint",
+    "clean": "pnpm --filter @midgard-manager/* clean",
     "start": "pnpm --filter @midgard-manager/cli start",
     "tx-generator": "pnpm --filter @midgard-manager/tx-generator start",
-    "test": "turbo test"
+    "test": "pnpm --filter @midgard-manager/* test"
   }
 }

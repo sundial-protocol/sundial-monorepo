@@ -1,4 +1,5 @@
 import { confirm, input, number, select } from '@inquirer/prompts';
+import { generateEmulatorAccountFromPrivateKey } from '@lucid-evolution/lucid';
 import { getGeneratorStatus, startGenerator, stopGenerator } from '@midgard-manager/tx-generator';
 import chalk from 'chalk';
 import { Effect } from 'effect';
@@ -109,27 +110,14 @@ export const configureTxGenerator: Action = {
         console.log(chalk.dim('─'.repeat(70)));
         console.log(chalk.bold('\n🔍 Beginning Configuration Process:\n'));
 
-        // Get list of wallets for selection
-        const wallets = await listWallets();
-        if (wallets.length === 0) {
-          console.error(chalk.red('❌ No wallets configured. Please add a wallet first.'));
-          console.log(chalk.gray("Select 'Wallet Management > Add Wallet' from the main menu."));
-          return {
-            success: false,
-            message: 'No wallets available. Please add a wallet first.',
-          };
-        }
-
         // Basic config to populate
         const txConfig = {
           transactionType: 'mixed' as 'one-to-one' | 'multi-output' | 'mixed',
           oneToOneRatio: 70,
-          batchSize: 10,
-          interval: 5,
-          concurrency: 5,
+          batchSize: context.config.generator.batchSize,
+          interval: context.config.generator.intervalMs / 1000,
+          concurrency: context.config.generator.maxConcurrent,
           nodeEndpoint: context.config.node.endpoint,
-          wallet: 'test',
-          enabled: true,
         };
 
         // Section divider for better visual organization
@@ -226,138 +214,155 @@ export const configureTxGenerator: Action = {
           txConfig.concurrency = concurrencyResult ?? txConfig.concurrency;
 
           // Node endpoint with explanation
-          txConfig.nodeEndpoint = await input({
-            message: 'Node endpoint URL:',
+          txConfig.nodeEndpoint = await select({
+            message: 'Node endpoint:',
+            choices: [
+              {
+                value: 'http://localhost:3000',
+                name: 'Local (http://localhost:3000)',
+                description: 'Local Midgard node instance',
+              },
+              {
+                value: context.config.node.endpoint,
+                name: `Current (${context.config.node.endpoint})`,
+                description: 'Currently configured endpoint',
+              },
+            ],
             default: txConfig.nodeEndpoint,
-            validate: (value) =>
-              value.startsWith('http') ? true : 'URL must begin with http:// or https://',
           });
         }
 
-        // Wallet selection section
-        console.log(chalk.bold('\n▶ Wallet Configuration'));
+        // Generate test wallet
+        console.log(chalk.bold('\n▶ Wallet Setup'));
+        console.log(chalk.dim('Generating a test wallet for transaction signing...'));
 
-        // Wallet selection
-        txConfig.wallet = await select({
-          message: 'Select a wallet for signing transactions:',
-          choices: wallets.map((w) => ({
-            value: w,
-            name: w,
-          })),
-          default: txConfig.wallet,
-        });
-
-        // Summary display of configuration before starting
-        console.log(chalk.bold('\n▶ Configuration Summary'));
-
-        const summaryTable = [
-          ['Setting', 'Value', 'Description'],
-          ['Type', txConfig.transactionType, getTypeDescription(txConfig.transactionType)],
-          txConfig.transactionType === 'mixed'
-            ? [
-                'Ratio',
-                `${txConfig.oneToOneRatio}% / ${100 - txConfig.oneToOneRatio}%`,
-                'One-to-one / Multi-output split',
-              ]
-            : ['', '', ''],
-          ['Batch Size', txConfig.batchSize.toString(), 'Transactions per batch'],
-          ['Interval', `${txConfig.interval} seconds`, 'Time between batches'],
-          ['Concurrency', txConfig.concurrency.toString(), 'Simultaneous batches'],
-          ['Wallet', txConfig.wallet, 'For transaction signing'],
-          ['Node', txConfig.nodeEndpoint, 'Submission endpoint'],
-        ].filter((row) => row[0] !== '');
-
-        // Display formatted summary
-        summaryTable.forEach((row, index) => {
-          if (index === 0) {
-            console.log(chalk.cyan(`  ${row[0].padEnd(12)}${row[1].padEnd(18)}${row[2]}`));
-            console.log(chalk.dim('  ' + '─'.repeat(60)));
-          } else if (row[0] !== '') {
-            console.log(
-              `  ${chalk.bold(row[0].padEnd(12))}${row[1].padEnd(18)}${chalk.dim(row[2])}`
-            );
-          }
-        });
-
-        // Final confirmation
-        const confirm_start = await confirm({
-          message: 'Start transaction generator with these settings?',
-          default: true,
-        });
-
-        if (!confirm_start) {
-          return {
-            success: true,
-            message: 'Transaction generator setup cancelled.',
-          };
-        }
-
-        // Get the wallet private key
-        const walletConfig = await getWallet(txConfig.wallet);
-        if (!walletConfig) {
-          return {
-            success: false,
-            message: `Wallet '${txConfig.wallet}' not found.`,
-          };
-        }
-
-        // Start with a loading spinner
-        const spinner = ora('Starting transaction generator...').start();
+        const spinner = ora('Setting up test wallet...').start();
 
         try {
-          // Start the generator
-          await startGenerator({
-            transactionType: txConfig.transactionType,
-            oneToOneRatio: txConfig.oneToOneRatio,
-            batchSize: txConfig.batchSize,
-            interval: txConfig.interval,
-            concurrency: txConfig.concurrency,
-            nodeEndpoint: txConfig.nodeEndpoint,
-            walletPrivateKey: walletConfig.privateKey,
+          // Generate test wallet
+          const account = await generateEmulatorAccountFromPrivateKey({});
+          const initialUTxO = {
+            txHash: Buffer.from(Array(32).fill(0)).toString('hex'),
+            outputIndex: 0,
+            address: account.address,
+            assets: {
+              lovelace: 10_000_000_000n, // 10,000 ADA for testing
+            },
+            datum: null,
+            datumHash: null,
+            scriptRef: null,
+          };
+
+          spinner.succeed('Test wallet generated successfully');
+          console.log(chalk.dim(`Address: ${account.address}`));
+
+          // Summary display
+          console.log(chalk.bold('\n▶ Configuration Summary'));
+
+          const summaryTable = [
+            ['Setting', 'Value', 'Description'],
+            ['Type', txConfig.transactionType, getTypeDescription(txConfig.transactionType)],
+            txConfig.transactionType === 'mixed'
+              ? [
+                  'Ratio',
+                  `${txConfig.oneToOneRatio}% / ${100 - txConfig.oneToOneRatio}%`,
+                  'One-to-one / Multi-output split',
+                ]
+              : ['', '', ''],
+            ['Batch Size', txConfig.batchSize.toString(), 'Transactions per batch'],
+            ['Interval', `${txConfig.interval}s`, 'Time between batches'],
+            ['Concurrency', txConfig.concurrency.toString(), 'Simultaneous batches'],
+            ['Node', txConfig.nodeEndpoint, 'Submission endpoint'],
+          ].filter((row) => row[0] !== '');
+
+          // Display formatted summary
+          summaryTable.forEach((row, index) => {
+            if (index === 0) {
+              console.log(chalk.cyan(`  ${row[0].padEnd(12)}${row[1].padEnd(18)}${row[2]}`));
+              console.log(chalk.dim('  ' + '─'.repeat(60)));
+            } else if (row[0] !== '') {
+              console.log(
+                `  ${chalk.bold(row[0].padEnd(12))}${chalk.green(
+                  row[1].padEnd(18)
+                )}${chalk.dim(row[2])}`
+              );
+            }
           });
 
-          spinner.succeed('Transaction generator started successfully');
+          // Final confirmation
+          const confirm_start = await confirm({
+            message: 'Start transaction generator with these settings?',
+            default: true,
+          });
 
-          // Save the corresponding values to the main config
-          const newConfig = {
-            ...context.config,
-            generator: {
-              enabled: true,
-              maxConcurrent: txConfig.concurrency,
+          if (!confirm_start) {
+            return {
+              success: true,
+              message: 'Transaction generator setup cancelled.',
+            };
+          }
+
+          spinner.text = 'Starting transaction generator...';
+          spinner.start();
+
+          try {
+            // Start the generator
+            await startGenerator({
+              transactionType: txConfig.transactionType,
+              oneToOneRatio: txConfig.oneToOneRatio,
               batchSize: txConfig.batchSize,
-              intervalMs: txConfig.interval * 1000, // Convert to ms
-            },
-            node: {
-              ...context.config.node,
-              endpoint: txConfig.nodeEndpoint,
-            },
-          };
+              interval: txConfig.interval,
+              concurrency: txConfig.concurrency,
+              nodeEndpoint: txConfig.nodeEndpoint,
+              network: 'Preview',
+              initialUTxO,
+              walletSeedOrPrivateKey: account.privateKey,
+              outputDir: 'generated-transactions',
+            });
 
-          await Effect.runPromise(saveConfig(newConfig));
+            spinner.succeed('Transaction generator started successfully');
 
-          return {
-            success: true,
-            message: `Transaction generator started with type: ${txConfig.transactionType}, batch size: ${txConfig.batchSize}, interval: ${txConfig.interval}s`,
-          };
+            // Save the corresponding values to the main config
+            const newConfig = {
+              ...context.config,
+              generator: {
+                enabled: true,
+                maxConcurrent: txConfig.concurrency,
+                batchSize: txConfig.batchSize,
+                intervalMs: txConfig.interval * 1000, // Convert to ms
+              },
+              node: {
+                ...context.config.node,
+                endpoint: txConfig.nodeEndpoint,
+              },
+            };
+
+            await Effect.runPromise(saveConfig(newConfig));
+
+            return {
+              success: true,
+              message: `Transaction generator started with type: ${txConfig.transactionType}, batch size: ${txConfig.batchSize}, interval: ${txConfig.interval}s`,
+            };
+          } catch (error) {
+            spinner.fail('Failed to start transaction generator');
+            throw new Error(`Failed to start transaction generator: ${error}`);
+          }
         } catch (error) {
-          spinner.fail('Failed to start transaction generator');
-          throw new Error(`Failed to start transaction generator: ${error}`);
+          spinner.fail('Failed to generate test wallet');
+          throw new Error(`Failed to generate test wallet: ${error}`);
         }
       } finally {
         // Clean up our SIGINT handler
         process.off('SIGINT', parentAbortHandler);
       }
-    } catch (error: unknown) {
-      // Check if it's an abort error and rethrow with the expected name
-      if (
-        error instanceof Error &&
-        (error.name === 'AbortError' || error.message === 'AbortPromptError')
-      ) {
-        const abortError = new Error('Operation cancelled');
-        abortError.name = 'AbortPromptError';
-        throw abortError;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortPromptError') {
+        return {
+          success: true,
+          message: 'Operation cancelled',
+        };
       }
-      throw MidgardError.config(`Failed to configure transaction generator: ${error}`);
+      throw MidgardError.transaction(`Failed to configure transaction generator: ${error}`);
     }
   },
 };
@@ -563,7 +568,7 @@ export const toggleTxGenerator: Action = {
               interval: context.config.generator.intervalMs / 1000, // Convert from ms
               concurrency: context.config.generator.maxConcurrent,
               nodeEndpoint: context.config.node.endpoint,
-              walletPrivateKey: walletConfig.privateKey,
+              walletSeedOrPrivateKey: walletConfig.privateKey,
             });
 
             spinner.succeed('Transaction generator started successfully');

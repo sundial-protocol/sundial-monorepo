@@ -3,8 +3,6 @@ import * as Command from '@effect/cli/Command';
 import { interactiveCommand } from './cli/interactive/index.js';
 import { generateTxCommand, stopTxCommand, txStatusCommand } from './commands/generate-tx.js';
 import { configureNodeCommand, nodeStatusCommand } from './commands/node.js';
-import { scheduleTxCommand } from './commands/scheduler/schedule-tx.js';
-import { walletCommand } from './commands/wallet.js';
 
 /**
  * Main CLI help text
@@ -15,7 +13,6 @@ CONFIGURATION:
 
 Configuration is stored in the project's config directory:
 - Main settings: config/settings.json
-- Wallet configs: config/wallets/default.json
 
 Example configuration structure:
 {
@@ -23,13 +20,10 @@ Example configuration structure:
     "endpoint": "http://localhost:3000"
   },
   "generator": {
-    "enabled": true,
+    "enabled": false,
     "maxConcurrent": 10,
     "batchSize": 100,
-    "intervalMs": 1000,
-    "transactionType": "mixed",
-    "oneToOneRatio": 70,
-    "defaultWallet": "test"
+    "intervalMs": 1000
   },
   "logging": {
     "level": "info",
@@ -38,46 +32,27 @@ Example configuration structure:
 }
 
 EXAMPLES:
-  
-# Interactive mode
+
+# Interactive mode (recommended)
 $ pnpm start interactive
-  
-# Wallet management
-$ pnpm start wallet list                                 # List all wallets
-$ pnpm start wallet details test                         # Show wallet details
-$ pnpm start wallet add myWallet --private-key <key>     # Add a new wallet
-$ pnpm start wallet remove myWallet                      # Remove a wallet
-  
-# Transaction generation
-$ pnpm start tx generate --interactive                   # Interactive setup
-$ pnpm start tx generate --type mixed --batch-size 10    # Direct configuration
-$ pnpm start tx status                                   # Check generator status
-$ pnpm start tx stop                                     # Stop the generator
-  
-# Scheduled transactions
-$ pnpm start tx schedule add --name "Hourly Test" --interactive    # Add schedule
-$ pnpm start tx schedule list                                      # List schedules
-$ pnpm start tx schedule toggle <id>                               # Enable/disable
-$ pnpm start tx schedule remove <id>                               # Remove schedule
-  
-# Node commands
-$ pnpm start node status                                # Check node status
-$ pnpm start node configure --interactive               # Configure node settings`;
+
+# Transaction Generator
+$ pnpm tx-generator start --test-wallet --type mixed --batch-size 10 --interval 5 --concurrency 1
+$ pnpm tx-generator status
+
+# Node Operations
+$ pnpm start node-status
+$ pnpm start configure-node --interactive
+
+For more detailed transaction generator options:
+$ pnpm tx-generator --help`;
 
 /**
  * Group transaction commands
  */
 const txCommands = Command.make('tx')
   .pipe(Command.withDescription('Transaction generator operations'))
-  .pipe(
-    Command.withSubcommands([
-      // Instead of renaming, we'll use the original commands since they have the right functionality
-      generateTxCommand,
-      stopTxCommand,
-      txStatusCommand,
-      scheduleTxCommand,
-    ])
-  );
+  .pipe(Command.withSubcommands([generateTxCommand, stopTxCommand, txStatusCommand]));
 
 /**
  * Group node commands
@@ -99,7 +74,6 @@ const mainCommand = Command.make('midgard-manager')
       // Command groups
       nodeCommands,
       txCommands,
-      walletCommand,
     ])
   );
 

@@ -22,7 +22,7 @@ export const configSchema = S.Struct({
   }),
 });
 
-// Type for our configuration
+// Export type
 export type MidgardConfig = S.Schema.Type<typeof configSchema>;
 
 // Default configuration
@@ -31,7 +31,7 @@ export const defaultConfig: MidgardConfig = {
     endpoint: 'http://localhost:3000',
   },
   generator: {
-    enabled: true,
+    enabled: false,
     maxConcurrent: 10,
     batchSize: 100,
     intervalMs: 1000,

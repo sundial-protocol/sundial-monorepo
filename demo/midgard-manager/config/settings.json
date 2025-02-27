@@ -3,13 +3,10 @@
     "endpoint": "http://localhost:3000"
   },
   "generator": {
-    "enabled": true,
+    "enabled": false,
     "maxConcurrent": 10,
     "batchSize": 100,
-    "intervalMs": 1000,
-    "transactionType": "mixed",
-    "oneToOneRatio": 70,
-    "defaultWallet": "test"
+    "intervalMs": 1000
   },
   "logging": {
     "level": "info",
