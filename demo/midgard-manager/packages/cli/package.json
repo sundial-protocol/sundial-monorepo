@@ -2,7 +2,7 @@
   "name": "@midgard-manager/cli",
   "version": "0.1.0",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "bin": {
     "midgard": "./dist/bin.js"
   },

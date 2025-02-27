@@ -6,7 +6,7 @@ export default defineConfig({
   publicDir: true,
   treeshake: 'smallest',
   external: ['@parcel/watcher'],
-  format: ['cjs'],
+  format: ['esm'],
   noExternal: ['@anastasia-labs/cardano-multiplatform-lib-nodejs'],
   platform: 'node',
   target: 'node18',
