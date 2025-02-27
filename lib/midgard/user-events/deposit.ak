@@ -1,7 +1,9 @@
-use aiken/crypto.{ScriptHash}
+use aiken/cbor
+use aiken/crypto.{ScriptHash, blake2b_256}
 use aiken/merkle_patricia_forestry as mpf
 use cardano/address.{Address}
 use cardano/assets.{AssetName}
+use cardano/transaction.{OutputReference}
 use midgard/common/types.{POSIXTime, Tokens}
 use midgard/user_events
 
@@ -35,7 +37,8 @@ pub type SpendRedeemer {
 pub type SpendPurpose {
   FundWithdrawal
   TransferToReserve
-  Refund
+  RefundOfSkippedDeposit
+  RefundOfDepositInTimeGap { settlement_link_ref_input_index: Int }
 }
 
 pub type MintRedeemer {
@@ -46,4 +49,8 @@ pub type MintRedeemer {
     witness_registration_redeemer_index: Int,
   }
   BurnDepositNFT { l2_id: AssetName }
+}
+
+pub fn nonce_out_ref_to_l2_id(nonce_out_ref: OutputReference) -> AssetName {
+  cbor.serialise(nonce_out_ref) |> blake2b_256
 }

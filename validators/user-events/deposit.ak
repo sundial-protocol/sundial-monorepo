@@ -1,28 +1,28 @@
-use aiken/cbor
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/crypto.{Blake2b_256, Hash, ScriptHash, blake2b_256}
+use aiken/crypto.{Blake2b_256, Hash, ScriptHash}
 use aiken/interval.{Finite, Interval}
+use aiken_design_patterns/linked_list/unordered
 use aiken_design_patterns/merkelized_validator.{delegated_validation}
 use cardano/address.{Address, Credential, Script}
 use cardano/assets.{PolicyId}
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Publish, Redeemer, Transaction, Mint,
+  InlineDatum, Input, Mint, Output, OutputReference, Publish, Redeemer,
+  Transaction,
 }
 use midgard/common/parameter_validation
 use midgard/common/utils
 use midgard/hub_oracle as hub
+use midgard/settlement_queue
 use midgard/user_events
 use midgard/user_events/deposit.{
-  AuthenticateDeposit, BurnDepositNFT, Datum, Event, Info, MintRedeemer,
-  SpendRedeemer,
+  AuthenticateDeposit, BurnDepositNFT, Datum, Event, FundWithdrawal, Info,
+  MintRedeemer, RefundOfDepositInTimeGap, RefundOfSkippedDeposit, SpendRedeemer,
+  TransferToReserve, nonce_out_ref_to_l2_id,
 }
 
-validator spend(
-  hub_oracle: ScriptHash,
-  deposit_policy_id: PolicyId,
-) {
+validator spend(hub_oracle: ScriptHash, deposit_policy_id: PolicyId) {
   spend(
     datum: Option<Datum>,
     redeemer: SpendRedeemer,
@@ -52,31 +52,34 @@ validator spend(
     expect Some(deposit_datum) = datum
     let Datum {
       event: user_events.Event {
-        id,
-        info: Info {
-          tokens: deposited_tokens,
-          ..
-        },
+        id: event_nonce_out_ref,
+        info: Info { tokens: deposited_tokens, .. },
       },
       inclusion_time,
       witness,
       refund_address,
-      refund_datum
+      refund_datum,
     } = deposit_datum
 
-    let Output {
-      value: own_value,
-      ..
-    } = utils.get_own_input_at(inputs, own_out_ref, input_index)
+    let expected_l2_id = nonce_out_ref_to_l2_id(event_nonce_out_ref)
 
-    let Input { .. } =
-      utils.get_authentic_input_with_policy_at_address(
-        reference_inputs,
-        settlement_queue_addr,
-        settlement_queue_policy_id,
-        settlement_node_asset_name,
-        settlement_ref_input_index,
-      )
+    let Output { value: own_value, .. } =
+      utils.get_own_input_at(inputs, own_out_ref, input_index)
+
+    let parsed_settlement_node_datum = settlement_queue.get_datum(
+      reference_inputs,
+      settlement_queue_addr,
+      settlement_queue_policy_id,
+      settlement_node_asset_name,
+      settlement_ref_input_index,
+    )
+
+    expect settlement_queue.NodeData {
+      deposits_root,
+      start_time: settlement_start_time,
+      end_time: settlement_end_time,
+      ..
+    } = parsed_settlement_node_datum.data
 
     expect BurnDepositNFT { l2_id: burn_asset_name }: MintRedeemer =
       utils.get_redeemer_at(
@@ -85,14 +88,31 @@ validator spend(
         mint_redeemer_index,
       )
 
-    expect utils.authentic_value_has_tokens(
-      own_value,
-      deposit_policy_id,
-      burn_asset_name,
-      deposited_tokens
-    )
+    expect burn_asset_name == expected_l2_id
 
-    todo
+    expect
+      utils.authentic_value_has_tokens(
+        own_value,
+        deposit_policy_id,
+        burn_asset_name,
+        deposited_tokens,
+      )
+
+    when purpose is {
+      FundWithdrawal -> todo
+      TransferToReserve -> todo
+      RefundOfSkippedDeposit -> todo
+      RefundOfDepositInTimeGap { settlement_link_ref_input_index } -> {
+        let parsed_settlement_link_datum = settlement_queue.get_datum(
+          reference_inputs,
+          settlement_queue_addr,
+          settlement_queue_policy_id,
+          unordered.serialize_key(parsed_settlement_node_datum.key),
+          settlement_link_ref_input_index,
+        )
+        todo
+      }
+    }
   }
 
   else(_) {
@@ -137,7 +157,7 @@ validator mint(hub_oracle: ScriptHash) {
         // The deposit will be represented on L2 as a UTxO, where its `tx_hash`
         // is Blake2b256 hash of the serialised nonce input output reference,
         // and its output index is 0.
-        let l2_id = cbor.serialise(nonce_input_out_ref) |> blake2b_256
+        let l2_id = nonce_out_ref_to_l2_id(nonce_input_out_ref)
 
         // Script hash of the witness script, required to be registered in this
         // transaction.
