@@ -1,0 +1,18 @@
+{
+  "test": {
+    "name": "test",
+    "privateKey": "ed25519_sk1gu2txg7w44jxnnuxpgyjyqtl66up25kkgk5s07xdtrh59vchadks7g4mj6",
+    "address": "addr_test1vqncxzeftgtwarzhz2wu23jvjysn8asy46q3lxlvgx5hn9chy0dur",
+    "isDefault": true
+  },
+  "test2": {
+    "name": "test2",
+    "privateKey": "ed25519_sk1zt4p9avc807vfccp5f4axwwdaav5axnu59q6ak3klkt0d3c6djns66v4wt",
+    "address": "addr_test1vzz3vjcvre8s3dgsaztgc7hnf5rxm06tqhee2880jwekr4q0r0c7g"
+  },
+  "test-new": {
+    "name": "test-new",
+    "privateKey": "ed25519_sk1lptfch6hapac80252xdwvujvyr8cc8yx5732cllgkcn9qs28ss2sapqtct",
+    "address": "addr_test1vphlaz85s45whlp0px4wzhyqyn2u60cn5t2m4l4k2ze65ysrlh2lp"
+  }
+}

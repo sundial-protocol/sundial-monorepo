@@ -20,7 +20,9 @@ export const serializeAssets = (assets: Assets): SerializedAssets => {
 /**
  * Parses a key into bech32 private key format
  */
-export const parseUnknownKeytoBech32PrivateKey = (unknownKey: unknown): string => {
+export const parseUnknownKeytoBech32PrivateKey = (
+  unknownKey: unknown
+): string => {
   if (typeof unknownKey !== 'string')
     throw new Error('Expected a string value for the private key');
 
@@ -55,19 +57,23 @@ export const getPublicKeyHashFromPrivateKey = (privateKey: string): string => {
  */
 export const getPrivateKeyCborHex = (privateKey: string): string => {
   return Data.to(
-    Buffer.from(CML.PrivateKey.from_bech32(privateKey).to_raw_bytes()).toString('hex')
+    Buffer.from(CML.PrivateKey.from_bech32(privateKey).to_raw_bytes()).toString(
+      'hex'
+    )
   );
 };
 
 /**
- * Wait for writable stream to be ready
+ * Ensures the writable stream is ready before writing
+ * @param writable - The writable stream to check
+ * @returns Promise that resolves when the stream is writable
  */
-export const waitWritable = (writable: NodeJS.WritableStream): Promise<void> => {
+const waitWritable = (writable: Writable): Promise<void> => {
   return new Promise((resolve) => {
-    if (writable.writable) {
-      resolve();
-    } else {
-      writable.once('drain', resolve);
-    }
+    setInterval(() => {
+      if (writable.writable) resolve();
+    }, 10);
   });
 };
+
+export { waitWritable };

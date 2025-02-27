@@ -1,0 +1,13 @@
+node_modules/
+.direnv/
+.envrc
+dist/
+*.tgz
+.env
+.env.local
+.eslintrc.json
+.DS_Store
+
+# Local stored transactions when node is not running
+generated-transactions/
+

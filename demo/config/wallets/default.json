@@ -1,6 +1,6 @@
 {
   "test": {
-    "privateKey": "ed25519_sk1lqglg27l7j7u80y488z352yxjr7auzm9wgwctf9mdsceq4qruqus0u2td6",
+    "privateKey": "ed25519_sk1qpqrz4x6gratn9w8fegqkjy3xkmnhax7zv0nqq0n3kx0kxqhvj6s5m2v4v",
     "description": "Default test wallet for transaction generation",
     "isTestOnly": true
   }

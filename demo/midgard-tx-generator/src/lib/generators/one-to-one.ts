@@ -6,30 +6,37 @@ import {
   Lucid,
   LucidEvolution,
   Network,
+  paymentCredentialOf,
   PROTOCOL_PARAMETERS_DEFAULT,
   UTxO,
 } from '@lucid-evolution/lucid';
 
-import { waitWritable } from '../../utils/common.js';
-import { MidgardNodeClient } from '../client/node-client.js';
 import { SerializedMidgardTransaction } from '../client/types.js';
+import { MidgardNodeClient } from '../client/node-client.js';
+import {
+  getPublicKeyHashFromPrivateKey,
+  parseUnknownKeytoBech32PrivateKey,
+  waitWritable,
+} from '../../utils/common.js';
 
 /**
  * Configuration for generating one-to-one transactions.
  * These transactions simulate simple transfers between addresses.
+ * @interface OneToOneTransactionConfig
+ * @property {Network} network - The network configuration (testnet/mainnet)
+ * @property {UTxO} initialUTxO - The initial UTxO to use for transaction generation
+ * @property {number} txsCount - Number of transactions to generate
+ * @property {string} walletSeedOrPrivateKey - Wallet seed phrase or private key for signing
+ * @property {Writable} [writable] - Optional writable stream for test output
+ * @property {MidgardNodeClient} [nodeClient] - Optional node client for submitting transactions
  */
-export interface OneToOneTransactionConfig {
+interface OneToOneTransactionConfig {
   network: Network;
   initialUTxO: UTxO;
   txsCount: number;
   walletSeedOrPrivateKey: string;
   writable?: Writable;
   nodeClient?: MidgardNodeClient;
-  nodeConfig?: {
-    retryAttempts?: number;
-    retryDelay?: number;
-    enableLogs?: boolean;
-  };
 }
 
 // Constants for transaction generation
@@ -38,24 +45,24 @@ const MIN_LOVELACE_OUTPUT = 1_000_000n; // Minimum lovelace per output
 
 /**
  * Validates the configuration parameters
+ * @param config - Transaction generation configuration
  * @throws Error if configuration is invalid
  */
 const validateConfig = (config: OneToOneTransactionConfig): void => {
   const { initialUTxO, walletSeedOrPrivateKey } = config;
 
-  // Validate wallet key format
-  if (!walletSeedOrPrivateKey.startsWith('ed25519_sk')) {
-    throw new Error('Invalid private key format. Expected Lucid emulator account private key.');
+  const privateKey = parseUnknownKeytoBech32PrivateKey(walletSeedOrPrivateKey);
+  const publicKeyHash = getPublicKeyHashFromPrivateKey(privateKey);
+  const initialUTxOAddressPubKeyHash = paymentCredentialOf(
+    initialUTxO.address
+  ).hash;
+
+  if (publicKeyHash !== initialUTxOAddressPubKeyHash) {
+    throw new Error('Payment Key is not valid to spend Initial UTxO');
   }
 
-  // Validate UTxO amount
   if (initialUTxO.assets.lovelace < MIN_LOVELACE_OUTPUT) {
     throw new Error('Initial UTxO must have at least 1 ADA');
-  }
-
-  // Validate transaction count
-  if (config.txsCount < 1) {
-    throw new Error('Transaction count must be at least 1');
   }
 };
 
@@ -65,7 +72,10 @@ const validateConfig = (config: OneToOneTransactionConfig): void => {
  * @param network - Network configuration
  * @returns Configured Lucid instance
  */
-const initializeLucid = async (emulator: Emulator, network: Network): Promise<LucidEvolution> => {
+const initializeLucid = async (
+  emulator: Emulator,
+  network: Network
+): Promise<LucidEvolution> => {
   return await Lucid(emulator, network, {
     presetProtocolParameters: {
       ...PROTOCOL_PARAMETERS_DEFAULT,
@@ -85,17 +95,20 @@ const initializeLucid = async (emulator: Emulator, network: Network): Promise<Lu
 const generateOneToOneTransactions = async (
   config: OneToOneTransactionConfig
 ): Promise<SerializedMidgardTransaction[]> => {
-  const { network, initialUTxO, txsCount, writable, nodeClient, walletSeedOrPrivateKey } = config;
+  const { network, initialUTxO, txsCount, writable, nodeClient } = config;
 
   // Validate configuration
   validateConfig(config);
+  const privateKey = parseUnknownKeytoBech32PrivateKey(
+    config.walletSeedOrPrivateKey
+  );
 
   // Setup emulator environment
   const account: EmulatorAccount = {
     seedPhrase: '',
     address: initialUTxO.address,
     assets: initialUTxO.assets,
-    privateKey: walletSeedOrPrivateKey,
+    privateKey,
   };
 
   const emulator = new Emulator([account]);
@@ -120,7 +133,9 @@ const generateOneToOneTransactions = async (
         .ToAddress(initialUTxO.address, initialUTxO.assets)
         .chain();
 
-      const txSigned = await txSignBuilder.sign.withPrivateKey(walletSeedOrPrivateKey).complete();
+      const txSigned = await txSignBuilder.sign
+        .withPrivateKey(privateKey)
+        .complete();
 
       // Create serialized transaction in Midgard format
       const txHash = txSigned.toHash();
@@ -133,7 +148,7 @@ const generateOneToOneTransactions = async (
 
       // Submit to node if client provided
       if (nodeClient) {
-        await nodeClient.submitTransaction(tx.cborHex, tx.description);
+        await nodeClient.submitTransaction(tx.cborHex);
       }
 
       // Add to transactions array
@@ -167,3 +182,4 @@ const generateOneToOneTransactions = async (
 };
 
 export { generateOneToOneTransactions };
+export type { OneToOneTransactionConfig };

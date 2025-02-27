@@ -1,7 +1,11 @@
 import { Effect } from 'effect';
+import { metrics } from '../scheduler/metrics.js';
 
-import { logFailedTransaction, logSubmittedTransaction } from '../../utils/logging.js';
-import { MidgardNodeConfig, TRANSACTION_CONSTANTS } from '../types.js';
+export interface MidgardNodeConfig {
+  baseUrl: string;
+  retryAttempts?: number;
+  retryDelay?: number;
+}
 
 // Simple error types for better error handling
 export type SubmitTxError =
@@ -13,52 +17,24 @@ export class MidgardNodeClient {
   private readonly baseUrl: string;
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
-  private readonly enableLogs: boolean;
 
   constructor(config: MidgardNodeConfig) {
     this.baseUrl = config.baseUrl;
-    this.retryAttempts = config.retryAttempts ?? TRANSACTION_CONSTANTS.NODE_DEFAULTS.RETRY_ATTEMPTS;
-    this.retryDelay = config.retryDelay ?? TRANSACTION_CONSTANTS.NODE_DEFAULTS.RETRY_DELAY;
-    this.enableLogs = config.enableLogs ?? true;
+    this.retryAttempts = config.retryAttempts ?? 3;
+    this.retryDelay = config.retryDelay ?? 1000;
   }
 
   /**
    * Check node availability by making a dummy request
    */
-  async isAvailable(
-    timeoutMs: number = TRANSACTION_CONSTANTS.NODE_DEFAULTS.AVAILABILITY_TIMEOUT
-  ): Promise<boolean> {
+  async isAvailable(): Promise<boolean> {
     try {
-      // Create an AbortController to allow for timeouts
-      const controller = new AbortController();
-      const signal = controller.signal;
-
-      // Set a timeout if provided
-      let timeoutId: NodeJS.Timeout | undefined;
-      if (timeoutMs) {
-        timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      }
-
-      try {
-        // Try to fetch a dummy transaction status - if the node is up, it will return 404
-        // If the node is down, it will throw a connection error
-        const response = await fetch(`${this.baseUrl}/tx?tx_hash=${'0'.repeat(64)}`, { signal });
-
-        // Clear timeout
-        if (timeoutId) clearTimeout(timeoutId);
-
-        return response.status === 404;
-      } catch (error) {
-        // Clear timeout to prevent memory leaks
-        if (timeoutId) clearTimeout(timeoutId);
-
-        // Check if this was a timeout abort or a different error
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          return false;
-        }
-
-        throw error; // Re-throw other errors to be caught by the outer try/catch
-      }
+      // Try to fetch a dummy transaction status - if the node is up, it will return 404
+      // If the node is down, it will throw a connection error
+      const response = await fetch(
+        `${this.baseUrl}/tx?tx_hash=${'0'.repeat(64)}`
+      );
+      return response.status === 404;
     } catch (error) {
       return false;
     }
@@ -67,7 +43,9 @@ export class MidgardNodeClient {
   /**
    * Submit a transaction to the node with retries
    */
-  submitTransaction(cborHex: string, txType: string = 'Transaction') {
+  submitTransaction(cborHex: string) {
+    const startTime = Date.now();
+
     return Effect.tryPromise({
       try: async () => {
         // First check if node is available
@@ -90,35 +68,35 @@ export class MidgardNodeClient {
 
             if (!response.ok) {
               const error = await response.json();
-              throw new Error(error.message || `Unexpected status: ${response.status}`);
+              throw new Error(
+                error.message || `Unexpected status: ${response.status}`
+              );
             }
 
             const result = await response.json();
-
-            // Log the successful transaction submission
-            if (this.enableLogs && result && result.txId) {
-              logSubmittedTransaction(result.txId, txType);
-            }
-
+            metrics.recordSubmission(true, 1, Date.now() - startTime);
             return result;
           } catch (error) {
             attempts++;
             if (attempts === this.retryAttempts) {
-              // Log the failed transaction if we've exhausted all attempts
-              if (this.enableLogs) {
-                const errorMsg = error instanceof Error ? error.message : String(error);
-                logFailedTransaction('unknown', txType, errorMsg);
-              }
+              metrics.recordSubmission(false, 1, Date.now() - startTime);
               throw error;
             }
-            await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
+            await new Promise((resolve) =>
+              setTimeout(resolve, this.retryDelay)
+            );
           }
         }
       },
       catch: (error: unknown): SubmitTxError => {
+        metrics.recordSubmission(false, 1, Date.now() - startTime);
+
         // Handle known error types
         if (error instanceof Error) {
-          if (error.message === 'Node is not available' || error instanceof TypeError) {
+          if (
+            error.message === 'Node is not available' ||
+            error instanceof TypeError
+          ) {
             return { _tag: 'NetworkError', error: error.message };
           }
           return { _tag: 'ValidationError', error: error.message };

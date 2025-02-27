@@ -10,22 +10,14 @@ const PROJECT_ROOT = join(__dirname, '../../../..'); // Simplified path to proje
 const CONFIG_DIR = join(PROJECT_ROOT, 'config/wallets');
 const WALLET_CONFIG_PATH = join(CONFIG_DIR, 'default.json');
 
-// Default test wallet that's always available for transaction generation
-// WARNING: This is only for testing/development - never use with real funds!
-
-const DEFAULT_WALLETS = {
-  test: {
-    privateKey: 'ed25519_sk1lqglg27l7j7u80y488z352yxjr7auzm9wgwctf9mdsceq4qruqus0u2td6',
-    description: 'Default test wallet for transaction generation',
-    isTestOnly: true,
-  },
-};
-
 export interface WalletConfig {
   [name: string]: {
+    name?: string;
     privateKey: string;
+    address: string;
     description?: string;
-    isTestOnly: boolean;
+    isDefault?: boolean;
+    isTestOnly?: boolean;
   };
 }
 
@@ -39,16 +31,10 @@ export const loadWallets = async (): Promise<WalletConfig> => {
     await mkdir(CONFIG_DIR, { recursive: true });
 
     const data = await readFile(WALLET_CONFIG_PATH, 'utf-8');
-    const wallets = JSON.parse(data);
-
-    // Always ensure the default test wallet exists and can't be modified
-    wallets.test = DEFAULT_WALLETS.test;
-
-    return wallets;
+    return JSON.parse(data);
   } catch (error) {
-    // If file doesn't exist, create default
-    await saveWallets(DEFAULT_WALLETS);
-    return DEFAULT_WALLETS;
+    console.error('Error loading wallets:', error);
+    throw new Error('Failed to load wallet configuration');
   }
 };
 
@@ -56,9 +42,6 @@ export const loadWallets = async (): Promise<WalletConfig> => {
  * Save wallet configuration to disk
  */
 const saveWallets = async (wallets: WalletConfig): Promise<void> => {
-  // Always ensure the default test wallet exists and can't be modified
-  wallets.test = DEFAULT_WALLETS.test;
-
   await mkdir(CONFIG_DIR, { recursive: true });
   await writeFile(WALLET_CONFIG_PATH, JSON.stringify(wallets, null, 2));
 };
@@ -69,15 +52,20 @@ const saveWallets = async (wallets: WalletConfig): Promise<void> => {
 export const addWallet = async (
   name: string,
   privateKey: string,
+  address: string,
   description?: string
 ): Promise<void> => {
-  if (name === 'test') {
-    throw new Error('Cannot modify the default test wallet');
+  const wallets = await loadWallets();
+
+  // Check if trying to modify a default wallet
+  if (wallets[name]?.isDefault) {
+    throw new Error('Cannot modify a default wallet');
   }
 
-  const wallets = await loadWallets();
   wallets[name] = {
+    name,
     privateKey,
+    address,
     description,
     isTestOnly: true,
   };
@@ -88,11 +76,13 @@ export const addWallet = async (
  * Remove a test wallet from the configuration
  */
 export const removeWallet = async (name: string): Promise<void> => {
-  if (name === 'test') {
-    throw new Error('Cannot remove the default test wallet');
+  const wallets = await loadWallets();
+
+  // Check if trying to remove a default wallet
+  if (wallets[name]?.isDefault) {
+    throw new Error('Cannot remove a default wallet');
   }
 
-  const wallets = await loadWallets();
   delete wallets[name];
   await saveWallets(wallets);
 };
@@ -100,9 +90,7 @@ export const removeWallet = async (name: string): Promise<void> => {
 /**
  * Get a wallet by name
  */
-export const getWallet = async (
-  name: string
-): Promise<{ privateKey: string; description?: string; isTestOnly: boolean } | null> => {
+export const getWallet = async (name: string): Promise<WalletConfig[string] | null> => {
   const wallets = await loadWallets();
   return wallets[name] || null;
 };

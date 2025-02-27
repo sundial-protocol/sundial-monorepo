@@ -10,6 +10,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@anastasia-labs/cardano-multiplatform-lib-nodejs':
+        specifier: ^6.0.2-3
+        version: 6.0.2-3
       '@effect/cli':
         specifier: latest
         version: 0.56.2(@effect/platform@0.77.2(effect@3.13.2))(@effect/printer-ansi@0.41.2(@effect/typeclass@0.32.2(effect@3.13.2))(effect@3.13.2))(@effect/printer@0.41.2(@effect/typeclass@0.32.2(effect@3.13.2))(effect@3.13.2))(effect@3.13.2)
@@ -34,6 +37,9 @@ importers:
       '@inquirer/prompts':
         specifier: ^7.2.1
         version: 7.3.2(@types/node@20.17.19)
+      '@lucid-evolution/lucid':
+        specifier: ^0.4.20
+        version: 0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
       '@midgard-manager/tx-generator':
         specifier: workspace:*
         version: link:../tx-generator

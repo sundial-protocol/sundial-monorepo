@@ -1,6 +1,17 @@
-/**
- * Configuration for the transaction generator
- */
+import { Network, UTxO } from '@lucid-evolution/lucid';
+
+// Transaction Types
+export type TransactionType = 'one-to-one' | 'multi-output' | 'mixed';
+
+// Node Client Configuration
+export interface MidgardNodeConfig {
+  baseUrl: string;
+  retryAttempts?: number;
+  retryDelay?: number;
+  enableLogs?: boolean;
+}
+
+// Transaction Generator Configuration
 export interface TransactionGeneratorConfig {
   // Node settings
   nodeEndpoint: string;
@@ -8,25 +19,36 @@ export interface TransactionGeneratorConfig {
   nodeRetryDelay?: number;
   nodeEnableLogs?: boolean;
 
+  // Network settings
+  network: Network;
+  initialUTxO: UTxO;
+
   // Wallet settings
-  walletPrivateKey: string;
+  walletSeedOrPrivateKey: string;
 
   // Transaction settings
-  transactionType: 'one-to-one' | 'multi-output' | 'mixed';
-  oneToOneRatio?: number; // Percentage of one-to-one transactions (0-100) when using 'mixed' type
+  transactionType: TransactionType;
+  oneToOneRatio?: number;
 
   // Batch settings
   batchSize: number;
-  interval: number; // in seconds
+  interval: number;
   concurrency: number;
+  autoStopAfterBatch?: boolean;
 
-  // Scheduling settings
-  autoStopAfterBatch?: boolean; // Automatically stop after generating one batch (for scheduled jobs)
+  // Output settings
+  outputDir?: string;
 }
 
-/**
- * Default configuration values
- */
+// Serialized Transaction Format
+export interface SerializedMidgardTransaction {
+  cborHex: string;
+  description: string;
+  txId: string;
+  type: string;
+}
+
+// Default configuration values
 export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
   // Node defaults
   nodeEndpoint: 'http://localhost:3000',
@@ -34,19 +56,49 @@ export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
   nodeRetryDelay: 1000,
   nodeEnableLogs: true,
 
-  // Wallet defaults
-  walletPrivateKey: '', // Will be filled from wallet config
+  // Network defaults
+  network: 'Preview' as Network,
+  initialUTxO: {
+    txHash: '0'.repeat(64),
+    outputIndex: 0,
+    assets: { lovelace: 10_000_000_000n },
+    address: '', // Will be derived from wallet
+    datum: null,
+    datumHash: null,
+    scriptRef: null,
+  },
+
+  // Wallet defaults - must be provided
+  walletSeedOrPrivateKey: '',
 
   // Transaction defaults
   transactionType: 'mixed',
-  oneToOneRatio: 70, // 70% one-to-one, 30% multi-output
+  oneToOneRatio: 70,
 
   // Batch defaults
   batchSize: 10,
   interval: 5,
   concurrency: 5,
   autoStopAfterBatch: false,
+
+  // Output defaults
+  outputDir: 'generated-transactions',
 };
+
+// Constants
+export const TRANSACTION_CONSTANTS = {
+  MIN_LOVELACE_OUTPUT: 1_000_000n,
+  OUTPUTS_PER_DISTRIBUTION: 20,
+  GC_PAUSE_INTERVAL: {
+    ONE_TO_ONE: 1000,
+    MULTI_OUTPUT: 250,
+  },
+  NODE_DEFAULTS: {
+    RETRY_ATTEMPTS: 3,
+    RETRY_DELAY: 1000,
+    AVAILABILITY_TIMEOUT: 5000,
+  },
+} as const;
 
 /**
  * Validates the transaction generator configuration
@@ -68,8 +120,8 @@ export const validateGeneratorConfig = (config: TransactionGeneratorConfig): voi
   }
 
   // Wallet validation
-  if (!config.walletPrivateKey) {
-    throw new Error('Wallet private key is required');
+  if (!config.walletSeedOrPrivateKey) {
+    throw new Error('Wallet private key or seed phrase is required');
   }
 
   // Transaction validation

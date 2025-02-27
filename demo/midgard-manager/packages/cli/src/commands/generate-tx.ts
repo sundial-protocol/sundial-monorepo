@@ -4,7 +4,6 @@ import chalk from 'chalk';
 import { Effect, pipe } from 'effect';
 import fs from 'fs/promises';
 import ora from 'ora-classic';
-import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -318,83 +317,74 @@ export const generateTxCommand = Command.make(
             }
           }
 
-          // Get the wallet private key
+          // Get wallet configuration
           const walletConfig = await getWallet(config.wallet);
           if (!walletConfig) {
             console.error(chalk.red(`❌ Wallet '${config.wallet}' not found`));
-            console.log(chalk.gray('Available wallets:'));
-            const wallets = await listWallets();
-            wallets.forEach((w) => console.log(chalk.gray(` • ${w}`)));
             return;
           }
 
-          // Start with a loading spinner
+          // Start the generator with wallet configuration
           const spinner = ora('Starting transaction generator...').start();
 
-          try {
-            // Start the generator
-            await startGenerator({
-              transactionType: config.transactionType,
-              oneToOneRatio: config.oneToOneRatio,
-              batchSize: config.batchSize,
-              interval: config.interval,
-              concurrency: config.concurrency,
-              nodeEndpoint: config.nodeEndpoint,
-              walletPrivateKey: walletConfig.privateKey,
-            });
+          await startGenerator({
+            transactionType: config.transactionType,
+            oneToOneRatio: config.oneToOneRatio,
+            batchSize: config.batchSize,
+            interval: config.interval,
+            concurrency: config.concurrency,
+            nodeEndpoint: config.nodeEndpoint,
+            walletPrivateKey: walletConfig.privateKey,
+            walletAddress: walletConfig.address || '', // Pass the wallet address
+          });
 
-            spinner.succeed('Transaction generator started successfully');
+          spinner.succeed('Transaction generator started successfully');
 
-            // Show configuration in a nice format
-            console.log(chalk.bold('\n✓ Transaction generator is running with configuration:'));
+          // Show configuration in a nice format
+          console.log(chalk.bold('\n✓ Transaction generator is running with configuration:'));
 
-            console.log(
-              `• Type: ${config.transactionType}${
-                config.transactionType === 'mixed'
-                  ? ` (${config.oneToOneRatio}% one-to-one, ${
-                      100 - config.oneToOneRatio
-                    }% multi-output)`
-                  : ''
-              }`
-            );
-            console.log(`• Batch Size: ${config.batchSize} transactions`);
-            console.log(`• Interval: ${config.interval} seconds`);
-            console.log(`• Concurrency: ${config.concurrency} simultaneous batches`);
-            console.log(`• Wallet: ${config.wallet}`);
-            console.log(`• Node Endpoint: ${config.nodeEndpoint}`);
+          console.log(
+            `• Type: ${config.transactionType}${
+              config.transactionType === 'mixed'
+                ? ` (${config.oneToOneRatio}% one-to-one, ${
+                    100 - config.oneToOneRatio
+                  }% multi-output)`
+                : ''
+            }`
+          );
+          console.log(`• Batch Size: ${config.batchSize} transactions`);
+          console.log(`• Interval: ${config.interval} seconds`);
+          console.log(`• Concurrency: ${config.concurrency} simultaneous batches`);
+          console.log(`• Wallet: ${config.wallet}`);
+          console.log(`• Node Endpoint: ${config.nodeEndpoint}`);
 
-            console.log(chalk.dim('\nStatus monitoring:'));
-            console.log(chalk.dim('• View status: midgard-manager tx-status'));
-            console.log(chalk.dim('• Stop generator: midgard-manager stop-tx'));
-            console.log(
-              chalk.dim('• Press Ctrl+C to stop this process (generator will continue running)')
-            );
+          console.log(chalk.dim('\nStatus monitoring:'));
+          console.log(chalk.dim('• View status: midgard-manager tx-status'));
+          console.log(chalk.dim('• Stop generator: midgard-manager stop-tx'));
+          console.log(
+            chalk.dim('• Press Ctrl+C to stop this process (generator will continue running)')
+          );
 
-            // Keep process running and handle graceful shutdown
-            process.on('SIGINT', async () => {
-              console.log('\n');
-              const stopSpinner = ora('Stopping transaction generator...').start();
-              await stopGenerator();
-              stopSpinner.succeed('Transaction generator stopped');
-              process.exit(0);
-            });
-          } catch (error) {
-            spinner.fail('Failed to start transaction generator');
-            console.error(
-              chalk.red(`Error: ${error instanceof Error ? error.message : String(error)}`)
-            );
-
-            if (error instanceof Error && error.message.includes('connection')) {
-              console.log(chalk.yellow('\nTroubleshooting:'));
-              console.log(chalk.gray('• Check that the Midgard node is running'));
-              console.log(chalk.gray(`• Verify the node endpoint: ${config.nodeEndpoint}`));
-              console.log(chalk.gray('• Check network connectivity'));
-            }
-          }
+          // Keep process running and handle graceful shutdown
+          process.on('SIGINT', async () => {
+            console.log('\n');
+            const stopSpinner = ora('Stopping transaction generator...').start();
+            await stopGenerator();
+            stopSpinner.succeed('Transaction generator stopped');
+            process.exit(0);
+          });
         } catch (error) {
+          spinner.fail('Failed to start transaction generator');
           console.error(
             chalk.red(`Error: ${error instanceof Error ? error.message : String(error)}`)
           );
+
+          if (error instanceof Error && error.message.includes('connection')) {
+            console.log(chalk.yellow('\nTroubleshooting:'));
+            console.log(chalk.gray('• Check that the Midgard node is running'));
+            console.log(chalk.gray(`• Verify the node endpoint: ${config.nodeEndpoint}`));
+            console.log(chalk.gray('• Check network connectivity'));
+          }
         }
       })
     );

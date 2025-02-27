@@ -1,16 +1,19 @@
 import { Network, UTxO } from '@lucid-evolution/lucid';
 import pLimit from 'p-limit';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import { MidgardNodeClient } from '../client/node-client.js';
 import {
   generateMultiOutputTransactions,
   generateOneToOneTransactions,
 } from '../generators/index.js';
-import { DEFAULT_CONFIG, TransactionGeneratorConfig, validateGeneratorConfig } from '../types.js';
-
-// Internal constants for multi-output transactions
-const OUTPUTS_PER_DISTRIBUTION = 20;
-const FINAL_UTXO_COUNT = 1;
+import {
+  DEFAULT_CONFIG,
+  TransactionGeneratorConfig,
+  validateGeneratorConfig,
+  TRANSACTION_CONSTANTS,
+} from '../types.js';
 
 /**
  * Generator State Manager
@@ -77,7 +80,9 @@ const state = TxGeneratorState.getInstance();
 /**
  * Starts a transaction generator with the given configuration
  */
-export const startGenerator = (config: Partial<TransactionGeneratorConfig> = {}): Promise<void> => {
+export const startGenerator = async (
+  config: Partial<TransactionGeneratorConfig> = {}
+): Promise<void> => {
   // Stop any existing generator
   if (state.currentPromise) {
     stopGenerator();
@@ -109,17 +114,10 @@ export const startGenerator = (config: Partial<TransactionGeneratorConfig> = {})
   // Reset stats
   state.resetStats();
 
-  // We need a dummy UTxO for now - this should be improved later
-  const dummyUTxO: UTxO = {
-    txHash: '0000000000000000000000000000000000000000000000000000000000000000',
-    outputIndex: 0,
-    assets: { lovelace: 100000000000n },
-    address:
-      'addr_test1qzq0nckg3ekgzuqtzw8aze3m7c4v8jxk8lm5s37lgjl5jfvrx5uv9rrnz6hd54l2l0ch6xvgwcnku6x9v736xcqnx3qvvmp2j', // Dummy testnet address
-    datum: null,
-    datumHash: null,
-    scriptRef: null,
-  };
+  // Create output directory if needed
+  if (fullConfig.outputDir) {
+    await mkdir(join(process.cwd(), fullConfig.outputDir), { recursive: true });
+  }
 
   // Log start with more configuration details
   console.log('\nStarting transaction generator with configuration:');
@@ -139,84 +137,82 @@ export const startGenerator = (config: Partial<TransactionGeneratorConfig> = {})
   // Define the transaction generation function
   const generateTransactions = async () => {
     try {
-      // Generate transactions concurrently up to the concurrency limit
       const tasks = Array(fullConfig.batchSize)
         .fill(null)
         .map(async () => {
           return concurrencyLimiter(async () => {
-            // For mixed type, determine which type to use based on ratio
             const useOneToOne =
               fullConfig.transactionType === 'one-to-one' ||
               (fullConfig.transactionType === 'mixed' &&
                 Math.random() * 100 < (fullConfig.oneToOneRatio ?? 70));
 
-            try {
-              // Generate the appropriate transaction type
-              const txs = useOneToOne
-                ? await generateOneToOneTransactions({
-                    network: 'Testnet' as Network,
-                    initialUTxO: dummyUTxO,
-                    txsCount: 1, // Generate one transaction at a time
-                    walletSeedOrPrivateKey: fullConfig.walletPrivateKey,
-                    nodeClient,
-                  })
-                : await generateMultiOutputTransactions({
-                    network: 'Testnet' as Network,
-                    initialUTxO: dummyUTxO,
-                    utxosCount: OUTPUTS_PER_DISTRIBUTION,
-                    finalUtxosCount: FINAL_UTXO_COUNT,
-                    walletSeedOrPrivateKey: fullConfig.walletPrivateKey,
-                    nodeClient,
-                  });
+            const txs = useOneToOne
+              ? await generateOneToOneTransactions({
+                  network: fullConfig.network,
+                  initialUTxO: fullConfig.initialUTxO,
+                  txsCount: 1,
+                  walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
+                  nodeClient,
+                })
+              : await generateMultiOutputTransactions({
+                  network: fullConfig.network,
+                  initialUTxO: fullConfig.initialUTxO,
+                  utxosCount: TRANSACTION_CONSTANTS.OUTPUTS_PER_DISTRIBUTION,
+                  finalUtxosCount: 1,
+                  walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
+                  nodeClient,
+                });
 
-              return txs;
-            } catch (txError) {
-              const errorMessage = txError instanceof Error ? txError.message : String(txError);
+            if (!txs || !Array.isArray(txs)) {
+              throw new Error('Failed to generate transactions');
+            }
 
-              console.error(
-                `Error generating ${
-                  useOneToOne ? 'one-to-one' : 'multi-output'
-                } transactions: ${errorMessage}`
-              );
-              state.stats.lastError = errorMessage;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const nodeAvailable = await nodeClient.isAvailable();
 
-              // For testing purposes, create mock transactions when there's an error
-              if (process.env.NODE_ENV === 'development' || process.env.MOCK_TXS === 'true') {
-                return [
-                  {
-                    type: useOneToOne ? 'one-to-one' : 'multi-output',
-                    description: `Test transaction`,
-                    cborHex: 'mock_cbor_for_testing_only',
-                    txId: `mock_tx_${Date.now()}`,
-                  },
-                ];
-              } else {
-                // In production, rethrow the error
-                throw txError;
+            if (!nodeAvailable && fullConfig.outputDir) {
+              const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
+              const filepath = join(process.cwd(), fullConfig.outputDir, filename);
+              await writeFile(filepath, JSON.stringify(txs, null, 2));
+              console.log(`Node unavailable - transactions written to ${filepath}`);
+              state.stats.transactionsGenerated += txs.length;
+            } else {
+              try {
+                const submissionStart = Date.now();
+                for (const tx of txs) {
+                  await nodeClient.submitTransaction(tx.cborHex);
+                }
+                const submissionEnd = Date.now();
+
+                state.stats.transactionsGenerated += txs.length;
+                state.stats.transactionsSubmitted += txs.length;
+                console.log(
+                  `Submitted ${txs.length} transactions in ${submissionEnd - submissionStart}ms`
+                );
+              } catch (submitError) {
+                console.error('Failed to submit transactions:', submitError);
+
+                if (fullConfig.outputDir) {
+                  const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
+                  const filepath = join(process.cwd(), fullConfig.outputDir, filename);
+                  await writeFile(filepath, JSON.stringify(txs, null, 2));
+                  console.log(`Failed submission - transactions written to ${filepath}`);
+                }
+
+                state.stats.transactionsGenerated += txs.length;
               }
             }
+
+            return txs;
           });
         });
 
-      // Wait for all transactions to be generated
-      const results = await Promise.all(tasks);
-      const txs = results.flat();
-
-      // Update stats
-      if (txs && Array.isArray(txs)) {
-        state.stats.transactionsGenerated += txs.length;
-        state.stats.transactionsSubmitted += txs.length;
-        console.log(`Generated ${txs.length} transactions`);
-      }
+      await Promise.all(tasks);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       state.stats.lastError = errorMessage;
       console.error('Error in transaction generation loop:', errorMessage);
-
-      // Ensure we don't swallow errors in development
-      if (process.env.NODE_ENV === 'development') {
-        console.error(error);
-      }
+      throw error;
     }
   };
 
@@ -252,8 +248,6 @@ export const startGenerator = (config: Partial<TransactionGeneratorConfig> = {})
     console.error('Generator failed:', errorMessage);
     state.currentPromise = null;
   });
-
-  return Promise.resolve();
 };
 
 /**

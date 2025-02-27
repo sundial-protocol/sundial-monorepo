@@ -2,9 +2,9 @@
 
 import chalk from 'chalk';
 import { Command } from 'commander';
+import { generateEmulatorAccountFromPrivateKey, Network } from '@lucid-evolution/lucid';
 
 import { getGeneratorStatus, startGenerator, stopGenerator } from '../lib/scheduler/scheduler.js';
-import { generateTestWallet } from '../utils/test-utils.js';
 
 interface GeneratorOptions {
   endpoint: string;
@@ -15,6 +15,8 @@ interface GeneratorOptions {
   concurrency: string;
   testWallet: boolean;
   privateKey?: string;
+  network?: string;
+  outputDir?: string;
 }
 
 const program = new Command();
@@ -37,21 +39,44 @@ program
   .option('-c, --concurrency <number>', 'Number of concurrent batches', '5')
   .option('--test-wallet', 'Generate a test wallet for transactions', false)
   .option('-k, --private-key <key>', 'Wallet private key (required if --test-wallet is not used)')
+  .option('-n, --network <network>', 'Network to use (Preview/Mainnet)', 'Preview')
+  .option(
+    '-o, --output-dir <dir>',
+    'Directory to save transactions when node is unavailable',
+    'generated-transactions'
+  )
   .action(async (options: GeneratorOptions) => {
     try {
-      let privateKey = options.privateKey;
+      let walletSeedOrPrivateKey = options.privateKey;
+      let initialUTxO;
 
       if (options.testWallet) {
         console.log(chalk.yellow('Generating test wallet...'));
-        const { privateKey: testKey } = await generateTestWallet();
-        privateKey = testKey;
-      } else if (!privateKey) {
+        const account = await generateEmulatorAccountFromPrivateKey({});
+        walletSeedOrPrivateKey = account.privateKey;
+
+        // Create initial UTxO with test funds
+        initialUTxO = {
+          txHash: Buffer.from(Array(32).fill(0)).toString('hex'),
+          outputIndex: 0,
+          address: account.address,
+          assets: {
+            lovelace: 10_000_000_000n, // 10,000 ADA for testing
+          },
+          datum: null,
+          datumHash: null,
+          scriptRef: null,
+        };
+
+        console.log(chalk.gray(`Generated test wallet with address: ${account.address}`));
+      } else if (!walletSeedOrPrivateKey) {
         console.error(chalk.red('Error: Either --private-key or --test-wallet must be provided'));
         process.exit(1);
       }
 
       console.log(chalk.blue('\nStarting transaction generator with configuration:'));
       console.log(chalk.gray(`Node Endpoint: ${options.endpoint}`));
+      console.log(chalk.gray(`Network: ${options.network}`));
       console.log(chalk.gray(`Transaction Type: ${options.type}`));
       if (options.type === 'mixed') {
         console.log(chalk.gray(`One-to-One Ratio: ${options.ratio}%`));
@@ -62,12 +87,15 @@ program
 
       await startGenerator({
         nodeEndpoint: options.endpoint,
-        walletPrivateKey: privateKey,
+        network: options.network as Network,
+        initialUTxO,
+        walletSeedOrPrivateKey,
         transactionType: options.type,
         oneToOneRatio: parseInt(options.ratio),
         batchSize: parseInt(options.batchSize),
-        interval: parseInt(options.interval) * 1000,
+        interval: parseInt(options.interval),
         concurrency: parseInt(options.concurrency),
+        outputDir: options.outputDir,
       });
 
       console.log(chalk.green('\nGenerator started successfully!'));

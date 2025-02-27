@@ -1,13 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-
 import { Network } from '@lucid-evolution/lucid';
-
-import {
-  generateMultiOutputTransactions,
-  generateOneToOneTransactions,
-} from '../lib/generators/index.js';
 import { generateTestWallet } from '../utils/test-utils.js';
+import {
+  generateOneToOneTransactions,
+  generateMultiOutputTransactions,
+} from '../lib/generators/index.js';
 
 const DEFAULT_CONFIG = {
   network: 'Preview' as Network,
@@ -47,7 +45,6 @@ async function main() {
     network: DEFAULT_CONFIG.network,
     initialUTxO: testUTxO,
     utxosCount: DEFAULT_CONFIG.txCount * 20,
-    finalUtxosCount: 1,
     walletSeedOrPrivateKey: privateKey,
   });
 
