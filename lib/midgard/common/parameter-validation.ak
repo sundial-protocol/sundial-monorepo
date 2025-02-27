@@ -1,49 +1,37 @@
-//// A partial clone from `aiken-design-patterns` for a custom wrapper and
-//// parameter application, for cases where the first parameter is a hash with
-//// 28 bytes, while the second parameter has 32 bytes.
+//// Duplicated from `aiken-design-patters` to simply change the type
+//// signatures.
 
 use aiken/builtin
-use aiken/crypto.{Blake2b_224, Blake2b_256, Hash, ScriptHash, blake2b_224}
+use aiken/crypto.{Blake2b_256, Hash, ScriptHash, blake2b_224}
 use aiken/primitive/bytearray
 use cardano/transaction.{Transaction}
 
-const param_header_32_bytes = #"004c01225820"
-
 const postfix: ByteArray = #"0001"
 
-/// Helper function for applying 2 prehashed parameters, whith first parameter
-/// being 28 bytes, and second one 32 bytes.
-pub fn apply_prehashed_param_2(
+pub fn apply_prehashed_param(
   version: Int,
   prefix: ByteArray,
-  param_0: ByteArray,
-  param_1: ByteArray,
+  param: ByteArray,
 ) -> ScriptHash {
   builtin.integer_to_bytearray(True, 1, version)
     |> bytearray.concat(prefix)
-    |> bytearray.concat(param_0)
-    |> bytearray.concat(param_header_32_bytes)
-    |> bytearray.concat(param_1)
+    |> bytearray.concat(param)
     |> bytearray.concat(postfix)
     |> blake2b_224
 }
 
-/// Wrapper function for defining a parameterized, non-spending validator, with
-/// prehashed parameters of 28 and 32 bytes, respectively.
-pub fn prehashed_param_no_datum_wrapper_2(
+pub fn prehashed_param_no_datum_wrapper(
   validator_function: fn(
-    Hash<Blake2b_224, a>,
-    Hash<Blake2b_256, b>,
+    Hash<Blake2b_256, a>,
     redeemer,
     endpoint_specific,
     Transaction,
   ) ->
     Bool,
-  parameter_0: Hash<Blake2b_224, a>,
-  parameter_1: Hash<Blake2b_256, b>,
+  param: Hash<Blake2b_256, a>,
   redeemer: redeemer,
   variable_arg: endpoint_specific,
   tx: Transaction,
 ) -> Bool {
-  validator_function(parameter_0, parameter_1, redeemer, variable_arg, tx)
+  validator_function(param, redeemer, variable_arg, tx)
 }

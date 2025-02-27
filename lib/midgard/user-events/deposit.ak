@@ -42,6 +42,7 @@ pub type MintRedeemer {
     nonce_input_index: Int,
     deposit_output_index: Int,
     hub_ref_input_index: Int,
+    witness_registration_redeemer_index: Int,
   }
   BurnDepositNFT
 }

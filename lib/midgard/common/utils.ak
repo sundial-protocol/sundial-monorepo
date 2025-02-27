@@ -4,7 +4,9 @@ use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken_design_patterns/validity_range_normalization as vrn
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
-use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
+use cardano/transaction.{
+  Input, Output, OutputReference, Redeemer, ScriptPurpose, ValidityRange,
+}
 use midgard/common/constants.{
   max_validity_range_for_current_time, posix_time_none,
 }
@@ -195,4 +197,14 @@ pub fn authentic_value_has_tokens(
     value
       |> assets.add(nft_policy_id, nft_asset_name, -1)
   assets.match(without_nft, tokens, fn(_, _) { True })
+}
+
+pub fn get_redeemer_at(
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+  expected_purpose: ScriptPurpose,
+  redeemer_index: Int,
+) -> Redeemer {
+  expect Some(redeemer_pair) = redeemers |> list.at(redeemer_index)
+  expect redeemer_pair.1st == expected_purpose
+  redeemer_pair.2nd
 }
