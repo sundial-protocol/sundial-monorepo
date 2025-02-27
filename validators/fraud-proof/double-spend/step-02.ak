@@ -5,7 +5,7 @@ use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{
-  get_ct_token, get_tx_root_validate_block_hash, handle_cancel,
+  get_singleton_ct_token, get_tx_root_validate_block_hash, handle_cancel,
   validate_membership_proof, validate_step_output,
 }
 use midgard/fraud_proof/double_spend/step_01.{StepState as Step1State}
@@ -51,7 +51,8 @@ validator main(
         // Check tx hash uniqueness
         expect Step1State { verified_tx1_hash }: Step1State = step_datum.data
         expect bad_tx2_hash != verified_tx1_hash
-        let ct_token_asset_name = get_ct_token(own_input, ct_token_policy_id)
+        let ct_token_asset_name =
+          get_singleton_ct_token(own_input, ct_token_policy_id)
         let extracted_tx_root =
           get_tx_root_validate_block_hash(
             tx,

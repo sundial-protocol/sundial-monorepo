@@ -3,7 +3,7 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/utils.{
-  get_ct_token, handle_cancel, validate_final_step_output,
+  get_singleton_ct_token, handle_cancel, validate_final_step_output,
 }
 use midgard/fraud_proof/double_spend/step_04.{
   Cancel, Continue, StepRedeemer as Step4Redeemer,
@@ -38,7 +38,8 @@ validator main(
       // Step 4: Final step to mint fraud token and burn CT token
       Continue { index_output, computation_thread_redeemer_index } -> {
         // get CT token
-        let ct_token_asset_name = get_ct_token(own_input, ct_token_policy_id)
+        let ct_token_asset_name =
+          get_singleton_ct_token(own_input, ct_token_policy_id)
 
         expect
           validate_final_step_output(

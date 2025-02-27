@@ -219,7 +219,10 @@ pub fn validate_ada_return_to_fraud_prover(
 
 // Get computation thread token from input
 // This is used by all redeemers to identify the computation thread token passed in from the previous step
-pub fn get_ct_token(own_input: Input, ct_token_policy_id: PolicyId) -> ByteArray {
+pub fn get_singleton_ct_token(
+  own_input: Input,
+  ct_token_policy_id: PolicyId,
+) -> ByteArray {
   expect Pair(ct_token_asset_name, 1) =
     get_singleton_asset_with_policy(own_input.output.value, ct_token_policy_id)
   ct_token_asset_name

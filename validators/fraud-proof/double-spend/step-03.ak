@@ -6,7 +6,7 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/utils.{
-  get_ct_token, handle_cancel, validate_step_output,
+  get_singleton_ct_token, handle_cancel, validate_step_output,
 }
 use midgard/fraud_proof/double_spend/step_02.{StepState as Step2State}
 use midgard/fraud_proof/double_spend/step_03.{
@@ -88,7 +88,8 @@ validator main(
           }
 
         // Get CT token
-        let ct_token_asset_name = get_ct_token(own_input, ct_token_policy_id)
+        let ct_token_asset_name =
+          get_singleton_ct_token(own_input, ct_token_policy_id)
 
         expect
           validate_step_output(
