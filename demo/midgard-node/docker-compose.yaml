@@ -1,0 +1,74 @@
+services:
+  midgard-node:
+    build:
+      context: .
+      additional_contexts:
+        - sdk=../midgard-sdk
+      dockerfile: ./Dockerfile
+    env_file:
+      - .env
+    command:
+      - node
+      - ./dist/index.js
+      - listen
+    ports:
+      - "8080:8080" # api server
+      - "9464:9464" # prometheus exporter
+      - "4318:4318" # opentelemetry
+    volumes:
+      - ./db:/app/db
+    networks:
+      midgard_net:
+    # restart: always
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    user: root
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-data:/prometheus
+    networks:
+      midgard_net:
+        
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    hostname: cadvisor
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:ro"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+    networks:
+      midgard_net:
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - DS_PROMETHEUS=prometheus
+    volumes:
+      - "grafana-data:/var/lib/grafana"
+      - "./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml"
+      - "./grafana/dashboard.json:/var/lib/grafana/dashboards/dashboard.json"
+      - "./grafana/default.yaml:/etc/grafana/provisioning/dashboards/default.yaml"
+    depends_on:
+      - prometheus
+    networks:
+      midgard_net:
+
+networks:
+  midgard_net:
+  
+volumes:
+  grafana-data:
+    driver: local
