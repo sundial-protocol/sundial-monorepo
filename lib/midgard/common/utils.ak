@@ -8,7 +8,7 @@ use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
 use midgard/common/constants.{
   max_validity_range_for_current_time, posix_time_none,
 }
-use midgard/common/types.{POSIXTime}
+use midgard/common/types.{POSIXTime, Tokens}
 
 pub fn validate_mint(
   mints: Value,
@@ -183,4 +183,16 @@ pub fn get_singleton_asset_with_policy(
       |> dict.to_pairs
 
   p
+}
+
+pub fn authentic_value_has_tokens(
+  value: Value,
+  nft_policy_id: PolicyId,
+  nft_asset_name: AssetName,
+  tokens: Tokens,
+) -> Bool {
+  let without_nft =
+    value
+      |> assets.add(nft_policy_id, nft_asset_name, -1)
+  assets.match(without_nft, tokens, fn(_, _) { True })
 }
