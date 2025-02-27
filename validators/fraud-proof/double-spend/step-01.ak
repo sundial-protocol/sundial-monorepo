@@ -13,8 +13,8 @@ use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{
-  handle_cancel, validate_block_hash_matches_token, validate_membership_proof,
-  validate_step_output,
+  get_ct_token, get_tx_root_validate_block_hash, handle_cancel,
+  validate_membership_proof, validate_step_output,
 }
 use midgard/fraud_proof/double_spend/step_01.{
   Cancel, Continue, StepRedeemer as Step1Redeemer, StepState as Step1State,
@@ -69,12 +69,12 @@ validator main(
         bad_tx1_to_root_proof_path,
         index_output,
       } -> {
-        let (extracted_tx_root, ct_token_asset_name) =
-          validate_block_hash_matches_token(
+        let ct_token_asset_name = get_ct_token(own_input, ct_token_policy_id)
+        let extracted_tx_root =
+          get_tx_root_validate_block_hash(
             tx,
-            own_input,
             bad_state_queue_node_ref_input_index,
-            ct_token_policy_id,
+            ct_token_asset_name,
           )
 
         // -------- Double spend validation specific logic START --------

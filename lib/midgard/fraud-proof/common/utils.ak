@@ -28,12 +28,11 @@ use midgard/state_queue.{Datum as NodeDatum}
 // (6) Transaction must not mint or burn any other tokens
 
 // Relevant to (1): tx_root provided by fraud prover in redeemer matches block_hash from the state queue block from the reference input
-pub fn validate_block_hash_matches_token(
+pub fn get_tx_root_validate_block_hash(
   tx: Transaction,
-  own_input: Input,
   state_queue_node_ref_input_index: Int,
-  ct_token_policy_id: PolicyId,
-) -> (ByteArray, ByteArray) {
+  ct_token_asset_name: ByteArray,
+) -> ByteArray {
   // Reference input with block_hash 
   expect Some(state_queue_node_input) =
     list.at(tx.reference_inputs, state_queue_node_ref_input_index)
@@ -47,10 +46,9 @@ pub fn validate_block_hash_matches_token(
   let extracted_tx_root = parsed_state_queue_datum.transactions_root
 
   // Get CT token and check match with the block hash
-  let ct_token_asset_name = get_ct_token(own_input, ct_token_policy_id)
   expect drop(ct_token_asset_name, n: 4) == block_hash
 
-  (extracted_tx_root, ct_token_asset_name)
+  extracted_tx_root
 }
 
 // tx_root, merkle root of transactions in the state queue block
@@ -231,7 +229,7 @@ pub fn get_ct_token(own_input: Input, ct_token_policy_id: PolicyId) -> ByteArray
 pub fn validate_output_to_fraud_prover(
   output_to_fraud_prover: Output,
   prover_hash: ByteArray,
-) {
+) -> Bool {
   when output_to_fraud_prover.address.payment_credential is {
     VerificationKey(hash) -> hash == prover_hash
     _ -> False
