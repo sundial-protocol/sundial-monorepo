@@ -68,11 +68,15 @@ export class MidgardNodeClient {
    * Submit a transaction to the node with retries
    */
   submitTransaction(cborHex: string, txType: string = 'Transaction') {
-    return Effect.tryPromise({
-      try: async () => {
+    return Effect.tryPromise((signal: AbortSignal) => 
+      (async () => {
         // First check if node is available
-        if (!(await this.isAvailable())) {
-          throw new Error('Node is not available');
+        const isNodeAvailable = await this.isAvailable();
+        if (!isNodeAvailable) {
+          return {
+            status: 'NODE_UNAVAILABLE',
+            message: 'Node is not available - transaction will be stored locally',
+          };
         }
 
         let attempts = 0;
@@ -85,6 +89,7 @@ export class MidgardNodeClient {
                 headers: {
                   'Content-Type': 'text/plain',
                 },
+                signal,
               }
             );
 
@@ -100,6 +105,7 @@ export class MidgardNodeClient {
               logSubmittedTransaction(result.txId, txType);
             }
 
+            // For successful submissions, return the raw result
             return result;
           } catch (error) {
             attempts++;
@@ -109,25 +115,31 @@ export class MidgardNodeClient {
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 logFailedTransaction('unknown', txType, errorMsg);
               }
-              throw error;
+              throw error; // Let the Effect.catchAll handle it
             }
             await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
           }
         }
-      },
-      catch: (error: unknown): SubmitTxError => {
-        // Handle known error types
-        if (error instanceof Error) {
-          if (error.message === 'Node is not available' || error instanceof TypeError) {
-            return { _tag: 'NetworkError', error: error.message };
-          }
-          return { _tag: 'ValidationError', error: error.message };
-        }
-
-        // Handle unknown errors
-        return { _tag: 'UnknownError', error: String(error) };
-      },
-    }).pipe(Effect.runPromise);
+        
+        throw new Error('All retry attempts failed');
+      })()
+    ).pipe(
+      // Handle errors by converting them to our status format
+      Effect.catchAll((error) => 
+        Effect.succeed(
+          error instanceof TypeError || (error instanceof Error && error.message === 'Node is not available')
+            ? {
+                status: 'NODE_UNAVAILABLE',
+                message: 'Node is not available - transaction will be stored locally',
+              }
+            : {
+                status: 'ERROR',
+                error: error instanceof Error ? error.message : String(error)
+              }
+        )
+      ),
+      Effect.runPromise
+    );
   }
 
   /**

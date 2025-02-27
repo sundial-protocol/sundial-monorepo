@@ -180,7 +180,19 @@ export const startGenerator = async (
               try {
                 const submissionStart = Date.now();
                 for (const tx of txs) {
-                  await nodeClient.submitTransaction(tx.cborHex);
+                  const result = await nodeClient.submitTransaction(tx.cborHex);
+                  
+                  // Handle node unavailability gracefully
+                  if (result && result.status === 'NODE_UNAVAILABLE') {
+                    if (fullConfig.outputDir) {
+                      const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
+                      const filepath = join(process.cwd(), fullConfig.outputDir, filename);
+                      await writeFile(filepath, JSON.stringify(txs, null, 2));
+                      console.log(`Node unavailable - transactions written to ${filepath}`);
+                    }
+                    state.stats.transactionsGenerated += txs.length;
+                    break; // Exit the loop since node is unavailable
+                  }
                 }
                 const submissionEnd = Date.now();
 

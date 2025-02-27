@@ -114,24 +114,44 @@ const generateOneToOneTransactions = async (
   const transactions: SerializedMidgardTransaction[] = [];
 
   try {
+    // First transaction to move away from genesis UTxO
+    const initialTxBuilder = lucid.newTx();
+    const [initialNewWalletUTxOs, initialDerivedOutputs, initialTxSignBuilder] = await initialTxBuilder.pay
+      .ToAddress(initialUTxO.address, initialUTxO.assets)
+      .chain();
+    
+    const initialTxSigned = await initialTxSignBuilder.sign.withPrivateKey(walletSeedOrPrivateKey).complete();
+    
+    // Use the output of initial transaction for subsequent transactions
+    const firstUtxo = {
+      txHash: initialTxSigned.toHash(),
+      outputIndex: 0,
+      address: initialUTxO.address,
+      assets: initialUTxO.assets,
+    };
+    
+    lucid.selectWallet.fromAddress(firstUtxo.address, [firstUtxo]);
+
+    // Generate the actual transactions with unique data
     for (let i = 0; i < txsCount; i++) {
       const txBuilder = lucid.newTx();
+      
 
-      const [newWalletUTxOs, , txSignBuilder] = await txBuilder.pay
+      const [newWalletUTxOs, derivedOutputs, txSignBuilder] = await txBuilder.pay
         .ToAddressWithData(
           initialUTxO.address,
-          { kind: 'inline', value: Data.to(BigInt(Date.now())) },
+          { kind: 'inline', value: Data.to(BigInt(Date.now() + i)) },
           initialUTxO.assets
         )
         .chain();
 
       const txSigned = await txSignBuilder.sign.withPrivateKey(walletSeedOrPrivateKey).complete();
-
+      
       // Create serialized transaction in Midgard format
       const txHash = txSigned.toHash();
       const tx: SerializedMidgardTransaction = {
         cborHex: txSigned.toCBOR(),
-        description: 'One-to-One Self Transfer',
+        description: `One-to-One Self Transfer (${i + 1}/${txsCount})`,
         txId: txHash,
         type: 'Midgard L2 User Transaction',
       };
@@ -147,7 +167,7 @@ const generateOneToOneTransactions = async (
       // Write to test output if writable provided
       if (writable) {
         await waitWritable(writable);
-        writable.write(JSON.stringify(tx, null, 2) + '\n');
+        writable.write(JSON.stringify([tx], null, 2) + '\n');
       }
 
       // Update wallet state for next transaction
@@ -163,6 +183,11 @@ const generateOneToOneTransactions = async (
         await new Promise<void>((resolve) => setTimeout(() => resolve(), 100));
       }
     }
+
+    // Cleanup initial transaction resources
+    initialTxBuilder.rawConfig().txBuilder.free();
+    initialTxSignBuilder.toTransaction().free();
+    initialTxSigned.toTransaction().free();
   } catch (error) {
     console.error('Error generating transactions:', error);
     throw error;

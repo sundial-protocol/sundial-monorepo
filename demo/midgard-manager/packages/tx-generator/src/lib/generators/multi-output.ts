@@ -1,5 +1,3 @@
-import { Writable } from 'node:stream';
-
 import {
   Data,
   Emulator,
@@ -16,8 +14,7 @@ import pLimit from 'p-limit';
 
 import {
   getPublicKeyHashFromPrivateKey,
-  parseUnknownKeytoBech32PrivateKey,
-  waitWritable,
+  parseUnknownKeytoBech32PrivateKey
 } from '../../utils/common.js';
 import { MidgardNodeClient } from '../client/node-client.js';
 import { SerializedMidgardTransaction } from '../client/types.js';
@@ -146,6 +143,8 @@ export const generateMultiOutputTransactions = async (
   // State tracking
   let currentUtxosCount = 1;
   let currentTxsCount = 0;
+  let outputCounter = 0;
+  const MAX_SAFE_COUNTER = Number.MAX_SAFE_INTEGER - OUTPUT_UTXOS_CHUNK; // Prevent overflow
   const rollBackers: { utxos: UTxO[]; privateKey: string }[] = [];
   const outputLovelace = calculateOutputLovelace(initialUTxO.assets.lovelace, utxosCount);
 
@@ -153,21 +152,32 @@ export const generateMultiOutputTransactions = async (
   const transactions: SerializedMidgardTransaction[] = [];
 
   try {
+    // Skip first transaction if it's a genesis UTxO
+    if (!initialUTxO.txHash.startsWith('genesis')) {
+      currentTxsCount++;
+    }
+
     // Distribution phase: Generate transactions with multiple outputs
     while (currentUtxosCount < utxosCount) {
+      // Check counter safety
+      if (outputCounter >= MAX_SAFE_COUNTER) {
+        throw new Error('Output counter limit reached. Please start a new generation batch.');
+      }
+
       const randomAccount = accounts[Math.floor(Math.random() * TOTAL_ACCOUNT_COUNT)];
       const txBuilder = lucid.newTx();
 
       // create multiple outputs in single transaction
-      Array.from({ length: OUTPUT_UTXOS_CHUNK }).forEach(() =>
+      Array.from({ length: OUTPUT_UTXOS_CHUNK }).forEach(() => {
+        outputCounter++; // Increment for each output
         txBuilder.pay.ToAddressWithData(
           randomAccount.address,
-          { kind: 'inline', value: Data.to(BigInt(Date.now())) },
+          { kind: 'inline', value: Data.to(BigInt(outputCounter)) },
           {
             lovelace: outputLovelace,
           }
-        )
-      );
+        );
+      });
 
       const [newWalletUTxOs, derivedOutputs, txSignBuilder] = await txBuilder.chain();
       const txSigned = await txSignBuilder.sign.withPrivateKey(privateKey).complete();
