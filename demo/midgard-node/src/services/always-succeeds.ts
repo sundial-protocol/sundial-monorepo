@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, pipe } from "effect";
-import * as scripts from "../../../always-succeeds/plutus.json" with { type: "json" };
+import * as scripts from "../../blueprints/always-succeeds/plutus.json" with { type: "json" };
 import {
   applyDoubleCborEncoding,
   MintingPolicy,
