@@ -1,7 +1,7 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/primitive/bytearray.{drop}
-use aiken_design_patterns/linked_list/unordered.{Key}
+use aiken_design_patterns/linked_list/unordered as unordered
 use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script, VerificationKey}
 use cardano/assets.{PolicyId, lovelace_of}
@@ -10,7 +10,6 @@ use midgard/common/utils.{get_singleton_asset_with_policy} as get_singleton_asse
 use midgard/computation_thread.{StepDatum, Success}
 use midgard/fraud_proof/common/types.{FraudProofDatum, MembershipProofInputs}
 use midgard/ledger_state.{Header}
-use midgard/state_queue.{Datum as NodeDatum}
 
 // ------------ ABSTRACTIONS FOR ALL FRAUD PROOF STEPS ------------
 // Each step in a computation thread must in the continue redeemer:
@@ -40,9 +39,9 @@ pub fn get_tx_root_validate_block_hash(
   // Extract tx_root via the state queue block hash
   expect InlineDatum(state_queue_datum_data) =
     state_queue_node_input.output.datum
-  expect state_queue_node_datum: NodeDatum = state_queue_datum_data
+  expect state_queue_node_datum: unordered.NodeDatum = state_queue_datum_data
   expect parsed_state_queue_datum: Header = state_queue_node_datum.data
-  expect Key(block_hash) = state_queue_node_datum.key
+  expect unordered.Key(block_hash) = state_queue_node_datum.key
   let extracted_tx_root = parsed_state_queue_datum.transactions_root
 
   // Get CT token and check match with the block hash
