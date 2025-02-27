@@ -11,8 +11,8 @@ const param_header_32_bytes = #"004c01225820"
 
 const postfix: ByteArray = #"0001"
 
-/// Similar to [`apply_prehashed_param`](#apply_prehashed_param), but for
-/// scripts with 2 parameters.
+/// Helper function for applying 2 prehashed parameters, whith first parameter
+/// being 28 bytes, and second one 32 bytes.
 pub fn apply_prehashed_param_2(
   version: Int,
   prefix: ByteArray,
@@ -28,6 +28,8 @@ pub fn apply_prehashed_param_2(
     |> blake2b_224
 }
 
+/// Wrapper function for defining a parameterized, non-spending validator, with
+/// prehashed parameters of 28 and 32 bytes, respectively.
 pub fn prehashed_param_no_datum_wrapper_2(
   validator_function: fn(
     Hash<Blake2b_224, a>,
