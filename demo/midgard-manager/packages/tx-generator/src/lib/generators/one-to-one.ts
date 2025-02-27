@@ -1,6 +1,7 @@
 import { Writable } from 'node:stream';
 
 import {
+  Data,
   Emulator,
   EmulatorAccount,
   Lucid,
@@ -117,7 +118,11 @@ const generateOneToOneTransactions = async (
       const txBuilder = lucid.newTx();
 
       const [newWalletUTxOs, , txSignBuilder] = await txBuilder.pay
-        .ToAddress(initialUTxO.address, initialUTxO.assets)
+        .ToAddressWithData(
+          initialUTxO.address,
+          { kind: 'inline', value: Data.to(BigInt(Date.now())) },
+          initialUTxO.assets
+        )
         .chain();
 
       const txSigned = await txSignBuilder.sign.withPrivateKey(walletSeedOrPrivateKey).complete();

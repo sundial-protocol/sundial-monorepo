@@ -127,7 +127,7 @@ export class MidgardNodeClient {
         // Handle unknown errors
         return { _tag: 'UnknownError', error: String(error) };
       },
-    });
+    }).pipe(Effect.runPromise);
   }
 
   /**

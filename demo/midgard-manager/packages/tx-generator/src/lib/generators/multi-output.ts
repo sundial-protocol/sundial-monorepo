@@ -1,6 +1,7 @@
 import { Writable } from 'node:stream';
 
 import {
+  Data,
   Emulator,
   EmulatorAccount,
   generateEmulatorAccountFromPrivateKey,
@@ -159,9 +160,13 @@ export const generateMultiOutputTransactions = async (
 
       // create multiple outputs in single transaction
       Array.from({ length: OUTPUT_UTXOS_CHUNK }).forEach(() =>
-        txBuilder.pay.ToAddress(randomAccount.address, {
-          lovelace: outputLovelace,
-        })
+        txBuilder.pay.ToAddressWithData(
+          randomAccount.address,
+          { kind: 'inline', value: Data.to(BigInt(Date.now())) },
+          {
+            lovelace: outputLovelace,
+          }
+        )
       );
 
       const [newWalletUTxOs, derivedOutputs, txSignBuilder] = await txBuilder.chain();
