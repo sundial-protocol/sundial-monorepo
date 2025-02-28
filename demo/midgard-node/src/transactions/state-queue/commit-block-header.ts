@@ -56,14 +56,18 @@ export const buildAndSubmitCommitmentBlock = (
       const newUTxOList = [...filteredUTxOList, ...producedList].map(
         (utxo) => utxo.txHash + utxo.outputIndex,
       );
+
       const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
-      const { spendScript } = yield* AlwaysSucceeds.AlwaysSucceedsContract;
+      const { spendScript, mintScript, policyId } =
+        yield* AlwaysSucceeds.AlwaysSucceedsContract;
       // Build commitment block
       const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
-        newUTxOsRoot: utxoRoot.hash.toString(),
-        transactionsRoot: txRoot.hash.toString(),
+        newUTxOsRoot: utxoRoot.hash.toString("hex"),
+        transactionsRoot: txRoot.hash.toString("hex"),
         endTime: BigInt(endTime),
         stateQueueSpendingScript: spendScript,
+        policyId,
+        stateQueueMintingScript: mintScript,
       };
       const aoUpdateCommitmentTimeParams = {};
       const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
@@ -72,6 +76,9 @@ export const buildAndSubmitCommitmentBlock = (
         commitBlockParams,
         aoUpdateCommitmentTimeParams,
       );
+      const txSize = txBuilder.toCBOR().length / 2;
+      // console.log("txBuilder.toCBOR() :>> ", txBuilder.toCBOR());
+      console.log("txSize :>> ", txSize);
       // Submit the transaction
       yield* handleSignSubmit(lucid, txBuilder);
       // TODO: For final product, handle tx submission failures properly.

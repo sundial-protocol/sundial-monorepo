@@ -51,6 +51,7 @@ export const buildAndSubmitMergeTx = (
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
 
+    console.log("firstBlockTxs :>> ", firstBlockTxs);
     const { spent: spentOutRefs, produced: producedUTxOs } =
       yield* findAllSpentAndProducedUTxOs(firstBlockTxs);
 

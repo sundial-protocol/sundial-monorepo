@@ -166,11 +166,11 @@ export const listen = (
           LatestLedgerDB.clear(db),
           ConfirmedLedgerDB.clear(db),
         ]);
-        res.json({ message: "Cleared all tables successfully!" });
+        // res.json({ message: "Cleared all tables successfully!" });
       } catch (_e) {
-        res.status(400).json({
-          message: "Failed to clear one or more tables. Please try again.",
-        });
+        // res.status(400).json({
+        //   message: "Failed to clear one or more tables. Please try again.",
+        // });
       }
     });
 
@@ -222,6 +222,7 @@ const monitorStateQueue = (
         lucid,
         fetchConfig,
       );
+      yield* Console.log("latestBlock: ", latestBlock);
       const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
       if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
         latestBlockOutRef = fetchedBlocksOutRef;

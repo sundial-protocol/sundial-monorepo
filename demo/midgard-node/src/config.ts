@@ -1,12 +1,24 @@
-import { Lucid, Blockfrost, Network } from "@lucid-evolution/lucid";
+import {
+  Lucid,
+  Blockfrost,
+  Network,
+  Kupmios,
+  Koios,
+} from "@lucid-evolution/lucid";
 import { Effect, pipe, Context, Layer, Config } from "effect";
 
 const makeUser = Effect.gen(function* ($) {
   const nodeConfig = yield* NodeConfig;
   const user = yield* Effect.tryPromise(() =>
     Lucid(
-      new Blockfrost(nodeConfig.BLOCKFROST_API_URL, nodeConfig.BLOCKFROST_KEY),
-      nodeConfig.NETWORK,
+      // new Koios("https://preprod.koios.rest/api/v1"),
+      new Kupmios(
+        "https://dmtr_kupo1xe0kw6rtffars5r9dpz456mgwse9q46j0pqsum0xnj.preprod-v2.kupo-m1.demeter.run",
+        "https://ogmios1u2j0842z52rzqr0jjvu.preprod-v6.ogmios-m1.demeter.run",
+      ),
+      "Preprod",
+      // new Blockfrost(nodeConfig.BLOCKFROST_API_URL, nodeConfig.BLOCKFROST_KEY),
+      // nodeConfig.NETWORK,
     ),
   );
   user.selectWallet.fromSeed(nodeConfig.SEED_PHRASE);
