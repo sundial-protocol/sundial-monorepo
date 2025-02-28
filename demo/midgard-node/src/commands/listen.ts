@@ -21,7 +21,15 @@ import {
   ImmutableDB,
   UtilsDB,
 } from "../database/index.js";
-import { Duration, Effect, Option, Schedule, Metric, pipe } from "effect";
+import {
+  Duration,
+  Effect,
+  Option,
+  Schedule,
+  Metric,
+  pipe,
+  Console,
+} from "effect";
 import { User, NodeConfig } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { NodeSdk } from "@effect/opentelemetry";
@@ -266,30 +274,51 @@ export const runNode = Effect.gen(function* () {
     stateQueueAddress: spendScriptAddress,
     stateQueuePolicyId: policyId,
   };
-  const db = yield* Effect.tryPromise(() =>
-    UtilsDB.initializeDb(nodeConfig.DATABASE_PATH),
+
+  const db = yield* Effect.tryPromise({
+    try: () => UtilsDB.initializeDb(nodeConfig.DATABASE_PATH),
+    catch: (e) => new Error(`${e}`),
+  });
+
+  const otlpTraceExporter = new OTLPTraceExporter({
+    url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
+  });
+
+  // Log the OTLP port
+  logInfo(
+    `OTLP Trace Exporter running at http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
   );
+
+  const prometheusExporter = new PrometheusExporter({
+    port: nodeConfig.PROM_METRICS_PORT,
+  });
+
+  // Ensure Prometheus exporter is started
+  yield* Effect.tryPromise({
+    try: async () => {
+      await prometheusExporter.startServer();
+      logInfo(
+        `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`,
+      );
+    },
+    catch: (e) => new Error(`Failed to start Prometheus metrics server: ${e}`),
+  });
+
   const MetricsLive = NodeSdk.layer(() => ({
     resource: { serviceName: "midgard-node" },
-    spanProcessor: new BatchSpanProcessor(
-      new OTLPTraceExporter({
-        url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
-      }),
-    ),
-    metricReader: new PrometheusExporter({
-      port: nodeConfig.PROM_METRICS_PORT,
-    }),
+    spanProcessor: new BatchSpanProcessor(otlpTraceExporter),
+    metricReader: prometheusExporter,
   }));
 
   yield* Effect.all([
     listen(user, db, nodeConfig.PORT),
-    // monitorStateQueue(user, fetchConfig, db, nodeConfig.POLLING_INTERVAL),
-    // monitorConfirmedState(
-    //   user,
-    //   fetchConfig,
-    //   db,
-    //   nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL
-    // ),
+    monitorStateQueue(user, fetchConfig, db, nodeConfig.POLLING_INTERVAL),
+    monitorConfirmedState(
+      user,
+      fetchConfig,
+      db,
+      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL
+    ),
   ]).pipe(
     Effect.withSpan("midgard-node"),
     Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
