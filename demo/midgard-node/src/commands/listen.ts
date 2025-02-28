@@ -152,9 +152,9 @@ export const listen = (
         );
         await Effect.runPromise(program);
         res.json({ message: "Collected all UTxOs successfully!" });
-      } catch (_e) {
+      } catch (e) {
         res.status(400).json({
-          message: "Failed to collect one or more UTxOs. Please try again.",
+          message: `Failed to collect one or more UTxOs. Please try again. Error: ${e}`,
         });
       }
       try {
@@ -197,7 +197,7 @@ export const listen = (
           Effect.runSync(Metric.increment(txCounter));
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
-          res.status(400).json({ message: "Something went wrong" });
+          res.status(400).json({ message: `Something went wrong: ${e}` });
         }
       } else {
         res.status(400).json({ message: "Invalid CBOR provided" });
@@ -317,7 +317,7 @@ export const runNode = Effect.gen(function* () {
       user,
       fetchConfig,
       db,
-      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL
+      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
     ),
   ]).pipe(
     Effect.withSpan("midgard-node"),

@@ -32,7 +32,7 @@ export const handleSignSubmit = (
       );
     yield* Effect.logDebug(`🚀 Transaction submitted: ${txHash}`);
     yield* Effect.logDebug(`Confirming Transaction...`);
-    yield* Effect.tryPromise(() => lucid.awaitTx(txHash, 40_000));
+    yield* Effect.tryPromise(() => lucid.awaitTx(txHash, 10_000));
     yield* Effect.logDebug(`✅ Transaction confirmed: ${txHash}`);
     yield* Effect.logDebug("Pausing for 10 seconds...");
     yield* Effect.sleep("10 seconds");
