@@ -1,0 +1,18 @@
+{
+  "node": {
+    "endpoint": "http://localhost:3000"
+  },
+  "generator": {
+    "enabled": false,
+    "maxConcurrent": 10,
+    "batchSize": 100,
+    "intervalMs": 1000
+  },
+  "logging": {
+    "level": "info",
+    "format": "pretty"
+  },
+  "wallets": {
+    "directory": "./config/wallets"
+  }
+}

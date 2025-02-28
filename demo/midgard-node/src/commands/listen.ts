@@ -67,7 +67,7 @@ export const listen = (
         });
       } else {
         res
-          .status(400)
+          .status(404)
           .json({ message: `Invalid transaction hash: ${txHash}` });
       }
     });
@@ -177,12 +177,15 @@ export const listen = (
             spentAndProducedProgram,
           );
           // TODO: Avoid abstraction, dedicate a SQL command.
-          await UtilsDB.modifyMultipleTables(
-            db,
-            [MempoolDB.insert, tx.toHash(), txCBOR],
-            [MempoolLedgerDB.clearUTxOs, spent],
-            [MempoolLedgerDB.insert, produced],
-          );
+          await MempoolDB.insert(db, tx.toHash(), txCBOR);
+          await MempoolLedgerDB.clearUTxOs(db, spent);
+          await MempoolLedgerDB.insert(db, produced);
+          // await UtilsDB.modifyMultipleTables(
+          //   db,
+          //   [MempoolDB.insert, tx.toHash(), txCBOR],
+          //   [MempoolLedgerDB.clearUTxOs, spent],
+          //   [MempoolLedgerDB.insert, produced],
+          // );
           Effect.runSync(Metric.increment(txCounter));
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
@@ -280,13 +283,13 @@ export const runNode = Effect.gen(function* () {
 
   yield* Effect.all([
     listen(user, db, nodeConfig.PORT),
-    monitorStateQueue(user, fetchConfig, db, nodeConfig.POLLING_INTERVAL),
-    monitorConfirmedState(
-      user,
-      fetchConfig,
-      db,
-      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
-    ),
+    // monitorStateQueue(user, fetchConfig, db, nodeConfig.POLLING_INTERVAL),
+    // monitorConfirmedState(
+    //   user,
+    //   fetchConfig,
+    //   db,
+    //   nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL
+    // ),
   ]).pipe(
     Effect.withSpan("midgard-node"),
     Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
