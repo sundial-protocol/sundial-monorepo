@@ -1,6 +1,6 @@
 // Build a tx Merkle root with all the mempool txs
 
-import { LucidEvolution } from "@lucid-evolution/lucid";
+import { LucidEvolution, Script } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
@@ -12,7 +12,6 @@ import {
   UtilsDB,
 } from "@/database/index.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
-import { AlwaysSucceeds } from "@/services/index.js";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -28,6 +27,7 @@ export const buildAndSubmitCommitmentBlock = (
   lucid: LucidEvolution,
   db: Database,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
+  spendScript: Script,
   endTime: number,
 ) =>
   Effect.gen(function* () {
