@@ -12,6 +12,8 @@ import {
   UtilsDB,
 } from "@/database/index.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
+import { makeConfig, makeUserFn } from "@/config.js";
+import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -27,8 +29,7 @@ export const buildAndSubmitCommitmentBlock = (
   lucid: LucidEvolution,
   db: Database,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  spendScript: Script,
-  endTime: number,
+  endTime: number
 ) =>
   Effect.gen(function* () {
     // Fetch transactions from the first block
@@ -40,7 +41,7 @@ export const buildAndSubmitCommitmentBlock = (
       const { spent: spentList, produced: producedList } =
         yield* findAllSpentAndProducedUTxOs(txCbors);
       const utxoList = yield* Effect.tryPromise(() =>
-        LatestLedgerDB.retrieve(db),
+        LatestLedgerDB.retrieve(db)
       );
       // Remove spent UTxOs from utxoList
       const filteredUTxOList = utxoList.filter(
@@ -48,18 +49,19 @@ export const buildAndSubmitCommitmentBlock = (
           !spentList.some(
             (spent) =>
               spent.txHash === utxo.txHash &&
-              spent.outputIndex === utxo.outputIndex,
-          ),
+              spent.outputIndex === utxo.outputIndex
+          )
       );
 
       // Merge filtered utxoList with producedList
       const newUTxOList = [...filteredUTxOList, ...producedList].map(
-        (utxo) => utxo.txHash + utxo.outputIndex,
+        (utxo) => utxo.txHash + utxo.outputIndex
       );
 
       const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
-      const { spendScript, mintScript, policyId } =
-        yield* AlwaysSucceeds.AlwaysSucceedsContract;
+      const nodeConfig = yield* makeConfig;
+      const { policyId, spendScript, mintScript } =
+        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
       // Build commitment block
       const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
         newUTxOsRoot: utxoRoot.hash.toString("hex"),
@@ -74,7 +76,7 @@ export const buildAndSubmitCommitmentBlock = (
         lucid,
         fetchConfig,
         commitBlockParams,
-        aoUpdateCommitmentTimeParams,
+        aoUpdateCommitmentTimeParams
       );
       const txSize = txBuilder.toCBOR().length / 2;
       // console.log("txBuilder.toCBOR() :>> ", txBuilder.toCBOR());
@@ -89,7 +91,7 @@ export const buildAndSubmitCommitmentBlock = (
             [LatestLedgerDB.clearUTxOs, spentList],
             [LatestLedgerDB.insert, producedList],
             [MempoolDB.clear],
-            [ImmutableDB.insertTxs, txs],
+            [ImmutableDB.insertTxs, txs]
           ),
         catch: (e) => new Error(`Transaction failed: ${e}`),
       });

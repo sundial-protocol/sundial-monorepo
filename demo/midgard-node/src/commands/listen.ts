@@ -198,38 +198,6 @@ export const listen = (
     );
   });
 
-const monitorStateQueue = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  db: sqlite3.Database,
-  pollingInterval: number,
-) =>
-  Effect.gen(function* () {
-    let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
-    const monitor = Effect.gen(function* () {
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
-        lucid,
-        fetchConfig,
-      );
-      yield* Console.log("latestBlock: ", latestBlock);
-      const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
-      if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
-        latestBlockOutRef = fetchedBlocksOutRef;
-        logInfo("Committing a new block...");
-        yield* StateQueueTx.buildAndSubmitCommitmentBlock(
-          lucid,
-          db,
-          fetchConfig,
-          Date.now(),
-        );
-      }
-    });
-    const schedule = Schedule.addDelay(Schedule.forever, () =>
-      Duration.millis(pollingInterval),
-    );
-    yield* Effect.repeat(monitor, schedule);
-  });
-
 export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
