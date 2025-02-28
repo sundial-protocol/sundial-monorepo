@@ -4,11 +4,7 @@ import {
   logInfo,
   logWarning,
 } from "../utils.js";
-import {
-  LucidEvolution,
-  OutRef,
-  getAddressDetails,
-} from "@lucid-evolution/lucid";
+import { LucidEvolution, getAddressDetails } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import express from "express";
 import sqlite3 from "sqlite3";
@@ -21,22 +17,15 @@ import {
   ImmutableDB,
   UtilsDB,
 } from "../database/index.js";
-import {
-  Duration,
-  Effect,
-  Option,
-  Schedule,
-  Metric,
-  pipe,
-  Console,
-} from "effect";
+import { Effect, Option, Metric, pipe } from "effect";
 import { User, NodeConfig } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { NodeSdk } from "@effect/opentelemetry";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
+import { StateQueueTx } from "@/transactions/index.js";
+import { Worker } from "worker_threads";
 
 export const listen = (
   lucid: LucidEvolution,
@@ -209,37 +198,6 @@ export const listen = (
     );
   });
 
-const monitorStateQueue = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  db: sqlite3.Database,
-  pollingInterval: number,
-) =>
-  Effect.gen(function* () {
-    let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
-    const monitor = Effect.gen(function* () {
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
-        lucid,
-        fetchConfig,
-      );
-      const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
-      if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
-        latestBlockOutRef = fetchedBlocksOutRef;
-        logInfo("Committing a new block...");
-        yield* StateQueueTx.buildAndSubmitCommitmentBlock(
-          lucid,
-          db,
-          fetchConfig,
-          Date.now(),
-        );
-      }
-    });
-    const schedule = Schedule.addDelay(Schedule.forever, () =>
-      Duration.millis(pollingInterval),
-    );
-    yield* Effect.repeat(monitor, schedule);
-  });
-
 export const storeTx = async (
   lucid: LucidEvolution,
   db: sqlite3.Database,
@@ -248,22 +206,6 @@ export const storeTx = async (
   Effect.gen(function* () {
     const txHash = lucid.fromTx(tx).toHash();
     yield* Effect.tryPromise(() => MempoolDB.insert(db, txHash, tx));
-  });
-
-const monitorConfirmedState = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  db: sqlite3.Database,
-  pollingInterval: number,
-) =>
-  Effect.gen(function* () {
-    const schedule = Schedule.addDelay(Schedule.forever, () =>
-      Duration.millis(pollingInterval),
-    );
-    yield* Effect.repeat(
-      StateQueueTx.buildAndSubmitMergeTx(lucid, db, fetchConfig),
-      schedule,
-    );
   });
 
 export const runNode = Effect.gen(function* () {
@@ -310,16 +252,13 @@ export const runNode = Effect.gen(function* () {
     metricReader: prometheusExporter,
   }));
 
-  yield* Effect.all([
-    listen(user, db, nodeConfig.PORT),
-    monitorStateQueue(user, fetchConfig, db, nodeConfig.POLLING_INTERVAL),
-    monitorConfirmedState(
-      user,
-      fetchConfig,
-      db,
-      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
-    ),
-  ]).pipe(
+  const workers = [
+    new Worker(new URL("./worker-monitorStateQueue.js", import.meta.url)),
+    new Worker(new URL("./worker-monitorConfirmedState.js", import.meta.url)),
+  ];
+  workers.forEach((w) => w.postMessage("start"));
+
+  yield* Effect.all([listen(user, db, nodeConfig.PORT)]).pipe(
     Effect.withSpan("midgard-node"),
     Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
     Effect.provide(MetricsLive),

@@ -1,28 +1,49 @@
 import { Lucid, Blockfrost, Network } from "@lucid-evolution/lucid";
 import { Effect, pipe, Context, Layer, Config } from "effect";
 
+export type NodeConfigDep = {
+  BLOCKFROST_API_URL: string;
+  BLOCKFROST_KEY: string;
+  SEED_PHRASE: string;
+  NETWORK: Network;
+  DATABASE_PATH: string;
+  PORT: number;
+  POLLING_INTERVAL: number;
+  CONFIRMED_STATE_POLLING_INTERVAL: number;
+  PROM_METRICS_PORT: number;
+  OTLP_PORT: number;
+};
+
+export const makeUserFn = (nodeConfig: NodeConfigDep) =>
+  Effect.gen(function* ($) {
+    const user = yield* Effect.tryPromise(() =>
+      Lucid(
+        new Blockfrost(
+          nodeConfig.BLOCKFROST_API_URL,
+          nodeConfig.BLOCKFROST_KEY,
+        ),
+        nodeConfig.NETWORK,
+      ),
+    );
+    user.selectWallet.fromSeed(nodeConfig.SEED_PHRASE);
+    yield* pipe(
+      Effect.promise(() => user.wallet().address()),
+      Effect.flatMap((address) => Effect.log(`Wallet : ${address}`)),
+    );
+    yield* pipe(
+      Effect.promise(() => user.wallet().getUtxos()),
+      Effect.flatMap((utxos) =>
+        Effect.log(`Total Wallet UTxOs: ${utxos.length}`),
+      ),
+    );
+    return {
+      user,
+    };
+  });
+
 const makeUser = Effect.gen(function* ($) {
   const nodeConfig = yield* NodeConfig;
-  const user = yield* Effect.tryPromise(() =>
-    Lucid(
-      new Blockfrost(nodeConfig.BLOCKFROST_API_URL, nodeConfig.BLOCKFROST_KEY),
-      nodeConfig.NETWORK,
-    ),
-  );
-  user.selectWallet.fromSeed(nodeConfig.SEED_PHRASE);
-  yield* pipe(
-    Effect.promise(() => user.wallet().address()),
-    Effect.flatMap((address) => Effect.log(`Wallet : ${address}`)),
-  );
-  yield* pipe(
-    Effect.promise(() => user.wallet().getUtxos()),
-    Effect.flatMap((utxos) =>
-      Effect.log(`Total Wallet UTxOs: ${utxos.length}`),
-    ),
-  );
-  return {
-    user,
-  };
+  return yield* makeUserFn(nodeConfig);
 }).pipe(Effect.orDie);
 
 export class User extends Context.Tag("User")<
@@ -34,7 +55,7 @@ export class User extends Context.Tag("User")<
 
 export const NETWORK: Network = "Preprod";
 
-const makeConfig = Effect.gen(function* ($) {
+export const makeConfig = Effect.gen(function* ($) {
   const config = yield* Config.all([
     Config.string("BLOCKFROST_API_URL"),
     Config.string("BLOCKFROST_KEY"),
@@ -65,18 +86,7 @@ const makeConfig = Effect.gen(function* ($) {
 
 export class NodeConfig extends Context.Tag("NodeConfig")<
   NodeConfig,
-  {
-    BLOCKFROST_API_URL: string;
-    BLOCKFROST_KEY: string;
-    SEED_PHRASE: string;
-    NETWORK: Network;
-    DATABASE_PATH: string;
-    PORT: number;
-    POLLING_INTERVAL: number;
-    CONFIRMED_STATE_POLLING_INTERVAL: number;
-    PROM_METRICS_PORT: number;
-    OTLP_PORT: number;
-  }
+  NodeConfigDep
 >() {
   static readonly layer = Layer.effect(NodeConfig, makeConfig);
 }

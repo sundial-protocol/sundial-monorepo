@@ -8,7 +8,7 @@
  */
 
 import { Database } from "sqlite3";
-import { LucidEvolution } from "@lucid-evolution/lucid";
+import { LucidEvolution, Script } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect } from "effect";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
@@ -29,15 +29,14 @@ export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
   db: Database,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
+  spendScript: Script,
+  mintScript: Script,
 ) =>
   Effect.gen(function* ($) {
     // Fetch transactions from the first block
     const { txs: firstBlockTxs, headerHash } = yield* $(
       fetchFirstBlockTxs(lucid, fetchConfig, db),
     );
-
-    const { mintScript, spendScript } =
-      yield* AlwaysSucceeds.AlwaysSucceedsContract;
     // Build the transaction
     const txBuilder = yield* SDK.Endpoints.mergeToConfirmedStateProgram(
       lucid,
