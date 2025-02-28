@@ -386,7 +386,6 @@ export const toggleTxGenerator: Action = {
       try {
         // Check current status
         const currentStatus = getGeneratorStatus();
-       
 
         // Display current status with more detail
         if (context.config.generator.enabled) {

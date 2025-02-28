@@ -53,7 +53,9 @@ export const buildAndSubmitCommitmentBlock = (
       );
 
       // Merge filtered utxoList with producedList
-      const newUTxOList = [...filteredUTxOList, ...producedList];
+      const newUTxOList = [...filteredUTxOList, ...producedList].map(
+        (utxo) => utxo.txHash + utxo.outputIndex,
+      );
       const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
       const { spendScript } = yield* AlwaysSucceeds.AlwaysSucceedsContract;
       // Build commitment block

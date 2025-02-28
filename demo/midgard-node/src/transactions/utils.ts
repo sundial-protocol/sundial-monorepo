@@ -73,7 +73,7 @@ export const handleSignSubmitWithoutConfirmation = (
  */
 export const fetchFirstBlockTxs = (
   lucid: LucidEvolution,
-  fetchConfig: SDK.Types.FetchConfig,
+  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   db: Database,
 ): Effect.Effect<{ txs: string[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
