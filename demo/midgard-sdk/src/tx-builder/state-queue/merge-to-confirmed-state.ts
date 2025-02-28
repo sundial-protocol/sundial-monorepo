@@ -42,6 +42,7 @@ export const mergeTxBuilder = (
           Data.castFrom(currentConfirmedNodeDatum.data, ConfirmedState),
         catch: (e) => new Error(`${e}`),
       });
+      const blockNode: NodeDatum = yield* getNodeDatumFromUTxO(firstBlockUTxO);
       const blockHeader: Header = yield* getHeaderFromBlockUTxO(firstBlockUTxO);
       const headerHash = yield* hashHeader(blockHeader);
       const newConfirmedState = {
@@ -55,6 +56,7 @@ export const mergeTxBuilder = (
       const newConfirmedNodeDatum: NodeDatum = {
         ...currentConfirmedNodeDatum,
         data: Data.castTo(newConfirmedState, ConfirmedState),
+        next: blockNode.key,
       };
       const [nftSym, nftName, _nftQty] = yield* getSingleAssetApartFromAda(
         firstBlockUTxO.assets,
