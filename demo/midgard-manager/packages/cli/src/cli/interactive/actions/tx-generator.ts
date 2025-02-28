@@ -1,4 +1,4 @@
-import { confirm, input, number, select } from '@inquirer/prompts';
+import { confirm, number, select } from '@inquirer/prompts';
 import { generateEmulatorAccountFromPrivateKey } from '@lucid-evolution/lucid';
 import { getGeneratorStatus, startGenerator, stopGenerator } from '@midgard-manager/tx-generator';
 import chalk from 'chalk';
@@ -9,9 +9,6 @@ import { saveConfig } from '../../../config/index.js';
 import { getWallet, listWallets } from '../../../config/wallets.js';
 import { MidgardError } from '../../../utils/errors.js';
 import type { Action } from '../types.js';
-
-// Available transaction types
-const transactionTypes = ['one-to-one', 'multi-output', 'mixed'];
 
 /**
  * Helper function to get a description for each transaction type
@@ -389,7 +386,7 @@ export const toggleTxGenerator: Action = {
       try {
         // Check current status
         const currentStatus = getGeneratorStatus();
-        const isRunning = currentStatus.running;
+       
 
         // Display current status with more detail
         if (context.config.generator.enabled) {

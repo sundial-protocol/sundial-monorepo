@@ -68,7 +68,7 @@ export class MidgardNodeClient {
    * Submit a transaction to the node with retries
    */
   submitTransaction(cborHex: string, txType: string = 'Transaction') {
-    return Effect.tryPromise((signal: AbortSignal) => 
+    return Effect.tryPromise((signal: AbortSignal) =>
       (async () => {
         // First check if node is available
         const isNodeAvailable = await this.isAvailable();
@@ -120,21 +120,22 @@ export class MidgardNodeClient {
             await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
           }
         }
-        
+
         throw new Error('All retry attempts failed');
       })()
     ).pipe(
       // Handle errors by converting them to our status format
-      Effect.catchAll((error) => 
+      Effect.catchAll((error) =>
         Effect.succeed(
-          error instanceof TypeError || (error instanceof Error && error.message === 'Node is not available')
+          error instanceof TypeError ||
+            (error instanceof Error && error.message === 'Node is not available')
             ? {
                 status: 'NODE_UNAVAILABLE',
                 message: 'Node is not available - transaction will be stored locally',
               }
             : {
                 status: 'ERROR',
-                error: error instanceof Error ? error.message : String(error)
+                error: error instanceof Error ? error.message : String(error),
               }
         )
       ),

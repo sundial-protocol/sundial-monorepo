@@ -1,6 +1,7 @@
 import { Args, Command } from '@effect/cli';
 import chalk from 'chalk';
 import { Effect, pipe } from 'effect';
+
 import {
   generateWallet,
   getWalletDetails,

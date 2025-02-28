@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname,join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Network } from '@lucid-evolution/lucid';
 
@@ -8,6 +9,10 @@ import {
   generateOneToOneTransactions,
 } from '../lib/generators/index.js';
 import { generateTestWallet } from '../utils/test-utils.js';
+
+// Get the directory path for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const DEFAULT_CONFIG = {
   network: 'Preview' as Network,
@@ -20,7 +25,8 @@ async function main() {
   const { privateKey, testUTxO } = await generateTestWallet();
 
   // output directory exists
-  const outputDir = join(process.cwd(), DEFAULT_CONFIG.outputDir);
+  const projectRoot = join(__dirname, '../../..');
+  const outputDir = join(projectRoot, DEFAULT_CONFIG.outputDir);
   await mkdir(outputDir, { recursive: true });
 
   console.log('Starting transaction generation...');

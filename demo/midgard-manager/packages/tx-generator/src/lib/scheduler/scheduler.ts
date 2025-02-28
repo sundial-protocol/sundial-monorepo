@@ -1,7 +1,9 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { Network, UTxO } from '@lucid-evolution/lucid';
 import pLimit from 'p-limit';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 
 import { MidgardNodeClient } from '../client/node-client.js';
 import {
@@ -10,10 +12,14 @@ import {
 } from '../generators/index.js';
 import {
   DEFAULT_CONFIG,
+  TRANSACTION_CONSTANTS,
   TransactionGeneratorConfig,
   validateGeneratorConfig,
-  TRANSACTION_CONSTANTS,
 } from '../types.js';
+
+// Get the directory path for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Generator State Manager
@@ -116,7 +122,9 @@ export const startGenerator = async (
 
   // Create output directory if needed
   if (fullConfig.outputDir) {
-    await mkdir(join(process.cwd(), fullConfig.outputDir), { recursive: true });
+    const projectRoot = join(__dirname, '../../../..');
+    const outputPath = join(projectRoot, fullConfig.outputDir);
+    await mkdir(outputPath, { recursive: true });
   }
 
   // Log start with more configuration details
@@ -171,8 +179,9 @@ export const startGenerator = async (
             const nodeAvailable = await nodeClient.isAvailable();
 
             if (!nodeAvailable && fullConfig.outputDir) {
+              const projectRoot = join(__dirname, '../../../..');
               const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
-              const filepath = join(process.cwd(), fullConfig.outputDir, filename);
+              const filepath = join(projectRoot, fullConfig.outputDir, filename);
               await writeFile(filepath, JSON.stringify(txs, null, 2));
               console.log(`Node unavailable - transactions written to ${filepath}`);
               state.stats.transactionsGenerated += txs.length;
@@ -181,12 +190,13 @@ export const startGenerator = async (
                 const submissionStart = Date.now();
                 for (const tx of txs) {
                   const result = await nodeClient.submitTransaction(tx.cborHex);
-                  
+
                   // Handle node unavailability gracefully
                   if (result && result.status === 'NODE_UNAVAILABLE') {
                     if (fullConfig.outputDir) {
+                      const projectRoot = join(__dirname, '../../../..');
                       const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
-                      const filepath = join(process.cwd(), fullConfig.outputDir, filename);
+                      const filepath = join(projectRoot, fullConfig.outputDir, filename);
                       await writeFile(filepath, JSON.stringify(txs, null, 2));
                       console.log(`Node unavailable - transactions written to ${filepath}`);
                     }
@@ -205,8 +215,9 @@ export const startGenerator = async (
                 console.error('Failed to submit transactions:', submitError);
 
                 if (fullConfig.outputDir) {
+                  const projectRoot = join(__dirname, '../../../..');
                   const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
-                  const filepath = join(process.cwd(), fullConfig.outputDir, filename);
+                  const filepath = join(projectRoot, fullConfig.outputDir, filename);
                   await writeFile(filepath, JSON.stringify(txs, null, 2));
                   console.log(`Failed submission - transactions written to ${filepath}`);
                 }

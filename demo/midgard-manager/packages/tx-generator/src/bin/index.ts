@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
+import { generateEmulatorAccountFromPrivateKey, Network } from '@lucid-evolution/lucid';
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { generateEmulatorAccountFromPrivateKey, Network } from '@lucid-evolution/lucid';
 
 import { getGeneratorStatus, startGenerator, stopGenerator } from '../lib/scheduler/scheduler.js';
 

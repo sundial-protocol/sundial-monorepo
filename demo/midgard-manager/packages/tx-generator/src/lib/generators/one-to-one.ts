@@ -14,6 +14,7 @@ import {
 import { waitWritable } from '../../utils/common.js';
 import { MidgardNodeClient } from '../client/node-client.js';
 import { SerializedMidgardTransaction } from '../client/types.js';
+import { Int } from 'effect/Schema';
 
 /**
  * Configuration for generating one-to-one transactions.
@@ -36,6 +37,19 @@ export interface OneToOneTransactionConfig {
 // Constants for transaction generation
 const GC_PAUSE_INTERVAL = 1000; // Number of transactions before GC pause
 const MIN_LOVELACE_OUTPUT = 1_000_000n; // Minimum lovelace per output
+
+/**
+ * Generates a unique hex string for transaction datum
+ * Combines timestamp and random values into a valid hex string
+ */
+const generateUniqueHexDatum = (counter: number): string => {
+  const timestamp = Date.now().toString(16).padStart(12, '0');
+  const random = Math.floor(Math.random() * 16777215)
+    .toString(16)
+    .padStart(6, '0');
+  const count = counter.toString(16).padStart(6, '0');
+  return timestamp + random + count;
+};
 
 /**
  * Validates the configuration parameters
@@ -116,12 +130,13 @@ const generateOneToOneTransactions = async (
   try {
     // First transaction to move away from genesis UTxO
     const initialTxBuilder = lucid.newTx();
-    const [initialNewWalletUTxOs, initialDerivedOutputs, initialTxSignBuilder] = await initialTxBuilder.pay
-      .ToAddress(initialUTxO.address, initialUTxO.assets)
-      .chain();
-    
-    const initialTxSigned = await initialTxSignBuilder.sign.withPrivateKey(walletSeedOrPrivateKey).complete();
-    
+    const [initialNewWalletUTxOs, initialDerivedOutputs, initialTxSignBuilder] =
+      await initialTxBuilder.pay.ToAddress(initialUTxO.address, initialUTxO.assets).chain();
+
+    const initialTxSigned = await initialTxSignBuilder.sign
+      .withPrivateKey(walletSeedOrPrivateKey)
+      .complete();
+
     // Use the output of initial transaction for subsequent transactions
     const firstUtxo = {
       txHash: initialTxSigned.toHash(),
@@ -129,29 +144,28 @@ const generateOneToOneTransactions = async (
       address: initialUTxO.address,
       assets: initialUTxO.assets,
     };
-    
+
     lucid.selectWallet.fromAddress(firstUtxo.address, [firstUtxo]);
 
     // Generate the actual transactions with unique data
     for (let i = 0; i < txsCount; i++) {
       const txBuilder = lucid.newTx();
-      
 
       const [newWalletUTxOs, derivedOutputs, txSignBuilder] = await txBuilder.pay
         .ToAddressWithData(
           initialUTxO.address,
-          { kind: 'inline', value: Data.to(BigInt(Date.now() + i)) },
+          { kind: 'inline', value: Data.to(generateUniqueHexDatum(i)) },
           initialUTxO.assets
         )
         .chain();
 
       const txSigned = await txSignBuilder.sign.withPrivateKey(walletSeedOrPrivateKey).complete();
-      
+
       // Create serialized transaction in Midgard format
       const txHash = txSigned.toHash();
       const tx: SerializedMidgardTransaction = {
         cborHex: txSigned.toCBOR(),
-        description: `One-to-One Self Transfer (${i + 1}/${txsCount})`,
+        description: `One-to-One Self Transfer ()`,
         txId: txHash,
         type: 'Midgard L2 User Transaction',
       };

@@ -1,7 +1,7 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 // Get the directory path relative to the project
 const __filename = fileURLToPath(import.meta.url);

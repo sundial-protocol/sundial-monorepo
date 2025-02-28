@@ -14,7 +14,7 @@ import pLimit from 'p-limit';
 
 import {
   getPublicKeyHashFromPrivateKey,
-  parseUnknownKeytoBech32PrivateKey
+  parseUnknownKeytoBech32PrivateKey,
 } from '../../utils/common.js';
 import { MidgardNodeClient } from '../client/node-client.js';
 import { SerializedMidgardTransaction } from '../client/types.js';

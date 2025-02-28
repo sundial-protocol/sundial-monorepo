@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
 import { generateEmulatorAccountFromPrivateKey, LucidEvolution } from '@lucid-evolution/lucid';
 
 // Simple wallet storage
