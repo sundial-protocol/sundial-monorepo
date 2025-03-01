@@ -5,7 +5,6 @@ import {
   logWarning,
 } from "../utils.js";
 import { LucidEvolution, getAddressDetails } from "@lucid-evolution/lucid";
-import * as SDK from "@al-ft/midgard-sdk";
 import express from "express";
 import sqlite3 from "sqlite3";
 import {
@@ -21,11 +20,56 @@ import { Effect, Option, Metric, pipe } from "effect";
 import { User, NodeConfig } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { NodeSdk } from "@effect/opentelemetry";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { StateQueueTx } from "@/transactions/index.js";
 import { Worker } from "worker_threads";
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+
+const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
+  description:
+    "A gauge for tracking the current number of transactions in the mempool",
+  bigint: true,
+});
+
+const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
+  description:
+    "A gauge for tracking the current number of transactions in the commit block",
+  bigint: true,
+});
+
+const totalTxSizeGauge = Metric.gauge("total_tx_size", {
+  description:
+    "A gauge for tracking the total size of transactions in the commit block",
+});
+
+const commitBlockCounter = Metric.counter("commit_block_count", {
+  description: "A counter for tracking the number of committed blocks",
+  bigint: true,
+  incremental: true,
+});
+
+const commitBlockTxCounter = Metric.counter("commit_block_tx_count", {
+  description:
+    "A counter for tracking the number of transactions in the commit block",
+  bigint: true,
+  incremental: true,
+});
+
+const commitBlockTxSizeGauge = Metric.gauge("commit_block_tx_size", {
+  description: "A gauge for tracking the size of the commit block transaction",
+});
+
+const txCounter = Metric.counter("tx_count", {
+  description: "A counter for tracking submit transactions",
+  bigint: true,
+  incremental: true,
+});
+
+const mergeBlockCounter = Metric.counter("merge_block_count", {
+  description: "A counter for tracking merge blocks",
+  bigint: true,
+  incremental: true,
+});
 
 export const listen = (
   lucid: LucidEvolution,
@@ -34,11 +78,6 @@ export const listen = (
 ): Effect.Effect<void, never, never> =>
   Effect.sync(() => {
     const app = express();
-    const txCounter = Metric.counter("tx_count", {
-      description: "A counter for tracking transactions",
-      bigint: true,
-      incremental: true,
-    }).pipe(Metric.tagged("environment", lucid.config().network!));
     app.get("/tx", (req, res) => {
       const txHash = req.query.tx_hash;
       logInfo(`GET /tx - Request received for tx_hash: ${txHash}`);
@@ -245,46 +284,60 @@ export const storeTx = async (
   });
 
 export const runNode = Effect.gen(function* () {
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
-  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-    stateQueueAddress: spendScriptAddress,
-    stateQueuePolicyId: policyId,
-  };
-
   const db = yield* Effect.tryPromise({
     try: () => UtilsDB.initializeDb(nodeConfig.DATABASE_PATH),
     catch: (e) => new Error(`${e}`),
   });
-
-  const otlpTraceExporter = new OTLPTraceExporter({
-    url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
-  });
-
-  // Log the OTLP port
-  logInfo(
-    `OTLP Trace Exporter running at http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
-  );
-
-  const prometheusExporter = new PrometheusExporter({
-    port: nodeConfig.PROM_METRICS_PORT,
-  });
-
-  // Ensure Prometheus exporter is started
-  yield* Effect.tryPromise({
-    try: async () => {
-      await prometheusExporter.startServer();
-      logInfo(
-        `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`,
-      );
+  const prometheusExporter = new PrometheusExporter(
+    {
+      port: nodeConfig.PROM_METRICS_PORT,
+      // host: "localhost",
     },
-    catch: (e) => new Error(`Failed to start Prometheus metrics server: ${e}`),
+    () => {
+      `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
+    },
+  );
+  const originalStop = prometheusExporter.stopServer;
+  prometheusExporter.stopServer = async function () {
+    logWarning("Prometheus exporter is stopping!");
+    return originalStop();
+  };
+  const cleanup = async () => {
+    logInfo("Shutting down Prometheus exporter...");
+
+    try {
+      if (prometheusExporter) {
+        await prometheusExporter.stopServer();
+        logInfo("Prometheus exporter stopped successfully.");
+      } else {
+        logWarning(
+          "Prometheus exporter is already undefined or was never initialized.",
+        );
+      }
+    } catch (error) {
+      logWarning(`Error stopping Prometheus exporter: ${error}`);
+    }
+    process.exit(0);
+  };
+
+  // Handle exit signals
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
+  process.on("exit", cleanup);
+  process.on("uncaughtException", (error) => {
+    logWarning(`Uncaught Exception: ${error.stack || error}`);
+    cleanup();
+  });
+  process.on("unhandledRejection", (reason) => {
+    logWarning(`Unhandled Rejection: ${reason || reason}`);
+    cleanup();
   });
 
   const MetricsLive = NodeSdk.layer(() => ({
     resource: { serviceName: "midgard-node" },
-    spanProcessor: new BatchSpanProcessor(otlpTraceExporter),
     metricReader: prometheusExporter,
   }));
 
@@ -292,11 +345,34 @@ export const runNode = Effect.gen(function* () {
     new Worker(new URL("./worker-monitorStateQueue.js", import.meta.url)),
     new Worker(new URL("./worker-monitorConfirmedState.js", import.meta.url)),
   ];
-  workers.forEach((w) => w.postMessage("start"));
+  workers.forEach((w) => {
+    w.on("message", (message) => {
+      switch (message.type) {
+        case "commit-block-metrics":
+          const { txSize, numTx, totalTxSize } = message.data;
+          Effect.runSync(commitBlockTxSizeGauge(Effect.succeed(txSize)));
+          Effect.runSync(commitBlockNumTxGauge(Effect.succeed(numTx)));
+          Effect.runSync(Metric.increment(commitBlockCounter));
+          Effect.runSync(Metric.incrementBy(commitBlockTxCounter, numTx));
+          Effect.runSync(totalTxSizeGauge(Effect.succeed(totalTxSize)));
+          break;
+        case "mempool-metrics":
+          Effect.runSync(mempoolTxGauge(Effect.succeed(message.data.numTx)));
+          break;
+        case "merge-tx-metric":
+          Effect.runSync(Metric.increment(mergeBlockCounter));
+          break;
+        default:
+          logWarning(`Unknown message type: ${message.type}`);
+      }
+    });
+    w.postMessage("start");
+  });
 
   yield* Effect.all([listen(user, db, nodeConfig.PORT)]).pipe(
     Effect.withSpan("midgard-node"),
     Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
     Effect.provide(MetricsLive),
+    Effect.catchAllCause(Effect.logError),
   );
 });

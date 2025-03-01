@@ -1,7 +1,7 @@
 // Build a tx Merkle root with all the mempool txs
 
-import { LucidEvolution, Script } from "@lucid-evolution/lucid";
-import { Effect } from "effect";
+import { LucidEvolution } from "@lucid-evolution/lucid";
+import { Effect, Metric } from "effect";
 import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
 import { handleSignSubmit } from "../utils.js";
@@ -12,8 +12,9 @@ import {
   UtilsDB,
 } from "@/database/index.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
-import { makeConfig, makeUserFn } from "@/config.js";
+import { makeConfig } from "@/config.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
+import { parentPort } from "worker_threads";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -34,7 +35,14 @@ export const buildAndSubmitCommitmentBlock = (
   Effect.gen(function* () {
     // Fetch transactions from the first block
     const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
-    if (txList.length > 0) {
+    const numTx = BigInt(txList.length);
+    parentPort?.postMessage({
+      type: "mempool-metrics",
+      data: {
+        numTx,
+      },
+    });
+    if (numTx > 0n) {
       const txs = txList.map(([txHash, txCbor]) => ({ txHash, txCbor }));
       const txRoot = yield* SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
       const txCbors = txList.map(([_txHash, txCbor]) => txCbor);
@@ -83,6 +91,18 @@ export const buildAndSubmitCommitmentBlock = (
       console.log("txSize :>> ", txSize);
       // Submit the transaction
       yield* handleSignSubmit(lucid, txBuilder);
+      const totalTxSize = txCbors.reduce(
+        (acc, cbor) => acc + cbor.length / 2,
+        0,
+      );
+      parentPort?.postMessage({
+        type: "commit-block-metrics",
+        data: {
+          txSize,
+          numTx,
+          totalTxSize,
+        },
+      });
       // TODO: For final product, handle tx submission failures properly.
       yield* Effect.tryPromise({
         try: () =>

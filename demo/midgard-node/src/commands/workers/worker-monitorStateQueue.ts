@@ -57,6 +57,9 @@ parentPort?.on("message", (_) => {
       Duration.millis(nodeConfig.POLLING_INTERVAL),
     );
     const action = monitorStateQueue(user, fetchConfig, db).pipe(
+      Effect.tap((metrics) => {
+        parentPort?.postMessage({ type: "metrics", data: metrics });
+      }),
       Effect.catchAll((error) => {
         Effect.log("monitorStateQueue: error occured", error);
         return Effect.void;

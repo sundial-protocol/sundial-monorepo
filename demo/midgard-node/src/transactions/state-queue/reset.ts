@@ -1,5 +1,12 @@
 import * as SDK from "@al-ft/midgard-sdk";
-import { Assets, Data, LucidEvolution, Script, UTxO, toUnit } from "@lucid-evolution/lucid";
+import {
+  Assets,
+  Data,
+  LucidEvolution,
+  Script,
+  UTxO,
+  toUnit,
+} from "@lucid-evolution/lucid";
 import { AlwaysSucceeds } from "@/services/index.js";
 import { User } from "@/config.js";
 import { Effect } from "effect";
