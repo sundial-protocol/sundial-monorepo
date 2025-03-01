@@ -40,8 +40,9 @@ export const listen = (
       incremental: true,
     }).pipe(Metric.tagged("environment", lucid.config().network!));
     app.get("/tx", (req, res) => {
-      res.type("text/plain");
       const txHash = req.query.tx_hash;
+      logInfo(`GET /tx - Request received for tx_hash: ${txHash}`);
+
       if (
         typeof txHash === "string" &&
         isHexString(txHash) &&
@@ -49,20 +50,31 @@ export const listen = (
       ) {
         MempoolDB.retrieveTxCborByHash(db, txHash).then((ret) => {
           Option.match(ret, {
-            onSome: (retrieved) => res.json({ tx: retrieved }),
+            onSome: (retrieved) => {
+              logInfo(`GET /tx - Transaction found in mempool: ${txHash}`);
+              res.json({ tx: retrieved });
+            },
             onNone: () =>
               ImmutableDB.retrieveTxCborByHash(db, txHash).then((ret) => {
                 Option.match(ret, {
-                  onSome: (retrieved) => res.json({ tx: retrieved }),
-                  onNone: () =>
+                  onSome: (retrieved) => {
+                    logInfo(
+                      `GET /tx - Transaction found in immutable: ${txHash}`,
+                    );
+                    res.json({ tx: retrieved });
+                  },
+                  onNone: () => {
+                    logWarning(`GET /tx - No transaction found: ${txHash}`);
                     res
                       .status(404)
-                      .json({ message: "No matching transactions found" }),
+                      .json({ message: "No matching transactions found" });
+                  },
                 });
               }),
           });
         });
       } else {
+        logWarning(`GET /tx - Invalid transaction hash: ${txHash}`);
         res
           .status(404)
           .json({ message: `Invalid transaction hash: ${txHash}` });
@@ -70,42 +82,57 @@ export const listen = (
     });
 
     app.get("/utxos", (req, res) => {
-      res.type("text/plain");
       const addr = req.query.addr;
+      logInfo(`GET /utxos - Request received for address: ${addr}`);
+
       if (typeof addr === "string") {
         try {
           const addrDetails = getAddressDetails(addr);
           if (addrDetails.paymentCredential) {
-            MempoolLedgerDB.retrieve(db).then((allUTxOs) =>
-              res.json({
-                utxos: allUTxOs.filter(
-                  (a) => a.address === addrDetails.address.bech32,
-                ),
-              }),
-            );
+            MempoolLedgerDB.retrieve(db).then((allUTxOs) => {
+              const filtered = allUTxOs.filter(
+                (a) => a.address === addrDetails.address.bech32,
+              );
+              logInfo(
+                `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
+              );
+              res.json({ utxos: filtered });
+            });
           } else {
+            logWarning(
+              `GET /utxos - Invalid address (no payment credential): ${addr}`,
+            );
             res.status(400).json({ message: `Invalid address: ${addr}` });
           }
-        } catch {
+        } catch (e) {
+          logWarning(
+            `GET /utxos - Invalid address format: ${addr}, error: ${e}`,
+          );
           res.status(400).json({ message: `Invalid address: ${addr}` });
         }
       } else {
+        logWarning(`GET /utxos - Invalid address type: ${addr}`);
         res.status(400).json({ message: `Invalid address: ${addr}` });
       }
     });
 
     app.get("/block", (req, res) => {
-      res.type("text/plain");
       const hdrHash = req.query.header_hash;
+      logInfo(`GET /block - Request received for header_hash: ${hdrHash}`);
+
       if (
         typeof hdrHash === "string" &&
         isHexString(hdrHash) &&
         hdrHash.length === 32
       ) {
-        BlocksDB.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes) =>
-          res.json({ hashes }),
-        );
+        BlocksDB.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes) => {
+          logInfo(
+            `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`,
+          );
+          res.json({ hashes });
+        });
       } else {
+        logWarning(`GET /block - Invalid block header hash: ${hdrHash}`);
         res
           .status(400)
           .json({ message: `Invalid block header hash: ${hdrHash}` });
@@ -113,6 +140,7 @@ export const listen = (
     });
 
     app.get("/init", async (_req, res) => {
+      logInfo("GET /init - Initialization request received");
       try {
         const program = pipe(
           StateQueueTx.stateQueueInit,
@@ -121,9 +149,10 @@ export const listen = (
           Effect.provide(NodeConfig.layer),
         );
         const txHash = await Effect.runPromise(program);
+        logInfo(`GET /init - Initialization successful: ${txHash}`);
         res.json({ message: `Initiation successful: ${txHash}` });
       } catch (e) {
-        logWarning(`Initiation failed: ${e}`);
+        logWarning(`GET /init - Initialization failed: ${e}`);
         res.status(500).json({
           message: "Initiation failed.",
         });
@@ -131,6 +160,7 @@ export const listen = (
     });
 
     app.get("/reset", async (_req, res) => {
+      logInfo("GET /reset - Reset request received");
       res.type("text/plain");
       try {
         const program = pipe(
@@ -164,8 +194,9 @@ export const listen = (
     });
 
     app.post("/submit", async (req, res) => {
-      res.type("text/plain");
       const txCBOR = req.query.tx_cbor;
+      logInfo(`POST /submit - Submit request received for transaction`);
+
       if (typeof txCBOR === "string" && isHexString(txCBOR)) {
         try {
           const tx = lucid.fromTx(txCBOR);
@@ -184,11 +215,16 @@ export const listen = (
           //   [MempoolLedgerDB.insert, produced],
           // );
           Effect.runSync(Metric.increment(txCounter));
+          logInfo(
+            `POST /submit - Transaction submitted successfully: ${tx.toHash()}`,
+          );
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
+          logWarning(`POST /submit - Submission failed: ${e}`);
           res.status(400).json({ message: `Something went wrong: ${e}` });
         }
       } else {
+        logWarning("POST /submit - Invalid CBOR provided");
         res.status(400).json({ message: "Invalid CBOR provided" });
       }
     });
