@@ -15,12 +15,12 @@ let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
 const monitorStateQueue = (
   lucid: LucidEvolution,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  db: sqlite3.Database
+  db: sqlite3.Database,
 ) =>
   Effect.gen(function* () {
     const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
       lucid,
-      fetchConfig
+      fetchConfig,
     );
     const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
     if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
@@ -30,7 +30,7 @@ const monitorStateQueue = (
         lucid,
         db,
         fetchConfig,
-        Date.now()
+        Date.now(),
       );
     }
   });
@@ -54,13 +54,13 @@ parentPort?.on("message", (_) => {
     });
 
     const policy = Schedule.addDelay(Schedule.forever, () =>
-      Duration.millis(nodeConfig.POLLING_INTERVAL)
+      Duration.millis(nodeConfig.POLLING_INTERVAL),
     );
     const action = monitorStateQueue(user, fetchConfig, db).pipe(
       Effect.catchAll((error) => {
         Effect.log("monitorStateQueue: error occured", error);
         return Effect.void;
-      })
+      }),
     );
     yield* Effect.repeat(action, policy);
   });
