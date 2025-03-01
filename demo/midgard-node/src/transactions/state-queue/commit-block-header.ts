@@ -1,7 +1,7 @@
 // Build a tx Merkle root with all the mempool txs
 
-import { LucidEvolution, Script } from "@lucid-evolution/lucid";
-import { Effect } from "effect";
+import { LucidEvolution } from "@lucid-evolution/lucid";
+import { Effect, Metric } from "effect";
 import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
 import { handleSignSubmit } from "../utils.js";
@@ -12,8 +12,42 @@ import {
   UtilsDB,
 } from "@/database/index.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
-import { makeConfig, makeUserFn } from "@/config.js";
+import { makeConfig } from "@/config.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
+
+const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
+  description:
+    "A gauge for tracking the current number of transactions in the mempool",
+  bigint: true,
+});
+
+const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
+  description:
+    "A gauge for tracking the current number of transactions in the commit block",
+  bigint: true,
+});
+
+const totalTxSizeGauge = Metric.gauge("total_tx_size", {
+  description:
+    "A gauge for tracking the total size of transactions in the commit block",
+});
+
+const commitBlockCounter = Metric.counter("commit_block_count", {
+  description: "A counter for tracking the number of committed blocks",
+  bigint: true,
+  incremental: true,
+});
+
+const commitBlockTxCounter = Metric.counter("commit_block_tx_count", {
+  description:
+    "A counter for tracking the number of transactions in the commit block",
+  bigint: true,
+  incremental: true,
+});
+
+const commitBlockTxSizeGauge = Metric.gauge("commit_block_tx_size", {
+  description: "A gauge for tracking the size of the commit block transaction",
+});
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -34,7 +68,9 @@ export const buildAndSubmitCommitmentBlock = (
   Effect.gen(function* () {
     // Fetch transactions from the first block
     const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
-    if (txList.length > 0) {
+    const numTx = BigInt(txList.length);
+    yield* mempoolTxGauge(Effect.succeed(numTx));
+    if (numTx > 0n) {
       const txs = txList.map(([txHash, txCbor]) => ({ txHash, txCbor }));
       const txRoot = yield* SDK.Utils.mptFromList(txs.map((tx) => tx.txCbor));
       const txCbors = txList.map(([_txHash, txCbor]) => txCbor);
@@ -83,6 +119,15 @@ export const buildAndSubmitCommitmentBlock = (
       console.log("txSize :>> ", txSize);
       // Submit the transaction
       yield* handleSignSubmit(lucid, txBuilder);
+      yield* commitBlockTxSizeGauge(Effect.succeed(txSize));
+      yield* commitBlockNumTxGauge(Effect.succeed(numTx));
+      yield* Metric.increment(commitBlockCounter);
+      yield* Metric.incrementBy(commitBlockTxCounter, numTx);
+      const totalTxSize = txCbors.reduce(
+        (acc, cbor) => acc + cbor.length / 2,
+        0,
+      );
+      yield* totalTxSizeGauge(Effect.succeed(totalTxSize));
       // TODO: For final product, handle tx submission failures properly.
       yield* Effect.tryPromise({
         try: () =>

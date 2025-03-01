@@ -26,6 +26,7 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { StateQueueTx } from "@/transactions/index.js";
 import { Worker } from "worker_threads";
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 
 export const listen = (
   lucid: LucidEvolution,
@@ -258,6 +259,7 @@ export const runNode = Effect.gen(function* () {
     catch: (e) => new Error(`${e}`),
   });
 
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   const otlpTraceExporter = new OTLPTraceExporter({
     url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
   });
@@ -269,6 +271,7 @@ export const runNode = Effect.gen(function* () {
 
   const prometheusExporter = new PrometheusExporter({
     port: nodeConfig.PROM_METRICS_PORT,
+    host: "localhost",
   });
 
   // Ensure Prometheus exporter is started
