@@ -294,7 +294,7 @@ export const runNode = Effect.gen(function* () {
   const prometheusExporter = new PrometheusExporter(
     {
       port: nodeConfig.PROM_METRICS_PORT,
-      host: "localhost",
+      // host: "localhost",
     },
     () => {
       `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;

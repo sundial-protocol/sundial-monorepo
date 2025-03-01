@@ -17,6 +17,9 @@ dependencies:
   '@lucid-evolution/lucid':
     specifier: ^0.4.23
     version: 0.4.23(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
+  '@opentelemetry/api':
+    specifier: ^1.9.0
+    version: 1.9.0
   '@opentelemetry/exporter-prometheus':
     specifier: ^0.57.2
     version: 0.57.2(@opentelemetry/api@1.9.0)
@@ -4261,7 +4264,7 @@ packages:
     dev: false
 
   file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2):
-    resolution: {integrity: sha512-rmFUjjF0Iv1/DVA1tu0hVUr6pL3hPHBiVZwx4THk7JcfoWEpSxZH09wpL+TRDPogjJOnr2RPa9zmEJLIaZ8HsA==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-dGDApdxG8ISZ+phNvkRwDbqIpkHySzrx2PEdgF8EiiKN9prZGCO7ut2nFvM5630UiG6s0ZUnnulRyluCdL1gUg==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
     id: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz
     name: '@al-ft/midgard-sdk'
     version: 0.1.0

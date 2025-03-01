@@ -35,6 +35,9 @@ parentPort?.on("message", (_) => {
       spendScript,
       mintScript,
     ).pipe(
+      Effect.tap((metrics) => {
+        parentPort?.postMessage({ type: "metrics", data: metrics });
+      }),
       Effect.catchAll((error) => {
         Effect.log("monitorConfirmedState: error occured", error);
         return Effect.void;
