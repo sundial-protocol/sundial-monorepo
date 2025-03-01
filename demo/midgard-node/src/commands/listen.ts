@@ -25,6 +25,52 @@ import { StateQueueTx } from "@/transactions/index.js";
 import { Worker } from "worker_threads";
 import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 
+const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
+  description:
+    "A gauge for tracking the current number of transactions in the mempool",
+  bigint: true,
+});
+
+const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
+  description:
+    "A gauge for tracking the current number of transactions in the commit block",
+  bigint: true,
+});
+
+const totalTxSizeGauge = Metric.gauge("total_tx_size", {
+  description:
+    "A gauge for tracking the total size of transactions in the commit block",
+});
+
+const commitBlockCounter = Metric.counter("commit_block_count", {
+  description: "A counter for tracking the number of committed blocks",
+  bigint: true,
+  incremental: true,
+});
+
+const commitBlockTxCounter = Metric.counter("commit_block_tx_count", {
+  description:
+    "A counter for tracking the number of transactions in the commit block",
+  bigint: true,
+  incremental: true,
+});
+
+const commitBlockTxSizeGauge = Metric.gauge("commit_block_tx_size", {
+  description: "A gauge for tracking the size of the commit block transaction",
+});
+
+const txCounter = Metric.counter("tx_count", {
+  description: "A counter for tracking submit transactions",
+  bigint: true,
+  incremental: true,
+});
+
+const mergeBlockCounter = Metric.counter("merge_block_count", {
+  description: "A counter for tracking merge blocks",
+  bigint: true,
+  incremental: true,
+});
+
 export const listen = (
   lucid: LucidEvolution,
   db: sqlite3.Database,
@@ -32,11 +78,6 @@ export const listen = (
 ): Effect.Effect<void, never, never> =>
   Effect.sync(() => {
     const app = express();
-    const txCounter = Metric.counter("tx_count", {
-      description: "A counter for tracking transactions",
-      bigint: true,
-      incremental: true,
-    }).pipe(Metric.tagged("environment", lucid.config().network!));
     app.get("/tx", (req, res) => {
       const txHash = req.query.tx_hash;
       logInfo(`GET /tx - Request received for tx_hash: ${txHash}`);
@@ -304,7 +345,29 @@ export const runNode = Effect.gen(function* () {
     new Worker(new URL("./worker-monitorStateQueue.js", import.meta.url)),
     new Worker(new URL("./worker-monitorConfirmedState.js", import.meta.url)),
   ];
-  workers.forEach((w) => w.postMessage("start"));
+  workers.forEach((w) => {
+    w.on("message", (message) => {
+      switch (message.type) {
+        case "commit-block-metrics":
+          const { txSize, numTx, totalTxSize } = message.data;
+          Effect.runSync(commitBlockTxSizeGauge(Effect.succeed(txSize)));
+          Effect.runSync(commitBlockNumTxGauge(Effect.succeed(numTx)));
+          Effect.runSync(Metric.increment(commitBlockCounter));
+          Effect.runSync(Metric.incrementBy(commitBlockTxCounter, numTx));
+          Effect.runSync(totalTxSizeGauge(Effect.succeed(totalTxSize)));
+          break;
+        case "mempool-metrics":
+          Effect.runSync(mempoolTxGauge(Effect.succeed(message.data.numTx)));
+          break;
+        case "merge-tx-metric":
+          Effect.runSync(Metric.increment(mergeBlockCounter));
+          break;
+        default:
+          logWarning(`Unknown message type: ${message.type}`);
+      }
+    });
+    w.postMessage("start");
+  });
 
   yield* Effect.all([listen(user, db, nodeConfig.PORT)]).pipe(
     Effect.withSpan("midgard-node"),

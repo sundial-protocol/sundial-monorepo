@@ -15,6 +15,7 @@ import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import { BlocksDB, ConfirmedLedgerDB, UtilsDB } from "@/database/index.js";
 import { AlwaysSucceeds } from "@/services/index.js";
+import { parentPort } from "worker_threads";
 
 /**
  * Build and submit the merge transaction.
@@ -49,6 +50,9 @@ export const buildAndSubmitMergeTx = (
 
     // Submit the transaction
     yield* handleSignSubmit(lucid, txBuilder);
+    parentPort?.postMessage({
+      type: "merge-tx-metric",
+    });
 
     console.log("firstBlockTxs :>> ", firstBlockTxs);
     const { spent: spentOutRefs, produced: producedUTxOs } =
