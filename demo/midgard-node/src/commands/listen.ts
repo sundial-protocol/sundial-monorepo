@@ -5,7 +5,6 @@ import {
   logWarning,
 } from "../utils.js";
 import { LucidEvolution, getAddressDetails } from "@lucid-evolution/lucid";
-import * as SDK from "@al-ft/midgard-sdk";
 import express from "express";
 import sqlite3 from "sqlite3";
 import {
@@ -21,9 +20,7 @@ import { Effect, Option, Metric, pipe } from "effect";
 import { User, NodeConfig } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { NodeSdk } from "@effect/opentelemetry";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { StateQueueTx } from "@/transactions/index.js";
 import { Worker } from "worker_threads";
 import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
@@ -246,48 +243,60 @@ export const storeTx = async (
   });
 
 export const runNode = Effect.gen(function* () {
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
-  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-    stateQueueAddress: spendScriptAddress,
-    stateQueuePolicyId: policyId,
-  };
-
   const db = yield* Effect.tryPromise({
     try: () => UtilsDB.initializeDb(nodeConfig.DATABASE_PATH),
     catch: (e) => new Error(`${e}`),
   });
-
-  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
-  const otlpTraceExporter = new OTLPTraceExporter({
-    url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
-  });
-
-  // Log the OTLP port
-  logInfo(
-    `OTLP Trace Exporter running at http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
-  );
-
-  const prometheusExporter = new PrometheusExporter({
-    port: nodeConfig.PROM_METRICS_PORT,
-    host: "localhost",
-  });
-
-  // Ensure Prometheus exporter is started
-  yield* Effect.tryPromise({
-    try: async () => {
-      await prometheusExporter.startServer();
-      logInfo(
-        `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`,
-      );
+  const prometheusExporter = new PrometheusExporter(
+    {
+      port: nodeConfig.PROM_METRICS_PORT,
+      host: "localhost",
     },
-    catch: (e) => new Error(`Failed to start Prometheus metrics server: ${e}`),
+    () => {
+      `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
+    },
+  );
+  const originalStop = prometheusExporter.stopServer;
+  prometheusExporter.stopServer = async function () {
+    logWarning("Prometheus exporter is stopping!");
+    return originalStop();
+  };
+  const cleanup = async () => {
+    logInfo("Shutting down Prometheus exporter...");
+
+    try {
+      if (prometheusExporter) {
+        await prometheusExporter.stopServer();
+        logInfo("Prometheus exporter stopped successfully.");
+      } else {
+        logWarning(
+          "Prometheus exporter is already undefined or was never initialized.",
+        );
+      }
+    } catch (error) {
+      logWarning(`Error stopping Prometheus exporter: ${error}`);
+    }
+    process.exit(0);
+  };
+
+  // Handle exit signals
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
+  process.on("exit", cleanup);
+  process.on("uncaughtException", (error) => {
+    logWarning(`Uncaught Exception: ${error.stack || error}`);
+    cleanup();
+  });
+  process.on("unhandledRejection", (reason) => {
+    logWarning(`Unhandled Rejection: ${reason || reason}`);
+    cleanup();
   });
 
   const MetricsLive = NodeSdk.layer(() => ({
     resource: { serviceName: "midgard-node" },
-    spanProcessor: new BatchSpanProcessor(otlpTraceExporter),
     metricReader: prometheusExporter,
   }));
 
@@ -301,5 +310,6 @@ export const runNode = Effect.gen(function* () {
     Effect.withSpan("midgard-node"),
     Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
     Effect.provide(MetricsLive),
+    Effect.catchAllCause(Effect.logError),
   );
 });
