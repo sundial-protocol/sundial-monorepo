@@ -32,6 +32,7 @@ export const mergeTxBuilder = (
   Effect.gen(function* () {
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
       yield* fetchConfirmedStateAndItsLinkProgram(lucid, fetchConfig);
+    console.log("firstBlockUTxO :>> ", firstBlockUTxO);
     if (!firstBlockUTxO) {
       return yield* Effect.fail(new Error("No blocks in queue"));
     } else {
@@ -43,6 +44,7 @@ export const mergeTxBuilder = (
         catch: (e) => new Error(`${e}`),
       });
       const blockNode: NodeDatum = yield* getNodeDatumFromUTxO(firstBlockUTxO);
+      console.log("blockNode :>> ", blockNode);
       const blockHeader: Header = yield* getHeaderFromBlockUTxO(firstBlockUTxO);
       const headerHash = yield* hashHeader(blockHeader);
       const newConfirmedState = {
@@ -56,8 +58,9 @@ export const mergeTxBuilder = (
       const newConfirmedNodeDatum: NodeDatum = {
         ...currentConfirmedNodeDatum,
         data: Data.castTo(newConfirmedState, ConfirmedState),
-        next: blockNode.key,
+        next: blockNode.next,
       };
+      console.log("newConfirmedNodeDatum :>> ", newConfirmedNodeDatum);
       const [nftSym, nftName, _nftQty] = yield* getSingleAssetApartFromAda(
         firstBlockUTxO.assets,
       );
@@ -78,7 +81,7 @@ export const mergeTxBuilder = (
           },
           confirmedUTxO.assets,
         )
-        .mintAssets(assetsToBurn)
+        .mintAssets(assetsToBurn, Data.void())
         .attach.Script(stateQueueSpendingScript)
         .attach.Script(stateQueueMintingScript);
       return tx;

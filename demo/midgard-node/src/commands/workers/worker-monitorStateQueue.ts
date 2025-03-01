@@ -16,7 +16,6 @@ const monitorStateQueue = (
   lucid: LucidEvolution,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   db: sqlite3.Database,
-  spendScript: Script,
 ) =>
   Effect.gen(function* () {
     const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
@@ -31,7 +30,6 @@ const monitorStateQueue = (
         lucid,
         db,
         fetchConfig,
-        spendScript,
         Date.now(),
       );
     }
@@ -43,7 +41,7 @@ parentPort?.on("message", (_) => {
   const workerProgram = Effect.gen(function* () {
     const nodeConfig = yield* makeConfig;
     const { user } = yield* makeUserFn(nodeConfig);
-    const { spendScriptAddress, policyId, spendScript } =
+    const { spendScriptAddress, policyId } =
       yield* makeAlwaysSucceedsServiceFn(nodeConfig);
     const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
       stateQueueAddress: spendScriptAddress,
@@ -58,7 +56,7 @@ parentPort?.on("message", (_) => {
     const policy = Schedule.addDelay(Schedule.forever, () =>
       Duration.millis(nodeConfig.POLLING_INTERVAL),
     );
-    const action = monitorStateQueue(user, fetchConfig, db, spendScript).pipe(
+    const action = monitorStateQueue(user, fetchConfig, db).pipe(
       Effect.catchAll((error) => {
         Effect.log("monitorStateQueue: error occured", error);
         return Effect.void;

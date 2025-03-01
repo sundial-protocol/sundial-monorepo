@@ -12,6 +12,8 @@ import {
   UtilsDB,
 } from "@/database/index.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
+import { makeConfig, makeUserFn } from "@/config.js";
+import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -27,7 +29,6 @@ export const buildAndSubmitCommitmentBlock = (
   lucid: LucidEvolution,
   db: Database,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  spendScript: Script,
   endTime: number,
 ) =>
   Effect.gen(function* () {
@@ -56,13 +57,19 @@ export const buildAndSubmitCommitmentBlock = (
       const newUTxOList = [...filteredUTxOList, ...producedList].map(
         (utxo) => utxo.txHash + utxo.outputIndex,
       );
+
       const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
+      const nodeConfig = yield* makeConfig;
+      const { policyId, spendScript, mintScript } =
+        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
       // Build commitment block
       const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
-        newUTxOsRoot: utxoRoot.hash.toString(),
-        transactionsRoot: txRoot.hash.toString(),
+        newUTxOsRoot: utxoRoot.hash.toString("hex"),
+        transactionsRoot: txRoot.hash.toString("hex"),
         endTime: BigInt(endTime),
         stateQueueSpendingScript: spendScript,
+        policyId,
+        stateQueueMintingScript: mintScript,
       };
       const aoUpdateCommitmentTimeParams = {};
       const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
@@ -71,6 +78,9 @@ export const buildAndSubmitCommitmentBlock = (
         commitBlockParams,
         aoUpdateCommitmentTimeParams,
       );
+      const txSize = txBuilder.toCBOR().length / 2;
+      // console.log("txBuilder.toCBOR() :>> ", txBuilder.toCBOR());
+      console.log("txSize :>> ", txSize);
       // Submit the transaction
       yield* handleSignSubmit(lucid, txBuilder);
       // TODO: For final product, handle tx submission failures properly.
