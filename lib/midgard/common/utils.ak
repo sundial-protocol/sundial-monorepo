@@ -1,16 +1,20 @@
+use aiken/builtin
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
+use aiken/merkle_patricia_forestry as mpf
+use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/validity_range_normalization as vrn
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
   Input, Output, OutputReference, Redeemer, ScriptPurpose, ValidityRange,
 }
+use env
 use midgard/common/constants.{
   max_validity_range_for_current_time, posix_time_none,
 }
-use midgard/common/types.{POSIXTime, Tokens}
+use midgard/common/types.{MerkleRoot, MerklingInput, POSIXTime, Tokens}
 
 pub fn validate_mint(
   mints: Value,
@@ -216,4 +220,61 @@ pub fn get_redeemer_at(
   expect Some(redeemer_pair) = redeemers |> list.at(redeemer_index)
   expect redeemer_pair.1st == expected_purpose
   redeemer_pair.2nd
+}
+
+fn plutarch_helper_root_key_value_proof(
+  plutarch_function_validator_hash: ScriptHash,
+  mpf_root: ByteArray,
+  key: Data,
+  value: Data,
+  membership_proof: mpf.Proof,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+) -> Bool {
+  todo
+}
+
+pub fn plutarch_phas(
+  mpf_root: ByteArray,
+  key: Data,
+  value: Data,
+  membership_proof: mpf.Proof,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+) -> Bool {
+  merkelized_validator.generic_delegated_validation(
+    staking_validator: env.plutarch_phas_validator_hash,
+    withdraw_redeemer_validator: fn(membership_validator_redeemer: Data) -> Bool {
+      expect [
+        input_root_data, input_key_data, input_value_data, input_proof_data,
+        ..
+      ] = builtin.unconstr_fields(membership_validator_redeemer)
+      let mpf_root_data: Data = mpf_root
+      let proof_data: Data = membership_proof
+      and {
+        mpf_root_data == input_root_data,
+        key == input_key_data,
+        value == input_value_data,
+        proof_data == input_proof_data,
+      }
+    },
+    redeemers: redeemers,
+  )
+}
+
+pub fn plutarch_pinsert(
+  root: ByteArray,
+  key: Data,
+  value: Data,
+  proof: mpf.Proof,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+) -> MerkleRoot {
+  merkelized_validator.delegated_compute(
+    function_input: MerklingInput { root, key, value, proof },
+    staking_validator: env.plutarch_pinsert_validator_hash,
+    input_data_coercer: fn(input: Data) {
+      expect coerced: MerklingInput = input
+      coerced
+    },
+    output_data_coercer: builtin.un_b_data,
+    redeemers: redeemers,
+  )
 }

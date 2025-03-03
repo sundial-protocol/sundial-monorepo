@@ -1,4 +1,5 @@
 use aiken/crypto.{Blake2b_256, Hash, VerificationKeyHash}
+use aiken/merkle_patricia_forestry as mpf
 use cardano/assets.{AssetName, PolicyId}
 
 /// A number of milliseconds since 00:00:00 UTC on 1 January 1970.
@@ -18,3 +19,10 @@ pub type PubKeyHash =
 
 pub type MerkleRoot =
   Hash<Blake2b_256, ByteArray>
+
+pub type MerklingInput {
+  root: ByteArray,
+  key: Data,
+  value: Data,
+  proof: mpf.Proof,
+}

@@ -4,7 +4,7 @@ use aiken/merkle_patricia_forestry as mpf
 use cardano/address.{Address}
 use cardano/assets.{AssetName}
 use cardano/transaction.{OutputReference}
-use midgard/common/types.{POSIXTime, Tokens}
+use midgard/common/types.{MerkleRoot, POSIXTime, Tokens}
 use midgard/user_events
 
 pub type Event =
@@ -30,14 +30,14 @@ pub type SpendRedeemer {
   settlement_ref_input_index: Int,
   settlement_node_asset_name: AssetName,
   mint_redeemer_index: Int,
-  membership_proof: mpf.Proof,
+  merkle_proof: mpf.Proof,
   purpose: SpendPurpose,
 }
 
 pub type SpendPurpose {
   FundWithdrawal
   TransferToReserve
-  RefundOfSkippedDeposit
+  RefundOfSkippedDeposit { insertion_root: MerkleRoot }
   RefundOfDepositInTimeGap { settlement_link_ref_input_index: Int }
 }
 

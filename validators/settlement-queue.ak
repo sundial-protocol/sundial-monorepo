@@ -1,4 +1,3 @@
-use aiken/builtin
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite, Interval}
@@ -6,7 +5,6 @@ use aiken_design_patterns/linked_list/ordered
 use aiken_design_patterns/linked_list/unordered.{
   Key, NodeDatum, get_node_inputs, get_node_outputs, list_state_transition,
 }
-use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
@@ -24,11 +22,7 @@ use midgard/settlement_queue.{
 use midgard/state_queue
 use midgard/user_events
 
-validator spend(
-  hub_oracle: ScriptHash,
-  settlement_policy_id: ScriptHash,
-  plutarch_phas_validator_hash: ScriptHash,
-) {
+validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
   spend(
     m_datum: Option<Datum>,
     redeemer: SpendRedeemer,
@@ -217,26 +211,12 @@ validator spend(
                 //    tree of the settlement datum that's been flagged as fully
                 //    resolved by its operator.
                 expect
-                  merkelized_validator.generic_delegated_validation(
-                    staking_validator: plutarch_phas_validator_hash,
-                    withdraw_redeemer_validator: fn(
-                      membership_validator_redeemer: Data,
-                    ) -> Bool {
-                      expect [
-                        input_root_data, input_key_data, input_value_data,
-                        input_proof_data,
-                        ..
-                      ] = builtin.unconstr_fields(membership_validator_redeemer)
-                      let mpf_root_data: Data = events_root
-                      let proof_data: Data = membership_proof
-                      and {
-                        mpf_root_data == input_root_data,
-                        event_key == input_key_data,
-                        event_value == input_value_data,
-                        proof_data == input_proof_data,
-                      }
-                    },
-                    redeemers: redeemers,
+                  utils.plutarch_phas(
+                    events_root,
+                    event_key,
+                    event_value,
+                    membership_proof,
+                    redeemers,
                   )
 
                 // 4. Expect a mint redeemer at the specified redeemer index.
