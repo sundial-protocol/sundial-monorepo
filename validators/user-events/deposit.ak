@@ -3,12 +3,10 @@ use aiken/collection/list
 use aiken/crypto.{Blake2b_256, Hash, ScriptHash}
 use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/linked_list/unordered
-use cardano/address.{Address, Credential, Script}
 use cardano/assets.{PolicyId}
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Publish, Redeemer,
-  Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use midgard/common/parameter_validation
 use midgard/common/utils
@@ -18,7 +16,8 @@ use midgard/user_events
 use midgard/user_events/deposit.{
   AuthenticateDeposit, BurnDepositNFT, Datum, Event, FundWithdrawal, Info,
   MintRedeemer, RefundOfDepositInTimeGap, RefundOfSkippedDeposit, SpendRedeemer,
-  TransferToReserve, nonce_out_ref_to_l2_id,
+  TransferToReserve, nonce_out_ref_to_l2_id, validate_witness_redeemer,
+  witness_script_prefix,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -81,7 +80,7 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = parsed_settlement_node_datum.data
 
-    expect BurnDepositNFT { l2_id: burn_asset_name }: MintRedeemer =
+    expect BurnDepositNFT { l2_id: burn_asset_name, .. }: MintRedeemer =
       utils.get_redeemer_at(
         redeemers,
         Mint(deposit_policy_id),
@@ -101,8 +100,6 @@ validator spend(hub_oracle: ScriptHash) {
     when purpose is {
       FundWithdrawal -> todo
       TransferToReserve -> todo
-      // TODO: Check unregistration of witness staking credential for refund
-      //       endpoints.
       RefundOfSkippedDeposit { insertion_root } -> {
         // Downcast values already extracted from the datum.
         let event_id_data: Data = event_nonce_out_ref
@@ -166,11 +163,6 @@ validator spend(hub_oracle: ScriptHash) {
   }
 }
 
-/// Witness script's prefix from its single CBOR encoded applied bytearray.
-/// TODO: This should probably be moved to `env`.
-const witness_script_prefix: ByteArray =
-  #"59016101010033232323232323223225333004323232323253330093370e900318051baa00113232323232323253330103370e900000209998081801998011bab30013012375401400a941288a99980819b87480080104ccc040c00ccc008dd5980098091baa00a0054a09445281180a980b180b180b180b0009119299980899b8748008c048dd50008a5eb7bdb1804dd5980b18099baa001323300100100322533301500114c103d87a800013233322253330163372200e0062a66602c66e3c01c00c4cdd2a4000660346e980092f5c02980103d87a8000133006006001375c60280026eacc054004c064008c05c00494ccc0440045288a50300d3754602260240066eb8010dd6980780098059baa00116300d300e003300c002300b002300b0013006375400229309b2b1bae0015734aae7555cf2ab9f5740ae855d12601225820"
-
 validator mint(hub_oracle: ScriptHash) {
   mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
     when redeemer is {
@@ -214,6 +206,18 @@ validator mint(hub_oracle: ScriptHash) {
             param: l2_id,
           )
 
+        // 1. Validate this script hash is being registered.
+        // 2. Validate the policy ID passed in its redeemer is the same as this
+        //    deposit policy ID.
+        expect
+          validate_witness_redeemer(
+            expected_witness_script_hash: expected_witness_script_hash,
+            witness_redeemer_index: witness_registration_redeemer_index,
+            for_registration: True,
+            event_policy_id: own_policy,
+            redeemers: redeemers,
+          )
+
         // Deposit event's produced UTxO.
         expect Some(Output {
           address: output_deposit_address,
@@ -234,56 +238,51 @@ validator mint(hub_oracle: ScriptHash) {
           ..
         }: Datum = output_deposit_datum_data
 
-        expect and {
-            // 1. Deposit UTxO must be produced at the deposit script's address
-            //    from hub oracle.
-            output_deposit_address == deposit_addr,
-            // 2. Specified list of tokens in the deposit event must be included
-            //    in the value of the deposit UTxO (along with its NFT). No
-            //    validation on ADA (TODO?).
-            utils.authentic_value_has_tokens(
-              output_deposit_value,
-              own_policy,
-              l2_id,
-              output_deposit_tokens,
-            ),
-            // 3. ID of the deposit event must match the specified nonce input's
-            //    output reference.
-            output_deposit_id == nonce_input_out_ref,
-            // 4. Specified inclusion time of the event must be some time in the
-            //    future.
-            output_deposit_inclusion_time == valid_to + user_events.wait_duration,
-            // 5. Recorded witness must be correct.
-            output_deposit_witness == expected_witness_script_hash,
-          }
-
-        // Grab redeemer pair of witness script registration.
-        expect Some(witness_registration_redeemer_pair) =
-          redeemers |> list.at(witness_registration_redeemer_index)
-
-        // Grab the included script hash (no validation on `certificate` index,
-        // TODO?).
-        expect Publish {
-          certificate: RegisterCredential {
-            credential: Script(witness_registration_script_hash),
-            ..
-          },
-          ..
-        } = witness_registration_redeemer_pair.1st
-
-        // Type cast its redeemer to `PolicyId`.
-        expect witness_registration_redeemer: PolicyId =
-          witness_registration_redeemer_pair.2nd
-
         and {
-          // 6. Registered script must match the expected witness.
-          witness_registration_script_hash == expected_witness_script_hash,
-          // 7. Deposit policy ID must be the registration redeemer.
-          witness_registration_redeemer == own_policy,
+          // 3. Deposit UTxO must be produced at the deposit script's address
+          //    from hub oracle.
+          output_deposit_address == deposit_addr,
+          // 4. Specified list of tokens in the deposit event must be included
+          //    in the value of the deposit UTxO (along with its NFT). No
+          //    validation on ADA (TODO?).
+          utils.authentic_value_has_tokens(
+            output_deposit_value,
+            own_policy,
+            l2_id,
+            output_deposit_tokens,
+          ),
+          // 5. ID of the deposit event must match the specified nonce input's
+          //    output reference.
+          output_deposit_id == nonce_input_out_ref,
+          // 6. Specified inclusion time of the event must be some time in the
+          //    future.
+          output_deposit_inclusion_time == valid_to + user_events.wait_duration,
+          // 7. Recorded witness must be correct.
+          output_deposit_witness == expected_witness_script_hash,
         }
       }
-      BurnDepositNFT { l2_id } ->
-        assets.quantity_of(tx.mint, own_policy, l2_id) == -1
+      BurnDepositNFT { l2_id, witness_unregistration_redeemer_index } -> {
+        let Transaction { mint, redeemers, .. } = tx
+        let expected_witness_script_hash =
+          parameter_validation.apply_prehashed_param(
+            version: 3,
+            prefix: witness_script_prefix,
+            param: l2_id,
+          )
+        and {
+          // 1. The claimed NFT must be burnt.
+          assets.quantity_of(mint, own_policy, l2_id) == -1,
+          // 2. Witness staking script corresponding to the NFT must be getting
+          //    unregistered.
+          validate_witness_redeemer(
+            expected_witness_script_hash: expected_witness_script_hash,
+            witness_redeemer_index: witness_unregistration_redeemer_index,
+            for_registration: False,
+            event_policy_id: own_policy,
+            redeemers: redeemers,
+          ),
+        }
+      }
     }
   }
 
