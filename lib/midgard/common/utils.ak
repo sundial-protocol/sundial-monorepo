@@ -200,6 +200,12 @@ pub fn get_singleton_asset_with_policy(
   p
 }
 
+/// Given a value, an NFT, and a `Tokens` (structured identical to `Value`, but
+/// safe for storage in datums), this helper ensures that the given `Value` is
+/// a correct representation of the given `Tokens`. Meaning it expects `Value`
+/// to only have the `Tokens`, the NFT, and some ADA. It also validates that 0
+/// ADA is included in `Tokens` (this does NOT validate the absence of ADA
+/// policy ID and asset name in `Tokens`, TODO?).
 pub fn authentic_value_has_tokens(
   value: Value,
   nft_policy_id: PolicyId,
@@ -209,7 +215,7 @@ pub fn authentic_value_has_tokens(
   let without_nft =
     value
       |> assets.add(nft_policy_id, nft_asset_name, -1)
-  assets.match(without_nft, tokens, fn(_, _) { True })
+  assets.match(without_nft, tokens, fn(_, tokens_ada) { tokens_ada == 0 })
 }
 
 pub fn get_redeemer_at(
@@ -220,17 +226,6 @@ pub fn get_redeemer_at(
   expect Some(redeemer_pair) = redeemers |> list.at(redeemer_index)
   expect redeemer_pair.1st == expected_purpose
   redeemer_pair.2nd
-}
-
-fn plutarch_helper_root_key_value_proof(
-  plutarch_function_validator_hash: ScriptHash,
-  mpf_root: ByteArray,
-  key: Data,
-  value: Data,
-  membership_proof: mpf.Proof,
-  redeemers: Pairs<ScriptPurpose, Redeemer>,
-) -> Bool {
-  todo
 }
 
 pub fn plutarch_phas(

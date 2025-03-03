@@ -6,7 +6,7 @@ use aiken_design_patterns/linked_list/unordered
 use cardano/assets.{PolicyId}
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
+  InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Transaction,
 }
 use midgard/common/parameter_validation
 use midgard/common/utils
@@ -14,8 +14,8 @@ use midgard/hub_oracle as hub
 use midgard/settlement_queue
 use midgard/user_events
 use midgard/user_events/deposit.{
-  AuthenticateDeposit, BurnDepositNFT, Datum, Event, FundWithdrawal, Info,
-  MintRedeemer, RefundOfDepositInTimeGap, RefundOfSkippedDeposit, SpendRedeemer,
+  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap, Event,
+  FundWithdrawal, Info, MintRedeemer, Refund, SkippedDeposit, SpendRedeemer,
   TransferToReserve, nonce_out_ref_to_l2_id, validate_witness_redeemer,
   witness_script_prefix,
 }
@@ -27,7 +27,8 @@ validator spend(hub_oracle: ScriptHash) {
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    let Transaction { inputs, reference_inputs, redeemers, .. } = tx
+    let Transaction { inputs, outputs, reference_inputs, mint, redeemers, .. } =
+      tx
 
     let SpendRedeemer {
       input_index,
@@ -47,23 +48,6 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-    expect Some(deposit_datum) = datum
-    let Datum {
-      event: user_events.Event {
-        id: event_nonce_out_ref,
-        info: Info { tokens: deposited_tokens, .. } as event_info,
-      },
-      inclusion_time,
-      witness,
-      refund_address,
-      refund_datum,
-    } = deposit_datum
-
-    let expected_l2_id = nonce_out_ref_to_l2_id(event_nonce_out_ref)
-
-    let Output { value: own_value, .. } =
-      utils.get_own_input_at(inputs, own_out_ref, input_index)
-
     let parsed_settlement_node_datum =
       settlement_queue.get_datum(
         reference_inputs,
@@ -79,6 +63,23 @@ validator spend(hub_oracle: ScriptHash) {
       end_time: settlement_end_time,
       ..
     } = parsed_settlement_node_datum.data
+
+    expect Some(deposit_datum) = datum
+    let Datum {
+      event: user_events.Event {
+        id: event_nonce_out_ref,
+        info: Info { tokens: deposited_tokens, .. } as event_info,
+      },
+      inclusion_time,
+      refund_address,
+      refund_datum,
+      ..
+    } = deposit_datum
+
+    let expected_l2_id = nonce_out_ref_to_l2_id(event_nonce_out_ref)
+
+    let Output { value: own_value, .. } =
+      utils.get_own_input_at(inputs, own_out_ref, input_index)
 
     expect BurnDepositNFT { l2_id: burn_asset_name, .. }: MintRedeemer =
       utils.get_redeemer_at(
@@ -99,60 +100,111 @@ validator spend(hub_oracle: ScriptHash) {
 
     when purpose is {
       FundWithdrawal -> todo
-      TransferToReserve -> todo
-      RefundOfSkippedDeposit { insertion_root } -> {
-        // Downcast values already extracted from the datum.
-        let event_id_data: Data = event_nonce_out_ref
-        let event_info_data: Data = event_info
+      TransferToReserve { output_index } -> {
+        // 1. Assert no datum and no reference script attached to the produced
+        //    UTxO.
+        expect Some(Output {
+          address: output_address,
+          value: output_value,
+          datum: NoDatum,
+          reference_script: None,
+        }) = outputs |> list.at(output_index)
 
-        // Find the deposit root after this event has been inserted into the
-        // settlement node's deposit tree.
-        let root_after_insertion =
-          utils.plutarch_pinsert(
-            deposits_root,
-            event_id_data,
-            event_info_data,
-            merkle_proof,
-            redeemers,
-          )
+        expect and {
+            // 2. Deposit must go to the reserve.
+            output_address == reserve_addr,
+            // 3. UTxO at reserve must only contain ADA.
+            output_value == assets.from_lovelace(assets.lovelace_of(own_value)),
+          }
 
-        and {
-          // 1. It must be proven that this event can successfully be inserted
-          //    into the existing tree of the settlement node (i.e. the event
-          //    doesn't exist in the tree).
-          root_after_insertion == insertion_root,
-          // 2. Inclusion time of the deposit subject to this refund logic must
-          //    fall within the time range of the specified settlement node.
-          //    TODO: Should any of the comparisons be exclusive?
-          inclusion_time <= settlement_end_time,
-          inclusion_time >= settlement_start_time,
-        }
+        // We already expect the deposit NFT to be burnt, so we remove it from
+        // `mint`, and also negate the result to step closer to what tokens are
+        // included in the deposit UTxO.
+        let negated_mint_without_deposit_nft =
+          mint
+            |> assets.add(deposit_policy_id, burn_asset_name, 1)
+            |> assets.negate
+
+        // 4. Only the deposit NFT, and the deposited tokens must be burnt in
+        //    this transaction.
+        assets.match(
+          negated_mint_without_deposit_nft,
+          deposited_tokens,
+          fn(_, tokens_ada) { tokens_ada == 0 },
+        )
       }
-      RefundOfDepositInTimeGap { settlement_link_ref_input_index } -> {
-        // 1. Grab the immediate next settlement node, and ensure correct
-        //    linkage (authenticity of the reference UTxO is checked with
-        //    `settlement_queue.get_datum`).
-        let parsed_settlement_link_datum =
-          settlement_queue.get_datum(
-            reference_inputs,
-            settlement_queue_addr,
-            settlement_queue_policy_id,
-            unordered.serialize_key(parsed_settlement_node_datum.key),
-            settlement_link_ref_input_index,
-          )
-        expect
-          parsed_settlement_node_datum.link == parsed_settlement_link_datum.key
+      Refund { output_index, refund_approach } -> {
+        expect Some(Output {
+          address: output_address,
+          value: output_value,
+          datum: output_datum,
+          reference_script: None,
+        }) = outputs |> list.at(output_index)
 
-        // 2. Inclusion time of the deposit subject to this refund logic must
-        //    fall within the time gap between the two settlement nodes.
-        //    TODO: Should any of the comparisons be inclusive?
-        expect settlement_queue.NodeData {
-          start_time: settlement_link_start_time,
-          ..
-        } = parsed_settlement_link_datum.data
-        and {
-          inclusion_time > settlement_end_time,
-          inclusion_time < settlement_link_start_time,
+        expect and {
+            // 1. The specified address must be the recepient.
+            output_address == refund_address,
+            // 2. The whole value must go refunded.
+            output_value == own_value,
+            // 3. The attached datum must be as specified.
+            output_datum == refund_datum,
+          }
+        when refund_approach is {
+          SkippedDeposit { insertion_root } -> {
+            // Downcast values already extracted from the datum.
+            let event_id_data: Data = event_nonce_out_ref
+            let event_info_data: Data = event_info
+
+            // Find the deposit root after this event has been inserted into the
+            // settlement node's deposit tree.
+            let root_after_insertion =
+              utils.plutarch_pinsert(
+                deposits_root,
+                event_id_data,
+                event_info_data,
+                merkle_proof,
+                redeemers,
+              )
+
+            and {
+              // 1. It must be proven that this event can successfully be inserted
+              //    into the existing tree of the settlement node (i.e. the event
+              //    doesn't exist in the tree).
+              root_after_insertion == insertion_root,
+              // 2. Inclusion time of the deposit subject to this refund logic must
+              //    fall within the time range of the specified settlement node.
+              //    TODO: Should any of the comparisons be exclusive?
+              inclusion_time <= settlement_end_time,
+              inclusion_time >= settlement_start_time,
+            }
+          }
+          DepositInTimeGap { settlement_link_ref_input_index } -> {
+            // 1. Grab the immediate next settlement node, and ensure correct
+            //    linkage (authenticity of the reference UTxO is checked with
+            //    `settlement_queue.get_datum`).
+            let parsed_settlement_link_datum =
+              settlement_queue.get_datum(
+                reference_inputs,
+                settlement_queue_addr,
+                settlement_queue_policy_id,
+                unordered.serialize_key(parsed_settlement_node_datum.key),
+                settlement_link_ref_input_index,
+              )
+            expect
+              parsed_settlement_node_datum.link == parsed_settlement_link_datum.key
+
+            // 2. Inclusion time of the deposit subject to this refund logic must
+            //    fall within the time gap between the two settlement nodes.
+            //    TODO: Should any of the comparisons be inclusive?
+            expect settlement_queue.NodeData {
+              start_time: settlement_link_start_time,
+              ..
+            } = parsed_settlement_link_datum.data
+            and {
+              inclusion_time > settlement_end_time,
+              inclusion_time < settlement_link_start_time,
+            }
+          }
         }
       }
     }

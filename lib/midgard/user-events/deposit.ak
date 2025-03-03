@@ -5,8 +5,9 @@ use aiken/merkle_patricia_forestry as mpf
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/certificate.{RegisterCredential, UnregisterCredential}
-use cardano/transaction.{OutputReference, Publish, Redeemer, ScriptPurpose}
-use midgard/common/parameter_validation
+use cardano/transaction.{
+  Datum as CardanoDatum, OutputReference, Publish, Redeemer, ScriptPurpose,
+}
 use midgard/common/types.{MerkleRoot, POSIXTime, Tokens}
 use midgard/user_events
 
@@ -24,7 +25,7 @@ pub type Datum {
   inclusion_time: POSIXTime,
   witness: ScriptHash,
   refund_address: Address,
-  refund_datum: Option<Data>,
+  refund_datum: CardanoDatum,
 }
 
 pub type SpendRedeemer {
@@ -39,9 +40,13 @@ pub type SpendRedeemer {
 
 pub type SpendPurpose {
   FundWithdrawal
-  TransferToReserve
-  RefundOfSkippedDeposit { insertion_root: MerkleRoot }
-  RefundOfDepositInTimeGap { settlement_link_ref_input_index: Int }
+  TransferToReserve { output_index: Int }
+  Refund { output_index: Int, refund_approach: RefundApproach }
+}
+
+pub type RefundApproach {
+  SkippedDeposit { insertion_root: MerkleRoot }
+  DepositInTimeGap { settlement_link_ref_input_index: Int }
 }
 
 pub type MintRedeemer {
