@@ -305,36 +305,6 @@ export const runNode = Effect.gen(function* () {
     logWarning("Prometheus exporter is stopping!");
     return originalStop();
   };
-  const cleanup = async () => {
-    logInfo("Shutting down Prometheus exporter...");
-
-    try {
-      if (prometheusExporter) {
-        await prometheusExporter.stopServer();
-        logInfo("Prometheus exporter stopped successfully.");
-      } else {
-        logWarning(
-          "Prometheus exporter is already undefined or was never initialized.",
-        );
-      }
-    } catch (error) {
-      logWarning(`Error stopping Prometheus exporter: ${error}`);
-    }
-    process.exit(0);
-  };
-
-  // Handle exit signals
-  process.on("SIGINT", cleanup);
-  process.on("SIGTERM", cleanup);
-  process.on("exit", cleanup);
-  process.on("uncaughtException", (error) => {
-    logWarning(`Uncaught Exception: ${error.stack || error}`);
-    cleanup();
-  });
-  process.on("unhandledRejection", (reason) => {
-    logWarning(`Unhandled Rejection: ${reason || reason}`);
-    cleanup();
-  });
 
   const MetricsLive = NodeSdk.layer(() => ({
     resource: { serviceName: "midgard-node" },
