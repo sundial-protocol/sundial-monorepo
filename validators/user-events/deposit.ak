@@ -228,6 +228,7 @@ validator mint(hub_oracle: ScriptHash) {
           outputs,
           reference_inputs,
           validity_range,
+          mint,
           redeemers,
           ..
         } = tx
@@ -248,6 +249,9 @@ validator mint(hub_oracle: ScriptHash) {
         // and its output index is 0.
         let l2_id = nonce_out_ref_to_l2_id(nonce_input_out_ref)
 
+        // 1. Only 1 deposit NFT must be minted.
+        expect assets.quantity_of(mint, own_policy, l2_id) == 1
+
         // Script hash of the witness script, required to be registered in this
         // transaction.
         let expected_witness_script_hash =
@@ -257,9 +261,9 @@ validator mint(hub_oracle: ScriptHash) {
             param: l2_id,
           )
 
-        // 1. Validate this script hash is being registered.
-        // 2. Validate the policy ID passed in its redeemer is the same as this
-        //    deposit policy ID.
+        // 2. Validate this script hash is being registered.
+        // 3. Validate the policy ID and L2 ID passed in its redeemer are
+        //    correct.
         expect
           validate_witness_redeemer(
             expected_witness_script_hash: expected_witness_script_hash,
@@ -270,7 +274,8 @@ validator mint(hub_oracle: ScriptHash) {
             redeemers: redeemers,
           )
 
-        // Deposit event's produced UTxO.
+        // Deposit event's produced UTxO, with an inline datum and no reference
+        // script attached.
         expect Some(Output {
           address: output_deposit_address,
           value: output_deposit_value,
@@ -291,10 +296,10 @@ validator mint(hub_oracle: ScriptHash) {
         }: Datum = output_deposit_datum_data
 
         and {
-          // 3. Deposit UTxO must be produced at the deposit script's address
+          // 4. Deposit UTxO must be produced at the deposit script's address
           //    from hub oracle.
           output_deposit_address == deposit_addr,
-          // 4. Specified list of tokens in the deposit event must be included
+          // 5. Specified list of tokens in the deposit event must be included
           //    in the value of the deposit UTxO (along with its NFT). The only
           //    validation on ADA is that `output_deposit_tokens` must have 0
           //    of it (it still can contain `("", "", 0)`, TODO?).
@@ -304,13 +309,13 @@ validator mint(hub_oracle: ScriptHash) {
             l2_id,
             output_deposit_tokens,
           ),
-          // 5. ID of the deposit event must match the specified nonce input's
+          // 6. ID of the deposit event must match the specified nonce input's
           //    output reference.
           output_deposit_id == nonce_input_out_ref,
-          // 6. Specified inclusion time of the event must be some time in the
+          // 7. Specified inclusion time of the event must be some time in the
           //    future.
           output_deposit_inclusion_time == valid_to + user_events.wait_duration,
-          // 7. Recorded witness must be correct.
+          // 8. Recorded witness must be correct.
           output_deposit_witness == expected_witness_script_hash,
         }
       }
@@ -329,6 +334,8 @@ validator mint(hub_oracle: ScriptHash) {
           assets.quantity_of(mint, own_policy, l2_id) == -1,
           // 2. Witness staking script corresponding to the NFT must be getting
           //    unregistered.
+          // 3. `WitnessRedeemer` for unregistration must have correct values
+          //    (i.e. `own_policy` and `l2_id`).
           validate_witness_redeemer(
             expected_witness_script_hash: expected_witness_script_hash,
             witness_redeemer_index: witness_unregistration_redeemer_index,

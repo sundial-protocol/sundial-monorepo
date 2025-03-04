@@ -9,8 +9,8 @@ A user deposits funds into Midgard by submitting an L1 transaction that performs
 \begin{enumerate}
     \item Spend an input \code{l1\_nonce}, which uniquely identifies this deposit transaction.
     \item Register a staking script credential to witness the deposit.
-      The script is parametrized by \code{l1\_nonce}, and the credential's purpose is to disprove the existence of the deposit whenever the credential is \emph{not} registered.\footnote{Cardano's ledger lacks a more direct method to disprove the existence of a utxo to a Plutus script.}
-    \item If any tokens are included in the deposit, they must be withheld until maturity. However, all the tokens must be burnt when transferring deposits to the Midgard reserve.
+      The script is parametrized by \code{l2\_id} (which is Blake2b256 hash of \code{l1\_nonce}), and the credential's purpose is to disprove the existence of the deposit whenever the credential is \emph{not} registered.\footnote{Cardano's ledger lacks a more direct method to disprove the existence of a utxo to a Plutus script.}
+    \item If any tokens are included in the deposit, they must be recorded in \code{DepositEvent}, and withheld within the utxo until maturity. However, all the tokens must be burnt when transferring deposits to the Midgard reserve.
     \item Mint a deposit auth token to verify the following datum:
         \begin{equation*}
         \T{DepositDatum} \coloneq \left\{
@@ -47,11 +47,40 @@ The deposit's outcome is determined as follows:
 
 The deposit's \code{witness} staking credential must be deregistered when the deposit utxo is spent.
 
-\subsection{Staking script}
-\label{h:deposit-staking-script}
-
 \subsection{Minting policy}
 \label{h:deposit-minting-policy}
+
+The \code{deposit} minting policy is statically parametrized on the \code{hub\_oracle} minting policy.
+It oversees correctness of datums, and registration/unregistration of events' corresponding witness staking scripts.
+
+\begin{description}
+  \item[Authenticate Deposit.] Properly record a new deposit event from L1 to L2.
+    Conditions:
+      \begin{enumerate}
+        \item Let \code{l1\_nonce} be the output reference of a utxo on L1 that is spent in the deposit transaction.
+        \item Let \code{l2\_id} be the Blake2b256 hash of \code{l1\_nonce}.
+        \item An NFT with own policy ID and asset name of \code{l2\_id} must be minted.
+        \item The witness staking script, instantiated with \code{l2\_id} must be registered in the transaction.
+        \item The redeemer used for registrering the witness script must be correct. Namely, it must have been provided with \code{deposit} policy ID and \code{l2\_id}.
+        \item Let \code{deposit\_addr} be the address of the deposit contract from Midgard's hub oracle.
+        \item Deposit utxo must be produced at \code{deposit\_addr}.
+        \item Specified list of tokens in the deposit event must be included in the produced utxo, along with some ADA and the deposit NFT, but no other tokens.
+        \item Recorded \code{l1\_nonce} in the deposit event must be correct.
+        \item The deposit's \code{inclusion\_time} must be equal to transaction's time-validity upper bound plus \code{event\_wait\_duration} Midgard protocol parameter.
+        \item The hash of the witness script must be correctly stored in the deposit datum.
+      \end{enumerate}
+  \item[Burn Deposit NFT.] Oversee conclusion of a deposit event by requiring its NFTs to be burnt.
+    Conditions:
+      \begin{enumerate}
+        \item Let \code{l2\_id} be the corresponding ID of the target deposit event, provided via the redeemer.
+        \item An NFT with own policy ID and asset name of \code{l2\_id} must be burnt.
+        \item The witness staking script, instantiated with \code{l2\_id} must be unregistered in the transaction.
+        \item The redeemer used for unregistrering the witness script must be correct. Namely, it must have been provided with \code{deposit} policy ID and \code{l2\_id}.
+      \end{enumerate}
+\end{description}
+
+\subsection{Staking script}
+\label{h:deposit-staking-script}
 
 \subsection{Spending validator}
 \label{h:deposit-spending-validator}
