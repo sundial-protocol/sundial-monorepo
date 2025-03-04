@@ -7,7 +7,7 @@ import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { Effect, Metric, Option, pipe } from "effect";
 import express from "express";
-import { Pool } from "pg";
+import pg from "pg";
 import { Worker } from "worker_threads";
 import {
   BlocksDB,
@@ -73,7 +73,7 @@ const mergeBlockCounter = Metric.counter("merge_block_count", {
 
 export const listen = (
   lucid: LucidEvolution,
-  pool: Pool,
+  pool: pg.Pool,
   port: number
 ): Effect.Effect<void, never, never> =>
   Effect.sync(() => {
@@ -273,7 +273,11 @@ export const listen = (
     );
   });
 
-export const storeTx = async (lucid: LucidEvolution, pool: Pool, tx: string) =>
+export const storeTx = async (
+  lucid: LucidEvolution,
+  pool: pg.Pool,
+  tx: string
+) =>
   Effect.gen(function* () {
     const txHash = lucid.fromTx(tx).toHash();
     yield* Effect.tryPromise(() => MempoolDB.insert(pool, txHash, tx));
@@ -283,14 +287,16 @@ export const runNode = Effect.gen(function* () {
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const pool = new Pool({
-    host: "localhost",
+  const pool = new pg.Pool({
+    host: "postgres",
     user: nodeConfig.POSTGRES_USER,
+    password: nodeConfig.POSTGRES_PASSWORD,
+    database: nodeConfig.POSTGRES_DB,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
   });
-  const db = yield* Effect.tryPromise({
+  yield* Effect.tryPromise({
     try: () => UtilsDB.initializeDb(pool),
     catch: (e) => new Error(`${e}`),
   });
@@ -334,6 +340,8 @@ export const runNode = Effect.gen(function* () {
           break;
         case "merge-tx-metric":
           Effect.runSync(Metric.increment(mergeBlockCounter));
+          break;
+        case "metrics":
           break;
         default:
           logWarning(`Unknown message type: ${message.type}`);
