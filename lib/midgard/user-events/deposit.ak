@@ -62,10 +62,8 @@ pub type MintRedeemer {
   }
 }
 
-pub type WitnessRedeemer {
-  deposit_minting_policy: PolicyId,
-  l2_id: AssetName,
-}
+pub type WitnessRedeemer =
+  PolicyId
 
 /// Witness script's prefix from its single CBOR encoded applied bytearray.
 /// TODO: This should probably be moved to `env` with a better generation
@@ -82,7 +80,6 @@ pub fn validate_witness_redeemer(
   witness_redeemer_index: Int,
   for_registration: Bool,
   event_policy_id: PolicyId,
-  l2_id: AssetName,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
 ) -> Bool {
   // Grab redeemer pair of witness script registration.
@@ -112,8 +109,7 @@ pub fn validate_witness_redeemer(
       witness_unregistration_script_hash
     }
 
-  let expected_witness_redeemer: Data =
-    WitnessRedeemer { deposit_minting_policy: event_policy_id, l2_id }
+  let expected_witness_redeemer: Data = event_policy_id
 
   and {
     // 1. Registered script must match the expected witness.

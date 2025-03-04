@@ -285,7 +285,6 @@ validator mint(hub_oracle: ScriptHash) {
             witness_redeemer_index: witness_registration_redeemer_index,
             for_registration: True,
             event_policy_id: own_policy,
-            l2_id: l2_id,
             redeemers: redeemers,
           )
 
@@ -356,7 +355,6 @@ validator mint(hub_oracle: ScriptHash) {
             witness_redeemer_index: witness_unregistration_redeemer_index,
             for_registration: False,
             event_policy_id: own_policy,
-            l2_id: l2_id,
             redeemers: redeemers,
           ),
         }
@@ -371,17 +369,13 @@ validator mint(hub_oracle: ScriptHash) {
 
 validator witness(nonce: Hash<Blake2b_256, ByteArray>) {
   publish(redeemer: WitnessRedeemer, certificate: Certificate, tx: Transaction) {
-    // Note that we're ignoring the `nonce`. However, it still affects the
-    // resulting script hash since the wrapper function has been applied to it.
     parameter_validation.prehashed_param_no_datum_wrapper(
       validator_function: fn(
-        _nonce: Hash<Blake2b_256, ByteArray>,
-        witness_redeemer: WitnessRedeemer,
+        l2_id: Hash<Blake2b_256, ByteArray>,
+        deposit_minting_policy: WitnessRedeemer,
         cert: Certificate,
         tx: Transaction,
       ) -> Bool {
-        let WitnessRedeemer { deposit_minting_policy, l2_id } = witness_redeemer
-
         let mint_qty =
           tx.mint |> assets.quantity_of(deposit_minting_policy, l2_id)
 
