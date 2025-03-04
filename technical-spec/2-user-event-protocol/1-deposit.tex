@@ -110,7 +110,18 @@ It's responsible for concluding deposits, whether for transfering them to Midgar
 
 \subsection{Staking script}
 \label{h:deposit-staking-script}
+The \code{witness} script is parameterized by transaction ID of the resulting L2 output reference from a deposit, which obtained by hashing the serialized L1 output reference with Blake2b256.
+The registration state of this script is the mechanism that allows related fraud proofs to function.
+Conditions:
 
-\todo
+\begin{enumerate}
+  \item Let \code{l2\_id} be the Blake2b256 hash of deposit event's \code{deposit\_id} (L1 nonce output reference).
+  \item Registration/unregsitration of this witness script is respectively tied to the \code{deposit} minting policy's mint/burn logic. 
+    \begin{itemize}
+      \item Registeration is allowed if a deposit NFT with asset name of \code{l2\_id} is minted.
+      \item Unregistration is allowed if a deposit NFT with asset name of \code{l2\_id} is burnt.
+    \end{itemize}
+\end{enumerate}
+
 
 \end{document}
