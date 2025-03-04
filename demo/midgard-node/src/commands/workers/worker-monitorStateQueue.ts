@@ -1,26 +1,26 @@
+import { LucidEvolution, OutRef } from "@lucid-evolution/lucid";
 import { Duration, Effect, Schedule } from "effect";
-import { LucidEvolution, OutRef, Script } from "@lucid-evolution/lucid";
 import { parentPort } from "worker_threads";
-import sqlite3 from "sqlite3";
 
-import * as SDK from "@al-ft/midgard-sdk";
 import { makeConfig, makeUserFn } from "@/config.js";
-import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { UtilsDB } from "@/database/index.js";
+import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
+import * as SDK from "@al-ft/midgard-sdk";
 import { logInfo } from "effect/Effect";
-
+import pg from "pg";
 let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
 
 const monitorStateQueue = (
   lucid: LucidEvolution,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  db: sqlite3.Database,
+  pool: pg.Pool
 ) =>
   Effect.gen(function* () {
+    console.log("monitorStateQueue... :>> ");
     const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
       lucid,
-      fetchConfig,
+      fetchConfig
     );
     const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
     if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
@@ -28,9 +28,9 @@ const monitorStateQueue = (
       logInfo("monitorStateQueue: Committing a new block...");
       yield* StateQueueTx.buildAndSubmitCommitmentBlock(
         lucid,
-        db,
+        pool,
         fetchConfig,
-        Date.now(),
+        Date.now()
       );
     }
   });
@@ -48,13 +48,23 @@ parentPort?.on("message", (_) => {
       stateQueuePolicyId: policyId,
     };
 
+    const pool = new pg.Pool({
+      host: "postgres",
+      user: nodeConfig.POSTGRES_USER,
+      password: nodeConfig.POSTGRES_PASSWORD,
+      database: nodeConfig.POSTGRES_DB,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+
     const db = yield* Effect.tryPromise({
-      try: () => UtilsDB.initializeDb(nodeConfig.DATABASE_PATH),
+      try: () => UtilsDB.initializeDb(pool),
       catch: (e) => new Error(`${e}`),
     });
 
     const policy = Schedule.addDelay(Schedule.forever, () =>
-      Duration.millis(nodeConfig.POLLING_INTERVAL),
+      Duration.millis(nodeConfig.POLLING_INTERVAL)
     );
     const action = monitorStateQueue(user, fetchConfig, db).pipe(
       Effect.tap((metrics) => {
@@ -63,7 +73,7 @@ parentPort?.on("message", (_) => {
       Effect.catchAll((error) => {
         Effect.log("monitorStateQueue: error occured", error);
         return Effect.void;
-      }),
+      })
     );
     yield* Effect.repeat(action, policy);
   });

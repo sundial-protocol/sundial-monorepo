@@ -1,11 +1,5 @@
-import {
-  Lucid,
-  Blockfrost,
-  Network,
-  Kupmios,
-  Koios,
-} from "@lucid-evolution/lucid";
-import { Effect, pipe, Context, Layer, Config } from "effect";
+import { Blockfrost, Kupmios, Lucid, Network } from "@lucid-evolution/lucid";
+import { Config, Context, Effect, Layer, pipe } from "effect";
 
 const SUPPORTED_PROVIDERS = ["kupmios", "blockfrost"] as const;
 type Provider = (typeof SUPPORTED_PROVIDERS)[number];
@@ -28,6 +22,9 @@ export type NodeConfigDep = {
   CONFIRMED_STATE_POLLING_INTERVAL: number;
   PROM_METRICS_PORT: number;
   OTLP_PORT: number;
+  POSTGRES_USER: string;
+  POSTGRES_PASSWORD: string;
+  POSTGRES_DB: string;
 };
 
 export const makeUserFn = (nodeConfig: NodeConfigDep) =>
@@ -37,28 +34,28 @@ export const makeUserFn = (nodeConfig: NodeConfigDep) =>
         case "kupmios":
           return Lucid(
             new Kupmios(nodeConfig.L1_KUPO_KEY, nodeConfig.L1_OGMIOS_KEY),
-            nodeConfig.NETWORK,
+            nodeConfig.NETWORK
           );
         case "blockfrost":
           return Lucid(
             new Blockfrost(
               nodeConfig.L1_BLOCKFROST_API_URL,
-              nodeConfig.L1_BLOCKFROST_KEY,
+              nodeConfig.L1_BLOCKFROST_KEY
             ),
-            nodeConfig.NETWORK,
+            nodeConfig.NETWORK
           );
       }
     });
     user.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
     yield* pipe(
       Effect.promise(() => user.wallet().address()),
-      Effect.flatMap((address) => Effect.log(`Wallet : ${address}`)),
+      Effect.flatMap((address) => Effect.log(`Wallet : ${address}`))
     );
     yield* pipe(
       Effect.promise(() => user.wallet().getUtxos()),
       Effect.flatMap((utxos) =>
-        Effect.log(`Total Wallet UTxOs: ${utxos.length}`),
-      ),
+        Effect.log(`Total Wallet UTxOs: ${utxos.length}`)
+      )
     );
     return {
       user,
@@ -92,16 +89,19 @@ export const makeConfig = Effect.gen(function* ($) {
     Config.integer("PORT").pipe(Config.withDefault(3000)),
     Config.integer("POLLING_INTERVAL").pipe(Config.withDefault(10000)),
     Config.integer("CONFIRMED_STATE_POLLING_INTERVAL").pipe(
-      Config.withDefault(60000),
+      Config.withDefault(60000)
     ),
     Config.integer("PROM_METRICS_PORT").pipe(Config.withDefault(9464)),
     Config.integer("OTLP_PORT").pipe(Config.withDefault(4318)),
+    Config.string("POSTGRES_USER").pipe(Config.withDefault("postgres")),
+    Config.string("POSTGRES_PASSWORD").pipe(Config.withDefault("postgres")),
+    Config.string("POSTGRES_DB").pipe(Config.withDefault("midgard")),
   ]);
 
   const provider = config[0].toLowerCase();
   if (!isValidProvider(provider)) {
     throw new Error(
-      `Invalid L1_PROVIDER: ${provider}. Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,
+      `Invalid L1_PROVIDER: ${provider}. Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`
     );
   }
   return {
@@ -118,6 +118,9 @@ export const makeConfig = Effect.gen(function* ($) {
     CONFIRMED_STATE_POLLING_INTERVAL: config[10],
     PROM_METRICS_PORT: config[11],
     OTLP_PORT: config[12],
+    POSTGRES_USER: config[13],
+    POSTGRES_PASSWORD: config[14],
+    POSTGRES_DB: config[15],
   };
 }).pipe(Effect.orDie);
 

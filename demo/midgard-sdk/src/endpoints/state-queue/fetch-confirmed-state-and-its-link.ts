@@ -38,7 +38,6 @@ export const fetchConfirmedStateAndItsLinkProgram = (
           allUTxOs.map((u: UTxO) => {
             const nodeDatumEffect = getNodeDatumFromUTxO(u);
             return Effect.andThen(nodeDatumEffect, (nodeDatum) => {
-              console.log("nodeDatum :>> ", nodeDatum);
               if (
                 nodeDatum.key !== "Empty" &&
                 nodeDatum.key.Key.key === firstLink.key

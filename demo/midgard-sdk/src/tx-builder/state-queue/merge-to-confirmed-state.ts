@@ -60,7 +60,6 @@ export const mergeTxBuilder = (
         data: Data.castTo(newConfirmedState, ConfirmedState),
         next: blockNode.next,
       };
-      console.log("newConfirmedNodeDatum :>> ", newConfirmedNodeDatum);
       const [nftSym, nftName, _nftQty] = yield* getSingleAssetApartFromAda(
         firstBlockUTxO.assets,
       );

@@ -1,29 +1,29 @@
+import { NodeConfig, User } from "@/config.js";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { StateQueueTx } from "@/transactions/index.js";
+import { NodeSdk } from "@effect/opentelemetry";
+import { getAddressDetails, LucidEvolution } from "@lucid-evolution/lucid";
+import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { Effect, Metric, Option, pipe } from "effect";
+import express from "express";
+import pg from "pg";
+import { Worker } from "worker_threads";
+import {
+  BlocksDB,
+  ConfirmedLedgerDB,
+  ImmutableDB,
+  LatestLedgerDB,
+  MempoolDB,
+  MempoolLedgerDB,
+  UtilsDB,
+} from "../database/index.js";
 import {
   findSpentAndProducedUTxOs,
   isHexString,
   logInfo,
   logWarning,
 } from "../utils.js";
-import { LucidEvolution, getAddressDetails } from "@lucid-evolution/lucid";
-import express from "express";
-import sqlite3 from "sqlite3";
-import {
-  MempoolDB,
-  MempoolLedgerDB,
-  LatestLedgerDB,
-  ConfirmedLedgerDB,
-  BlocksDB,
-  ImmutableDB,
-  UtilsDB,
-} from "../database/index.js";
-import { Effect, Option, Metric, pipe } from "effect";
-import { User, NodeConfig } from "@/config.js";
-import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
-import { NodeSdk } from "@effect/opentelemetry";
-import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
-import { StateQueueTx } from "@/transactions/index.js";
-import { Worker } from "worker_threads";
-import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 
 const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   description:
@@ -73,8 +73,8 @@ const mergeBlockCounter = Metric.counter("merge_block_count", {
 
 export const listen = (
   lucid: LucidEvolution,
-  db: sqlite3.Database,
-  port: number,
+  pool: pg.Pool,
+  port: number
 ): Effect.Effect<void, never, never> =>
   Effect.sync(() => {
     const app = express();
@@ -87,18 +87,18 @@ export const listen = (
         isHexString(txHash) &&
         txHash.length === 32
       ) {
-        MempoolDB.retrieveTxCborByHash(db, txHash).then((ret) => {
+        MempoolDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
           Option.match(ret, {
             onSome: (retrieved) => {
               logInfo(`GET /tx - Transaction found in mempool: ${txHash}`);
               res.json({ tx: retrieved });
             },
             onNone: () =>
-              ImmutableDB.retrieveTxCborByHash(db, txHash).then((ret) => {
+              ImmutableDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
                 Option.match(ret, {
                   onSome: (retrieved) => {
                     logInfo(
-                      `GET /tx - Transaction found in immutable: ${txHash}`,
+                      `GET /tx - Transaction found in immutable: ${txHash}`
                     );
                     res.json({ tx: retrieved });
                   },
@@ -128,24 +128,24 @@ export const listen = (
         try {
           const addrDetails = getAddressDetails(addr);
           if (addrDetails.paymentCredential) {
-            MempoolLedgerDB.retrieve(db).then((allUTxOs) => {
+            MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
               const filtered = allUTxOs.filter(
-                (a) => a.address === addrDetails.address.bech32,
+                (a) => a.address === addrDetails.address.bech32
               );
               logInfo(
-                `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
+                `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`
               );
               res.json({ utxos: filtered });
             });
           } else {
             logWarning(
-              `GET /utxos - Invalid address (no payment credential): ${addr}`,
+              `GET /utxos - Invalid address (no payment credential): ${addr}`
             );
             res.status(400).json({ message: `Invalid address: ${addr}` });
           }
         } catch (e) {
           logWarning(
-            `GET /utxos - Invalid address format: ${addr}, error: ${e}`,
+            `GET /utxos - Invalid address format: ${addr}, error: ${e}`
           );
           res.status(400).json({ message: `Invalid address: ${addr}` });
         }
@@ -164,9 +164,9 @@ export const listen = (
         isHexString(hdrHash) &&
         hdrHash.length === 32
       ) {
-        BlocksDB.retrieveTxHashesByBlockHash(db, hdrHash).then((hashes) => {
+        BlocksDB.retrieveTxHashesByBlockHash(pool, hdrHash).then((hashes) => {
           logInfo(
-            `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`,
+            `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`
           );
           res.json({ hashes });
         });
@@ -185,7 +185,7 @@ export const listen = (
           StateQueueTx.stateQueueInit,
           Effect.provide(User.layer),
           Effect.provide(AlwaysSucceedsContract.layer),
-          Effect.provide(NodeConfig.layer),
+          Effect.provide(NodeConfig.layer)
         );
         const txHash = await Effect.runPromise(program);
         logInfo(`GET /init - Initialization successful: ${txHash}`);
@@ -206,7 +206,7 @@ export const listen = (
           StateQueueTx.resetStateQueue,
           Effect.provide(User.layer),
           Effect.provide(AlwaysSucceedsContract.layer),
-          Effect.provide(NodeConfig.layer),
+          Effect.provide(NodeConfig.layer)
         );
         await Effect.runPromise(program);
         res.json({ message: "Collected all UTxOs successfully!" });
@@ -217,12 +217,12 @@ export const listen = (
       }
       try {
         await Promise.all([
-          MempoolDB.clear(db),
-          MempoolLedgerDB.clear(db),
-          BlocksDB.clear(db),
-          ImmutableDB.clear(db),
-          LatestLedgerDB.clear(db),
-          ConfirmedLedgerDB.clear(db),
+          MempoolDB.clear(pool),
+          MempoolLedgerDB.clear(pool),
+          BlocksDB.clear(pool),
+          ImmutableDB.clear(pool),
+          LatestLedgerDB.clear(pool),
+          ConfirmedLedgerDB.clear(pool),
         ]);
         // res.json({ message: "Cleared all tables successfully!" });
       } catch (_e) {
@@ -241,12 +241,12 @@ export const listen = (
           const tx = lucid.fromTx(txCBOR);
           const spentAndProducedProgram = findSpentAndProducedUTxOs(txCBOR);
           const { spent, produced } = await Effect.runPromise(
-            spentAndProducedProgram,
+            spentAndProducedProgram
           );
           // TODO: Avoid abstraction, dedicate a SQL command.
-          await MempoolDB.insert(db, tx.toHash(), txCBOR);
-          await MempoolLedgerDB.clearUTxOs(db, spent);
-          await MempoolLedgerDB.insert(db, produced);
+          await MempoolDB.insert(pool, tx.toHash(), txCBOR);
+          await MempoolLedgerDB.clearUTxOs(pool, spent);
+          await MempoolLedgerDB.insert(pool, produced);
           // await UtilsDB.modifyMultipleTables(
           //   db,
           //   [MempoolDB.insert, tx.toHash(), txCBOR],
@@ -255,7 +255,7 @@ export const listen = (
           // );
           Effect.runSync(Metric.increment(txCounter));
           logInfo(
-            `POST /submit - Transaction submitted successfully: ${tx.toHash()}`,
+            `POST /submit - Transaction submitted successfully: ${tx.toHash()}`
           );
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
@@ -269,26 +269,35 @@ export const listen = (
     });
 
     app.listen(port, () =>
-      logInfo(`Server running at http://localhost:${port}`),
+      logInfo(`Server running at http://localhost:${port}`)
     );
   });
 
 export const storeTx = async (
   lucid: LucidEvolution,
-  db: sqlite3.Database,
-  tx: string,
+  pool: pg.Pool,
+  tx: string
 ) =>
   Effect.gen(function* () {
     const txHash = lucid.fromTx(tx).toHash();
-    yield* Effect.tryPromise(() => MempoolDB.insert(db, txHash, tx));
+    yield* Effect.tryPromise(() => MempoolDB.insert(pool, txHash, tx));
   });
 
 export const runNode = Effect.gen(function* () {
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const db = yield* Effect.tryPromise({
-    try: () => UtilsDB.initializeDb(nodeConfig.DATABASE_PATH),
+  const pool = new pg.Pool({
+    host: "postgres",
+    user: nodeConfig.POSTGRES_USER,
+    password: nodeConfig.POSTGRES_PASSWORD,
+    database: nodeConfig.POSTGRES_DB,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  });
+  yield* Effect.tryPromise({
+    try: () => UtilsDB.initializeDb(pool),
     catch: (e) => new Error(`${e}`),
   });
   const prometheusExporter = new PrometheusExporter(
@@ -298,7 +307,7 @@ export const runNode = Effect.gen(function* () {
     },
     () => {
       `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
-    },
+    }
   );
   const originalStop = prometheusExporter.stopServer;
   prometheusExporter.stopServer = async function () {
@@ -332,6 +341,8 @@ export const runNode = Effect.gen(function* () {
         case "merge-tx-metric":
           Effect.runSync(Metric.increment(mergeBlockCounter));
           break;
+        case "metrics":
+          break;
         default:
           logWarning(`Unknown message type: ${message.type}`);
       }
@@ -339,10 +350,10 @@ export const runNode = Effect.gen(function* () {
     w.postMessage("start");
   });
 
-  yield* Effect.all([listen(user, db, nodeConfig.PORT)]).pipe(
+  yield* Effect.all([listen(user, pool, nodeConfig.PORT)]).pipe(
     Effect.withSpan("midgard-node"),
     Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
     Effect.provide(MetricsLive),
-    Effect.catchAllCause(Effect.logError),
+    Effect.catchAllCause(Effect.logError)
   );
 });

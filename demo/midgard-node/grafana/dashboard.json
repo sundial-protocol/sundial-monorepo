@@ -78,7 +78,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -116,7 +117,7 @@
           "useBackend": false
         }
       ],
-      "title": "Commit Block Tx Size",
+      "title": "L1 Commit Block Tx Size",
       "type": "timeseries"
     },
     {
@@ -175,7 +176,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "txs"
         },
         "overrides": []
       },
@@ -315,7 +317,7 @@
           "useBackend": false
         }
       ],
-      "title": "Total Committed Blocks",
+      "title": "Committed Blocks",
       "type": "timeseries"
     },
     {
@@ -406,8 +408,8 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "merge_block_count_total{instance=\"midgard-node:9464\"} / midgard_tx_confirmation_time_ms_count",
+          "editorMode": "code",
+          "expr": "merge_block_count_total{instance=\"midgard-node:9464\"} ",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -417,7 +419,7 @@
           "useBackend": false
         }
       ],
-      "title": "Merge Block Count",
+      "title": "Merged Blocks",
       "type": "timeseries"
     },
     {
@@ -476,7 +478,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -514,7 +517,7 @@
           "useBackend": false
         }
       ],
-      "title": "Total Tx Size In Commit Block",
+      "title": "L2 Tx Size In Commit Block",
       "type": "timeseries"
     },
     {
@@ -616,7 +619,7 @@
           "useBackend": false
         }
       ],
-      "title": "Midgard submit request tx",
+      "title": "Received transactions",
       "type": "timeseries"
     },
     {
@@ -675,7 +678,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "txs"
         },
         "overrides": []
       },
@@ -713,7 +717,7 @@
           "useBackend": false
         }
       ],
-      "title": "Tx In Commit Block",
+      "title": "L2 Tx In Commit Block",
       "type": "timeseries"
     },
     {
@@ -772,7 +776,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "txs"
         },
         "overrides": []
       },
@@ -815,7 +820,7 @@
           "useBackend": false
         }
       ],
-      "title": "Midgard Confirmed Tx",
+      "title": "Committed Txs",
       "type": "timeseries"
     },
     {

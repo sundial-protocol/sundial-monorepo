@@ -2,7 +2,6 @@
 
 import { LucidEvolution } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
-import { Database } from "sqlite3";
 import * as SDK from "@al-ft/midgard-sdk";
 import { handleSignSubmit } from "../utils.js";
 import {
@@ -15,6 +14,7 @@ import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import { makeConfig } from "@/config.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { parentPort } from "worker_threads";
+import pg from "pg";
 
 // Apply mempool txs to LatestLedgerDB, and find the new UTxO set
 
@@ -28,14 +28,15 @@ import { parentPort } from "worker_threads";
 
 export const buildAndSubmitCommitmentBlock = (
   lucid: LucidEvolution,
-  db: Database,
+  db: pg.Pool,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  endTime: number,
+  endTime: number
 ) =>
   Effect.gen(function* () {
     // Fetch transactions from the first block
     const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
     const numTx = BigInt(txList.length);
+    console.log("numTx :>> ", numTx);
     parentPort?.postMessage({
       type: "mempool-metrics",
       data: {
@@ -49,7 +50,7 @@ export const buildAndSubmitCommitmentBlock = (
       const { spent: spentList, produced: producedList } =
         yield* findAllSpentAndProducedUTxOs(txCbors);
       const utxoList = yield* Effect.tryPromise(() =>
-        LatestLedgerDB.retrieve(db),
+        LatestLedgerDB.retrieve(db)
       );
       // Remove spent UTxOs from utxoList
       const filteredUTxOList = utxoList.filter(
@@ -57,13 +58,13 @@ export const buildAndSubmitCommitmentBlock = (
           !spentList.some(
             (spent) =>
               spent.txHash === utxo.txHash &&
-              spent.outputIndex === utxo.outputIndex,
-          ),
+              spent.outputIndex === utxo.outputIndex
+          )
       );
 
       // Merge filtered utxoList with producedList
       const newUTxOList = [...filteredUTxOList, ...producedList].map(
-        (utxo) => utxo.txHash + utxo.outputIndex,
+        (utxo) => utxo.txHash + utxo.outputIndex
       );
 
       const utxoRoot = yield* SDK.Utils.mptFromList(newUTxOList);
@@ -84,7 +85,7 @@ export const buildAndSubmitCommitmentBlock = (
         lucid,
         fetchConfig,
         commitBlockParams,
-        aoUpdateCommitmentTimeParams,
+        aoUpdateCommitmentTimeParams
       );
       const txSize = txBuilder.toCBOR().length / 2;
       // console.log("txBuilder.toCBOR() :>> ", txBuilder.toCBOR());
@@ -93,7 +94,7 @@ export const buildAndSubmitCommitmentBlock = (
       yield* handleSignSubmit(lucid, txBuilder);
       const totalTxSize = txCbors.reduce(
         (acc, cbor) => acc + cbor.length / 2,
-        0,
+        0
       );
       parentPort?.postMessage({
         type: "commit-block-metrics",
@@ -103,17 +104,36 @@ export const buildAndSubmitCommitmentBlock = (
           totalTxSize,
         },
       });
+      console.log("spentList.length :>> ", spentList.length);
+      const bs = 100;
+      for (let i = 0; i < spentList.length; i += bs) {
+        yield* Effect.tryPromise(() =>
+          LatestLedgerDB.clearUTxOs(db, spentList.slice(i, i + bs))
+        );
+      }
+      for (let i = 0; i < producedList.length; i += bs) {
+        yield* Effect.tryPromise(() =>
+          LatestLedgerDB.insert(db, producedList.slice(i, i + bs))
+        );
+      }
+      for (let i = 0; i < txs.length; i += bs) {
+        yield* Effect.tryPromise(() =>
+          ImmutableDB.insertTxs(db, txs.slice(i, i + bs))
+        );
+      }
+
+      yield* Effect.tryPromise(() => MempoolDB.clear(db));
       // TODO: For final product, handle tx submission failures properly.
-      yield* Effect.tryPromise({
-        try: () =>
-          UtilsDB.modifyMultipleTables(
-            db,
-            [LatestLedgerDB.clearUTxOs, spentList],
-            [LatestLedgerDB.insert, producedList],
-            [MempoolDB.clear],
-            [ImmutableDB.insertTxs, txs],
-          ),
-        catch: (e) => new Error(`Transaction failed: ${e}`),
-      });
+      // yield* Effect.tryPromise({
+      //   try: () =>
+      //     UtilsDB.modifyMultipleTables(
+      //       db,
+      //       [LatestLedgerDB.clearUTxOs, spentList],
+      //       [LatestLedgerDB.insert, producedList],
+      //       [MempoolDB.clear],
+      //       [ImmutableDB.insertTxs, txs]
+      //     ),
+      //   catch: (e) => new Error(`Transaction failed: ${e}`),
+      // });
     }
   });
