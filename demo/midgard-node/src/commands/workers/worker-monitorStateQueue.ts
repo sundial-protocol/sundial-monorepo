@@ -1,13 +1,12 @@
+import { LucidEvolution, OutRef } from "@lucid-evolution/lucid";
 import { Duration, Effect, Schedule } from "effect";
-import { LucidEvolution, OutRef, Script } from "@lucid-evolution/lucid";
 import { parentPort } from "worker_threads";
-import sqlite3 from "sqlite3";
 
-import * as SDK from "@al-ft/midgard-sdk";
 import { makeConfig, makeUserFn } from "@/config.js";
-import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { UtilsDB } from "@/database/index.js";
+import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
+import * as SDK from "@al-ft/midgard-sdk";
 import { logInfo } from "effect/Effect";
 
 let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
@@ -15,12 +14,12 @@ let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
 const monitorStateQueue = (
   lucid: LucidEvolution,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  db: sqlite3.Database,
+  pool: Pool
 ) =>
   Effect.gen(function* () {
     const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
       lucid,
-      fetchConfig,
+      fetchConfig
     );
     const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
     if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
@@ -30,7 +29,7 @@ const monitorStateQueue = (
         lucid,
         db,
         fetchConfig,
-        Date.now(),
+        Date.now()
       );
     }
   });
@@ -54,7 +53,7 @@ parentPort?.on("message", (_) => {
     });
 
     const policy = Schedule.addDelay(Schedule.forever, () =>
-      Duration.millis(nodeConfig.POLLING_INTERVAL),
+      Duration.millis(nodeConfig.POLLING_INTERVAL)
     );
     const action = monitorStateQueue(user, fetchConfig, db).pipe(
       Effect.tap((metrics) => {
@@ -63,7 +62,7 @@ parentPort?.on("message", (_) => {
       Effect.catchAll((error) => {
         Effect.log("monitorStateQueue: error occured", error);
         return Effect.void;
-      }),
+      })
     );
     yield* Effect.repeat(action, policy);
   });

@@ -41,13 +41,14 @@
     "dotenv": "^16.4.7",
     "effect": "^3.13.4",
     "express": "^4.21.2",
-    "sqlite3": "^5.1.7",
+    "pg": "^8.13.3",
     "vitest": "^3.0.7"
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.1.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.5",
+    "@types/pg": "^8.11.11",
     "prettier": "^3.5.2",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3"
