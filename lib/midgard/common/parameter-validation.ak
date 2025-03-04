@@ -1,4 +1,4 @@
-//// Duplicated from `aiken-design-patters` to simply change the type
+//// Duplicated from `aiken-design-patterns` to simply change the type
 //// signatures.
 
 use aiken/builtin

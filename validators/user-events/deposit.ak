@@ -1,4 +1,3 @@
-use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{Blake2b_256, Hash, ScriptHash}
 use aiken/interval.{Finite, Interval}
@@ -16,8 +15,8 @@ use midgard/user_events
 use midgard/user_events/deposit.{
   AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap, Event,
   FundWithdrawal, Info, MintRedeemer, Refund, SkippedDeposit, SpendRedeemer,
-  TransferToReserve, nonce_out_ref_to_l2_id, validate_witness_redeemer,
-  witness_script_prefix,
+  TransferToReserve, WitnessRedeemer, nonce_out_ref_to_l2_id,
+  validate_witness_redeemer, witness_script_prefix,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -267,6 +266,7 @@ validator mint(hub_oracle: ScriptHash) {
             witness_redeemer_index: witness_registration_redeemer_index,
             for_registration: True,
             event_policy_id: own_policy,
+            l2_id: l2_id,
             redeemers: redeemers,
           )
 
@@ -295,8 +295,9 @@ validator mint(hub_oracle: ScriptHash) {
           //    from hub oracle.
           output_deposit_address == deposit_addr,
           // 4. Specified list of tokens in the deposit event must be included
-          //    in the value of the deposit UTxO (along with its NFT). No
-          //    validation on ADA (TODO?).
+          //    in the value of the deposit UTxO (along with its NFT). The only
+          //    validation on ADA is that `output_deposit_tokens` must have 0
+          //    of it (it still can contain `("", "", 0)`, TODO?).
           utils.authentic_value_has_tokens(
             output_deposit_value,
             own_policy,
@@ -315,14 +316,16 @@ validator mint(hub_oracle: ScriptHash) {
       }
       BurnDepositNFT { l2_id, witness_unregistration_redeemer_index } -> {
         let Transaction { mint, redeemers, .. } = tx
+
         let expected_witness_script_hash =
           parameter_validation.apply_prehashed_param(
             version: 3,
             prefix: witness_script_prefix,
             param: l2_id,
           )
+
         and {
-          // 1. The claimed NFT must be burnt.
+          // 1. The specified NFT must be burnt.
           assets.quantity_of(mint, own_policy, l2_id) == -1,
           // 2. Witness staking script corresponding to the NFT must be getting
           //    unregistered.
@@ -331,6 +334,7 @@ validator mint(hub_oracle: ScriptHash) {
             witness_redeemer_index: witness_unregistration_redeemer_index,
             for_registration: False,
             event_policy_id: own_policy,
+            l2_id: l2_id,
             redeemers: redeemers,
           ),
         }
@@ -344,19 +348,24 @@ validator mint(hub_oracle: ScriptHash) {
 }
 
 validator witness(nonce: Hash<Blake2b_256, ByteArray>) {
-  publish(redeemer: PolicyId, certificate: Certificate, tx: Transaction) {
+  publish(redeemer: WitnessRedeemer, certificate: Certificate, tx: Transaction) {
+    // Note that we're ignoring the `nonce`. However, it still affects the
+    // resulting script hash since the wrapper function has been applied to it.
     parameter_validation.prehashed_param_no_datum_wrapper(
       validator_function: fn(
         _nonce: Hash<Blake2b_256, ByteArray>,
-        deposit_minting_policy: PolicyId,
+        witness_redeemer: WitnessRedeemer,
         cert: Certificate,
         tx: Transaction,
       ) -> Bool {
+        let WitnessRedeemer { deposit_minting_policy, l2_id } = witness_redeemer
+
+        let mint_qty =
+          tx.mint |> assets.quantity_of(deposit_minting_policy, l2_id)
+
         when cert is {
-          RegisterCredential { .. } | UnregisterCredential { .. } ->
-            !(tx.mint
-              |> assets.tokens(deposit_minting_policy)
-              |> dict.is_empty)
+          RegisterCredential { .. } -> mint_qty == 1
+          UnregisterCredential { .. } -> mint_qty == -1
           _ -> False
         }
       },

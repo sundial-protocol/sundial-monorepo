@@ -62,10 +62,16 @@ pub type MintRedeemer {
   }
 }
 
+pub type WitnessRedeemer {
+  deposit_minting_policy: PolicyId,
+  l2_id: AssetName,
+}
+
 /// Witness script's prefix from its single CBOR encoded applied bytearray.
-/// TODO: This should probably be moved to `env`.
+/// TODO: This should probably be moved to `env` with a better generation
+///       process.
 pub const witness_script_prefix: ByteArray =
-  #"59016101010033232323232323223225333004323232323253330093370e900318051baa00113232323232323253330103370e900000209998081801998011bab30013012375401400a941288a99980819b87480080104ccc040c00ccc008dd5980098091baa00a0054a09445281180a980b180b180b180b0009119299980899b8748008c048dd50008a5eb7bdb1804dd5980b18099baa001323300100100322533301500114c103d87a800013233322253330163372200e0062a66602c66e3c01c00c4cdd2a4000660346e980092f5c02980103d87a8000133006006001375c60280026eacc054004c064008c05c00494ccc0440045288a50300d3754602260240066eb8010dd6980780098059baa00116300d300e003300c002300b002300b0013006375400229309b2b1bae0015734aae7555cf2ab9f5740ae855d12601225820"
+  #"5901ee01010033232323232323223225333004323232323253330093370e900318051baa0011323322533300c3370e900018069baa0051323232325333013301600213232323253330143370e9000000898018010a99980a1801800899b8700248004528180a1baa0083332223253330163005301737540022900009bad301b3018375400264a66602c600a602e6ea8004530103d87a8000132330010013756603860326ea8008894ccc06c004530103d87a8000132333222533301c337220100062a66603866e3c02000c4cdd2a4000660406ea00092f5c02980103d87a8000133006006001375c60340026eb4c06c004c07c008c074004c8cc004004010894ccc0680045300103d87a8000132333222533301b337220100062a66603666e3c02000c4cdd2a40006603e6e980092f5c02980103d87a8000133006006001375c60320026eacc068004c078008c070004dd5980b980c180c180c180c180a1baa00c375c602e0046eb8c05cc060008dc3a400460246ea802458dd7180a000980a0011bae3012001300e375400a2c6eb4c03c004c03cc040004c02cdd50008b1806980700198060011805801180580098031baa00114984d958dd7000ab9a5573aaae7955cfaba05742ae893001225820"
 
 pub fn nonce_out_ref_to_l2_id(nonce_out_ref: OutputReference) -> AssetName {
   cbor.serialise(nonce_out_ref) |> blake2b_256
@@ -76,6 +82,7 @@ pub fn validate_witness_redeemer(
   witness_redeemer_index: Int,
   for_registration: Bool,
   event_policy_id: PolicyId,
+  l2_id: AssetName,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
 ) -> Bool {
   // Grab redeemer pair of witness script registration.
@@ -105,13 +112,16 @@ pub fn validate_witness_redeemer(
       witness_unregistration_script_hash
     }
 
+  let expected_witness_redeemer =
+    WitnessRedeemer { deposit_minting_policy: event_policy_id, l2_id }
+
   // Type cast its redeemer to `PolicyId`.
-  expect witness_redeemer: PolicyId = witness_redeemer_pair.2nd
+  expect witness_redeemer: WitnessRedeemer = witness_redeemer_pair.2nd
 
   and {
     // 1. Registered script must match the expected witness.
     present_witness_script_hash == expected_witness_script_hash,
-    // 2. Deposit policy ID must be the registration redeemer.
-    witness_redeemer == event_policy_id,
+    // 2. Deposit policy ID, and L2 ID must be correctly set.
+    witness_redeemer == expected_witness_redeemer,
   }
 }
