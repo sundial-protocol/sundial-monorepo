@@ -112,16 +112,13 @@ pub fn validate_witness_redeemer(
       witness_unregistration_script_hash
     }
 
-  let expected_witness_redeemer =
+  let expected_witness_redeemer: Data =
     WitnessRedeemer { deposit_minting_policy: event_policy_id, l2_id }
-
-  // Type cast its redeemer to `PolicyId`.
-  expect witness_redeemer: WitnessRedeemer = witness_redeemer_pair.2nd
 
   and {
     // 1. Registered script must match the expected witness.
     present_witness_script_hash == expected_witness_script_hash,
     // 2. Deposit policy ID, and L2 ID must be correctly set.
-    witness_redeemer == expected_witness_redeemer,
+    witness_redeemer_pair.2nd == expected_witness_redeemer,
   }
 }
