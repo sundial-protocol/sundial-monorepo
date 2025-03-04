@@ -30,6 +30,7 @@ pub type Datum {
 
 pub type SpendRedeemer {
   input_index: Int,
+  output_index: Int,
   hub_ref_input_index: Int,
   settlement_ref_input_index: Int,
   settlement_node_asset_name: AssetName,
@@ -39,9 +40,8 @@ pub type SpendRedeemer {
 }
 
 pub type SpendPurpose {
-  FundWithdrawal
-  TransferToReserve { output_index: Int }
-  Refund { output_index: Int, refund_approach: RefundApproach }
+  TransferToReserve
+  Refund { refund_approach: RefundApproach }
 }
 
 pub type RefundApproach {
