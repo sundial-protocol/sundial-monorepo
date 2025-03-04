@@ -146,8 +146,11 @@ validator spend(hub_oracle: ScriptHash) {
             expect and {
                 // 4. The specified address must be the recepient.
                 output_address == refund_address,
-                // 5. The whole value must go refunded.
-                output_value == own_value,
+                // 5. The whole value must get refunded (excluding the NFT).
+                output_value == (
+                  own_value
+                    |> assets.add(deposit_policy_id, burn_asset_name, -1)
+                ),
                 // 6. The attached datum must be as specified.
                 output_datum == refund_datum,
               }

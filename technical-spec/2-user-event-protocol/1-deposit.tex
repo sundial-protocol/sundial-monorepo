@@ -41,7 +41,7 @@ Therefore, Midgard's ledger rules require this new block header to include all d
 
 The deposit's outcome is determined as follows:
 \begin{itemize}
-    \item If the deposit event is included in a settlement queue node, then the deposit utxo can be absorbed into the Midgard reserves or used to pay for withdrawals.
+    \item If the deposit event is included in a settlement queue node, then the deposit utxo can be absorbed into the Midgard reserve.
     \item If the deposit's inclusion time is within the confirmed header's event interval but not within the event interval of any settlement queue node, then the deposit utxo can be refunded to its user according to the \code{refund\_address} and \code{refund\_datum} fields.
 \end{itemize}
 
@@ -79,11 +79,37 @@ It oversees correctness of datums, and registration/unregistration of events' co
       \end{enumerate}
 \end{description}
 
-\subsection{Staking script}
-\label{h:deposit-staking-script}
-
 \subsection{Spending validator}
 \label{h:deposit-spending-validator}
+
+The \code{deposit} spending validator is statically parametrized on the \code{hub\_oracle} minting policy.
+It's responsible for concluding deposits, whether for transfering them to Midgard reserve, funding approved withdrawal events, or refunding stranded deposits.
+
+\begin{description}
+  \item[Transfer to Reserve.] Transaction for moving funds of finalized deposit events into Midgard reserve.
+    Conditions:
+    \begin{enumerate}
+      \item Let \code{reserve\_addr} be the address of the Midgard reserve retrieved from hub oracle.
+      \item The utxo produced at \code{reserve\_addr} must only contain the ADA from deposit utxo.
+      \item The deposit NFT must be burnt.
+      \item If any other tokens have also been included in the deposit, they too must be burnt.
+      \item No datum and no reference script must be attached to the reserve utxo.
+    \end{enumerate}
+  \item[Refund.] 
+    Conditions:
+    \begin{enumerate}
+      \item All the tokens included in the deposit utxo (except for the deposit NFT) must go to the \code{refund\_address} specified in the deposit datum.
+      \item The datum attached to the produced utxo must also match the one stated in deposit datum.
+      \item 
+        \begin{itemize}
+          \item If inclusion time of the stranded deposit falls within the time range of an existing settlement node, refund can only be allowed if the settlement node's corresponding tree does not contain the deposit (proven by providing an insertion proof).
+          \item Otherwise, if the inclusion time falls in one of the time gaps of settlement queue, refund request is valid.
+        \end{itemize}
+    \end{enumerate}
+\end{description}
+
+\subsection{Staking script}
+\label{h:deposit-staking-script}
 
 \todo
 
