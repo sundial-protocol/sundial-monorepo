@@ -35,17 +35,16 @@ pub type SpendRedeemer {
   settlement_ref_input_index: Int,
   settlement_node_asset_name: AssetName,
   mint_redeemer_index: Int,
-  merkle_proof: mpf.Proof,
   purpose: SpendPurpose,
 }
 
 pub type SpendPurpose {
-  TransferToReserve
+  TransferToReserve { merkle_proof: mpf.Proof }
   Refund { refund_approach: RefundApproach }
 }
 
 pub type RefundApproach {
-  SkippedDeposit { insertion_root: MerkleRoot }
+  SkippedDeposit { insertion_root: MerkleRoot, merkle_proof: mpf.Proof }
   DepositInTimeGap { settlement_link_ref_input_index: Int }
 }
 

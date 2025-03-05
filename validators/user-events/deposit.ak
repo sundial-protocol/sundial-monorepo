@@ -36,7 +36,6 @@ validator spend(hub_oracle: ScriptHash) {
       settlement_ref_input_index,
       settlement_node_asset_name,
       mint_redeemer_index,
-      merkle_proof,
       purpose,
     } = redeemer
 
@@ -113,14 +112,36 @@ validator spend(hub_oracle: ScriptHash) {
           )
 
         when spend_purpose is {
-          TransferToReserve -> {
-            // 4. Assert no datum is attached to the produced UTxO.
+          TransferToReserve { merkle_proof } -> {
+            // Downcast values already extracted from the datum.
+            let event_id_data: Data = event_nonce_out_ref
+            let event_info_data: Data = event_info
+
+            expect and {
+                // 4. The referenced settlement node's deposit tree must contain
+                //    the subjected deposit event.
+                utils.plutarch_phas(
+                  deposits_root,
+                  event_id_data,
+                  event_info_data,
+                  merkle_proof,
+                  redeemers,
+                ),
+                // 5. Inclusion time of the subjected deposit must fall within
+                //    the time range of the specified settlement node.
+                //    TODO: Should any of the comparisons be exclusive?
+                //    TODO: This is probably redundant.
+                inclusion_time <= settlement_end_time,
+                inclusion_time >= settlement_start_time,
+              }
+
+            // 6. Assert no datum is attached to the produced UTxO.
             expect output_datum == NoDatum
 
             expect and {
-                // 5. Deposit must go to the reserve.
+                // 7. Deposit must go to the reserve.
                 output_address == reserve_addr,
-                // 6. UTxO at reserve must only contain ADA.
+                // 8. UTxO at reserve must only contain ADA.
                 output_value == assets.from_lovelace(
                   assets.lovelace_of(own_value),
                 ),
@@ -134,7 +155,7 @@ validator spend(hub_oracle: ScriptHash) {
                 |> assets.add(deposit_policy_id, burn_asset_name, 1)
                 |> assets.negate
 
-            // 7. Only the deposit NFT, and the deposited tokens must be burnt
+            // 9. Only the deposit NFT, and the deposited tokens must be burnt
             //    in this transaction.
             assets.match(
               negated_mint_without_deposit_nft,
@@ -156,7 +177,7 @@ validator spend(hub_oracle: ScriptHash) {
               }
 
             when refund_approach is {
-              SkippedDeposit { insertion_root } -> {
+              SkippedDeposit { insertion_root, merkle_proof } -> {
                 // Downcast values already extracted from the datum.
                 let event_id_data: Data = event_nonce_out_ref
                 let event_info_data: Data = event_info
