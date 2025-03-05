@@ -43,37 +43,47 @@ Furthermore, the Leios blob storage fees will become an additional source of rev
 \subsection{Data availability via Mithril}
 \label{h:data-availability-multisig}
 
-If Leios blobs are not available on Cardano mainnet in time for Midgard's deployment, a viable alternative is using stake-weighted Mithril certificates to ensure data availability.
+If Leios blobs are unavailable on Cardano mainnet in time for Midgard's deployment, a viable alternative is using stake-weighted Mithril certificates to ensure data availability.
 
-Mithril was specifically designed to address the data-availability problem, as stated in the Mithril whitepaper:
+The Mithril whitepaper states that it was specifically designed to address the data-availability problem:
 \begin{quotePretty}
 Mithril provides an immediate solution to the data-availability problem: if the underlying consensus protocol is run on references for which a Mithril signature exists, data availability is (cryptographically) guaranteed.
 \end{quotePretty}
 
-In this approach, a state commitment is only considered valid if it is accompanied by a Mithril certificate signed by a stake-weighted quorum of Mithril participants. This certificate serves as a cryptographic guarantee that the necessary block data is publicly available.
+In this approach, a state commitment is only considered valid if it is accompanied by a Mithril certificate signed by a stake-weighted quorum of Mithril participants.
+This certificate represents the Mithril participants' collective claim that the necessary block data is publicly available.
 
-The process follows these steps:
+Midgard's L1 consensus protocol is adapted as follows:
 \begin{enumerate}
-  \item \textbf{Publishing Data:} Operators must publish their full block data at a publicly accessible location. This data must be sufficient to reconstruct the Merkle roots referenced by the state commitment.
-  \item \textbf{Verification by Mithril Participants:} Each Mithril participant independently retrieves the published data and verifies that:
+  \item \textbf{Publishing Data:} When the current operator wishes to commit a new block header to the state queue, they must publish the block's full data at a publicly accessible location.
+    This data must be sufficient to reconstruct the Merkle roots referenced by the block header.
+  \item \textbf{Verification by Mithril Participants:} Each Mithril participant monitors the publicly accessible location.
+    When a new block is published, the Mithril participant independently retrieves the block's data and verifies that:
   \begin{itemize}
     \item The data is available.
     \item It corresponds exactly to the Merkle roots in the state commitment.
   \end{itemize}
-  \item \textbf{Signing the Certificate:} If the data meets these conditions, the Mithril participant signs the Mithril certificate.
-  \item \textbf{Onchain Verification:} The state commitment cannot be appended to the Midgard state queue until:
-  \begin{itemize}
-    \item An associated Mithril certificate has been produced.
-    \item The stake-weight attributed to the certificate exceeds Midgard's \code{da\_multisig\_threshold} parameter.
-    \item The message attested to by the certificate uniquely identifies the state commitment.
-  \end{itemize}
-  \item \textbf{Appending to the State Queue:} Only once all the above conditions are met will the operator be able to append the state commitment to the Midgard state queue.
+  \item \textbf{Signing the Certificate:} If the block's data meets these conditions, the Mithril participant signs the Mithril certificate and broadcasts the signature to the Mithril aggregators.
+  \item \textbf{Onchain Verification:} The Midgard state queue requires every new block header to be appended with an associated Mithril certificate signed by Midgard's quorum for the Mithril-based DA.
+    Midgard's \code{da\_multisig\_threshold} parameter sets this quorum threshold.
 \end{enumerate}
 
-By leveraging Mithril, Midgard ensures that state commitments are only accepted when their corresponding block data is provably available. This mechanism safeguards Midgard against data-availability fraud, where a malicious operator attempts to submit a state commitment without disclosing the underlying data. Without access to this data, fraud provers would be unable to construct and submit fraud proofs, allowing the fraudulent state commitment to become canonical once the fraud detection window closes. By requiring a Mithril certificate before a state commitment is appended, Midgard guarantees that the data remains accessible, preserving the integrity of the system.
+By leveraging Mithril, Midgard ensures that state commitments are only accepted when their corresponding block data is provably available.
+This mechanism safeguards Midgard against data-availability fraud, where a malicious operator attempts to submit a state commitment without disclosing the underlying data.
+Without access to this data, fraud provers would be unable to construct and submit fraud proofs, allowing the fraudulent state commitment to become canonical once the fraud detection window closes.
+By requiring a Mithril certificate before a state commitment is appended, Midgard guarantees that the data remains accessible, preserving the system's integrity.
 
-A key difference between the Leios blob and Mithril-based data availability (DA) solutions lies in the security guarantees provided by each approach. In the Leios blob solution, data availability is assured with the full security of Cardano’s consensus, meaning that all active stake on the network contributes to securing DA, just as it does for transaction finality and block production. This ensures that any attempt to suppress or manipulate stored data would require an adversary to control a majority of Cardano’s total stake, making attacks highly impractical. In contrast, the Mithril-based DA solution relies on a subset of Cardano’s stake—specifically, the stake controlled by SPOs (Stake Pool Operators) running Mithril or, equivalently, the total stake actively participating in Mithril. While this still provides strong cryptographic guarantees, it does not benefit from the full economic security of Cardano’s entire stake-weighted consensus, making it theoretically more susceptible to adversarial control if a sufficiently large fraction of the Mithril-active stake colludes or becomes compromised. 
+A key difference between the Leios blob and Mithril-based data availability (DA) solutions lies in the security guarantees each approach provides.
+In the Leios blob solution, data availability is assured with the full security of Cardano's consensus, meaning that all active stake on the network contributes to securing DA, just as it does for transaction finality and block production.
+Thus, any attempt to suppress or manipulate stored data would require an adversary to control a majority of Cardano's total stake, making attacks highly impractical.
+In contrast, the Mithril-based DA solution relies on a subset of Cardano's stake—specifically, the stake controlled by SPOs (Stake Pool Operators) running Mithril or, equivalently, the total stake actively participating in Mithril.
+While this still provides strong cryptographic guarantees, it does not benefit from the full economic security of Cardano's entire stake-weighted consensus, making it theoretically more susceptible to adversarial control if a sufficiently large fraction of the Mithril-active stake colludes or becomes compromised.
 
-This difference in security between the Leios blob and Mithril-based data availability (DA) solutions is alleviated as more SPOs participate in Mithril. As a greater number of SPOs run Mithril nodes, a larger fraction of Cardano's total stake becomes actively involved in securing DA, thereby increasing the overall economic security of the Mithril-based approach. If Mithril were to achieve near-universal adoption among SPOs, then the total stake securing Mithril would closely approach the total active stake of Cardano, making it nearly as resilient as Cardano's full consensus mechanism. In the ideal scenario where all SPOs participate in Mithril, the Mithril DA solution would provide equivalent resilience to the Leios blob solution, as both would be backed by the same stake-weighted economic security. Therefore, the effectiveness of Mithril as a DA solution is directly proportional to its adoption rate among SPOs, and broad participation is key to minimizing any security gap between the two approaches.
+This difference in security between the Leios blob and Mithril-based data availability (DA) solutions is alleviated as more SPOs participate in Mithril.
+As the number of SPOs running Mithril nodes grows, an increasing proportion of Cardano's total stake becomes actively involved in securing the DA, thereby increasing the overall economic security of the Mithril-based approach.
+As Mithril approaches universal adoption among Cardano's SPOs, the Mithril-based DA solution's resilience converges to that of the Leios blob-based DA solution.
+At the limit, they are equivalent because the same stake-weighted economic security backs both.
+
+Therefore, broad participation in Mithril among Cardano SPOs is key to minimizing any security gap between the two approaches.
 
 \end{document}
