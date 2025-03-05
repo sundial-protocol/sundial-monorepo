@@ -89,6 +89,9 @@ It's responsible for concluding deposits, whether for transfering them to Midgar
   \item[Transfer to Reserve.] Transaction for moving funds of finalized deposit events into Midgard reserve.
     Conditions:
     \begin{enumerate}
+      \item Let \code{settlement\_node} be the referenced settlement node.
+      \item The deposit must be included in the deposit tree of \code{settlement\_node}.
+      \item Inclusion time of the deposit must fall within the time interval of \code{settlement\_node}.
       \item Let \code{reserve\_addr} be the address of the Midgard reserve retrieved from hub oracle.
       \item The utxo produced at \code{reserve\_addr} must only contain the ADA from deposit utxo.
       \item The deposit NFT must be burnt.

@@ -9,7 +9,7 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Transaction,
 }
 use midgard/common/parameter_validation
-use midgard/common/utils
+use midgard/common/utils.{plutarch_phas, plutarch_pinsert}
 use midgard/hub_oracle as hub
 use midgard/settlement_queue
 use midgard/user_events
@@ -120,7 +120,7 @@ validator spend(hub_oracle: ScriptHash) {
             expect and {
                 // 4. The referenced settlement node's deposit tree must contain
                 //    the subjected deposit event.
-                utils.plutarch_phas(
+                plutarch_phas(
                   deposits_root,
                   event_id_data,
                   event_info_data,
@@ -185,7 +185,7 @@ validator spend(hub_oracle: ScriptHash) {
                 // Find the deposit root after this event has been inserted into
                 // the settlement node's deposit tree.
                 let root_after_insertion =
-                  utils.plutarch_pinsert(
+                  plutarch_pinsert(
                     deposits_root,
                     event_id_data,
                     event_info_data,
