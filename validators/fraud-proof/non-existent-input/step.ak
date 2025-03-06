@@ -14,10 +14,10 @@ use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{
   get_singleton_ct_token, get_tx_root_validate_block_hash, handle_cancel,
-  validate_membership_proof, validate_step_output,
+  validate_final_step_output, validate_membership_proof,
 }
 use midgard/fraud_proof/non_existing_input/step.{
-  Cancel, Continue, StepRedeemer as Step1Redeemer, StepState as Step1State,
+  Cancel, Continue, StepRedeemer as Step1Redeemer,
 }
 
 // ----------------- DOUBLE SPEND FRAUD PROOF: DEFINITION --------------------------
@@ -32,8 +32,8 @@ use midgard/fraud_proof/non_existing_input/step.{
 //   Outputs (tx_out2): [UTxO_D]
 
 validator main(
-  // Script hash of next step (backwards compilation order of step validators required)
-  double_spend_step_02_validator_script_hash: ScriptHash,
+  // Fraud proof token policy
+  fraud_proof_token_policy: PolicyId,
   // Script hash of stake validator (forwarded merkle proof logic)
   plutarch_midgard_merkle_validator: ScriptHash,
   // Computation thread token policy
@@ -68,6 +68,7 @@ validator main(
         bad_tx1_info_hash,
         bad_tx1_to_root_proof_path,
         index_output,
+        computation_thread_redeemer_index,
       } -> {
         let ct_token_asset_name =
           get_singleton_ct_token(own_input, ct_token_policy_id)
@@ -78,7 +79,7 @@ validator main(
             ct_token_asset_name,
           )
 
-        // -------- Double spend validation specific logic START --------
+        // -------- Non-existent input: validation-specific logic START --------
         // Membership proof for tx1
         expect
           validate_membership_proof(
@@ -92,23 +93,19 @@ validator main(
             },
           )
 
-        // -------- Double spend validation specific logic END --------
-        let step_1_state = Step1State { verified_tx1_hash: bad_tx1_hash }
-        let expected_output_datum =
-          StepDatum {
-            fraud_prover: step_datum.fraud_prover,
-            data: step_1_state,
-          }
+        // Membership of the bad_input among the tx1 spent inputs
+        // TODO
+        expect True
 
+        // -------- Non-existent input: validation-specific logic END --------
         expect
-          validate_step_output(
+          validate_final_step_output(
             tx,
             index_output,
-            double_spend_step_02_validator_script_hash,
-            ct_token_policy_id,
+            fraud_proof_token_policy,
             ct_token_asset_name,
             step_datum,
-            expected_output_datum,
+            computation_thread_redeemer_index,
           )
 
         True

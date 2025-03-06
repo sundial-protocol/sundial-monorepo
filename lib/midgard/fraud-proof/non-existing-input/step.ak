@@ -8,9 +8,6 @@ pub type StepRedeemer {
     bad_tx1_info_hash: ByteArray,
     bad_tx1_to_root_proof_path: Proof,
     index_output: Int,
+    computation_thread_redeemer_index: Int,
   }
-}
-
-pub type StepState {
-  verified_tx1_hash: ByteArray,
 }
