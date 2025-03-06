@@ -1,8 +1,7 @@
-use aiken/crypto.{Blake2b_224, Hash}
-use midgard/common/types.{MerkleRoot, POSIXTime, PubKeyHash}
+use midgard/common/types.{H28, MerkleRoot, POSIXTime, PubKeyHash}
 
 pub type HeaderHash =
-  Hash<Blake2b_224, Header>
+  H28<Header>
 
 pub type Header {
   prev_utxos_root: MerkleRoot,
