@@ -1,21 +1,17 @@
-//// Double Spend Fraud Proof Validator
-////
-//// This is the abstracted version of the double spend fraud proof validator that uses
-//// common utilities to reduce code duplication.
-////
-//// To see the original implementation that shows the raw logic of fraud proofs, you can view the diff at:
-//// https://github.com/Anastasia-Labs/midgard/pull/91
+//// Fraud proof validator for the non-existing input violation.
 
+use aiken/builtin
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
+use midgard/common/utils.{verify_hash_32}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{
   get_singleton_ct_token, get_tx_root_validate_block_hash, handle_cancel,
   validate_final_step_output, validate_membership_proof,
-}
+} as fraud_proof_utils
 use midgard/fraud_proof/non_existing_input/step.{
   Cancel, Continue, StepRedeemer as Step1Redeemer,
 }
@@ -64,9 +60,13 @@ validator main(
       // Step 1: Membership proof for tx1
       Continue {
         bad_state_queue_node_ref_input_index,
-        bad_tx1_hash,
-        bad_tx1_info_hash,
-        bad_tx1_to_root_proof_path,
+        bad_tx_hash,
+        bad_tx_info_hash,
+        bad_tx_to_root_proof_path,
+        bad_tx,
+        bad_tx_body,
+        bad_spend_inputs,
+        bad_input,
         index_output,
         computation_thread_redeemer_index,
       } -> {
@@ -87,14 +87,23 @@ validator main(
             plutarch_midgard_merkle_validator,
             MembershipProofInputs {
               tx_root: extracted_tx_root,
-              tx_hash: bad_tx1_hash,
-              tx_info_hash: bad_tx1_info_hash,
-              tx_to_root_proof_path: bad_tx1_to_root_proof_path,
+              tx_hash: bad_tx_hash,
+              tx_info_hash: bad_tx_info_hash,
+              tx_to_root_proof_path: bad_tx_to_root_proof_path,
             },
           )
 
         // Membership of the bad_input among the tx1 spent inputs
-        // TODO
+        verify_hash_32(bad_tx, bad_tx_hash)
+        verify_hash_32(bad_tx_body, bad_tx.body)
+        verify_hash_32(bad_spend_inputs, bad_tx_body.spend_inputs)
+
+        expect list.has(builtin.un_list_data(bad_spend_inputs), bad_input)
+
+        // TODO: exclusion proof that bad_input is not in the block's prev_utxos_root.
+        expect True
+
+        // TODO: exclusion proof that bad_input.tx_hash is not in the block's tx_root.
         expect True
 
         // -------- Non-existent input: validation-specific logic END --------
