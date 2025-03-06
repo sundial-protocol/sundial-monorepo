@@ -1,7 +1,6 @@
-import { makeConfig, NodeConfig, User } from "@/config.js";
+import { NodeConfig, User } from "@/config.js";
 import {
   AlwaysSucceedsContract,
-  makeAlwaysSucceedsServiceFn,
 } from "@/services/always-succeeds.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
 import { NodeSdk } from "@effect/opentelemetry";
@@ -15,7 +14,6 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { Duration, Effect, Metric, Option, pipe, Schedule } from "effect";
 import express from "express";
 import pg from "pg";
-import { Worker } from "worker_threads";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
