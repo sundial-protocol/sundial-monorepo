@@ -175,10 +175,42 @@ export const listen = (
 
     app.get("/commit", async (_req, res) => {
       logInfo("GET /commit - Manual block commitment order received");
+      try {
+        const program = pipe(
+          makeBlockCommitmentAction(pool),
+          Effect.provide(User.layer),
+          Effect.provide(AlwaysSucceedsContract.layer),
+          Effect.provide(NodeConfig.layer),
+        );
+        const txHash = await Effect.runPromise(program);
+        logInfo(`GET /commit - Block commitment successful: ${txHash}`);
+        res.json({ message: `Block commitment successful: ${txHash}` });
+      } catch (e) {
+        logWarning(`GET /commit - Block commitment failed: ${e}`);
+        res.status(500).json({
+          message: "Block commitment failed.",
+        });
+      }
     });
 
     app.get("/merge", async (_req, res) => {
       logInfo("GET /merge - Manual merge order received");
+      try {
+        const program = pipe(
+          makeMergeAction(pool),
+          Effect.provide(User.layer),
+          Effect.provide(AlwaysSucceedsContract.layer),
+          Effect.provide(NodeConfig.layer),
+        );
+        const txHash = await Effect.runPromise(program);
+        logInfo(`GET /merge - Merging confirmed state successful: ${txHash}`);
+        res.json({ message: `Merging confirmed state successful: ${txHash}` });
+      } catch (e) {
+        logWarning(`GET /merge - Merging confirmed state failed: ${e}`);
+        res.status(500).json({
+          message: "Merging confirmed state failed.",
+        });
+      }
     });
 
     app.get("/reset", async (_req, res) => {
@@ -268,7 +300,7 @@ export const storeTx = async (
 
 let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
 
-const makeCommitAction = (
+const makeBlockCommitmentAction = (
   db: pg.Pool,
 ) => Effect.gen(function* () {
   yield* Effect.logInfo("Started committing a new block...");
@@ -307,7 +339,7 @@ const blockCommitmentFork = (
 ) =>
   pipe(
     Effect.gen(function* () {
-      const action = makeCommitAction(
+      const action = makeBlockCommitmentAction(
         db,
       ).pipe(Effect.catchAllCause(Effect.logWarning));
       const schedule = Schedule.addDelay(Schedule.forever, () =>
