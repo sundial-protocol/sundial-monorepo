@@ -149,6 +149,24 @@ export const clearUTxOs = async (
   }
 };
 
+export const clearTxs = async (
+  pool: Pool,
+  tableName: string,
+  txHashes: string[]
+): Promise<void> => {
+  const query = `DELETE FROM ${tableName} WHERE tx_hash IN (${txHashes
+    .map((_, i) => `$${i + 1}`)
+    .join(", ")})`;
+  const values = txHashes.flatMap((h) => [Buffer.from(h, "hex")]);
+  try {
+    const result = await pool.query(query, values);
+    logInfo(`${tableName} db: ${result.rowCount} txs removed`);
+  } catch (err) {
+    logAbort(`${tableName} db: txs removing error: ${err}`);
+    throw err;
+  }
+};
+
 export const retrieveTxCborByHash = async (
   pool: Pool,
   tableName: string,
