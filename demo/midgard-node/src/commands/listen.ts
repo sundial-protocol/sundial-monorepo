@@ -32,6 +32,7 @@ import {
   logWarning,
 } from "../utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
+import { AlwaysSucceeds } from "@/services/index.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -172,6 +173,14 @@ export const listen = (
       }
     });
 
+    app.get("/commit", async (_req, res) => {
+      logInfo("GET /commit - Manual block commitment order received");
+    });
+
+    app.get("/merge", async (_req, res) => {
+      logInfo("GET /merge - Manual merge order received");
+    });
+
     app.get("/reset", async (_req, res) => {
       logInfo("GET /reset - Reset request received");
       res.type("text/plain");
@@ -257,38 +266,50 @@ export const storeTx = async (
     yield* Effect.tryPromise(() => MempoolDB.insert(pool, txHash, tx));
   });
 
-const monitorStateQueue = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
+let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
+
+const makeCommitAction = (
+  db: pg.Pool,
+) => Effect.gen(function* () {
+  yield* Effect.logInfo("Started committing a new block...");
+  const { user: lucid } = yield* User;
+  const { spendScriptAddress, policyId } =
+    yield* AlwaysSucceeds.AlwaysSucceedsContract;
+  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+    stateQueueAddress: spendScriptAddress,
+    stateQueuePolicyId: policyId,
+  }
+  const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
+  const numTx = BigInt(txList.length);
+  yield* mempoolTxGauge(Effect.succeed(numTx));
+  const latestBlock =
+    yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
+      lucid,
+      fetchConfig,
+    );
+  const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
+
+  if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
+    latestBlockOutRef = fetchedBlocksOutRef;
+    yield* Effect.logInfo("Committing a new block...");
+    yield* StateQueueTx.buildAndSubmitCommitmentBlock(
+      lucid,
+      db,
+      fetchConfig,
+      Date.now(),
+    );
+  }
+});
+
+const blockCommitmentFork = (
   db: pg.Pool,
   pollingInterval: number,
 ) =>
   pipe(
     Effect.gen(function* () {
-      let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
-      const action = Effect.gen(function* () {
-        yield* Effect.logInfo("monitorStateQueue...");
-        const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
-        const numTx = BigInt(txList.length);
-        yield* mempoolTxGauge(Effect.succeed(numTx));
-        const latestBlock =
-          yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
-            lucid,
-            fetchConfig,
-          );
-        const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
-
-        if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
-          latestBlockOutRef = fetchedBlocksOutRef;
-          yield* Effect.logInfo("Committing a new block...");
-          yield* StateQueueTx.buildAndSubmitCommitmentBlock(
-            lucid,
-            db,
-            fetchConfig,
-            Date.now(),
-          );
-        }
-      }).pipe(Effect.catchAllCause(Effect.logWarning));
+      const action = makeCommitAction(
+        db,
+      ).pipe(Effect.catchAllCause(Effect.logWarning));
       const schedule = Schedule.addDelay(Schedule.forever, () =>
         Duration.millis(pollingInterval),
       );
@@ -297,28 +318,38 @@ const monitorStateQueue = (
     Effect.fork, // Forking ensures the effect keeps running
   );
 
-const monitorConfirmedState = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
+const makeMergeAction = (
+  db: pg.Pool,
+) => Effect.gen(function* () {
+  yield* Effect.logInfo("Merging oldest block...");
+  const { user: lucid } = yield* User;
+  const { spendScriptAddress, policyId, spendScript, mintScript } =
+    yield* AlwaysSucceeds.AlwaysSucceedsContract;
+  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+    stateQueueAddress: spendScriptAddress,
+    stateQueuePolicyId: policyId,
+  }
+  return StateQueueTx.buildAndSubmitMergeTx(
+    lucid,
+    db,
+    fetchConfig,
+    spendScript,
+    mintScript,
+  )
+});
+
+
+const mergeFork = (
   db: pg.Pool,
   pollingInterval: number,
 ) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("monitor confirmed state...");
-      const nodeConfig = yield* makeConfig;
-      const { spendScript, mintScript } =
-        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
       const schedule = Schedule.addDelay(Schedule.forever, () =>
         Duration.millis(pollingInterval),
       );
-      const action = StateQueueTx.buildAndSubmitMergeTx(
-        lucid,
-        db,
-        fetchConfig,
-        spendScript,
-        mintScript,
-      ).pipe(Effect.catchAllCause(Effect.logWarning));
+      const action = makeMergeAction(db).pipe(Effect.catchAllCause(Effect.logWarning));
       yield* Effect.repeat(action, schedule);
     }),
     Effect.fork, // Forking ensures the effect keeps running
@@ -328,11 +359,6 @@ export const runNode = Effect.gen(function* () {
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
-  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-    stateQueueAddress: spendScriptAddress,
-    stateQueuePolicyId: policyId,
-  };
   const pool = new pg.Pool({
     host: nodeConfig.POSTGRES_HOST,
     user: nodeConfig.POSTGRES_USER,
@@ -377,17 +403,23 @@ export const runNode = Effect.gen(function* () {
 
   const program = Effect.gen(function* () {
     yield* Effect.fork(listen(user, pool, nodeConfig.PORT));
-    yield* monitorStateQueue(
-      user,
-      fetchConfig,
-      pool,
-      nodeConfig.POLLING_INTERVAL,
+    yield* pipe(
+      blockCommitmentFork(
+        pool,
+        nodeConfig.POLLING_INTERVAL,
+      ),
+      Effect.provide(User.layer),
+      Effect.provide(AlwaysSucceedsContract.layer),
+      Effect.provide(NodeConfig.layer),
     );
-    yield* monitorConfirmedState(
-      user,
-      fetchConfig,
-      pool,
-      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
+    yield* pipe(
+      mergeFork(
+        pool,
+        nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
+      ),
+      Effect.provide(User.layer),
+      Effect.provide(AlwaysSucceedsContract.layer),
+      Effect.provide(NodeConfig.layer),
     );
     yield* Effect.never;
   });
