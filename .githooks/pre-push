@@ -16,7 +16,7 @@
 #
 #   <local ref> <local oid> <remote ref> <remote oid>
 
-cd onchain/aiken
+cd "$(git rev-parse --show-toplevel)/onchain/aiken"
 
 remote="$1"
 url="$2"
