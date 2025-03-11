@@ -25,11 +25,11 @@ These groups are used to populate the fields of two record types in Midgard's co
         \T{withdraw\_root} : & \T{MPTR} \\
         \T{start\_time}: & \T{PosixTime} \\
         \T{end\_time}: & \T{PosixTime} \\
-        \T{resolution}: & \T{Option}(\T{SettlementResolution})
+        \T{resolution\_claim}: & \T{Option}(\T{SettlementResolution})
     \end{array} \right\} \\
     \T{SettlementResolution} &\coloneq \left\{
     \begin{array}{ll}
-        \T{resolution\_time}: & \T{PosixTime} \\
+        \T{time}: & \T{PosixTime} \\
         \T{operator}: & \T{VerificationKey}
     \end{array}
     \right\}
