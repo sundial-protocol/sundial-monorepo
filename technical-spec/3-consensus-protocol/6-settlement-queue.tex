@@ -121,15 +121,14 @@ Conditions:
           Let that reference input be \code{unprocessed\_event}.
         \item A valid membership proof must be provided, proving that \code{unprocessed\_event} is a member of the corresponding tree in the settlement node.
         \item Let \code{operator\_status} be a redeemer argument indicating whether the fraudulent operator is active or retired.
-        % TODO: Add `Slash Operator Bad Settlement' redeemer to state queue minting policy.
         \item If \code{operator\_status} is active:
             \begin{enumerate}
-                \item The transaction must Remove a node from the \code{active\_operators} set via the Slash Operator Bad Settlement redeemer.
+                \item The transaction must Remove a node from the \code{active\_operators} set via the Remove Operator Bad Settlement redeemer.
                   The \code{slashed\_operator} argument provided to that redeemer must match \code{fraudulent\_operator}.
             \end{enumerate}
         \item Otherwise:
             \begin{enumerate}
-                \item The transaction must Remove a node from the \code{retired\_operators} set via the Slash Operator Bad Settlement redeemer.
+                \item The transaction must Remove a node from the \code{retired\_operators} set via the Remove Operator Bad Settlement redeemer.
                   The \code{slashed\_operator} argument provided to that redeemer must match \code{fraudulent\_operator}.
             \end{enumerate}
       \end{enumerate}

@@ -252,7 +252,8 @@ validator spend(
 
                 // 6. Found redeemer data must have the same structure as active
                 //    operator's bond slash redeemer.
-                expect active_operators.RemoveOperatorSlashBond {
+                // TODO: the fraudulent operator can also be retired
+                expect active_operators.RemoveOperatorBadSettlement {
                   slashed_active_operator_key,
                   ..
                 }: active_operators.MintRedeemer =
