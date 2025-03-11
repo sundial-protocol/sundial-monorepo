@@ -13,6 +13,7 @@ jobs:
       - uses: aiken-lang/setup-aiken@v1
         with:
           version: v1.1.9
+      - working-directory: ./onchain/aiken
       - run: aiken fmt --check
       - run: aiken check -D
       - run: aiken build

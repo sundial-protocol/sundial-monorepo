@@ -16,6 +16,8 @@
 #
 #   <local ref> <local oid> <remote ref> <remote oid>
 
+cd onchain/aiken
+
 remote="$1"
 url="$2"
 
