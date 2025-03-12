@@ -55,4 +55,7 @@ export const retrieve = async (pool: Pool): Promise<[string, string][]> => {
   }
 };
 
+export const clearTxs = async (pool: Pool, txHashes: string[]) =>
+  utils.clearTxs(pool, "mempool", txHashes);
+
 export const clear = async (pool: Pool) => clearTable(pool, "mempool");

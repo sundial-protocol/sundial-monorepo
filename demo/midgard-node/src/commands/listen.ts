@@ -9,7 +9,6 @@ import {
   LucidEvolution,
   OutRef,
 } from "@lucid-evolution/lucid";
-import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { Duration, Effect, Metric, Option, pipe, Schedule } from "effect";
 import express from "express";
@@ -31,6 +30,8 @@ import {
 } from "../utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { AlwaysSucceeds } from "@/services/index.js";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -256,16 +257,9 @@ export const listen = (
           const { spent, produced } = await Effect.runPromise(
             spentAndProducedProgram,
           );
-          // TODO: Avoid abstraction, dedicate a SQL command.
           await MempoolDB.insert(pool, tx.toHash(), txCBOR);
           await MempoolLedgerDB.clearUTxOs(pool, spent);
           await MempoolLedgerDB.insert(pool, produced);
-          // await UtilsDB.modifyMultipleTables(
-          //   db,
-          //   [MempoolDB.insert, tx.toHash(), txCBOR],
-          //   [MempoolLedgerDB.clearUTxOs, spent],
-          //   [MempoolLedgerDB.insert, produced],
-          // );
           Effect.runSync(Metric.increment(txCounter));
           // logInfo(
           //   `POST /submit - Transaction submitted successfully: ${tx.toHash()}`
@@ -316,7 +310,7 @@ const makeBlockCommitmentAction = (
     yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
       lucid,
       fetchConfig,
-    );
+    ).pipe(Effect.withSpan("fetchLatestCommitedBlockProgram"));
   const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
 
   if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
@@ -327,7 +321,7 @@ const makeBlockCommitmentAction = (
       db,
       fetchConfig,
       Date.now(),
-    );
+    ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));;
   }
 });
 
@@ -339,13 +333,16 @@ const blockCommitmentFork = (
     Effect.gen(function* () {
       const action = makeBlockCommitmentAction(
         db,
-      ).pipe(Effect.catchAllCause(Effect.logWarning));
+      ).pipe(
+        Effect.withSpan("block-commitment-fork"),
+        Effect.catchAllCause(Effect.logWarning),
+      );
       const schedule = Schedule.addDelay(Schedule.forever, () =>
         Duration.millis(pollingInterval),
       );
       yield* Effect.repeat(action, schedule);
     }),
-    Effect.fork, // Forking ensures the effect keeps running
+    // Effect.fork, // Forking ensures the effect keeps running
   );
 
 const makeMergeAction = (
@@ -369,6 +366,9 @@ const makeMergeAction = (
 });
 
 
+// possible issues:
+// 1. tx-generator: large batch size & high concurrency
+// 2. after initing node, can't commit the block
 const mergeFork = (
   db: pg.Pool,
   pollingInterval: number,
@@ -379,16 +379,19 @@ const mergeFork = (
       const schedule = Schedule.addDelay(Schedule.forever, () =>
         Duration.millis(pollingInterval),
       );
-      const action = makeMergeAction(db).pipe(Effect.catchAllCause(Effect.logWarning));
+      const action = makeMergeAction(db).pipe(
+        Effect.withSpan("merge-confirmed-state-fork"),
+        Effect.catchAllCause(Effect.logWarning),
+      );
       yield* Effect.repeat(action, schedule);
     }),
-    Effect.fork, // Forking ensures the effect keeps running
+    // Effect.fork, // Forking ensures the effect keeps running
   );
 
 export const runNode = Effect.gen(function* () {
-  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
+  const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
   const pool = new pg.Pool({
     host: nodeConfig.POSTGRES_HOST,
     user: nodeConfig.POSTGRES_USER,
@@ -403,18 +406,9 @@ export const runNode = Effect.gen(function* () {
     catch: (e) => new Error(`${e}`),
   });
 
-  // const otlpTraceExporter = new OTLPTraceExporter({
-  //   url: `http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
-  // });
-
-  // // Log the OTLP port
-  // logInfo(
-  //   `OTLP Trace Exporter running at http://localhost:${nodeConfig.OTLP_PORT}/v1/traces`,
-  // );
   const prometheusExporter = new PrometheusExporter(
     {
       port: nodeConfig.PROM_METRICS_PORT,
-      // host: "localhost",
     },
     () => {
       `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
@@ -429,38 +423,56 @@ export const runNode = Effect.gen(function* () {
   const MetricsLive = NodeSdk.layer(() => ({
     resource: { serviceName: "midgard-node" },
     metricReader: prometheusExporter,
+    spanProcessor: new BatchSpanProcessor(
+      new OTLPTraceExporter({ url: nodeConfig.OLTP_EXPORTER_URL }),
+    ),
   }));
 
-  const program = Effect.gen(function* () {
-    yield* Effect.fork(listen(user, pool, nodeConfig.PORT));
-    yield* pipe(
-      blockCommitmentFork(
-        pool,
-        nodeConfig.POLLING_INTERVAL,
-      ),
-      Effect.provide(User.layer),
-      Effect.provide(AlwaysSucceedsContract.layer),
-      Effect.provide(NodeConfig.layer),
-    );
-    yield* pipe(
-      mergeFork(
-        pool,
-        nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
-      ),
-      Effect.provide(User.layer),
-      Effect.provide(AlwaysSucceedsContract.layer),
-      Effect.provide(NodeConfig.layer),
-    );
-    yield* Effect.never;
+  const appThread = listen(user, pool, nodeConfig.PORT);
+
+  const blockCommitmentThread = pipe(
+    blockCommitmentFork(
+      pool,
+      nodeConfig.POLLING_INTERVAL,
+    ),
+    Effect.provide(User.layer),
+    Effect.provide(AlwaysSucceedsContract.layer),
+    Effect.provide(NodeConfig.layer),
+  );
+
+  const mergeThread = pipe(
+    mergeFork(
+      pool,
+      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
+    ),
+    Effect.provide(User.layer),
+    Effect.provide(AlwaysSucceedsContract.layer),
+    Effect.provide(NodeConfig.layer),
+  );
+
+  const monitorMempoolThread = Effect.gen(function* () {
+    const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(pool));
+    const numTx = BigInt(txList.length);
+    yield* mempoolTxGauge(Effect.succeed(numTx));
   });
+
+  const program = Effect.all(
+    [
+      appThread,
+      blockCommitmentThread,
+      mergeThread,
+      monitorMempoolThread,
+    ],
+    {
+      concurrency: "unbounded",
+    },
+  );
 
   pipe(
     program,
-    Effect.awaitAllChildren,
-    Effect.withSpan("midgard-node"),
-    Effect.tap(() => Effect.annotateCurrentSpan("migdard-node", "runner")),
+    Effect.withSpan("midgard"),
     Effect.provide(MetricsLive),
     Effect.catchAllCause(Effect.logError),
-    Effect.runFork,
+    Effect.runPromise,
   );
 });

@@ -178,9 +178,16 @@ describe("database", () => {
     expect(result3).toEqual([tx1, tx2]);
   });
 
+  it("clears particular txs in the mempool db", async () => {
+    const nonExistentTx = "aaaa1111";
+    await MempoolDB.clearTxs(pool, [tx1Hash, nonExistentTx]);
+    const result1 = await MempoolDB.retrieve(pool);
+    expect(result1).toEqual([[tx2Hash, tx2]]);
+  });
+
   it("clears the mempool db", async () => {
     const initialRows = await MempoolDB.retrieve(pool);
-    expect(initialRows.length).toBe(2);
+    expect(initialRows.length).toBe(1);
     await MempoolDB.clear(pool);
     const result = await MempoolDB.retrieve(pool);
     expect(result.length).toBe(0);
