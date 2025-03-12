@@ -65,40 +65,29 @@ export const handleSignSubmitWithoutConfirmation = (
 /**
  * Fetch transactions of the first block by querying BlocksDB and ImmutableDB.
  *
- * @param lucid - The LucidEvolution instance.
- * @param fetchConfig - The configuration for fetching data.
+ * @param firstBlockUTxO - UTxO of the first block in queue.
  * @param db - The database instance.
  * @returns An Effect that resolves to an array of transactions.
  */
 export const fetchFirstBlockTxs = (
-  lucid: LucidEvolution,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
+  firstBlockUTxO: UTxO,
   db: pg.Pool,
 ): Effect.Effect<{ txs: string[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
-    const { link: firstBlockUTxO } =
-      yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
-        lucid,
-        fetchConfig,
-      );
-    if (!firstBlockUTxO) {
-      return { txs: [], headerHash: "" };
-    } else {
-      const blockHeader =
-        yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
-      const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
-      const txHashes = yield* Effect.tryPromise({
-        try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),
-        catch: (e) => new Error(`${e}`),
-      });
-      const txs = yield* Effect.tryPromise({
-        try: () => ImmutableDB.retrieveTxCborsByHashes(db, txHashes),
-        catch: (e) => {
-          return new Error(`${e}`);
-        },
-      });
-      return { txs, headerHash };
-    }
+    const blockHeader =
+      yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
+    const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
+    const txHashes = yield* Effect.tryPromise({
+      try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),
+      catch: (e) => new Error(`${e}`),
+    });
+    const txs = yield* Effect.tryPromise({
+      try: () => ImmutableDB.retrieveTxCborsByHashes(db, txHashes),
+      catch: (e) => {
+        return new Error(`${e}`);
+      },
+    });
+    return { txs, headerHash };
   });
 
 export const utxoToOutRef = (utxo: UTxO): OutRef => ({

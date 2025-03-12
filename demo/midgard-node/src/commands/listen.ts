@@ -295,7 +295,7 @@ let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
 const makeBlockCommitmentAction = (
   db: pg.Pool,
 ) => Effect.gen(function* () {
-  yield* Effect.logInfo("Started committing a new block...");
+  yield* Effect.logInfo("New block commitment process started.");
   const { user: lucid } = yield* User;
   const { spendScriptAddress, policyId } =
     yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -303,25 +303,37 @@ const makeBlockCommitmentAction = (
     stateQueueAddress: spendScriptAddress,
     stateQueuePolicyId: policyId,
   }
+  yield* Effect.logInfo("Querying mempool to see if there are transactions present for inclusion in the block...");
   const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
   const numTx = BigInt(txList.length);
   yield* mempoolTxGauge(Effect.succeed(numTx));
-  const latestBlock =
-    yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
-      lucid,
-      fetchConfig,
-    ).pipe(Effect.withSpan("fetchLatestCommitedBlockProgram"));
-  const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
+  if (numTx > 0) {
+    yield* Effect.logInfo(`Found ${numTx} transaction(s) in mempool.`);
+    yield* Effect.logInfo("Fetching the latest block from L1...");
+    const latestBlock =
+      yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
+        lucid,
+        fetchConfig,
+      ).pipe(Effect.withSpan("fetchLatestCommitedBlockProgram"));
+    const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
 
-  if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
-    latestBlockOutRef = fetchedBlocksOutRef;
-    yield* Effect.logInfo("Committing a new block...");
-    yield* StateQueueTx.buildAndSubmitCommitmentBlock(
-      lucid,
-      db,
-      fetchConfig,
-      Date.now(),
-    ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));;
+    yield* Effect.logInfo(`Success, its out ref is: ${fetchedBlocksOutRef}`);
+    yield* Effect.logInfo(`Latest stored out ref is: ${latestBlockOutRef}`);
+
+    if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
+      yield* Effect.logInfo("Latest block on-chain is different from the one stored in memory.");
+      latestBlockOutRef = fetchedBlocksOutRef;
+      yield* StateQueueTx.buildAndSubmitCommitmentBlock(
+        lucid,
+        db,
+        fetchConfig,
+        Date.now(),
+      ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));;
+    } else {
+      yield* Effect.logInfo("Latest block on L1 hasn't updated yet.");
+    }
+  } else {
+    yield* Effect.logInfo("There are no transactions in mempool, block submission aborted.");
   }
 });
 
@@ -331,6 +343,7 @@ const blockCommitmentFork = (
 ) =>
   pipe(
     Effect.gen(function* () {
+      yield* Effect.logInfo("Block commitment fork started.");
       const action = makeBlockCommitmentAction(
         db,
       ).pipe(
@@ -348,7 +361,7 @@ const blockCommitmentFork = (
 const makeMergeAction = (
   db: pg.Pool,
 ) => Effect.gen(function* () {
-  yield* Effect.logInfo("Merging oldest block...");
+  yield* Effect.logInfo("Merging of oldest block started.");
   const { user: lucid } = yield* User;
   const { spendScriptAddress, policyId, spendScript, mintScript } =
     yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -375,13 +388,13 @@ const mergeFork = (
 ) =>
   pipe(
     Effect.gen(function* () {
-      yield* Effect.logInfo("monitor confirmed state...");
-      const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(pollingInterval),
-      );
+      yield* Effect.logInfo("Merge fork started.");
       const action = makeMergeAction(db).pipe(
         Effect.withSpan("merge-confirmed-state-fork"),
         Effect.catchAllCause(Effect.logWarning),
+      );
+      const schedule = Schedule.addDelay(Schedule.forever, () =>
+        Duration.millis(pollingInterval),
       );
       yield* Effect.repeat(action, schedule);
     }),
@@ -391,7 +404,6 @@ const mergeFork = (
 export const runNode = Effect.gen(function* () {
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const { spendScriptAddress, policyId } = yield* AlwaysSucceedsContract;
   const pool = new pg.Pool({
     host: nodeConfig.POSTGRES_HOST,
     user: nodeConfig.POSTGRES_USER,

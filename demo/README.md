@@ -47,7 +47,7 @@ This will start:
 - Prometheus metrics server
 - OpenTelemetry collector
 
-6. You can view your container using `docker`:
+6. You can view your containers using `docker`:
 
 ```sh
 docker ps -a
