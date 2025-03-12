@@ -1,3 +1,11 @@
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    max-size: "1m"
+    max-file: "1"
+    tag: "{{.Name}}"
+
 services:
   midgard-node:
     build:
@@ -7,6 +15,9 @@ services:
       dockerfile: ./Dockerfile
     env_file:
       - .env
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
     command:
       - node
       - ./dist/index.js
@@ -17,6 +28,7 @@ services:
       # - "4318:4318" # opentelemetry
     volumes:
       - ./db:/app/db
+    logging: *default-logging
     networks:
       midgard_net:
     # restart: always
@@ -72,9 +84,36 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+    logging: *default-logging
     networks:
       midgard_net:
-        
+    
+  loki:
+    container_name: loki
+    image: grafana/loki:3.4.1
+    ports:
+      - "3100:3100"
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
+    logging: *default-logging
+    networks:
+      midgard_net:
+  
+  promtail:
+    image: grafana/promtail:2.7.1
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log
+      - ./promtail-config.yaml:/etc/promtail/config.yaml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+    networks:
+      midgard_net:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
@@ -85,6 +124,7 @@ services:
       - "/sys:/sys:ro"
       - "/var/lib/docker/:/var/lib/docker:ro"
       - "/dev/disk/:/dev/disk:ro"
+    logging: *default-logging
     networks:
       midgard_net:
 
@@ -107,6 +147,8 @@ services:
       - "./grafana/default.yaml:/etc/grafana/provisioning/dashboards/default.yaml"
     depends_on:
       - prometheus
+      - loki
+    logging: *default-logging
     networks:
       midgard_net:
   tempo-init:
@@ -136,6 +178,7 @@ services:
       - "9411:9411"    # zipkin
     depends_on:
       - tempo-init
+    logging: *default-logging
     networks:
       midgard_net:
 
