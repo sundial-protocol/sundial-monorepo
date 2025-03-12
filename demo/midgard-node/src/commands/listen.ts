@@ -249,7 +249,7 @@ export const listen = (
 
       const log = (msg: string) => Effect.runSync(Effect.logInfo(msg));
 
-      log(`POST /submit - Submit request received for transaction`);
+      log("◻️ Submit request received for transaction");
 
       if (typeof txCBOR === "string" && isHexString(txCBOR)) {
         try {
@@ -258,20 +258,22 @@ export const listen = (
           const { spent, produced } = await Effect.runPromise(
             spentAndProducedProgram,
           );
+          log(`▫️ Inserting ${tx.toHash()} into MempoolDB...`);
           await MempoolDB.insert(pool, tx.toHash(), txCBOR);
+          log(`▫️ Clearing spent UTxOs from MempoolLedgerDB...`);
           await MempoolLedgerDB.clearUTxOs(pool, spent);
+          log(`▫️ Inserting produced UTxOs into MempoolLedgerDB...`);
           await MempoolLedgerDB.insert(pool, produced);
+          log("▫️ Incrementing `txCounter` metric...");
           Effect.runSync(Metric.increment(txCounter));
-          log(
-            `POST /submit - Transaction submitted successfully: ${tx.toHash()}`,
-          );
+          log(`▫️ L2 Transaction processed successfully: ${tx.toHash()}`);
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
-          log(`POST /submit - Submission failed: ${e}`);
+          log(`▫️ Submission failed: ${e}`);
           res.status(400).json({ message: `Something went wrong: ${e}` });
         }
       } else {
-        log("POST /submit - Invalid CBOR provided");
+        log("▫️ Invalid CBOR provided");
         res.status(400).json({ message: "Invalid CBOR provided" });
       }
     });
@@ -291,11 +293,9 @@ export const storeTx = async (
     yield* Effect.tryPromise(() => MempoolDB.insert(pool, txHash, tx));
   });
 
-let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
-
 const makeBlockCommitmentAction = (db: pg.Pool) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo("New block commitment process started.");
+    yield* Effect.logInfo("🔹 New block commitment process started.");
     const { user: lucid } = yield* User;
     const { spendScriptAddress, policyId } =
       yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -304,40 +304,36 @@ const makeBlockCommitmentAction = (db: pg.Pool) =>
       stateQueuePolicyId: policyId,
     };
     yield* Effect.logInfo(
-      "Querying mempool to see if there are transactions present for inclusion in the block...",
+      "🔹 Querying mempool to see if there are transactions present for inclusion in the block...",
     );
     const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
     const numTx = BigInt(txList.length);
     yield* mempoolTxGauge(Effect.succeed(numTx));
     if (numTx > 0) {
-      yield* Effect.logInfo(`Found ${numTx} transaction(s) in mempool.`);
-      yield* Effect.logInfo("Fetching the latest block from L1...");
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
+      yield* Effect.logInfo(`🔹 Found ${numTx} transaction(s) in mempool.`);
+      yield* Effect.logInfo("🔹 Fetching the latest block from L1...");
+      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
         lucid,
         fetchConfig,
-      ).pipe(Effect.withSpan("fetchLatestCommitedBlockProgram"));
+      ).pipe(Effect.withSpan("fetchLatestCommittedBlockProgram"));
       const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
 
-      yield* Effect.logInfo(`Success, its out ref is: ${fetchedBlocksOutRef}`);
-      yield* Effect.logInfo(`Latest stored out ref is: ${latestBlockOutRef}`);
+      yield* Effect.logInfo(
+        `🔹 Success, its out ref is: ${fetchedBlocksOutRef.txHash}#${fetchedBlocksOutRef.outputIndex}`,
+      );
 
-      if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
-        yield* Effect.logInfo(
-          "Latest block on-chain is different from the one stored in memory.",
-        );
-        latestBlockOutRef = fetchedBlocksOutRef;
-        yield* StateQueueTx.buildAndSubmitCommitmentBlock(
-          lucid,
-          db,
-          fetchConfig,
-          Date.now(),
-        ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));
-      } else {
-        yield* Effect.logInfo("Latest block on L1 hasn't updated yet.");
-      }
+      yield* Effect.logInfo(
+        "🔹 Latest block on-chain is different from the one stored in memory.",
+      );
+      yield* StateQueueTx.buildAndSubmitCommitmentBlock(
+        lucid,
+        db,
+        fetchConfig,
+        Date.now(),
+      ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));
     } else {
       yield* Effect.logInfo(
-        "There are no transactions in mempool, block submission aborted.",
+        "🔹 There are no transactions in mempool, block submission aborted.",
       );
     }
   });
@@ -345,7 +341,7 @@ const makeBlockCommitmentAction = (db: pg.Pool) =>
 const blockCommitmentFork = (db: pg.Pool, pollingInterval: number) =>
   pipe(
     Effect.gen(function* () {
-      yield* Effect.logInfo("Block commitment fork started.");
+      yield* Effect.logInfo("🔵 Block commitment fork started.");
       const action = makeBlockCommitmentAction(db).pipe(
         Effect.withSpan("block-commitment-fork"),
         Effect.catchAllCause(Effect.logWarning),
@@ -360,7 +356,7 @@ const blockCommitmentFork = (db: pg.Pool, pollingInterval: number) =>
 
 const makeMergeAction = (db: pg.Pool) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo("Merging of oldest block started.");
+    yield* Effect.logInfo("🔸 Merging of oldest block started.");
     const { user: lucid } = yield* User;
     const { spendScriptAddress, policyId, spendScript, mintScript } =
       yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -383,7 +379,7 @@ const makeMergeAction = (db: pg.Pool) =>
 const mergeFork = (db: pg.Pool, pollingInterval: number) =>
   pipe(
     Effect.gen(function* () {
-      yield* Effect.logInfo("Merge fork started.");
+      yield* Effect.logInfo("🟠 Merge fork started.");
       const action = makeMergeAction(db).pipe(
         Effect.withSpan("merge-confirmed-state-fork"),
         Effect.catchAllCause(Effect.logWarning),

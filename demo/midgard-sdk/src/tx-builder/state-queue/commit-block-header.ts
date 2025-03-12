@@ -1,21 +1,24 @@
 import {
   Assets,
+  Credential,
   Data,
   LucidEvolution,
   TxBuilder,
+  UTxO,
   fromText,
   paymentCredentialOf,
   toUnit,
 } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import { CommitBlockParams, FetchConfig } from "./types.js";
-import { fetchLatestCommitedBlockProgram } from "../../endpoints/state-queue/fetch-latest-block.js";
+import { fetchLatestCommittedBlockProgram } from "../../endpoints/state-queue/fetch-latest-block.js";
 import { Header } from "../ledger-state.js";
 import {
   getHeaderFromBlockUTxO,
   hashHeader,
 } from "../../utils/ledger-state.js";
 import { getNodeDatumFromUTxO } from "@/utils/linked-list.js";
+import { MerkleRoot, POSIXTime } from "../common.js";
 import { getConfirmedStateFromUTxO } from "@/utils/state-queue.js";
 import { NodeDatum } from "../linked-list.js";
 
@@ -46,7 +49,7 @@ export const commitTxBuilder = (
       catch: (e) => new Error(`Failed to find the wallet: ${e}`),
     });
     const pubkeyHash = paymentCredentialOf(walletAddress).hash;
-    const latestBlock = yield* fetchLatestCommitedBlockProgram(lucid, config);
+    const latestBlock = yield* fetchLatestCommittedBlockProgram(lucid, config);
     const latestNodeDatum = yield* getNodeDatumFromUTxO(latestBlock);
     const makeNewHeaderProgram: () => Effect.Effect<
       { nodeDatum: NodeDatum; header: Header },
@@ -100,15 +103,17 @@ export const commitTxBuilder = (
     };
     const { nodeDatum: updatedNodeDatum, header: newHeader } =
       yield* makeNewHeaderProgram();
-    // console.log("newHeader :>> ", newHeader);
+
     const assets: Assets = {
       [toUnit(policyId, fromText("Node") + newHeader.prevHeaderHash)]: 1n,
     };
+
     const newNodeDatum: NodeDatum = {
       key: updatedNodeDatum.next,
       next: "Empty",
       data: Data.castTo(newHeader, Header),
     };
+
     const tx = lucid
       .newTx()
       // .validFrom(Number(newHeader.startTime))
