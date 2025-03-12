@@ -72,6 +72,13 @@ docker-compose up -d
 ```
 Now you should be able to interact with `midgard-node`.
 
+8. If you made any changes to `midgard-node` and had an image running, restart it with the 3 steps:
+```sh
+docker-compose down -v
+docker image rm midgard-node-midgard-node --force
+docker-compose up -d
+```
+
 ## Generate dummy transactions
 
 See [Midgard Manager](./midgard-manager/README.md)

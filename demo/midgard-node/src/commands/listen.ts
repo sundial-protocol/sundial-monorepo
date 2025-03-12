@@ -1,7 +1,5 @@
 import { NodeConfig, User } from "@/config.js";
-import {
-  AlwaysSucceedsContract,
-} from "@/services/always-succeeds.js";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
 import { NodeSdk } from "@effect/opentelemetry";
 import {
@@ -248,7 +246,10 @@ export const listen = (
 
     app.post("/submit", async (req, res) => {
       const txCBOR = req.query.tx_cbor;
-      // logInfo(`POST /submit - Submit request received for transaction`);
+
+      const log = (msg: string) => Effect.runSync(Effect.logInfo(msg));
+
+      log(`POST /submit - Submit request received for transaction`);
 
       if (typeof txCBOR === "string" && isHexString(txCBOR)) {
         try {
@@ -261,16 +262,16 @@ export const listen = (
           await MempoolLedgerDB.clearUTxOs(pool, spent);
           await MempoolLedgerDB.insert(pool, produced);
           Effect.runSync(Metric.increment(txCounter));
-          // logInfo(
-          //   `POST /submit - Transaction submitted successfully: ${tx.toHash()}`
-          // );
+          log(
+            `POST /submit - Transaction submitted successfully: ${tx.toHash()}`,
+          );
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
-          // logWarning(`POST /submit - Submission failed: ${e}`);
+          log(`POST /submit - Submission failed: ${e}`);
           res.status(400).json({ message: `Something went wrong: ${e}` });
         }
       } else {
-        // logWarning("POST /submit - Invalid CBOR provided");
+        log("POST /submit - Invalid CBOR provided");
         res.status(400).json({ message: "Invalid CBOR provided" });
       }
     });
@@ -292,61 +293,60 @@ export const storeTx = async (
 
 let latestBlockOutRef: OutRef = { txHash: "", outputIndex: 0 };
 
-const makeBlockCommitmentAction = (
-  db: pg.Pool,
-) => Effect.gen(function* () {
-  yield* Effect.logInfo("New block commitment process started.");
-  const { user: lucid } = yield* User;
-  const { spendScriptAddress, policyId } =
-    yield* AlwaysSucceeds.AlwaysSucceedsContract;
-  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-    stateQueueAddress: spendScriptAddress,
-    stateQueuePolicyId: policyId,
-  }
-  yield* Effect.logInfo("Querying mempool to see if there are transactions present for inclusion in the block...");
-  const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
-  const numTx = BigInt(txList.length);
-  yield* mempoolTxGauge(Effect.succeed(numTx));
-  if (numTx > 0) {
-    yield* Effect.logInfo(`Found ${numTx} transaction(s) in mempool.`);
-    yield* Effect.logInfo("Fetching the latest block from L1...");
-    const latestBlock =
-      yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
+const makeBlockCommitmentAction = (db: pg.Pool) =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo("New block commitment process started.");
+    const { user: lucid } = yield* User;
+    const { spendScriptAddress, policyId } =
+      yield* AlwaysSucceeds.AlwaysSucceedsContract;
+    const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+      stateQueueAddress: spendScriptAddress,
+      stateQueuePolicyId: policyId,
+    };
+    yield* Effect.logInfo(
+      "Querying mempool to see if there are transactions present for inclusion in the block...",
+    );
+    const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
+    const numTx = BigInt(txList.length);
+    yield* mempoolTxGauge(Effect.succeed(numTx));
+    if (numTx > 0) {
+      yield* Effect.logInfo(`Found ${numTx} transaction(s) in mempool.`);
+      yield* Effect.logInfo("Fetching the latest block from L1...");
+      const latestBlock = yield* SDK.Endpoints.fetchLatestCommitedBlockProgram(
         lucid,
         fetchConfig,
       ).pipe(Effect.withSpan("fetchLatestCommitedBlockProgram"));
-    const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
+      const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
 
-    yield* Effect.logInfo(`Success, its out ref is: ${fetchedBlocksOutRef}`);
-    yield* Effect.logInfo(`Latest stored out ref is: ${latestBlockOutRef}`);
+      yield* Effect.logInfo(`Success, its out ref is: ${fetchedBlocksOutRef}`);
+      yield* Effect.logInfo(`Latest stored out ref is: ${latestBlockOutRef}`);
 
-    if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
-      yield* Effect.logInfo("Latest block on-chain is different from the one stored in memory.");
-      latestBlockOutRef = fetchedBlocksOutRef;
-      yield* StateQueueTx.buildAndSubmitCommitmentBlock(
-        lucid,
-        db,
-        fetchConfig,
-        Date.now(),
-      ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));;
+      if (!UtilsTx.outRefsAreEqual(latestBlockOutRef, fetchedBlocksOutRef)) {
+        yield* Effect.logInfo(
+          "Latest block on-chain is different from the one stored in memory.",
+        );
+        latestBlockOutRef = fetchedBlocksOutRef;
+        yield* StateQueueTx.buildAndSubmitCommitmentBlock(
+          lucid,
+          db,
+          fetchConfig,
+          Date.now(),
+        ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));
+      } else {
+        yield* Effect.logInfo("Latest block on L1 hasn't updated yet.");
+      }
     } else {
-      yield* Effect.logInfo("Latest block on L1 hasn't updated yet.");
+      yield* Effect.logInfo(
+        "There are no transactions in mempool, block submission aborted.",
+      );
     }
-  } else {
-    yield* Effect.logInfo("There are no transactions in mempool, block submission aborted.");
-  }
-});
+  });
 
-const blockCommitmentFork = (
-  db: pg.Pool,
-  pollingInterval: number,
-) =>
+const blockCommitmentFork = (db: pg.Pool, pollingInterval: number) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("Block commitment fork started.");
-      const action = makeBlockCommitmentAction(
-        db,
-      ).pipe(
+      const action = makeBlockCommitmentAction(db).pipe(
         Effect.withSpan("block-commitment-fork"),
         Effect.catchAllCause(Effect.logWarning),
       );
@@ -358,34 +358,29 @@ const blockCommitmentFork = (
     // Effect.fork, // Forking ensures the effect keeps running
   );
 
-const makeMergeAction = (
-  db: pg.Pool,
-) => Effect.gen(function* () {
-  yield* Effect.logInfo("Merging of oldest block started.");
-  const { user: lucid } = yield* User;
-  const { spendScriptAddress, policyId, spendScript, mintScript } =
-    yield* AlwaysSucceeds.AlwaysSucceedsContract;
-  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-    stateQueueAddress: spendScriptAddress,
-    stateQueuePolicyId: policyId,
-  }
-  return StateQueueTx.buildAndSubmitMergeTx(
-    lucid,
-    db,
-    fetchConfig,
-    spendScript,
-    mintScript,
-  )
-});
-
+const makeMergeAction = (db: pg.Pool) =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo("Merging of oldest block started.");
+    const { user: lucid } = yield* User;
+    const { spendScriptAddress, policyId, spendScript, mintScript } =
+      yield* AlwaysSucceeds.AlwaysSucceedsContract;
+    const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+      stateQueueAddress: spendScriptAddress,
+      stateQueuePolicyId: policyId,
+    };
+    yield* StateQueueTx.buildAndSubmitMergeTx(
+      lucid,
+      db,
+      fetchConfig,
+      spendScript,
+      mintScript,
+    );
+  });
 
 // possible issues:
 // 1. tx-generator: large batch size & high concurrency
 // 2. after initing node, can't commit the block
-const mergeFork = (
-  db: pg.Pool,
-  pollingInterval: number,
-) =>
+const mergeFork = (db: pg.Pool, pollingInterval: number) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("Merge fork started.");
@@ -443,20 +438,14 @@ export const runNode = Effect.gen(function* () {
   const appThread = listen(user, pool, nodeConfig.PORT);
 
   const blockCommitmentThread = pipe(
-    blockCommitmentFork(
-      pool,
-      nodeConfig.POLLING_INTERVAL,
-    ),
+    blockCommitmentFork(pool, nodeConfig.POLLING_INTERVAL),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
   );
 
   const mergeThread = pipe(
-    mergeFork(
-      pool,
-      nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL,
-    ),
+    mergeFork(pool, nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
@@ -469,12 +458,7 @@ export const runNode = Effect.gen(function* () {
   });
 
   const program = Effect.all(
-    [
-      appThread,
-      blockCommitmentThread,
-      mergeThread,
-      monitorMempoolThread,
-    ],
+    [appThread, blockCommitmentThread, mergeThread, monitorMempoolThread],
     {
       concurrency: "unbounded",
     },

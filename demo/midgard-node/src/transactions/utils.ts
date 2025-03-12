@@ -74,8 +74,7 @@ export const fetchFirstBlockTxs = (
   db: pg.Pool,
 ): Effect.Effect<{ txs: string[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
-    const blockHeader =
-      yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
+    const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
     const txHashes = yield* Effect.tryPromise({
       try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),

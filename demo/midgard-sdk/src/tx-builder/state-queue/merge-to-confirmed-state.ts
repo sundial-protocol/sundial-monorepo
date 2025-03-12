@@ -26,14 +26,18 @@ import { Redeemer, FetchConfig, MergeParams } from "./types.js";
 export const mergeTxBuilder = (
   lucid: LucidEvolution,
   fetchConfig: FetchConfig,
-  { confirmedUTxO, firstBlockUTxO, stateQueueSpendingScript, stateQueueMintingScript }: MergeParams,
+  {
+    confirmedUTxO,
+    firstBlockUTxO,
+    stateQueueSpendingScript,
+    stateQueueMintingScript,
+  }: MergeParams,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const confirmedNode = yield* getNodeDatumFromUTxO(confirmedUTxO);
     const currentConfirmedNodeDatum = confirmedNode;
     const currentConfirmedState: ConfirmedState = yield* Effect.try({
-      try: () =>
-        Data.castFrom(currentConfirmedNodeDatum.data, ConfirmedState),
+      try: () => Data.castFrom(currentConfirmedNodeDatum.data, ConfirmedState),
       catch: (e) => new Error(`${e}`),
     });
     const blockNode: NodeDatum = yield* getNodeDatumFromUTxO(firstBlockUTxO);

@@ -15,7 +15,7 @@ import {
   handleSignSubmitWithoutConfirmation,
 } from "../utils.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
-import { BlocksDB, ConfirmedLedgerDB, UtilsDB } from "@/database/index.js";
+import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
 import pg from "pg";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
@@ -42,11 +42,18 @@ export const buildAndSubmitMergeTx = (
   mintScript: Script,
 ) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo("Fetching confirmed state and the first block in queue from L1...");
+    yield* Effect.logInfo(
+      "Fetching confirmed state and the first block in queue from L1...",
+    );
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
-      yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(lucid, fetchConfig);
+      yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
+        lucid,
+        fetchConfig,
+      );
     if (firstBlockUTxO) {
-      yield* Effect.logInfo(`First block found: ${firstBlockUTxO.txHash}#${firstBlockUTxO.outputIndex}`);
+      yield* Effect.logInfo(
+        `First block found: ${firstBlockUTxO.txHash}#${firstBlockUTxO.outputIndex}`,
+      );
       // Fetch transactions from the first block
       yield* Effect.logInfo("Looking up its transactions from BlocksDB...");
       const { txs: firstBlockTxs, headerHash } = yield* fetchFirstBlockTxs(
@@ -54,7 +61,9 @@ export const buildAndSubmitMergeTx = (
         db,
       ).pipe(Effect.withSpan("fetchFirstBlockTxs"));
       if (firstBlockTxs.length === 0) {
-        yield* Effect.logInfo("Failed to find first block's transactions in BlocksDB.");
+        yield* Effect.logInfo(
+          "Failed to find first block's transactions in BlocksDB.",
+        );
         return;
       }
       // Build the transaction
@@ -117,7 +126,7 @@ export const buildAndSubmitMergeTx = (
       //   catch: (e) => new Error(`Transaction failed: ${e}`),
       // });
     } else {
-      yield* Effect.logInfo("No blocks found in queue.")
+      yield* Effect.logInfo("No blocks found in queue.");
       return;
     }
   });
