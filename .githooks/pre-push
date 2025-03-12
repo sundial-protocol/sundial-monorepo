@@ -21,6 +21,20 @@ url="$2"
 
 zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
 
+dirRoot="$(git rev-parse --show-toplevel)"
+dirAiken="$dirRoot/onchain/aiken"
+
+remoteBranch="$(git rev-parse --abbrev-ref --symbolic-full-name @{u})"
+
+if git diff --cached --quiet $remoteBranch -- $dirAiken; then
+    echo "Aiken files are unchanged."
+    exit 0
+else
+    echo "Aiken files have changed. Rebuilding."
+fi
+
+cd $dirAiken
+
 aiken build
 if [ $? -ne 0 ]; then
   echo >&2 'CANCELLED PUSH: Aiken build failed'
