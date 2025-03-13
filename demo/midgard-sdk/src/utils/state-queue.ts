@@ -14,7 +14,7 @@ import { Datum } from "@/tx-builder/state-queue/types.js";
 import { getHeaderFromBlockUTxO, hashHeader } from "./ledger-state.js";
 
 export const getLinkFromBlockUTxO = (
-  blockUTxO: UTxO
+  blockUTxO: UTxO,
 ): Effect.Effect<NodeKey, Error> => {
   const nodeDatum = getNodeDatumFromUTxO(blockUTxO);
   return Effect.map(nodeDatum, (nd) => nd.next);
@@ -26,7 +26,7 @@ export const getLinkFromBlockUTxO = (
  * `ConfirmedState`.
  */
 export const getConfirmedStateFromUTxO = (
-  blockUTxO: UTxO
+  blockUTxO: UTxO,
 ): Effect.Effect<{ data: ConfirmedState; link: NodeKey }, Error> => {
   const datumCBOR = blockUTxO.datum;
   if (datumCBOR) {
@@ -62,7 +62,7 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
   latestBlock: UTxO,
   newUTxOsRoot: MerkleRoot,
   transactionsRoot: MerkleRoot,
-  endTime: POSIXTime
+  endTime: POSIXTime,
 ): Effect.Effect<{ nodeDatum: Datum; header: Header }, Error> =>
   Effect.gen(function* () {
     // const latestBlock = yield* fetchLatestCommittedBlockProgram(lucid, config);

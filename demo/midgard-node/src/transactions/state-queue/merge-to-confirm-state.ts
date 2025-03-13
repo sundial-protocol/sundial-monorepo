@@ -85,7 +85,9 @@ export const buildAndSubmitMergeTx = (
       yield* Metric.increment(mergeBlockCounter).pipe(
         Effect.withSpan("increment-merge-block-counter"),
       );
-      yield* Effect.logInfo("🔸 Merge transaction submitted, updating the db...");
+      yield* Effect.logInfo(
+        "🔸 Merge transaction submitted, updating the db...",
+      );
       if (firstBlockTxs.length === 0) {
         return;
       }

@@ -9,7 +9,7 @@ import {
 import { Effect } from "effect";
 import { CommitBlockParams, Datum, FetchConfig } from "./types.js";
 import { Header } from "../ledger-state.js";
-import {hashHeader} from "@/utils/ledger-state.js";
+import { hashHeader } from "@/utils/ledger-state.js";
 
 /**
  * Builds portions of a tx required for submitting a new block, using the
@@ -30,7 +30,7 @@ export const commitTxBuilder = (
     stateQueueSpendingScript,
     policyId,
     stateQueueMintingScript,
-  }: CommitBlockParams
+  }: CommitBlockParams,
 ): Effect.Effect<TxBuilder, Error> =>
   Effect.gen(function* () {
     const newHeaderHash = yield* hashHeader(newHeader);
@@ -53,12 +53,12 @@ export const commitTxBuilder = (
       .pay.ToContract(
         config.stateQueueAddress,
         { kind: "inline", value: Data.to(newNodeDatum, Datum) },
-        assets
+        assets,
       )
       .pay.ToContract(
         config.stateQueueAddress,
         { kind: "inline", value: Data.to(updatedNodeDatum, Datum) },
-        latestBlock.assets
+        latestBlock.assets,
       )
       .mintAssets(assets, Data.void())
       .attach.Script(stateQueueSpendingScript)

@@ -41,7 +41,9 @@ export const retrieveTxCborsByHashes = async (
 ): Promise<string[]> =>
   utils.retrieveTxCborsByHashes(pool, "mempool", txHashes);
 
-export const retrieve = async (pool: Pool): Promise<{txHash: string, txCbor: string}[]> => {
+export const retrieve = async (
+  pool: Pool,
+): Promise<{ txHash: string; txCbor: string }[]> => {
   const query = `SELECT * FROM mempool`;
   try {
     const result = await pool.query(query);
