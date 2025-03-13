@@ -1,4 +1,4 @@
-import { Address, PolicyId, Script, Data } from "@lucid-evolution/lucid";
+import { Address, PolicyId, Script, Data, UTxO } from "@lucid-evolution/lucid";
 import {
   MerkleRoot,
   OutputReferenceSchema,
@@ -48,6 +48,8 @@ export type CommitBlockParams = {
 };
 
 export type MergeParams = {
+  confirmedUTxO: UTxO;
+  firstBlockUTxO: UTxO;
   stateQueueSpendingScript: Script;
   stateQueueMintingScript: Script;
 };
