@@ -322,9 +322,6 @@ const makeBlockCommitmentAction = (db: pg.Pool) =>
         `🔹 Success, its out ref is: ${fetchedBlocksOutRef.txHash}#${fetchedBlocksOutRef.outputIndex}`,
       );
 
-      yield* Effect.logInfo(
-        "🔹 Latest block on-chain is different from the one stored in memory.",
-      );
       yield* StateQueueTx.buildAndSubmitCommitmentBlock(
         lucid,
         db,
