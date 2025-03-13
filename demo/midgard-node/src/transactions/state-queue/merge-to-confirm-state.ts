@@ -12,7 +12,7 @@ import * as SDK from "@al-ft/midgard-sdk";
 import { Effect, Metric } from "effect";
 import {
   fetchFirstBlockTxs,
-  handleSignSubmitWithoutConfirmation,
+  handleSignSubmit,
 } from "../utils.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
@@ -62,10 +62,11 @@ export const buildAndSubmitMergeTx = (
       ).pipe(Effect.withSpan("fetchFirstBlockTxs"));
       if (firstBlockTxs.length === 0) {
         yield* Effect.logInfo(
-          "🔸 Failed to find first block's transactions in BlocksDB.",
+          "🔸 ❌ Failed to find first block's transactions in BlocksDB.",
         );
         return;
       }
+      yield* Effect.logInfo("🔸 Building merge transaction...");
       // Build the transaction
       const txBuilder = yield* SDK.Endpoints.mergeToConfirmedStateProgram(
         lucid,
@@ -78,12 +79,15 @@ export const buildAndSubmitMergeTx = (
         },
       ).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
 
-      // Submit the transaction
-      yield* handleSignSubmitWithoutConfirmation(lucid, txBuilder).pipe(
-        Effect.withSpan("handleSignSubmit-merge-tx"),
-      );
+      // Increment the merge block counter before successful L1 as it seems
+      // confirmation can timeout.
       yield* Metric.increment(mergeBlockCounter).pipe(
         Effect.withSpan("increment-merge-block-counter"),
+      );
+
+      // Submit the transaction
+      yield* handleSignSubmit(lucid, txBuilder).pipe(
+        Effect.withSpan("handleSignSubmit-merge-tx"),
       );
       yield* Effect.logInfo(
         "🔸 Merge transaction submitted, updating the db...",
@@ -116,7 +120,7 @@ export const buildAndSubmitMergeTx = (
       yield* Effect.tryPromise(() => BlocksDB.clearBlock(db, headerHash)).pipe(
         Effect.withSpan("clear-block-from-BlocksDB"),
       );
-      yield* Effect.logInfo("🔸 Merge transaction completed.");
+      yield* Effect.logInfo("🔸 ☑️  Merge transaction completed.");
     } else {
       yield* Effect.logInfo("🔸 No blocks found in queue.");
       return;

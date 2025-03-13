@@ -23,8 +23,6 @@ import {
 import {
   findSpentAndProducedUTxOs,
   isHexString,
-  logInfo,
-  logWarning,
 } from "../utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { AlwaysSucceeds } from "@/services/index.js";
@@ -49,6 +47,7 @@ export const listen = (
   port: number,
 ): Effect.Effect<void, never, never> =>
   Effect.sync(() => {
+    const log = (msg: string) => Effect.runSync(Effect.logInfo(msg));
     const app = express();
     app.get("/tx", (req, res) => {
       const txHash = req.query.tx_hash;
@@ -62,20 +61,20 @@ export const listen = (
         MempoolDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
           Option.match(ret, {
             onSome: (retrieved) => {
-              logInfo(`GET /tx - Transaction found in mempool: ${txHash}`);
+              log(`GET /tx - Transaction found in mempool: ${txHash}`);
               res.json({ tx: retrieved });
             },
             onNone: () =>
               ImmutableDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
                 Option.match(ret, {
                   onSome: (retrieved) => {
-                    logInfo(
+                    log(
                       `GET /tx - Transaction found in immutable: ${txHash}`,
                     );
                     res.json({ tx: retrieved });
                   },
                   onNone: () => {
-                    logWarning(`GET /tx - No transaction found: ${txHash}`);
+                    log(`GET /tx - No transaction found: ${txHash}`);
                     res
                       .status(404)
                       .json({ message: "No matching transactions found" });
@@ -85,7 +84,7 @@ export const listen = (
           });
         });
       } else {
-        // logWarning(`GET /tx - Invalid transaction hash: ${txHash}`);
+        // log(`GET /tx - Invalid transaction hash: ${txHash}`);
         res
           .status(404)
           .json({ message: `Invalid transaction hash: ${txHash}` });
@@ -94,7 +93,7 @@ export const listen = (
 
     app.get("/utxos", (req, res) => {
       const addr = req.query.addr;
-      logInfo(`GET /utxos - Request received for address: ${addr}`);
+      log(`GET /utxos - Request received for address: ${addr}`);
 
       if (typeof addr === "string") {
         try {
@@ -104,32 +103,32 @@ export const listen = (
               const filtered = allUTxOs.filter(
                 (a) => a.address === addrDetails.address.bech32,
               );
-              logInfo(
+              log(
                 `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
               );
               res.json({ utxos: filtered });
             });
           } else {
-            logWarning(
+            log(
               `GET /utxos - Invalid address (no payment credential): ${addr}`,
             );
             res.status(400).json({ message: `Invalid address: ${addr}` });
           }
         } catch (e) {
-          logWarning(
+          log(
             `GET /utxos - Invalid address format: ${addr}, error: ${e}`,
           );
           res.status(400).json({ message: `Invalid address: ${addr}` });
         }
       } else {
-        logWarning(`GET /utxos - Invalid address type: ${addr}`);
+        log(`GET /utxos - Invalid address type: ${addr}`);
         res.status(400).json({ message: `Invalid address: ${addr}` });
       }
     });
 
     app.get("/block", (req, res) => {
       const hdrHash = req.query.header_hash;
-      logInfo(`GET /block - Request received for header_hash: ${hdrHash}`);
+      log(`GET /block - Request received for header_hash: ${hdrHash}`);
 
       if (
         typeof hdrHash === "string" &&
@@ -137,13 +136,13 @@ export const listen = (
         hdrHash.length === 32
       ) {
         BlocksDB.retrieveTxHashesByBlockHash(pool, hdrHash).then((hashes) => {
-          logInfo(
+          log(
             `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`,
           );
           res.json({ hashes });
         });
       } else {
-        logWarning(`GET /block - Invalid block header hash: ${hdrHash}`);
+        log(`GET /block - Invalid block header hash: ${hdrHash}`);
         res
           .status(400)
           .json({ message: `Invalid block header hash: ${hdrHash}` });
@@ -151,7 +150,7 @@ export const listen = (
     });
 
     app.get("/init", async (_req, res) => {
-      logInfo("GET /init - Initialization request received");
+      log("✨ Initialization request received");
       try {
         const program = pipe(
           StateQueueTx.stateQueueInit,
@@ -160,10 +159,10 @@ export const listen = (
           Effect.provide(NodeConfig.layer),
         );
         const txHash = await Effect.runPromise(program);
-        logInfo(`GET /init - Initialization successful: ${txHash}`);
+        log(`GET /init - Initialization successful: ${txHash}`);
         res.json({ message: `Initiation successful: ${txHash}` });
       } catch (e) {
-        logWarning(`GET /init - Initialization failed: ${e}`);
+        log(`GET /init - Initialization failed: ${e}`);
         res.status(500).json({
           message: "Initiation failed.",
         });
@@ -171,7 +170,7 @@ export const listen = (
     });
 
     app.get("/commit", async (_req, res) => {
-      logInfo("GET /commit - Manual block commitment order received");
+      log("GET /commit - Manual block commitment order received");
       try {
         const program = pipe(
           makeBlockCommitmentAction(pool),
@@ -180,10 +179,10 @@ export const listen = (
           Effect.provide(NodeConfig.layer),
         );
         const txHash = await Effect.runPromise(program);
-        logInfo(`GET /commit - Block commitment successful: ${txHash}`);
+        log(`GET /commit - Block commitment successful: ${txHash}`);
         res.json({ message: `Block commitment successful: ${txHash}` });
       } catch (e) {
-        logWarning(`GET /commit - Block commitment failed: ${e}`);
+        log(`GET /commit - Block commitment failed: ${e}`);
         res.status(500).json({
           message: "Block commitment failed.",
         });
@@ -191,7 +190,7 @@ export const listen = (
     });
 
     app.get("/merge", async (_req, res) => {
-      logInfo("GET /merge - Manual merge order received");
+      log("GET /merge - Manual merge order received");
       try {
         const program = pipe(
           makeMergeAction(pool),
@@ -200,10 +199,10 @@ export const listen = (
           Effect.provide(NodeConfig.layer),
         );
         const txHash = await Effect.runPromise(program);
-        logInfo(`GET /merge - Merging confirmed state successful: ${txHash}`);
+        log(`GET /merge - Merging confirmed state successful: ${txHash}`);
         res.json({ message: `Merging confirmed state successful: ${txHash}` });
       } catch (e) {
-        logWarning(`GET /merge - Merging confirmed state failed: ${e}`);
+        log(`GET /merge - Merging confirmed state failed: ${e}`);
         res.status(500).json({
           message: "Merging confirmed state failed.",
         });
@@ -211,7 +210,7 @@ export const listen = (
     });
 
     app.get("/reset", async (_req, res) => {
-      logInfo("GET /reset - Reset request received");
+      log("🚧 Reset request received");
       res.type("text/plain");
       try {
         const program = pipe(
@@ -247,8 +246,6 @@ export const listen = (
     app.post("/submit", async (req, res) => {
       const txCBOR = req.query.tx_cbor;
 
-      const log = (msg: string) => Effect.runSync(Effect.logInfo(msg));
-
       log("◻️ Submit request received for transaction");
 
       if (typeof txCBOR === "string" && isHexString(txCBOR)) {
@@ -258,13 +255,9 @@ export const listen = (
           const { spent, produced } = await Effect.runPromise(
             spentAndProducedProgram,
           );
-          log(`▫️ Inserting ${tx.toHash()} into MempoolDB...`);
           await MempoolDB.insert(pool, tx.toHash(), txCBOR);
-          log(`▫️ Clearing spent UTxOs from MempoolLedgerDB...`);
           await MempoolLedgerDB.clearUTxOs(pool, spent);
-          log(`▫️ Inserting produced UTxOs into MempoolLedgerDB...`);
           await MempoolLedgerDB.insert(pool, produced);
-          log("▫️ Incrementing `txCounter` metric...");
           Effect.runSync(Metric.increment(txCounter));
           log(`▫️ L2 Transaction processed successfully: ${tx.toHash()}`);
           res.json({ message: "Successfully submitted the transaction" });
@@ -279,7 +272,7 @@ export const listen = (
     });
 
     app.listen(port, () =>
-      logInfo(`Server running at http://localhost:${port}`),
+      log(`Server running at http://localhost:${port}`),
     );
   });
 
@@ -416,7 +409,7 @@ export const runNode = Effect.gen(function* () {
   );
   const originalStop = prometheusExporter.stopServer;
   prometheusExporter.stopServer = async function () {
-    logWarning("Prometheus exporter is stopping!");
+    Effect.runSync(Effect.logInfo("Prometheus exporter is stopping!"));
     return originalStop();
   };
 

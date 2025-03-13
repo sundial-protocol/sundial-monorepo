@@ -77,7 +77,7 @@ export const buildAndSubmitCommitmentBlock = (
       const txRoot = yield* SDK.Utils.mptFromList(mempoolTxCbors).pipe(
         Effect.withSpan("build MPT tx root"),
       );
-      yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot}`);
+      yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot.hash}`);
 
       const { spent: spentList, produced: producedList } =
         yield* findAllSpentAndProducedUTxOs(mempoolTxCbors).pipe(
@@ -103,7 +103,7 @@ export const buildAndSubmitCommitmentBlock = (
         "🔹 Building MPT root of UTxO set after applying MempoolDB to LatestLedgerDB...",
       );
       const utxoRoot = yield* SDK.Utils.mptFromList(newLatestLedger);
-      yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
+      yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot.hash}`);
 
       const nodeConfig = yield* makeConfig;
 
@@ -173,7 +173,7 @@ export const buildAndSubmitCommitmentBlock = (
 
       const batchSize = 100;
 
-      yield* Effect.logInfo("🔹 Clearing spennt UTxOs from LatestLedgerDB...");
+      yield* Effect.logInfo("🔹 Clearing spent UTxOs from LatestLedgerDB...");
       for (let i = 0; i < spentList.length; i += batchSize) {
         yield* Effect.tryPromise(() =>
           LatestLedgerDB.clearUTxOs(db, spentList.slice(i, i + batchSize)),
@@ -213,7 +213,7 @@ export const buildAndSubmitCommitmentBlock = (
         MempoolDB.clearTxs(db, mempoolTxHashes),
       ).pipe(Effect.withSpan("clear mempool"));
 
-      yield* Effect.logInfo("🔹 Block submission terminated successfully.");
+      yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
     } else {
       yield* Effect.logInfo("🔹 No transactions were found in MempoolDB.");
     }
