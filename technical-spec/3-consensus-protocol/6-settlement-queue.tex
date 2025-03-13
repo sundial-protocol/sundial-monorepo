@@ -99,6 +99,11 @@ It's responsible for appends to the \code{settlement\_queue} list's end, and als
 The spending validator of \code{settlement\_queue} is statically parametrized on the \code{settlement\_queue} and \code{hub\_oracle} minting policy.
 Conditions:
 \begin{description}
+  \item[List State Transition.] Forward to minting policy.
+    Conditions:
+      \begin{enumerate}
+          \item The transaction must mint or burn tokens of the \code{settlement\_queue} minting policy.
+      \end{enumerate}
   \item[Attach Resolution Claim.] The current operator attaches a resolution claim to a settlement node.
     Conditions:
       \begin{enumerate}
@@ -131,11 +136,6 @@ Conditions:
                 \item The transaction must Remove a node from the \code{retired\_operators} set via the Remove Operator Bad Settlement redeemer.
                   The \code{slashed\_operator} argument provided to that redeemer must match \code{fraudulent\_operator}.
             \end{enumerate}
-      \end{enumerate}
-  \item[Resolve Settlement Node.] Remove a settlement node if its resolution claim has matured.
-    Conditions:
-      \begin{enumerate}
-          \item All tokens of the \code{settlement\_queue} in the spent input must be burned.
       \end{enumerate}
 \end{description}
 

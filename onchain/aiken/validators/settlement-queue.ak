@@ -285,9 +285,6 @@ validator spend(
           tx,
         )
       }
-      ConcludeSettlement ->
-        list_state_transition(assets.tokens(tx.mint, settlement_policy_id))
-    }
   }
 
   else(_) {
