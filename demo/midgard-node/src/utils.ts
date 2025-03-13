@@ -14,7 +14,7 @@ import {
   UTxO,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Effect } from "effect";
+import { Duration, Effect, pipe, Schedule } from "effect";
 
 export const chalk = new chalk_.Chalk();
 

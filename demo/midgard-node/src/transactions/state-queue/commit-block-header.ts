@@ -77,7 +77,9 @@ export const buildAndSubmitCommitmentBlock = (
       const txRoot = yield* SDK.Utils.mptFromList(mempoolTxCbors).pipe(
         Effect.withSpan("build MPT tx root"),
       );
-      yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot.hash}`);
+      yield* Effect.logInfo(
+        `🔹 Mempool tx root found: ${txRoot.hash.toString("hex")}`,
+      );
 
       const { spent: spentList, produced: producedList } =
         yield* findAllSpentAndProducedUTxOs(mempoolTxCbors).pipe(
@@ -103,7 +105,9 @@ export const buildAndSubmitCommitmentBlock = (
         "🔹 Building MPT root of UTxO set after applying MempoolDB to LatestLedgerDB...",
       );
       const utxoRoot = yield* SDK.Utils.mptFromList(newLatestLedger);
-      yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot.hash}`);
+      yield* Effect.logInfo(
+        `🔹 New UTxO root found: ${utxoRoot.hash.toString("hex")}`,
+      );
 
       const nodeConfig = yield* makeConfig;
 

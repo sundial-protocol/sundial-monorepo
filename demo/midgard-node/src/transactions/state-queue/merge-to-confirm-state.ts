@@ -10,10 +10,7 @@
 import { LucidEvolution, Script } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect, Metric } from "effect";
-import {
-  fetchFirstBlockTxs,
-  handleSignSubmit,
-} from "../utils.js";
+import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
 import pg from "pg";
