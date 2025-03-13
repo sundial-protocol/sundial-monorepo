@@ -1,7 +1,7 @@
 // Build a tx Merkle root with all the mempool txs
 
 import { makeConfig } from "@/config.js";
-import { ImmutableDB, LatestLedgerDB, MempoolDB } from "@/database/index.js";
+import { BlocksDB, ImmutableDB, LatestLedgerDB, MempoolDB } from "@/database/index.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import { UtilsTx } from "@/transactions/index.js";
@@ -66,6 +66,7 @@ export const buildAndSubmitCommitmentBlock = (
       yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
 
       const mempoolTxCbors = mempoolTxs.map((tx) => tx.txCbor);
+      const mempoolTxHashes = mempoolTxs.map((tx) => tx.txHash);
 
       yield* Effect.logInfo("🔹 Building MPT root of transactions...");
       const txRoot = yield* SDK.Utils.mptFromList(
@@ -104,11 +105,30 @@ export const buildAndSubmitCommitmentBlock = (
       const { policyId, spendScript, mintScript } =
         yield* makeAlwaysSucceedsServiceFn(nodeConfig);
 
+      yield* Effect.logInfo("🔹 Fetching latest commited block...");
+      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
+        lucid,
+        fetchConfig,
+      );
+
+      yield* Effect.logInfo("🔹 Finding updated block datum and new header...");
+      const { nodeDatum: updatedNodeDatum, header: newHeader } =
+        yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
+          lucid,
+          latestBlock,
+          utxoRoot.hash.toString("hex"),
+          txRoot.hash.toString("hex"),
+          BigInt(endTime),
+        );
+      const newHeaderHash = yield* SDK.Utils.hashHeader(newHeader);
+
+      yield* Effect.logInfo(`🔹 New header hash is: ${newHeaderHash}`);
+
       // Build commitment block
       const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
-        newUTxOsRoot: utxoRoot.hash.toString("hex"),
-        transactionsRoot: txRoot.hash.toString("hex"),
-        endTime: BigInt(endTime),
+        anchorUTxO: latestBlock,
+        updatedAnchorDatum: updatedNodeDatum,
+        newHeader: newHeader,
         stateQueueSpendingScript: spendScript,
         policyId,
         stateQueueMintingScript: mintScript,
@@ -146,6 +166,7 @@ export const buildAndSubmitCommitmentBlock = (
 
       const batchSize = 100;
 
+
       yield* Effect.logInfo("🔹 Clearing spennt UTxOs from LatestLedgerDB...");
       for (let i = 0; i < spentList.length; i += batchSize) {
         yield* Effect.tryPromise(() =>
@@ -160,16 +181,20 @@ export const buildAndSubmitCommitmentBlock = (
         ).pipe(Effect.withSpan(`latest-ledger-insert-${i}`));
       }
 
-      yield* Effect.logInfo("🔹 Inserting included transactions into ImmutableDB...");
+      yield* Effect.logInfo("🔹 Inserting included transactions into ImmutableDB and BlocksDB...");
       for (let i = 0; i < mempoolTxsCount; i += batchSize) {
         yield* Effect.tryPromise(() =>
           ImmutableDB.insertTxs(db, mempoolTxs.slice(i, i + batchSize))
+        ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));
+
+        yield* Effect.tryPromise(() =>
+          BlocksDB.insert(db, newHeaderHash, mempoolTxHashes.slice(i, i + batchSize))
         ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));
       }
 
       yield* Effect.logInfo("🔹 Clearing included transactions from MempoolDB...");
       yield* Effect.tryPromise(
-        () => MempoolDB.clearTxs(db, mempoolTxs.map((tx) => tx.txHash))
+        () => MempoolDB.clearTxs(db, mempoolTxHashes)
       ).pipe(
         Effect.withSpan("clear mempool"),
       );
