@@ -9,11 +9,16 @@ sequenceDiagram
   Midgard ->> User: Staking script mints a withdrawal order token
   User ->> Midgard:User Send min-ADA to the Midgard withdrawal order address,<br>along with the withdrawal order token<br>and the witdrawal order datum
   Note over User,Midgard: WithdrawalOrderDatum ≔<br>event : WithdrawalEvent,<br>inclusion time : PosixTime,<br>witness : SciptHash,<br>refund_address : Address,<br>refund datum : Option (Data)
-  alt withdrawal event is included in a settlement queue node
-        Midgard->>User: Utxos from the Midgard are reserved and confirmed deposits<br>can be used to pay for the creation<br>of an L1 utxo according to the withdrawal event
-  else withdrawal order's inclusion time is within the confirmed header's event interval but not within the event interval of any settlement queue node
-    Midgard->>User: Withdrawal order utxo can be refunded to its user<br>according to the refund address and refund datum fields
+  rect rgba(255, 255, 0, .1)
+  rect rgba(0, 0, 255, .1)
+  Note over Midgard,User: withdrawal event is included in a settlement queue node
+  Midgard->>User: Utxos from the Midgard are reserved and confirmed deposits<br>can be used to pay for the creation<br>of an L1 utxo according to the withdrawal event
   end
+  rect rgba(0, 0, 255, .1)
+   Note over Midgard,User: withdrawal order's inclusion time is within<br>the confirmed header's event interval<br>but not within the event interval of any settlement queue node
+  Midgard->>User: Withdrawal order utxo can be refunded to its user<br>according to the refund address and refund datum fields
+  end
+  end
+  
   Midgard ->> Midgard: The withdrawal order’s witness staking credential must be deregistered when the withdrawal order utxo is spent
-
 ```
