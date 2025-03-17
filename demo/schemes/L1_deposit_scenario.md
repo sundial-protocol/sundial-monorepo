@@ -15,7 +15,7 @@ sequenceDiagram
     StateQueue ->> StateQueue: Deposit included eventually
   end
   alt In settlement queue
-    StateQueue ->> Midgard: Absorb deposit to reserver/withdrawals
+    StateQueue ->> Midgard: Absorb deposit to reserves/withdrawals
   else Not in settlement queue
     StateQueue ->> User: Refund deposit to refund_address
   end
