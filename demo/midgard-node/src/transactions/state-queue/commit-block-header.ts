@@ -101,7 +101,8 @@ export const buildAndSubmitCommitmentBlock = (
 
       const workerHelper = (input: WorkerInput) =>
         Effect.async<string, Error, never>((resume) => {
-          const worker = new Worker("../../workers/mpt.js", {
+          Effect.runSync(Effect.logInfo("👷 Starting worker..."));
+          const worker = new Worker(new URL("./mpt.js", import.meta.url), {
             workerData: input,
           });
           worker.on("message", (output: WorkerOutput) => {
