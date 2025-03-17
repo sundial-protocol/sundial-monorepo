@@ -12,29 +12,31 @@ interface WorkerOutput {
   root: string;
 }
 
-const wrapper = (input: WorkerInput): Promise<WorkerOutput> => {
-  const trieProgram = (() => {
-    if (input.itemsType === "txs") {
-      return SDK.Utils.mptFromTxs(input.items);
-    } else {
-      return SDK.Utils.mptFromUTxOs(input.items);
-    }
-  })()
-  const outputProgram = Effect.map(trieProgram, (t: Trie) => ({root: t.hash.toString("hex")} as WorkerOutput));
-  return Effect.runPromise(outputProgram);
-};
+const wrapper = (input: WorkerInput): Effect.Effect<WorkerOutput, Error> =>
+  Effect.gen(function* () {
+    const trieProgram = (() => {
+      if (input.itemsType === "txs") {
+        return SDK.Utils.mptFromTxs(input.items);
+      } else {
+        return SDK.Utils.mptFromUTxOs(input.items);
+      }
+    })();
+    return yield* Effect.map(
+      trieProgram,
+      (t: Trie) => ({ root: t.hash.toString("hex") }) as WorkerOutput
+    );
+  });
 
 if (parentPort === null) {
   throw new Error("MPT computation must be run as a worker");
-} else {
-  const inputData = workerData as WorkerInput;
-  
-  (async () => {
-    try {
-      const output = await wrapper(inputData);
-      parentPort?.postMessage(output);
-    } catch (e) {
-      parentPort?.postMessage({error: e instanceof Error ? e.message : "Unknown error from MPT worker"});
-    }
-  })
 }
+
+const inputData = workerData as WorkerInput;
+
+Effect.runPromise(
+  wrapper(inputData).pipe(
+    Effect.catchAll((e) =>
+      Effect.succeed({ error: e instanceof Error ? e.message : "Unknown error from MPT worker" })
+    )
+  )
+).then((output) => parentPort?.postMessage(output));
