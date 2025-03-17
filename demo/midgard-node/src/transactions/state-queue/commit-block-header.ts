@@ -8,13 +8,19 @@ import {
   MempoolDB,
 } from "@/database/index.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
-import { findAllSpentAndProducedUTxOs } from "@/utils.js";
+import {
+  WorkerInput,
+  WorkerOutput,
+  findAllSpentAndProducedUTxOs,
+} from "@/utils.js";
 import { UtilsTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { LucidEvolution } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import pg from "pg";
 import { handleSignSubmit } from "../utils.js";
+import { Worker } from "worker_threads";
+import path from "path";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
@@ -58,12 +64,12 @@ export const buildAndSubmitCommitmentBlock = (
   lucid: LucidEvolution,
   db: pg.Pool,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  endTime: number,
+  endTime: number
 ) =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
     const mempoolTxs = yield* Effect.tryPromise(() =>
-      MempoolDB.retrieve(db),
+      MempoolDB.retrieve(db)
     ).pipe(Effect.withSpan("retrieve mempool transaction"));
     const mempoolTxsCount = BigInt(mempoolTxs.length);
 
@@ -73,41 +79,75 @@ export const buildAndSubmitCommitmentBlock = (
       const mempoolTxCbors = mempoolTxs.map((tx) => tx.txCbor);
       const mempoolTxHashes = mempoolTxs.map((tx) => tx.txHash);
 
-      yield* Effect.logInfo("🔹 Building MPT root of transactions...");
-      const txRoot = yield* SDK.Utils.mptFromList(mempoolTxCbors).pipe(
-        Effect.withSpan("build MPT tx root"),
-      );
-      yield* Effect.logInfo(
-        `🔹 Mempool tx root found: ${txRoot.hash.toString("hex")}`,
-      );
-
       const { spent: spentList, produced: producedList } =
         yield* findAllSpentAndProducedUTxOs(mempoolTxCbors).pipe(
-          Effect.withSpan("findAllSpentAndProducedUTxOs"),
+          Effect.withSpan("findAllSpentAndProducedUTxOs")
         );
 
       const latestLedgerUTxOs = yield* Effect.tryPromise(() =>
-        LatestLedgerDB.retrieve(db),
+        LatestLedgerDB.retrieve(db)
       ).pipe(Effect.withSpan("retrieve latest ledger utxo list"));
 
       // Remove spent UTxOs from latestLedgerUTxOs
       const filteredUTxOList = latestLedgerUTxOs.filter(
         (utxo) =>
-          !spentList.some((spent) => UtilsTx.outRefsAreEqual(utxo, spent)),
+          !spentList.some((spent) => UtilsTx.outRefsAreEqual(utxo, spent))
       );
 
       // Merge filtered latestLedgerUTxOs with producedList
       const newLatestLedger = [...filteredUTxOList, ...producedList].map(
-        (utxo) => utxo.txHash + utxo.outputIndex,
+        (utxo) => utxo.txHash + utxo.outputIndex
       );
 
-      yield* Effect.logInfo(
-        "🔹 Building MPT root of UTxO set after applying MempoolDB to LatestLedgerDB...",
+      const workerHelper = (input: WorkerInput) =>
+        Effect.async<string, Error, never>((resume) => {
+          const worker = new Worker("../../workers/mpt.js", {
+            workerData: input,
+          });
+          worker.on("message", (output: WorkerOutput) => {
+            if ("error" in output) {
+              resume(
+                Effect.fail(new Error(`Error in worker: ${output.error}`))
+              );
+            } else {
+              resume(Effect.succeed(output.root));
+            }
+            worker.terminate();
+          });
+          worker.on("error", (e: Error) => {
+            resume(Effect.fail(new Error(`Error in worker: ${e}`)));
+            worker.terminate();
+          });
+          worker.on("exit", (code: number) => {
+            if (code !== 0) {
+              resume(
+                Effect.fail(new Error(`Worker exited with code: ${code}`))
+              );
+            }
+          });
+          return Effect.sync(() => {
+            worker.terminate();
+          });
+        });
+
+      const txRootWorkerProgram = workerHelper({
+        items: mempoolTxCbors,
+        itemsType: "txs",
+      });
+
+      const utxoRootWorkerProgram = workerHelper({
+        items: newLatestLedger,
+        itemsType: "utxos",
+      });
+
+      yield* Effect.logInfo("🔹 Building MPT roots...");
+      const [txRoot, utxoRoot] = yield* Effect.all(
+        [txRootWorkerProgram, utxoRootWorkerProgram],
+        { concurrency: 2 }
       );
-      const utxoRoot = yield* SDK.Utils.mptFromList(newLatestLedger);
-      yield* Effect.logInfo(
-        `🔹 New UTxO root found: ${utxoRoot.hash.toString("hex")}`,
-      );
+
+      yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot}`);
+      yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
 
       const nodeConfig = yield* makeConfig;
 
@@ -117,7 +157,7 @@ export const buildAndSubmitCommitmentBlock = (
       yield* Effect.logInfo("🔹 Fetching latest commited block...");
       const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
         lucid,
-        fetchConfig,
+        fetchConfig
       );
 
       yield* Effect.logInfo("🔹 Finding updated block datum and new header...");
@@ -125,9 +165,9 @@ export const buildAndSubmitCommitmentBlock = (
         yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
           lucid,
           latestBlock,
-          utxoRoot.hash.toString("hex"),
-          txRoot.hash.toString("hex"),
-          BigInt(endTime),
+          utxoRoot,
+          txRoot,
+          BigInt(endTime)
         );
       const newHeaderHash = yield* SDK.Utils.hashHeader(newHeader);
 
@@ -150,23 +190,23 @@ export const buildAndSubmitCommitmentBlock = (
         lucid,
         fetchConfig,
         commitBlockParams,
-        aoUpdateCommitmentTimeParams,
+        aoUpdateCommitmentTimeParams
       );
 
       const txSize = txBuilder.toCBOR().length / 2;
       yield* Effect.logInfo(
-        `🔹 Transaction built successfully. Size: ${txSize}`,
+        `🔹 Transaction built successfully. Size: ${txSize}`
       );
 
       // Using sign and submit helper with confirmation so that databases are
       // only updated after a successful on-chain registration of the block.
       yield* handleSignSubmit(lucid, txBuilder).pipe(
-        Effect.withSpan("handleSignSubmit-commit-block"),
+        Effect.withSpan("handleSignSubmit-commit-block")
       );
 
       const totalTxSize = mempoolTxCbors.reduce(
         (acc, cbor) => acc + cbor.length / 2,
-        0,
+        0
       );
 
       yield* commitBlockTxSizeGauge(Effect.succeed(txSize));
@@ -180,41 +220,41 @@ export const buildAndSubmitCommitmentBlock = (
       yield* Effect.logInfo("🔹 Clearing spent UTxOs from LatestLedgerDB...");
       for (let i = 0; i < spentList.length; i += batchSize) {
         yield* Effect.tryPromise(() =>
-          LatestLedgerDB.clearUTxOs(db, spentList.slice(i, i + batchSize)),
+          LatestLedgerDB.clearUTxOs(db, spentList.slice(i, i + batchSize))
         ).pipe(Effect.withSpan(`latest-ledger-clearUTxOs-${i}`));
       }
 
       yield* Effect.logInfo(
-        "🔹 Inserting produced UTxOs into LatestLedgerDB...",
+        "🔹 Inserting produced UTxOs into LatestLedgerDB..."
       );
       for (let i = 0; i < producedList.length; i += batchSize) {
         yield* Effect.tryPromise(() =>
-          LatestLedgerDB.insert(db, producedList.slice(i, i + batchSize)),
+          LatestLedgerDB.insert(db, producedList.slice(i, i + batchSize))
         ).pipe(Effect.withSpan(`latest-ledger-insert-${i}`));
       }
 
       yield* Effect.logInfo(
-        "🔹 Inserting included transactions into ImmutableDB and BlocksDB...",
+        "🔹 Inserting included transactions into ImmutableDB and BlocksDB..."
       );
       for (let i = 0; i < mempoolTxsCount; i += batchSize) {
         yield* Effect.tryPromise(() =>
-          ImmutableDB.insertTxs(db, mempoolTxs.slice(i, i + batchSize)),
+          ImmutableDB.insertTxs(db, mempoolTxs.slice(i, i + batchSize))
         ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));
 
         yield* Effect.tryPromise(() =>
           BlocksDB.insert(
             db,
             newHeaderHash,
-            mempoolTxHashes.slice(i, i + batchSize),
-          ),
+            mempoolTxHashes.slice(i, i + batchSize)
+          )
         ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));
       }
 
       yield* Effect.logInfo(
-        "🔹 Clearing included transactions from MempoolDB...",
+        "🔹 Clearing included transactions from MempoolDB..."
       );
       yield* Effect.tryPromise(() =>
-        MempoolDB.clearTxs(db, mempoolTxHashes),
+        MempoolDB.clearTxs(db, mempoolTxHashes)
       ).pipe(Effect.withSpan("clear mempool"));
 
       yield* Effect.logInfo("🔹 ☑️  Block submission completed.");

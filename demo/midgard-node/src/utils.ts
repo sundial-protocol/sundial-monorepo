@@ -16,6 +16,15 @@ import {
 import * as chalk_ from "chalk";
 import { Effect } from "effect";
 
+export interface WorkerInput {
+  items: any[];
+  itemsType: "txs" | "utxos";
+}
+
+export interface WorkerOutput {
+  root: string;
+}
+
 export const chalk = new chalk_.Chalk();
 
 export type ProviderName = "Blockfrost" | "Koios" | "Kupmios" | "Maestro";
