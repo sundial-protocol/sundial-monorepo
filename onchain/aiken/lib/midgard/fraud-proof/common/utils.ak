@@ -8,7 +8,10 @@ use cardano/assets.{PolicyId, lovelace_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/common/utils.{get_singleton_asset_with_policy} as get_singleton_asset_with_policy
 use midgard/computation_thread.{StepDatum, Success}
-use midgard/fraud_proof/common/types.{FraudProofDatum, MembershipProofInputs}
+use midgard/fraud_proof/common/types.{
+  ExclusionProofInputTx, ExclusionProofUtxo, FraudProofDatum,
+  MembershipProofInputs,
+}
 use midgard/ledger_state.{Header}
 
 // ------------ ABSTRACTIONS FOR ALL FRAUD PROOF STEPS ------------
@@ -50,6 +53,25 @@ pub fn get_tx_root_validate_block_hash(
   extracted_tx_root
 }
 
+// Relevant to (1): tx_root provided by fraud prover in redeemer matches block_hash from the state queue block from the reference input
+pub fn get_prev_utxo_root(
+  tx: Transaction,
+  state_queue_node_ref_input_index: Int,
+) -> ByteArray {
+  // Reference input with block_hash 
+  expect Some(state_queue_node_input) =
+    list.at(tx.reference_inputs, state_queue_node_ref_input_index)
+
+  // Extract tx_root via the state queue block hash
+  expect InlineDatum(state_queue_datum_data) =
+    state_queue_node_input.output.datum
+  expect state_queue_node_datum: unordered.NodeDatum = state_queue_datum_data
+  expect parsed_state_queue_datum: Header = state_queue_node_datum.data
+  let extracted_prev_utxo_root = parsed_state_queue_datum.prev_utxos_root
+
+  extracted_prev_utxo_root
+}
+
 // tx_root, merkle root of transactions in the state queue block
 // tx_hash, hash of the transaction that is being proven to be in tx_root
 // proof_path: minimum set of hashes needed to reconstruct the path from the tx to the root
@@ -71,6 +93,54 @@ pub fn validate_membership_proof(
       staking_validator: plutarch_midgard_merkle_validator,
       input_data_coercer: fn(withdraw_redeemer: Data) {
         expect coerced: MembershipProofInputs = withdraw_redeemer
+        coerced
+      },
+      redeemers: tx.redeemers,
+    )
+  True
+}
+
+// Relevant to (2)
+pub fn validate_exclusion_proof(
+  tx: Transaction,
+  plutarch_midgard_merkle_validator: ScriptHash,
+  proof_input: ExclusionProofInputTx,
+) -> Bool {
+  expect
+    merkelized_validator.delegated_validation(
+      function_input: ExclusionProofInputTx {
+        tx_root: proof_input.tx_root,
+        invalid_input_tx_hash: proof_input.invalid_input_tx_hash,
+        invalid_input_info_hash: proof_input.invalid_input_info_hash,
+        input_to_root_proof_path: proof_input.input_to_root_proof_path,
+      },
+      staking_validator: plutarch_midgard_merkle_validator,
+      input_data_coercer: fn(withdraw_redeemer: Data) {
+        expect coerced: ExclusionProofInputTx = withdraw_redeemer
+        coerced
+      },
+      redeemers: tx.redeemers,
+    )
+  True
+}
+
+// Relevant to (2)
+pub fn validate_exclusion_utxo_proof(
+  tx: Transaction,
+  plutarch_midgard_merkle_validator: ScriptHash,
+  proof_input: ExclusionProofUtxo,
+) -> Bool {
+  expect
+    merkelized_validator.delegated_validation(
+      function_input: ExclusionProofUtxo {
+        utxo_root: proof_input.utxo_root,
+        invalid_utxo: proof_input.invalid_utxo,
+        invalid_utxo_info_hash: proof_input.invalid_utxo_info_hash,
+        utxo_to_root_proof_path: proof_input.utxo_to_root_proof_path,
+      },
+      staking_validator: plutarch_midgard_merkle_validator,
+      input_data_coercer: fn(withdraw_redeemer: Data) {
+        expect coerced: ExclusionProofUtxo = withdraw_redeemer
         coerced
       },
       redeemers: tx.redeemers,
