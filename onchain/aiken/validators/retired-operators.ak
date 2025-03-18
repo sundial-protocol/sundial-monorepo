@@ -3,9 +3,10 @@ use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/linked_list/ordered.{
   Key, NodeDatum, get_node_inputs, get_node_outputs,
 }
+use cardano/address.{Script}
 use cardano/assets.{PolicyId, quantity_of, tokens}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
 }
 use midgard/active_operators
 use midgard/hub_oracle
@@ -13,6 +14,7 @@ use midgard/retired_operators.{
   Datum as RetiredOperatorDatum, Deinit, Init, MintRedeemer, RecoverOperatorBond,
   RemoveOperatorBadSettlement, RemoveOperatorBadState, RetireOperator,
 }
+use midgard/settlement_queue.{DisproveResolutionClaim}
 use midgard/state_queue.{RemoveFraudulentBlockHeader}
 
 validator spend(retired_operators_mint_script_hash: ByteArray) {
@@ -157,17 +159,29 @@ validator mint(
         hub_oracle_ref_input_index,
         retired_operator_slashed_node_input_index,
         retired_operator_anchor_node_input_index,
+        settlement_queue_input_index,
         settlement_queue_redeemer_index,
       } -> {
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
+        // TODO: use correct settlement queue redeemer
         expect Some(settlement_queue_redeemer_pair) =
           list.at(self.redeemers, settlement_queue_redeemer_index)
-        // TODO: use correct settlement queue redeemer
-        expect RemoveFraudulentBlockHeader { fraudulent_operator, .. } =
+        expect DisproveResolutionClaim { fraudulent_operator, .. } =
           settlement_queue_redeemer_pair.2nd
+        // TODO fix performance:
+        expect Some(settlement_queue_input) =
+          list.at(self.inputs, settlement_queue_input_index)
+        expect
+          settlement_queue_input.output.address.payment_credential == Script(
+            parsed_hub_oracle_datum.settlement_queue,
+          )
+        expect
+          settlement_queue_redeemer_pair.1st == Spend(
+            settlement_queue_input.output_reference,
+          )
         and {
           quantity_of(
             hub_oracle_ref_input.output.value,
@@ -184,9 +198,6 @@ validator mint(
           ),
           self.fee >= slashing_penalty,
           // TODO: use correct settlement queue redeemer
-          settlement_queue_redeemer_pair.1st == Mint(
-            parsed_hub_oracle_datum.settlement_queue,
-          ),
           fraudulent_operator == slashed_retired_operator_key,
         }
       }

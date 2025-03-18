@@ -35,6 +35,7 @@ pub type MintRedeemer {
     hub_oracle_ref_input_index: Int,
     active_operator_slashed_node_input_index: Int,
     active_operator_anchor_node_input_index: Int,
+    settlement_queue_input_index: Int,
     settlement_queue_redeemer_index: Int,
   }
   RetireOperator {

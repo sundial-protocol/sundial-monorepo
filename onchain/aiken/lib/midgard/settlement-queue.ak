@@ -35,6 +35,7 @@ pub type SpendRedeemer {
     unresolved_event_asset_name: AssetName,
     event_type: EventType,
     membership_proof: mpf.Proof,
+    fraudulent_operator: ByteArray,
   }
 }
 

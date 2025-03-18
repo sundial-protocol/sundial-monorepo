@@ -192,6 +192,7 @@ validator spend(
                 unresolved_event_asset_name,
                 event_type,
                 membership_proof,
+                fraudulent_operator,
                 ..
               } -> {
                 let (event_script, events_root) =
@@ -269,7 +270,7 @@ validator spend(
 
                 // 7. Operator vkey found in the slash bond redeemer must match
                 //    the one stored in the spending settlement UTxO.
-                expect slashed_active_operator_key == operator_vkey
+                expect slashed_active_operator_key == fraudulent_operator
 
                 // 8. The only change in the datum should be removal of the
                 //    claim, and also removal of the operator.
