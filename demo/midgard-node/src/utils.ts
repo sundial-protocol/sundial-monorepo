@@ -14,7 +14,18 @@ import {
   UTxO,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Duration, Effect, pipe, Schedule } from "effect";
+import { Effect } from "effect";
+
+export interface WorkerInput {
+  data: {
+    items: any[];
+    itemsType: "txs" | "utxos";
+  }
+}
+
+export interface WorkerOutput {
+  root: string;
+}
 
 export const chalk = new chalk_.Chalk();
 
