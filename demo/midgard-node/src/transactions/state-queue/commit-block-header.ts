@@ -100,7 +100,6 @@ export const buildAndSubmitCommitmentBlock = (
       const workerHelper = (input: WorkerInput) =>
         Effect.async<string, Error, never>((resume) => {
           Effect.runSync(Effect.logInfo("👷 Starting worker..."));
-          Effect.runSync(Effect.logInfo(`PACKET: ${JSON.stringify(input)}`));
           const worker = new Worker(new URL("./mpt.js", import.meta.url), {
             workerData: input,
           });

@@ -4,7 +4,6 @@ import { CML } from "@lucid-evolution/lucid";
 
 export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(`RECEIVED UTXOS: ${JSON.stringify(utxos)}`);
     const data = utxos.map((utxoCbor) => {
       const cmlUTxO = CML.TransactionUnspentOutput.from_cbor_hex(utxoCbor);
       return {
@@ -25,7 +24,6 @@ export const mptFromTxs = (
   txs: { txHash: string; txCbor: string }[],
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(`RECEIVED TXS: ${JSON.stringify(txs)}`);
     const data = txs.map(({ txHash, txCbor }) => {
       return {
         key: txHash,
