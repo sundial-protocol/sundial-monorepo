@@ -33,4 +33,7 @@ Effect.runPromise(
       })
     )
   )
-).then((output) => parentPort?.postMessage(output));
+).then((output) => {
+  Effect.runSync(Effect.logInfo("👷 Work completed."));
+  parentPort?.postMessage(output);
+});
