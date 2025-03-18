@@ -8,7 +8,8 @@
     "midgard-node": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --minify --format esm && tsup src/commands/workers/* --minify --format esm",
+    "clean": "rimraf dist node_modules",
+    "build": "tsup src/index.ts --minify --format esm && tsup src/workers/* --minify --format esm",
     "quick-test": "pnpm run build && node dist/index.js --help",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "format-check": "prettier --check \"**/*.{ts,tsx,md}\"",
@@ -27,7 +28,7 @@
   "dependencies": {
     "@aiken-lang/merkle-patricia-forestry": "^1.2.0",
     "@al-ft/midgard-sdk": "file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz",
-    "@effect/opentelemetry": "^0.44.4",
+    "@effect/opentelemetry": "^0.44.6",
     "@effect/platform-node": "^0.73.4",
     "@lucid-evolution/lucid": "^0.4.23",
     "@opentelemetry/api": "^1.9.0",
@@ -41,13 +42,15 @@
     "dotenv": "^16.4.7",
     "effect": "^3.13.4",
     "express": "^4.21.2",
-    "sqlite3": "^5.1.7",
+    "pg": "^8.13.3",
+    "rimraf": "^6.0.1",
     "vitest": "^3.0.7"
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.1.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.5",
+    "@types/pg": "^8.11.11",
     "prettier": "^3.5.2",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3"
