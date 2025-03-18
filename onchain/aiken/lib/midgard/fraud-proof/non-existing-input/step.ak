@@ -12,6 +12,10 @@ pub type StepRedeemer {
     bad_tx_body: MidgardTxBodyCompact,
     bad_spend_inputs: Data,
     bad_input: Data,
+    bad_input_utxo_info_hash: ByteArray,
+    bad_input_utxo_to_root_proof_path: Proof,
+    bad_input_tx_info_hash: ByteArray,
+    bad_input_tx_to_root_proof_path: Proof,
     index_output: Int,
     computation_thread_redeemer_index: Int,
   }
