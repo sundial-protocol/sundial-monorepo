@@ -17,8 +17,10 @@ import * as chalk_ from "chalk";
 import { Effect } from "effect";
 
 export interface WorkerInput {
-  items: any[];
-  itemsType: "txs" | "utxos";
+  data: {
+    items: any[];
+    itemsType: "txs" | "utxos";
+  }
 }
 
 export interface WorkerOutput {

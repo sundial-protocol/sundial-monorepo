@@ -15,7 +15,7 @@ import {
 } from "@/utils.js";
 import { UtilsTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { LucidEvolution } from "@lucid-evolution/lucid";
+import { LucidEvolution, utxoToCore } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import pg from "pg";
 import { handleSignSubmit } from "../utils.js";
@@ -95,13 +95,12 @@ export const buildAndSubmitCommitmentBlock = (
       );
 
       // Merge filtered latestLedgerUTxOs with producedList
-      const newLatestLedger = [...filteredUTxOList, ...producedList].map(
-        (utxo) => utxo.txHash + utxo.outputIndex
-      );
+      const newLatestLedger = [...filteredUTxOList, ...producedList];
 
       const workerHelper = (input: WorkerInput) =>
         Effect.async<string, Error, never>((resume) => {
           Effect.runSync(Effect.logInfo("👷 Starting worker..."));
+          Effect.runSync(Effect.logInfo(`PACKET: ${JSON.stringify(input)}`));
           const worker = new Worker(new URL("./mpt.js", import.meta.url), {
             workerData: input,
           });
@@ -132,13 +131,17 @@ export const buildAndSubmitCommitmentBlock = (
         });
 
       const txRootWorkerProgram = workerHelper({
-        items: mempoolTxCbors,
-        itemsType: "txs",
+        data: {
+          items: mempoolTxs,
+          itemsType: "txs",
+        }
       });
 
       const utxoRootWorkerProgram = workerHelper({
-        items: newLatestLedger,
-        itemsType: "utxos",
+        data: {
+          items: newLatestLedger.map((utxo) => utxoToCore(utxo).to_cbor_hex()),
+          itemsType: "utxos",
+        }
       });
 
       yield* Effect.logInfo("🔹 Building MPT roots...");

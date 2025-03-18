@@ -16,10 +16,10 @@ importers:
         version: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
       '@effect/opentelemetry':
         specifier: ^0.44.6
-        version: 0.44.11(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.30.0)(effect@3.13.11)
+        version: 0.44.12(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.30.0)(effect@3.13.12)
       '@effect/platform-node':
         specifier: ^0.73.4
-        version: 0.73.7(@effect/platform@0.77.6(effect@3.13.11))(effect@3.13.11)
+        version: 0.73.7(@effect/platform@0.77.6(effect@3.13.12))(effect@3.13.12)
       '@lucid-evolution/lucid':
         specifier: ^0.4.23
         version: 0.4.24(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
@@ -52,13 +52,13 @@ importers:
         version: 16.4.7
       effect:
         specifier: ^3.13.4
-        version: 3.13.11
+        version: 3.13.12
       express:
         specifier: ^4.21.2
         version: 4.21.2
       pg:
         specifier: ^8.13.3
-        version: 8.14.0
+        version: 8.14.1
       rimraf:
         specifier: ^6.0.1
         version: 6.0.1
@@ -94,7 +94,7 @@ packages:
     resolution: {integrity: sha512-yEie4HFRoQS+ShbEYGNcVEQKFvnClXHFEysYT7lqoL1FGVxwvWWTBsctsEXolUIvusslztzrnJyUG67KGljBKw==}
 
   '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-ly8a7P8/qA49+/DsdLFQpjqNVhKqXSlmLaAicPLvJGHqM77St10VwWb0PqHUOdUhVzFZqDgiOOtitvmkn8stPA==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-3W+LOJhXCtlbNXYKLtdROmpT/PrKizaaw6/Ih2QSge1ldWdEHPhWmW98YczCf8im+9G8J+UMiQtoOBIi/iof5w==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
     version: 0.1.0
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2':
@@ -193,8 +193,8 @@ packages:
     peerDependencies:
       commander: ~13.1.0
 
-  '@effect/opentelemetry@0.44.11':
-    resolution: {integrity: sha512-mAYVUl96NoBiUpGdXKrv2eoTnv7iD4CXJyXrKBRnVrsV/pvwLBzQAVAbqj8Muk2DrIVCgCK0DW6FtLcc2BMjrQ==}
+  '@effect/opentelemetry@0.44.12':
+    resolution: {integrity: sha512-pMHY1bB2FF2vSKlYXzBo+5BJGumSJ4iN5IqwruvA3nM23+MADy9ku/gtM61gJ9B/pOjMCFCfREds/pWaAjXHvA==}
     peerDependencies:
       '@opentelemetry/api': ^1.6
       '@opentelemetry/resources': ^1.22
@@ -204,7 +204,7 @@ packages:
       '@opentelemetry/sdk-trace-node': ^1.22
       '@opentelemetry/sdk-trace-web': ^1.22
       '@opentelemetry/semantic-conventions': ^1.24.1
-      effect: ^3.13.11
+      effect: ^3.13.12
     peerDependenciesMeta:
       '@opentelemetry/sdk-logs':
         optional: true
@@ -1073,8 +1073,8 @@ packages:
     resolution: {integrity: sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA==}
     engines: {node: '>= 6'}
 
-  consola@3.4.0:
-    resolution: {integrity: sha512-EiPU8G6dQG0GFHNR8ljnZFki/8a+cQwEQ+7wpxdChl02Q8HXlwEZWD5lqAF8vC2sEC3Tehr8hy7vErz88LHyUA==}
+  consola@3.4.1:
+    resolution: {integrity: sha512-zaUUWockhqxFf4bSXS+kTJwxWvAyMuKtShx0BWcGrMEUqbETcBCT91iQs9pECNx7yz8VH4VeWW/1KAbhE8kiww==}
     engines: {node: ^14.18.0 || >=16.10.0}
 
   content-disposition@0.5.4:
@@ -1165,8 +1165,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@3.13.11:
-    resolution: {integrity: sha512-SOUwX2E1ciNDPZDbSfx+YszGfIIg90sluKyx0BB6VwLIt8+NOA6tEAR3N2XI9MEOWfO/EpWzbARLnXI2hXcvaQ==}
+  effect@3.13.12:
+    resolution: {integrity: sha512-XHvZA8lOX7vxk+ME3Q+4BN6EVYsyo8csdHmHsD4oYEtWPb2Ou3WPkpavlHOD+DNap8QIwfZjmDtshcGlgV34hA==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -1730,8 +1730,8 @@ packages:
     resolution: {integrity: sha512-cRL3JpS3lKMGsKaWndugWQoLOCoP+Cic8oseVcbr0qhPzYD5DWXK+RZ9LY9wxRf7RQia4SCwQlXk0q6FCPrVng==}
     engines: {node: '>=10'}
 
-  pg@8.14.0:
-    resolution: {integrity: sha512-nXbVpyoaXVmdqlKEzToFf37qzyeeh7mbiXsnoWvstSqohj88yaa/I/Rq/HEVn2QPSZEuLIJa/jSpRDyzjEx4FQ==}
+  pg@8.14.1:
+    resolution: {integrity: sha512-0TdbqfjwIun9Fm/r89oB7RFQ0bLgduAhiIqIXOsyKoiC/L54DbuAAzIEN/9Op0f1Po9X7iCPXGoa/Ah+2aI8Xw==}
     engines: {node: '>= 8.0.0'}
     peerDependencies:
       pg-native: '>=3.0.1'
@@ -2283,7 +2283,7 @@ snapshots:
       '@aiken-lang/merkle-patricia-forestry': 1.2.0
       '@lucid-evolution/lucid': 0.4.24(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
       '@noble/hashes': 1.7.1
-      effect: 3.13.11
+      effect: 3.13.12
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
       - '@dcspark/cardano-multiplatform-lib-browser'
@@ -2409,30 +2409,30 @@ snapshots:
     dependencies:
       commander: 13.1.0
 
-  '@effect/opentelemetry@0.44.11(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.30.0)(effect@3.13.11)':
+  '@effect/opentelemetry@0.44.12(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.30.0)(effect@3.13.12)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.30.0
-      effect: 3.13.11
+      effect: 3.13.12
     optionalDependencies:
       '@opentelemetry/sdk-metrics': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-web': 1.30.1(@opentelemetry/api@1.9.0)
 
-  '@effect/platform-node-shared@0.27.7(@effect/platform@0.77.6(effect@3.13.11))(effect@3.13.11)':
+  '@effect/platform-node-shared@0.27.7(@effect/platform@0.77.6(effect@3.13.12))(effect@3.13.12)':
     dependencies:
-      '@effect/platform': 0.77.6(effect@3.13.11)
+      '@effect/platform': 0.77.6(effect@3.13.12)
       '@parcel/watcher': 2.5.1
-      effect: 3.13.11
+      effect: 3.13.12
       multipasta: 0.2.5
 
-  '@effect/platform-node@0.73.7(@effect/platform@0.77.6(effect@3.13.11))(effect@3.13.11)':
+  '@effect/platform-node@0.73.7(@effect/platform@0.77.6(effect@3.13.12))(effect@3.13.12)':
     dependencies:
-      '@effect/platform': 0.77.6(effect@3.13.11)
-      '@effect/platform-node-shared': 0.27.7(@effect/platform@0.77.6(effect@3.13.11))(effect@3.13.11)
-      effect: 3.13.11
+      '@effect/platform': 0.77.6(effect@3.13.12)
+      '@effect/platform-node-shared': 0.27.7(@effect/platform@0.77.6(effect@3.13.12))(effect@3.13.12)
+      effect: 3.13.12
       mime: 3.0.0
       undici: 7.5.0
       ws: 8.18.1
@@ -2440,26 +2440,26 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform@0.71.7(effect@3.13.11)':
+  '@effect/platform@0.71.7(effect@3.13.12)':
     dependencies:
-      effect: 3.13.11
+      effect: 3.13.12
       find-my-way-ts: 0.1.5
       multipasta: 0.2.5
 
-  '@effect/platform@0.77.6(effect@3.13.11)':
+  '@effect/platform@0.77.6(effect@3.13.12)':
     dependencies:
-      effect: 3.13.11
+      effect: 3.13.12
       find-my-way-ts: 0.1.5
       multipasta: 0.2.5
 
-  '@effect/schema@0.66.16(effect@3.13.11)(fast-check@3.23.2)':
+  '@effect/schema@0.66.16(effect@3.13.12)(fast-check@3.23.2)':
     dependencies:
-      effect: 3.13.11
+      effect: 3.13.12
       fast-check: 3.23.2
 
-  '@effect/schema@0.68.27(effect@3.13.11)':
+  '@effect/schema@0.68.27(effect@3.13.12)':
     dependencies:
-      effect: 3.13.11
+      effect: 3.13.12
       fast-check: 3.23.2
 
   '@emurgo/cardano-message-signing-browser@1.1.0': {}
@@ -2636,7 +2636,7 @@ snapshots:
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
-      '@effect/schema': 0.66.16(effect@3.13.11)(fast-check@3.23.2)
+      '@effect/schema': 0.66.16(effect@3.13.12)(fast-check@3.23.2)
       '@emurgo/cardano-message-signing-nodejs': 1.1.0
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
@@ -2646,7 +2646,7 @@ snapshots:
       '@lucid-evolution/uplc': 0.2.19
       '@lucid-evolution/utils': 0.1.65(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
       '@lucid-evolution/wallet': 0.1.71(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
-      effect: 3.13.11
+      effect: 3.13.12
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
       - '@dcspark/cardano-multiplatform-lib-browser'
@@ -2673,13 +2673,13 @@ snapshots:
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
-      '@effect/platform': 0.71.7(effect@3.13.11)
-      '@effect/schema': 0.68.27(effect@3.13.11)
+      '@effect/platform': 0.71.7(effect@3.13.12)
+      '@effect/schema': 0.68.27(effect@3.13.12)
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
       '@lucid-evolution/utils': 0.1.65(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
       '@lucid-evolution/wallet': 0.1.71(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)
-      effect: 3.13.11
+      effect: 3.13.12
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
       - '@dcspark/cardano-multiplatform-lib-browser'
@@ -2709,7 +2709,7 @@ snapshots:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
       '@cardano-sdk/core': 0.45.5
-      '@effect/schema': 0.68.27(effect@3.13.11)
+      '@effect/schema': 0.68.27(effect@3.13.12)
       '@harmoniclabs/plutus-data': 1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)
       '@harmoniclabs/uplc': 1.4.1(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(@harmoniclabs/plutus-data@1.2.4(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5))
       '@lucid-evolution/core-types': 0.1.22
@@ -2719,7 +2719,7 @@ snapshots:
       '@lucid-evolution/uplc': 0.2.19
       bip39: 3.1.0
       cbor-x: 1.6.0
-      effect: 3.13.11
+      effect: 3.13.12
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
       - '@dcspark/cardano-multiplatform-lib-browser'
@@ -3316,7 +3316,7 @@ snapshots:
 
   commander@4.1.1: {}
 
-  consola@3.4.0: {}
+  consola@3.4.1: {}
 
   content-disposition@0.5.4:
     dependencies:
@@ -3398,7 +3398,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  effect@3.13.11:
+  effect@3.13.12:
     dependencies:
       '@standard-schema/spec': 1.0.0
       fast-check: 3.23.2
@@ -3866,9 +3866,9 @@ snapshots:
 
   pg-numeric@1.0.2: {}
 
-  pg-pool@3.8.0(pg@8.14.0):
+  pg-pool@3.8.0(pg@8.14.1):
     dependencies:
-      pg: 8.14.0
+      pg: 8.14.1
 
   pg-protocol@1.8.0: {}
 
@@ -3890,10 +3890,10 @@ snapshots:
       postgres-interval: 3.0.0
       postgres-range: 1.1.4
 
-  pg@8.14.0:
+  pg@8.14.1:
     dependencies:
       pg-connection-string: 2.7.0
-      pg-pool: 3.8.0(pg@8.14.0)
+      pg-pool: 3.8.0(pg@8.14.1)
       pg-protocol: 1.8.0
       pg-types: 2.2.0
       pgpass: 1.0.5
@@ -4237,7 +4237,7 @@ snapshots:
       bundle-require: 5.1.0(esbuild@0.25.1)
       cac: 6.7.14
       chokidar: 4.0.3
-      consola: 3.4.0
+      consola: 3.4.1
       debug: 4.4.0
       esbuild: 0.25.1
       joycon: 3.1.1

@@ -1,19 +1,15 @@
 import { Trie } from "@aiken-lang/merkle-patricia-forestry";
 import { Effect } from "effect";
-import { UTxO, utxoToTransactionOutput, Data } from "@lucid-evolution/lucid";
-import { OutputReference } from "@/tx-builder/common.js";
+import { CML } from "@lucid-evolution/lucid";
 
-export const mptFromUTxOs = (utxos: UTxO[]): Effect.Effect<Trie, Error> =>
+export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    const data = utxos.map((utxo) => {
-      const outRef: OutputReference = {
-        outputIndex: BigInt(utxo.outputIndex),
-        txHash: { hash: utxo.txHash },
-      };
-      const cmlOutput = utxoToTransactionOutput(utxo);
+    yield* Effect.logInfo(`RECEIVED UTXOS: ${JSON.stringify(utxos)}`);
+    const data = utxos.map((utxoCbor) => {
+      const cmlUTxO = CML.TransactionUnspentOutput.from_cbor_hex(utxoCbor);
       return {
-        key: Data.to(outRef, OutputReference),
-        value: cmlOutput.to_cbor_hex(),
+        key: cmlUTxO.input().to_cbor_hex(),
+        value: cmlUTxO.output().to_cbor_hex(),
       };
     });
 
@@ -29,6 +25,7 @@ export const mptFromTxs = (
   txs: { txHash: string; txCbor: string }[],
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
+    yield* Effect.logInfo(`RECEIVED TXS: ${JSON.stringify(txs)}`);
     const data = txs.map(({ txHash, txCbor }) => {
       return {
         key: txHash,

@@ -7,10 +7,10 @@ import { WorkerInput, WorkerOutput } from "@/utils.js";
 const wrapper = (input: WorkerInput): Effect.Effect<WorkerOutput, Error> =>
   Effect.gen(function* () {
     const trieProgram = (() => {
-      if (input.itemsType === "txs") {
-        return SDK.Utils.mptFromTxs(input.items);
+      if (input.data.itemsType === "txs") {
+        return SDK.Utils.mptFromTxs(input.data.items);
       } else {
-        return SDK.Utils.mptFromUTxOs(input.items);
+        return SDK.Utils.mptFromUTxOs(input.data.items);
       }
     })();
     return yield* Effect.map(
