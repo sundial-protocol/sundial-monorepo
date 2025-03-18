@@ -1,14 +1,15 @@
 import { Trie } from "@aiken-lang/merkle-patricia-forestry";
 import { Effect } from "effect";
 import { CML } from "@lucid-evolution/lucid";
+import {hexToBytes} from "@noble/hashes/utils";
 
 export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
     const data = utxos.map((utxoCbor) => {
       const cmlUTxO = CML.TransactionUnspentOutput.from_cbor_hex(utxoCbor);
       return {
-        key: cmlUTxO.input().to_cbor_hex(),
-        value: cmlUTxO.output().to_cbor_hex(),
+        key: Buffer.from(cmlUTxO.input().to_cbor_bytes()),
+        value: Buffer.from(cmlUTxO.output().to_cbor_bytes()),
       };
     });
 
@@ -22,19 +23,22 @@ export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
 
 export const mptFromTxs = (
   txs: { txHash: string; txCbor: string }[],
+// ) =>
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    const data = txs.map(({ txHash, txCbor }) => {
-      return {
-        key: txHash,
-        value: txCbor,
-      };
-    });
-
     const trie = yield* Effect.tryPromise({
-      try: () => Trie.fromList(data),
+      try: () => Trie.fromList([]),
       catch: (e) => new Error(`${e}`),
     });
+
+    yield* Effect.forEach(
+      txs,
+      ({ txHash, txCbor }) => Effect.tryPromise({
+        try: () => trie.insert(Buffer.from(hexToBytes(txHash)), Buffer.from(hexToBytes(txCbor))),
+        catch: (e) => new Error(`${e}`),
+      }),
+      { concurrency: 1 },
+    );
 
     return trie;
   });

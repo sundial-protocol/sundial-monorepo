@@ -15,13 +15,13 @@ importers:
         specifier: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz
         version: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
       '@effect/opentelemetry':
-        specifier: ^0.44.6
+        specifier: ^0.44.12
         version: 0.44.12(@opentelemetry/api@1.9.0)(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-node@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-web@1.30.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.30.0)(effect@3.13.12)
       '@effect/platform-node':
-        specifier: ^0.73.4
+        specifier: ^0.73.7
         version: 0.73.7(@effect/platform@0.77.6(effect@3.13.12))(effect@3.13.12)
       '@lucid-evolution/lucid':
-        specifier: ^0.4.23
+        specifier: ^0.4.24
         version: 0.4.24(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.5)(@harmoniclabs/crypto@0.2.5)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
       '@opentelemetry/api':
         specifier: ^1.9.0
@@ -51,19 +51,19 @@ importers:
         specifier: ^16.4.7
         version: 16.4.7
       effect:
-        specifier: ^3.13.4
+        specifier: ^3.13.12
         version: 3.13.12
       express:
         specifier: ^4.21.2
         version: 4.21.2
       pg:
-        specifier: ^8.13.3
+        specifier: ^8.14.1
         version: 8.14.1
       rimraf:
         specifier: ^6.0.1
         version: 6.0.1
       vitest:
-        specifier: ^3.0.7
+        specifier: ^3.0.9
         version: 3.0.9(@types/node@22.13.10)
     devDependencies:
       '@commander-js/extra-typings':
@@ -73,19 +73,19 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
       '@types/node':
-        specifier: ^22.13.5
+        specifier: ^22.13.10
         version: 22.13.10
       '@types/pg':
         specifier: ^8.11.11
         version: 8.11.11
       prettier:
-        specifier: ^3.5.2
+        specifier: ^3.5.3
         version: 3.5.3
       tsup:
         specifier: ^8.4.0
         version: 8.4.0(postcss@8.5.3)(typescript@5.8.2)
       typescript:
-        specifier: ^5.7.3
+        specifier: ^5.8.2
         version: 5.8.2
 
 packages:
@@ -94,7 +94,7 @@ packages:
     resolution: {integrity: sha512-yEie4HFRoQS+ShbEYGNcVEQKFvnClXHFEysYT7lqoL1FGVxwvWWTBsctsEXolUIvusslztzrnJyUG67KGljBKw==}
 
   '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-3W+LOJhXCtlbNXYKLtdROmpT/PrKizaaw6/Ih2QSge1ldWdEHPhWmW98YczCf8im+9G8J+UMiQtoOBIi/iof5w==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-MJCuJRTcfR4g1HizY0Tdkh7ENq0UEVePlVQR0BTymcsWbwoPsdJp259IQXNh8w+gkT5KLd4Ol5rAo4mYdata0A==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
     version: 0.1.0
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2':
@@ -1073,8 +1073,8 @@ packages:
     resolution: {integrity: sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA==}
     engines: {node: '>= 6'}
 
-  consola@3.4.1:
-    resolution: {integrity: sha512-zaUUWockhqxFf4bSXS+kTJwxWvAyMuKtShx0BWcGrMEUqbETcBCT91iQs9pECNx7yz8VH4VeWW/1KAbhE8kiww==}
+  consola@3.4.2:
+    resolution: {integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==}
     engines: {node: ^14.18.0 || >=16.10.0}
 
   content-disposition@0.5.4:
@@ -3316,7 +3316,7 @@ snapshots:
 
   commander@4.1.1: {}
 
-  consola@3.4.1: {}
+  consola@3.4.2: {}
 
   content-disposition@0.5.4:
     dependencies:
@@ -4237,7 +4237,7 @@ snapshots:
       bundle-require: 5.1.0(esbuild@0.25.1)
       cac: 6.7.14
       chokidar: 4.0.3
-      consola: 3.4.1
+      consola: 3.4.2
       debug: 4.4.0
       esbuild: 0.25.1
       joycon: 3.1.1
