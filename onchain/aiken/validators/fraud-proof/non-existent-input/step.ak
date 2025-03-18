@@ -111,7 +111,7 @@ validator main(
 
         expect list.has(builtin.un_list_data(bad_spend_inputs), bad_input)
 
-        // TODO: exclusion proof that bad_input is not in the block's prev_utxos_root.
+        // Exclusion proof that bad_input is not in the block's prev_utxos_root.
         expect True
         let extracted_prev_utxo_root =
           get_prev_utxo_root(tx, bad_state_queue_node_ref_input_index)
@@ -128,8 +128,7 @@ validator main(
             },
           )
 
-        //TODO: exclusion proof that bad_input.tx_hash is not in the block's tx_root.
-        //TODO: ASK to George, should not we check that in case is present the index should be wrong?
+        // Exclusion proof that bad_input.tx_hash is not in the block's tx_root.
         expect invalid_input: Input = bad_input
         expect
           validate_exclusion_proof(
