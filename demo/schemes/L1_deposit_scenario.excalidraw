@@ -1,7 +1,7 @@
 {
   "type": "excalidraw",
   "version": 2,
-  "source": "https://excalidraw.com",
+  "source": "https://marketplace.visualstudio.com/items?itemName=pomdtr.excalidraw-editor",
   "elements": [
     {
       "id": "Rfrw4SG_yzJsZr5YTRFop",
@@ -585,8 +585,8 @@
     {
       "id": "0XfeppYHRbShIBTTLw4Fv",
       "type": "arrow",
-      "x": 6414.332661081387,
-      "y": 4216.03463981841,
+      "x": 6427.858051706387,
+      "y": 4215.39987419341,
       "width": 60.5,
       "height": 40,
       "angle": 0,
@@ -604,8 +604,8 @@
         "type": 2
       },
       "seed": 1783803214,
-      "version": 5,
-      "versionNonce": 1979853650,
+      "version": 18,
+      "versionNonce": 984173817,
       "isDeleted": false,
       "boundElements": [
         {
@@ -613,7 +613,7 @@
           "id": "HJf8L79ZNZFBwzhQRw3Wb"
         }
       ],
-      "updated": 1742302247179,
+      "updated": 1742303311557,
       "link": null,
       "locked": false,
       "points": [
@@ -644,8 +644,8 @@
     {
       "id": "ecrcRJozlRw0JkJyfQV97",
       "type": "arrow",
-      "x": 6414.332661081387,
-      "y": 4292.03463981841,
+      "x": 6435.133442331387,
+      "y": 4290.76510856841,
       "width": 60.5,
       "height": 40,
       "angle": 0,
@@ -663,8 +663,8 @@
         "type": 2
       },
       "seed": 376165262,
-      "version": 5,
-      "versionNonce": 50752206,
+      "version": 27,
+      "versionNonce": 1044279801,
       "isDeleted": false,
       "boundElements": [
         {
@@ -672,7 +672,7 @@
           "id": "eZEmNBwLXZULsTv1xBCMO"
         }
       ],
-      "updated": 1742302247179,
+      "updated": 1742303315172,
       "link": null,
       "locked": false,
       "points": [
@@ -3130,6 +3130,76 @@
       "verticalAlign": "middle",
       "containerId": "hdXOQRTaF2O-oSNkK9bBr",
       "originalText": "opt",
+      "autoResize": true,
+      "lineHeight": 1.25
+    },
+    {
+      "id": "mGcH0E6-cvCyXUJzrYavR",
+      "type": "rectangle",
+      "x": 6151.347652841641,
+      "y": 4197.545117997071,
+      "width": 243.60874938964847,
+      "height": 152.49023437499997,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b3Z",
+      "roundness": null,
+      "seed": 855869815,
+      "version": 224,
+      "versionNonce": 1406515863,
+      "isDeleted": false,
+      "boundElements": [
+        {
+          "type": "text",
+          "id": "bnFJPosUE5_pmSxzyynX7"
+        }
+      ],
+      "updated": 1742303370325,
+      "link": null,
+      "locked": false
+    },
+    {
+      "id": "bnFJPosUE5_pmSxzyynX7",
+      "type": "text",
+      "x": 6157.559811044766,
+      "y": 4213.790235184571,
+      "width": 231.18443298339844,
+      "height": 120,
+      "angle": 0,
+      "strokeColor": "#000",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b3a",
+      "roundness": null,
+      "seed": 182534807,
+      "version": 230,
+      "versionNonce": 1888505783,
+      "isDeleted": false,
+      "boundElements": [],
+      "updated": 1742303370326,
+      "link": null,
+      "locked": false,
+      "text": "DepositDatum ≔\nevent : DepositEvent,\ninclusion time : PosixTime,\nwitness : ScriptHash,\nrefund address : Address,\nrefund datum : Option (Data)",
+      "fontSize": 16,
+      "fontFamily": 5,
+      "textAlign": "center",
+      "verticalAlign": "middle",
+      "containerId": "mGcH0E6-cvCyXUJzrYavR",
+      "originalText": "DepositDatum ≔\nevent : DepositEvent,\ninclusion time : PosixTime,\nwitness : ScriptHash,\nrefund address : Address,\nrefund datum : Option (Data)",
       "autoResize": true,
       "lineHeight": 1.25
     }
