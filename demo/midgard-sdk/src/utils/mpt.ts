@@ -1,7 +1,7 @@
 import { Trie } from "@aiken-lang/merkle-patricia-forestry";
 import { Effect } from "effect";
 import { CML } from "@lucid-evolution/lucid";
-import {hexToBytes} from "@noble/hashes/utils";
+import { hexToBytes } from "@noble/hashes/utils";
 
 export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
@@ -23,7 +23,7 @@ export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
 
 export const mptFromTxs = (
   txs: { txHash: string; txCbor: string }[],
-// ) =>
+  // ) =>
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
     const trie = yield* Effect.tryPromise({
@@ -33,10 +33,15 @@ export const mptFromTxs = (
 
     yield* Effect.forEach(
       txs,
-      ({ txHash, txCbor }) => Effect.tryPromise({
-        try: () => trie.insert(Buffer.from(hexToBytes(txHash)), Buffer.from(hexToBytes(txCbor))),
-        catch: (e) => new Error(`${e}`),
-      }),
+      ({ txHash, txCbor }) =>
+        Effect.tryPromise({
+          try: () =>
+            trie.insert(
+              Buffer.from(hexToBytes(txHash)),
+              Buffer.from(hexToBytes(txCbor)),
+            ),
+          catch: (e) => new Error(`${e}`),
+        }),
       { concurrency: 1 },
     );
 
