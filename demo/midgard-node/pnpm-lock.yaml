@@ -78,6 +78,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.11
         version: 8.11.11
+      cbor-x:
+        specifier: ^1.6.0
+        version: 1.6.0
       prettier:
         specifier: ^3.5.2
         version: 3.5.3
@@ -94,7 +97,7 @@ packages:
     resolution: {integrity: sha512-yEie4HFRoQS+ShbEYGNcVEQKFvnClXHFEysYT7lqoL1FGVxwvWWTBsctsEXolUIvusslztzrnJyUG67KGljBKw==}
 
   '@al-ft/midgard-sdk@file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-3W+LOJhXCtlbNXYKLtdROmpT/PrKizaaw6/Ih2QSge1ldWdEHPhWmW98YczCf8im+9G8J+UMiQtoOBIi/iof5w==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
+    resolution: {integrity: sha512-dEJyWetHsXkfAsDCj2Jme9GQXmnFWIBVO8a9oSxwASV57oXdGdMbaU3E3ylx3kKt7I+OiWaijc3ZQ75c/9K12Q==, tarball: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
     version: 0.1.0
 
   '@anastasia-labs/cardano-multiplatform-lib-browser@6.0.2-2':

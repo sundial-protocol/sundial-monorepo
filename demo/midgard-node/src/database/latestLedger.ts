@@ -1,35 +1,22 @@
-import { OutRef, UTxO } from "@lucid-evolution/lucid";
+import { OutRef } from "@lucid-evolution/lucid";
 import { Pool } from "pg";
 import * as utils from "./utils.js";
-import { clearTable, insertUTxOs, retrieveUTxOs } from "./utils.js";
+import { clearTable, insertUTxOsCBOR, retrieveUTxOsCBOR } from "./utils.js";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS latest_ledger (
     tx_hash BYTEA NOT NULL,
     output_index INTEGER NOT NULL,
-    address TEXT NOT NULL,
-    datum_hash BYTEA,
-    datum BYTEA,
-    script_ref_type VARCHAR (8),
-    script_ref_script BYTEA,
+    utxo_cbor BYTEA NOT NULL,
     PRIMARY KEY (tx_hash, output_index)
-  );
-  CREATE TABLE IF NOT EXISTS latest_ledger_assets (
-    tx_hash BYTEA NOT NULL,
-    output_index INTEGER NOT NULL,
-    unit BYTEA,
-    quantity NUMERIC NOT NULL,
-    FOREIGN KEY (tx_hash, output_index)
-      REFERENCES latest_ledger(tx_hash, output_index)
-      ON DELETE CASCADE
   );
   `;
 
-export const insert = async (pool: Pool, utxos: UTxO[]) =>
-  insertUTxOs(pool, "latest_ledger", "latest_ledger_assets", utxos);
+export const insert = async (pool: Pool, utxosCBOR: [OutRef, string][]) =>
+  insertUTxOsCBOR(pool, "latest_ledger", utxosCBOR);
 
-export const retrieve = async (pool: Pool): Promise<UTxO[]> =>
-  retrieveUTxOs(pool, "latest_ledger", "latest_ledger_assets");
+export const retrieve = async (pool: Pool): Promise<[OutRef, string][]> =>
+  retrieveUTxOsCBOR(pool, "latest_ledger");
 
 export const clearUTxOs = async (pool: Pool, refs: OutRef[]) =>
   utils.clearUTxOs(pool, "latest_ledger", refs);

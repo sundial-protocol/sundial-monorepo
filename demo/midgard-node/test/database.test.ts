@@ -1,4 +1,5 @@
 import { CML, UTxO } from "@lucid-evolution/lucid";
+import * as CBOR from "cbor-x";
 import { Option } from "effect";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -60,6 +61,12 @@ describe("database", () => {
       "9eead0de42833bbd51866cbafe5d29b8448fa1b9e7430a7af7a7f0e7e9913a07",
     scriptRef: null,
   };
+  const utxo1OutRef = {
+    txHash: utxo1.txHash,
+    outputIndex: utxo1.outputIndex,
+  };
+  const utxo1CBOR = utxoToCBOR(utxo1);
+
   const utxo2: UTxO = {
     txHash: tx2Hash,
     outputIndex: 1,
@@ -73,6 +80,12 @@ describe("database", () => {
         "6e461fe947e14c4a53b905d0aa92f08bff98fb94129f6ed26877fcf1c8a4495192c0b379fb06aa3b",
     },
   };
+  const utxo2OutRef = {
+    txHash: utxo2.txHash,
+    outputIndex: utxo2.outputIndex,
+  };
+  const utxo2CBOR = utxoToCBOR(utxo2);
+
   it("should store tx hashes in blocks db", async () => {
     await BlocksDB.insert(pool, block1Hash, [tx1Hash]);
     const result1 = await BlocksDB.retrieve(pool);
@@ -194,24 +207,16 @@ describe("database", () => {
   });
 
   it("should store utxos in the mempool ledger db", async () => {
-    await MempoolLedgerDB.insert(pool, [utxo1]);
+    await MempoolLedgerDB.insert(pool, [[utxo1OutRef, utxo1CBOR]]);
     const result1 = await MempoolLedgerDB.retrieve(pool);
-    expect(result1).toStrictEqual([utxo1]);
+    expect(result1).toStrictEqual([[utxo1OutRef, utxo1CBOR]]);
 
-    await MempoolLedgerDB.insert(pool, [utxo2]);
+    await MempoolLedgerDB.insert(pool, [[utxo2OutRef, utxo2CBOR]]);
     const result2 = await MempoolLedgerDB.retrieve(pool);
-    expect(result2).toStrictEqual([utxo1, utxo2]);
-  });
-
-  it("retrieves utxos by address in the mempool ledger db", async () => {
-    const result1 = await MempoolLedgerDB.retrieveUTxOsAtAddress(
-      pool,
-      "non-existent address"
-    );
-    expect(result1).toEqual([]);
-
-    const result2 = await MempoolLedgerDB.retrieveUTxOsAtAddress(pool, address);
-    expect(result2).toEqual([utxo1, utxo2]);
+    expect(result2).toStrictEqual([
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
   });
 
   it("clears given utxo in the mempool ledger db", async () => {
@@ -222,7 +227,10 @@ describe("database", () => {
       },
     ]);
     const result0 = await MempoolLedgerDB.retrieve(pool);
-    expect(result0).toEqual([utxo1, utxo2]);
+    expect(result0).toEqual([
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
 
     await MempoolLedgerDB.clearUTxOs(pool, [
       {
@@ -231,7 +239,7 @@ describe("database", () => {
       },
     ]);
     const result1 = await MempoolLedgerDB.retrieve(pool);
-    expect(result1).toEqual([utxo2]);
+    expect(result1).toEqual([[utxo2OutRef, utxo2CBOR]]);
 
     await MempoolLedgerDB.clearUTxOs(pool, [
       {
@@ -244,8 +252,10 @@ describe("database", () => {
   });
 
   it("clears the mempool ledger db", async () => {
-    await MempoolLedgerDB.insert(pool, [utxo1]);
-    await MempoolLedgerDB.insert(pool, [utxo2]);
+    await MempoolLedgerDB.insert(pool, [
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
     const initialRows = await MempoolLedgerDB.retrieve(pool);
     expect(initialRows.length).toBe(2);
     await MempoolLedgerDB.clear(pool);
@@ -306,13 +316,16 @@ describe("database", () => {
   it("should store utxos in the confirmed ledger db", async () => {
     await ImmutableDB.insert(pool, tx1Hash, tx1);
     await ImmutableDB.insert(pool, tx2Hash, tx2);
-    await ConfirmedLedgerDB.insert(pool, [utxo1]);
+    await ConfirmedLedgerDB.insert(pool, [[utxo1OutRef, utxo1CBOR]]);
     const result1 = await ConfirmedLedgerDB.retrieve(pool);
-    expect(result1).toStrictEqual([utxo1]);
+    expect(result1).toStrictEqual([[utxo1OutRef, utxo1CBOR]]);
 
-    await ConfirmedLedgerDB.insert(pool, [utxo2]);
+    await ConfirmedLedgerDB.insert(pool, [[utxo2OutRef, utxo2CBOR]]);
     const result2 = await ConfirmedLedgerDB.retrieve(pool);
-    expect(result2).toStrictEqual([utxo1, utxo2]);
+    expect(result2).toStrictEqual([
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
   });
 
   it("clears given utxo in the confirmed ledger db", async () => {
@@ -323,7 +336,10 @@ describe("database", () => {
       },
     ]);
     const result0 = await ConfirmedLedgerDB.retrieve(pool);
-    expect(result0).toEqual([utxo1, utxo2]);
+    expect(result0).toEqual([
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
 
     await ConfirmedLedgerDB.clearUTxOs(pool, [
       {
@@ -332,9 +348,9 @@ describe("database", () => {
       },
     ]);
     const result1 = await ConfirmedLedgerDB.retrieve(pool);
-    expect(result1).toEqual([utxo2]);
+    expect(result1).toEqual([[utxo2OutRef, utxo2CBOR]]);
 
-    await ConfirmedLedgerDB.insert(pool, [utxo1]);
+    await ConfirmedLedgerDB.insert(pool, [[utxo1OutRef, utxo1CBOR]]);
     await ConfirmedLedgerDB.clearUTxOs(pool, [
       {
         txHash: utxo2.txHash,
@@ -350,7 +366,10 @@ describe("database", () => {
   });
 
   it("clears the confirmed ledger db", async () => {
-    await ConfirmedLedgerDB.insert(pool, [utxo1, utxo2]);
+    await ConfirmedLedgerDB.insert(pool, [
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
     const initialRows = await ConfirmedLedgerDB.retrieve(pool);
     expect(initialRows.length).toBe(2);
     await ConfirmedLedgerDB.clear(pool);
@@ -359,13 +378,16 @@ describe("database", () => {
   });
 
   it("should store utxos in the latest ledger db", async () => {
-    await LatestLedgerDB.insert(pool, [utxo1]);
+    await LatestLedgerDB.insert(pool, [[utxo1OutRef, utxo1CBOR]]);
     const result1 = await LatestLedgerDB.retrieve(pool);
-    expect(result1).toStrictEqual([utxo1]);
+    expect(result1).toStrictEqual([[utxo1OutRef, utxo1CBOR]]);
 
-    await LatestLedgerDB.insert(pool, [utxo2]);
+    await LatestLedgerDB.insert(pool, [[utxo2OutRef, utxo2CBOR]]);
     const result2 = await LatestLedgerDB.retrieve(pool);
-    expect(result2).toStrictEqual([utxo1, utxo2]);
+    expect(result2).toStrictEqual([
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
   });
 
   it("clears given utxo in the latest ledger db", async () => {
@@ -376,7 +398,10 @@ describe("database", () => {
       },
     ]);
     const result0 = await LatestLedgerDB.retrieve(pool);
-    expect(result0).toEqual([utxo1, utxo2]);
+    expect(result0).toEqual([
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
 
     await LatestLedgerDB.clearUTxOs(pool, [
       {
@@ -385,9 +410,9 @@ describe("database", () => {
       },
     ]);
     const result1 = await LatestLedgerDB.retrieve(pool);
-    expect(result1).toEqual([utxo2]);
+    expect(result1).toEqual([[utxo2OutRef, utxo2CBOR]]);
 
-    await LatestLedgerDB.insert(pool, [utxo1]);
+    await LatestLedgerDB.insert(pool, [[utxo1OutRef, utxo1CBOR]]);
     await LatestLedgerDB.clearUTxOs(pool, [
       {
         txHash: utxo2.txHash,
@@ -403,7 +428,10 @@ describe("database", () => {
   });
 
   it("clears the latest ledger db", async () => {
-    await LatestLedgerDB.insert(pool, [utxo1, utxo2]);
+    await LatestLedgerDB.insert(pool, [
+      [utxo1OutRef, utxo1CBOR],
+      [utxo2OutRef, utxo2CBOR],
+    ]);
     const initialRows = await LatestLedgerDB.retrieve(pool);
     expect(initialRows.length).toBe(2);
     await LatestLedgerDB.clear(pool);
@@ -436,3 +464,7 @@ const dropTables = async (pool: Pool): Promise<void> => {
     console.log(`${table} has been dropped successfully.`);
   }
 };
+
+function utxoToCBOR(utxo: UTxO): string {
+  return CBOR.encode(utxo).toString("hex");
+}

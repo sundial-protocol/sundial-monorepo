@@ -41,7 +41,7 @@ export const insertUTxOs = async (
   pool: Pool,
   tableName: string,
   assetTableName: string,
-  utxos: UTxO[],
+  utxos: UTxO[]
 ): Promise<void> => {
   const values = utxos.flatMap((utxo) => Object.values(utxoToRow(utxo)));
   const query = `
@@ -52,7 +52,7 @@ export const insertUTxOs = async (
   `;
 
   const normalizedAssets = utxos.flatMap((utxo) =>
-    utxoToNormalizedAssets(utxo),
+    utxoToNormalizedAssets(utxo)
   );
   const assetQuery = `
     INSERT INTO ${assetTableName}
@@ -91,7 +91,7 @@ export const insertUTxOs = async (
 export const retrieveUTxOs = async (
   pool: Pool,
   tableName: string,
-  assetTableName: string,
+  assetTableName: string
 ): Promise<UTxO[]> => {
   const query = `
     SELECT
@@ -130,7 +130,7 @@ export const retrieveUTxOs = async (
 export const clearUTxOs = async (
   pool: Pool,
   tableName: string,
-  refs: OutRef[],
+  refs: OutRef[]
 ): Promise<void> => {
   const query = `DELETE FROM ${tableName} WHERE (tx_hash, output_index) IN (${refs
     .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`)
@@ -152,7 +152,7 @@ export const clearUTxOs = async (
 export const clearTxs = async (
   pool: Pool,
   tableName: string,
-  txHashes: string[],
+  txHashes: string[]
 ): Promise<void> => {
   const query = `DELETE FROM ${tableName} WHERE tx_hash IN (${txHashes
     .map((_, i) => `$${i + 1}`)
@@ -170,7 +170,7 @@ export const clearTxs = async (
 export const retrieveTxCborByHash = async (
   pool: Pool,
   tableName: string,
-  txHash: string,
+  txHash: string
 ): Promise<Option.Option<string>> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = $1`;
   try {
@@ -189,7 +189,7 @@ export const retrieveTxCborByHash = async (
 export const retrieveTxCborsByHashes = async (
   pool: Pool,
   tableName: string,
-  txHashes: string[],
+  txHashes: string[]
 ): Promise<string[]> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ANY($1)`;
   try {
@@ -205,7 +205,7 @@ export const retrieveTxCborsByHashes = async (
 
 export const clearTable = async (
   pool: Pool,
-  tableName: string,
+  tableName: string
 ): Promise<void> => {
   const query = `TRUNCATE TABLE ${tableName} CASCADE;`;
 
@@ -248,7 +248,7 @@ export function utxoFromRow(row: UTxOFromRow): UTxO {
       acc[key] = quantityBigInt;
       return acc;
     },
-    {} as Record<Unit | "lovelace", bigint>,
+    {} as Record<Unit | "lovelace", bigint>
   );
   return {
     txHash: toHex(row.tx_hash),
@@ -354,3 +354,34 @@ export function utxoToNormalizedAssets(utxo: UTxO): NormalizedAsset[] {
     return asset;
   });
 }
+
+export const insertUTxOsCBOR = async (
+  pool: Pool,
+  tableName: string,
+  utxosCBOR: [OutRef, string][]
+): Promise<void> => {
+  const query = `
+  INSERT INTO ${tableName} (tx_hash, output_index, utxo_cbor)
+  VALUES
+  ${utxosCBOR.map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`).join(", ")}
+  `;
+  const values = utxosCBOR.flatMap(([ref, cbor]) => [
+    Buffer.from(ref.txHash, "hex"),
+    ref.outputIndex,
+    Buffer.from(cbor, "hex"),
+  ]);
+  await pool.query(query, values);
+};
+
+export const retrieveUTxOsCBOR = async (
+  pool: Pool,
+  tableName: string
+): Promise<[OutRef, string][]> => {
+  const query = `SELECT * FROM ${tableName}`;
+  const rows = await pool.query(query);
+  const result: [OutRef, string][] = rows.rows.map((r) => [
+    { txHash: toHex(r.tx_hash), outputIndex: r.output_index },
+    toHex(r.utxo_cbor),
+  ]);
+  return result;
+};
