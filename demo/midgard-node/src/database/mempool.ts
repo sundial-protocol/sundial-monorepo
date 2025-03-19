@@ -1,6 +1,5 @@
 import { Option } from "effect";
 import { Pool } from "pg";
-import { logAbort, logInfo } from "../utils.js";
 import * as utils from "./utils.js";
 import { clearTable } from "./utils.js";
 
@@ -14,14 +13,11 @@ export const createQuery = `
 export const insert = async (
   pool: Pool,
   txHash: string,
-  txCbor: string,
+  txCbor: Uint8Array,
 ): Promise<void> => {
   const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES ($1, $2)`;
   try {
-    await pool.query(query, [
-      Buffer.from(txHash, "hex"),
-      Buffer.from(txCbor, "hex"),
-    ]);
+    await pool.query(query, [Buffer.from(txHash, "hex"), Buffer.from(txCbor)]);
     // logInfo(`mempool db: tx stored`);
   } catch (err) {
     // logAbort(`mempool db: error inserting tx: ${err}`);
@@ -32,13 +28,13 @@ export const insert = async (
 export const retrieveTxCborByHash = async (
   pool: Pool,
   txHash: string,
-): Promise<Option.Option<string>> =>
+): Promise<Option.Option<Uint8Array>> =>
   utils.retrieveTxCborByHash(pool, "mempool", txHash);
 
 export const retrieveTxCborsByHashes = async (
   pool: Pool,
   txHashes: string[],
-): Promise<string[]> =>
+): Promise<Uint8Array[]> =>
   utils.retrieveTxCborsByHashes(pool, "mempool", txHashes);
 
 export const retrieve = async (

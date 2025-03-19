@@ -74,12 +74,12 @@ export const retrieveTxCborByHash = async (
   pool: Pool,
   tableName: string,
   txHash: string,
-): Promise<Option.Option<string>> => {
+): Promise<Option.Option<Uint8Array>> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = $1`;
   try {
     const result = await pool.query(query, [Buffer.from(txHash, "hex")]);
     if (result.rows.length > 0) {
-      return Option.some(result.rows[0].tx_cbor.toString("hex"));
+      return Option.some(result.rows[0].tx_cbor);
     } else {
       return Option.none();
     }
@@ -93,13 +93,13 @@ export const retrieveTxCborsByHashes = async (
   pool: Pool,
   tableName: string,
   txHashes: string[],
-): Promise<string[]> => {
+): Promise<Uint8Array[]> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ANY($1)`;
   try {
     const result = await pool.query(query, [
       txHashes.map((hash) => Buffer.from(hash, "hex")),
     ]);
-    return result.rows.map((row) => row.tx_cbor.toString("hex"));
+    return result.rows.map((row) => row.tx_cbor);
   } catch (err) {
     // logAbort(`${tableName} db: retrieving error: ${err}`);
     throw err;
