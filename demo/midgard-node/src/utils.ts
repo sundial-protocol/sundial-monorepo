@@ -105,11 +105,11 @@ export const setupLucid = async (
   }
 };
 
-export const findSpentAndProducedUTxOs = (txCBOR: string) =>
+export const findSpentAndProducedUTxOs = (txCBOR: ArrayBufferLike) =>
   Effect.gen(function* () {
     const spent: OutRef[] = [];
     const produced: UTxO[] = [];
-    const tx = CML.Transaction.from_cbor_hex(txCBOR);
+    const tx = CML.Transaction.from_cbor_bytes(Buffer.from(txCBOR));
     const txBody = tx.body();
     const inputs = txBody.inputs();
     const outputs = txBody.outputs();
@@ -132,7 +132,7 @@ export const findSpentAndProducedUTxOs = (txCBOR: string) =>
   });
 
 export const findAllSpentAndProducedUTxOs = (
-  txCBORs: string[],
+  txCBORs: ArrayBufferLike[],
 ): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> =>
   Effect.gen(function* () {
     const allEffects = yield* Effect.all(

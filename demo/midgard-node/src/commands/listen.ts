@@ -2,9 +2,10 @@ import { NodeConfig, User } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
+import { utxoToOutRefAndCBORArray } from "@/transactions/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { getAddressDetails, LucidEvolution } from "@lucid-evolution/lucid";
+import { LucidEvolution } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -82,38 +83,38 @@ export const listen = (
       }
     });
 
-    app.get("/utxos", (req, res) => {
-      const addr = req.query.addr;
-      log(`GET /utxos - Request received for address: ${addr}`);
+    // app.get("/utxos", (req, res) => {
+    //   const addr = req.query.addr;
+    //   log(`GET /utxos - Request received for address: ${addr}`);
 
-      if (typeof addr === "string") {
-        try {
-          const addrDetails = getAddressDetails(addr);
-          if (addrDetails.paymentCredential) {
-            MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
-              const filtered = allUTxOs.filter(
-                (a) => a.address === addrDetails.address.bech32,
-              );
-              log(
-                `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
-              );
-              res.json({ utxos: filtered });
-            });
-          } else {
-            log(
-              `GET /utxos - Invalid address (no payment credential): ${addr}`,
-            );
-            res.status(400).json({ message: `Invalid address: ${addr}` });
-          }
-        } catch (e) {
-          log(`GET /utxos - Invalid address format: ${addr}, error: ${e}`);
-          res.status(400).json({ message: `Invalid address: ${addr}` });
-        }
-      } else {
-        log(`GET /utxos - Invalid address type: ${addr}`);
-        res.status(400).json({ message: `Invalid address: ${addr}` });
-      }
-    });
+    //   if (typeof addr === "string") {
+    //     try {
+    //       const addrDetails = getAddressDetails(addr);
+    //       if (addrDetails.paymentCredential) {
+    //         MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
+    //           const filtered = allUTxOs.filter(
+    //             (a) => a.address === addrDetails.address.bech32,
+    //           );
+    //           log(
+    //             `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
+    //           );
+    //           res.json({ utxos: filtered });
+    //         });
+    //       } else {
+    //         log(
+    //           `GET /utxos - Invalid address (no payment credential): ${addr}`,
+    //         );
+    //         res.status(400).json({ message: `Invalid address: ${addr}` });
+    //       }
+    //     } catch (e) {
+    //       log(`GET /utxos - Invalid address format: ${addr}, error: ${e}`);
+    //       res.status(400).json({ message: `Invalid address: ${addr}` });
+    //     }
+    //   } else {
+    //     log(`GET /utxos - Invalid address type: ${addr}`);
+    //     res.status(400).json({ message: `Invalid address: ${addr}` });
+    //   }
+    // });
 
     app.get("/block", (req, res) => {
       const hdrHash = req.query.header_hash;
@@ -233,20 +234,24 @@ export const listen = (
     });
 
     app.post("/submit", async (req, res) => {
-      const txCBOR = req.query.tx_cbor;
+      const txString = req.query.tx_cbor;
 
       // log("◻️ Submit request received for transaction");
 
-      if (typeof txCBOR === "string" && isHexString(txCBOR)) {
+      if (typeof txString === "string" && isHexString(txString)) {
         try {
-          const tx = lucid.fromTx(txCBOR);
+          const txCBOR = Buffer.from(txString, "hex");
+          const tx = lucid.fromTx(txString);
           const spentAndProducedProgram = findSpentAndProducedUTxOs(txCBOR);
           const { spent, produced } = await Effect.runPromise(
             spentAndProducedProgram,
           );
           await MempoolDB.insert(pool, tx.toHash(), txCBOR);
           await MempoolLedgerDB.clearUTxOs(pool, spent);
-          await MempoolLedgerDB.insert(pool, produced);
+          await MempoolLedgerDB.insert(
+            pool,
+            produced.map((u) => utxoToOutRefAndCBORArray(u)),
+          );
           Effect.runSync(Metric.increment(txCounter));
           // log(`▫️ L2 Transaction processed successfully: ${tx.toHash()}`);
           res.json({ message: "Successfully submitted the transaction" });
@@ -270,7 +275,9 @@ export const storeTx = async (
 ) =>
   Effect.gen(function* () {
     const txHash = lucid.fromTx(tx).toHash();
-    yield* Effect.tryPromise(() => MempoolDB.insert(pool, txHash, tx));
+    yield* Effect.tryPromise(() =>
+      MempoolDB.insert(pool, txHash, Buffer.from(tx, "hex")),
+    );
   });
 
 const makeBlockCommitmentAction = (db: pg.Pool) =>

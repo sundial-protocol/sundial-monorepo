@@ -1,6 +1,5 @@
 import { Option } from "effect";
 import { Pool } from "pg";
-import { logAbort, logInfo } from "../utils.js";
 import { clearTable } from "./utils.js";
 
 export const createQuery = `

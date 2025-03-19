@@ -124,17 +124,17 @@ export const clearTable = async (
 export const insertUTxOsCBOR = async (
   pool: Pool,
   tableName: string,
-  utxosCBOR: [OutRef, Uint8Array][],
+  utxosCBOR: { outRef: OutRef; utxoCBOR: Uint8Array }[],
 ): Promise<void> => {
   const query = `
   INSERT INTO ${tableName} (tx_hash, output_index, utxo_cbor)
   VALUES
   ${utxosCBOR.map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`).join(", ")}
   `;
-  const values = utxosCBOR.flatMap(([ref, cbor]) => [
-    Buffer.from(ref.txHash, "hex"),
-    ref.outputIndex,
-    Buffer.from(cbor),
+  const values = utxosCBOR.flatMap((u) => [
+    Buffer.from(u.outRef.txHash, "hex"),
+    u.outRef.outputIndex,
+    Buffer.from(u.utxoCBOR),
   ]);
   await pool.query(query, values);
 };
@@ -142,11 +142,14 @@ export const insertUTxOsCBOR = async (
 export const retrieveUTxOsCBOR = async (
   pool: Pool,
   tableName: string,
-): Promise<[OutRef, Uint8Array][]> => {
+): Promise<{ outRef: OutRef; utxoCBOR: Uint8Array }[]> => {
   const query = `SELECT * FROM ${tableName}`;
   const rows = await pool.query(query);
-  return rows.rows.map((r) => [
-    { txHash: toHex(r.tx_hash), outputIndex: r.output_index },
-    Buffer.from(r.utxo_cbor),
-  ]);
+  const result: { outRef: OutRef; utxoCBOR: Uint8Array }[] = rows.rows.map(
+    (r) => ({
+      outRef: { txHash: toHex(r.tx_hash), outputIndex: r.output_index },
+      utxoCBOR: Buffer.from(r.utxo_cbor),
+    }),
+  );
+  return result;
 };

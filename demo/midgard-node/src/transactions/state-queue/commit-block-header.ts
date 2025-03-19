@@ -13,14 +13,12 @@ import {
   WorkerOutput,
   findAllSpentAndProducedUTxOs,
 } from "@/utils.js";
-import { UtilsTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { LucidEvolution, utxoToCore } from "@lucid-evolution/lucid";
+import { LucidEvolution } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import pg from "pg";
-import { handleSignSubmit } from "../utils.js";
 import { Worker } from "worker_threads";
-import path from "path";
+import { handleSignSubmit, utxoToOutRefAndCBORArray } from "../utils.js";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
@@ -79,10 +77,14 @@ export const buildAndSubmitCommitmentBlock = (
       const mempoolTxCbors = mempoolTxs.map((tx) => tx.txCbor);
       const mempoolTxHashes = mempoolTxs.map((tx) => tx.txHash);
 
-      const { spent: spentList, produced: producedList } =
+      const { spent: spentList, produced: producedListUTxOs } =
         yield* findAllSpentAndProducedUTxOs(mempoolTxCbors).pipe(
           Effect.withSpan("findAllSpentAndProducedUTxOs"),
         );
+
+      const producedList = producedListUTxOs.map((u) =>
+        utxoToOutRefAndCBORArray(u),
+      );
 
       const latestLedgerUTxOs = yield* Effect.tryPromise(() =>
         LatestLedgerDB.retrieve(db),
@@ -90,8 +92,7 @@ export const buildAndSubmitCommitmentBlock = (
 
       // Remove spent UTxOs from latestLedgerUTxOs
       const filteredUTxOList = latestLedgerUTxOs.filter(
-        (utxo) =>
-          !spentList.some((spent) => UtilsTx.outRefsAreEqual(utxo, spent)),
+        (utxo) => !spentList.some((spent) => utxo.outRef == spent),
       );
 
       // Merge filtered latestLedgerUTxOs with producedList
@@ -138,7 +139,7 @@ export const buildAndSubmitCommitmentBlock = (
 
       const utxoRootWorkerProgram = workerHelper({
         data: {
-          items: newLatestLedger.map((utxo) => utxoToCore(utxo).to_cbor_hex()),
+          items: newLatestLedger,
           itemsType: "utxos",
         },
       });

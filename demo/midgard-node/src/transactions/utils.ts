@@ -1,14 +1,16 @@
+import * as SDK from "@al-ft/midgard-sdk";
 import {
   LucidEvolution,
   OutRef,
   TxSignBuilder,
   UTxO,
 } from "@lucid-evolution/lucid";
+import * as CBOR from "cbor-x";
 import { Effect, Schedule } from "effect";
-import * as SDK from "@al-ft/midgard-sdk";
+import pg from "pg";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
-import pg from "pg";
+
 /**
  * Handle the signing and submission of a transaction.
  *
@@ -71,7 +73,7 @@ export const handleSignSubmitWithoutConfirmation = (
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: UTxO,
   db: pg.Pool,
-): Effect.Effect<{ txs: string[]; headerHash: string }, Error> =>
+): Effect.Effect<{ txs: ArrayBufferLike[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
     const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
@@ -99,3 +101,14 @@ export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
     outRef0.outputIndex === outRef1.outputIndex
   );
 };
+
+export const utxoToOutRefAndCBORArray = (
+  utxo: UTxO,
+): { outRef: OutRef; utxoCBOR: Uint8Array } => ({
+  outRef: utxoToOutRef(utxo),
+  utxoCBOR: utxoToCBOR(utxo),
+});
+
+export function utxoToCBOR(utxo: UTxO): Uint8Array {
+  return CBOR.encode(utxo);
+}

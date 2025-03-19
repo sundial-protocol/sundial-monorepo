@@ -12,10 +12,14 @@ export const createQuery = `
   );
   `;
 
-export const insert = async (pool: Pool, utxosCBOR: [OutRef, Uint8Array][]) =>
-  insertUTxOsCBOR(pool, "latest_ledger", utxosCBOR);
+export const insert = async (
+  pool: Pool,
+  utxosCBOR: { outRef: OutRef; utxoCBOR: Uint8Array }[],
+) => insertUTxOsCBOR(pool, "latest_ledger", utxosCBOR);
 
-export const retrieve = async (pool: Pool): Promise<[OutRef, Uint8Array][]> =>
+export const retrieve = async (
+  pool: Pool,
+): Promise<{ outRef: OutRef; utxoCBOR: Uint8Array }[]> =>
   retrieveUTxOsCBOR(pool, "latest_ledger");
 
 export const clearUTxOs = async (pool: Pool, refs: OutRef[]) =>

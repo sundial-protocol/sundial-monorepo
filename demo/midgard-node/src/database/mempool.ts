@@ -39,13 +39,13 @@ export const retrieveTxCborsByHashes = async (
 
 export const retrieve = async (
   pool: Pool,
-): Promise<{ txHash: string; txCbor: string }[]> => {
+): Promise<{ txHash: string; txCbor: Uint8Array }[]> => {
   const query = `SELECT * FROM mempool`;
   try {
     const result = await pool.query(query);
     return result.rows.map((row) => ({
       txHash: row.tx_hash.toString("hex"),
-      txCbor: row.tx_cbor.toString("hex"),
+      txCbor: row.tx_cbor,
     }));
   } catch (err) {
     // logAbort(`mempool db: retrieving error: ${err}`);
