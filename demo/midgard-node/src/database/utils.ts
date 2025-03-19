@@ -33,7 +33,7 @@ export async function initializeDb(pool: Pool) {
 export const clearUTxOs = async (
   pool: Pool,
   tableName: string,
-  refs: OutRef[]
+  refs: OutRef[],
 ): Promise<void> => {
   const query = `DELETE FROM ${tableName} WHERE (tx_hash, output_index) IN (${refs
     .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`)
@@ -55,7 +55,7 @@ export const clearUTxOs = async (
 export const clearTxs = async (
   pool: Pool,
   tableName: string,
-  txHashes: string[]
+  txHashes: string[],
 ): Promise<void> => {
   const query = `DELETE FROM ${tableName} WHERE tx_hash IN (${txHashes
     .map((_, i) => `$${i + 1}`)
@@ -73,7 +73,7 @@ export const clearTxs = async (
 export const retrieveTxCborByHash = async (
   pool: Pool,
   tableName: string,
-  txHash: string
+  txHash: string,
 ): Promise<Option.Option<string>> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = $1`;
   try {
@@ -92,7 +92,7 @@ export const retrieveTxCborByHash = async (
 export const retrieveTxCborsByHashes = async (
   pool: Pool,
   tableName: string,
-  txHashes: string[]
+  txHashes: string[],
 ): Promise<string[]> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ANY($1)`;
   try {
@@ -108,7 +108,7 @@ export const retrieveTxCborsByHashes = async (
 
 export const clearTable = async (
   pool: Pool,
-  tableName: string
+  tableName: string,
 ): Promise<void> => {
   const query = `TRUNCATE TABLE ${tableName} CASCADE;`;
 
@@ -124,7 +124,7 @@ export const clearTable = async (
 export const insertUTxOsCBOR = async (
   pool: Pool,
   tableName: string,
-  utxosCBOR: [OutRef, string][]
+  utxosCBOR: [OutRef, string][],
 ): Promise<void> => {
   const query = `
   INSERT INTO ${tableName} (tx_hash, output_index, utxo_cbor)
@@ -141,7 +141,7 @@ export const insertUTxOsCBOR = async (
 
 export const retrieveUTxOsCBOR = async (
   pool: Pool,
-  tableName: string
+  tableName: string,
 ): Promise<[OutRef, string][]> => {
   const query = `SELECT * FROM ${tableName}`;
   const rows = await pool.query(query);

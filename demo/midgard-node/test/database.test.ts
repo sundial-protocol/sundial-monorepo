@@ -102,13 +102,13 @@ describe("database", () => {
   it("retrieves tx hashes by block hash", async () => {
     const result1 = await BlocksDB.retrieveTxHashesByBlockHash(
       pool,
-      block1Hash
+      block1Hash,
     );
     expect(result1).toEqual([tx1Hash, tx2Hash]);
 
     const result2 = await BlocksDB.retrieveTxHashesByBlockHash(
       pool,
-      block2Hash
+      block2Hash,
     );
     expect(result2).toEqual([]);
   });
@@ -166,7 +166,7 @@ describe("database", () => {
     const nonExistentTxHash = "1234";
     const result1 = await MempoolDB.retrieveTxCborByHash(
       pool,
-      nonExistentTxHash
+      nonExistentTxHash,
     );
     expect(result1).toEqual(Option.none());
 
@@ -280,7 +280,7 @@ describe("database", () => {
     const nonExistentTxHash = "1234";
     const result1 = await ImmutableDB.retrieveTxCborByHash(
       pool,
-      nonExistentTxHash
+      nonExistentTxHash,
     );
     expect(result1).toEqual(Option.none());
 
