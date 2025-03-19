@@ -1,9 +1,13 @@
 import { NodeConfig, User } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
+import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
 import { getAddressDetails, LucidEvolution } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Duration, Effect, Metric, Option, pipe, Schedule } from "effect";
 import express from "express";
 import pg from "pg";
@@ -17,10 +21,6 @@ import {
   UtilsDB,
 } from "../database/index.js";
 import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
-import * as SDK from "@al-ft/midgard-sdk";
-import { AlwaysSucceeds } from "@/services/index.js";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",

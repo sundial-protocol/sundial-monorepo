@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS mempool_ledger (
     PRIMARY KEY (tx_hash, output_index)
   );`;
 
-export const insert = async (pool: Pool, utxosCBOR: [OutRef, string][]) =>
+export const insert = async (pool: Pool, utxosCBOR: [OutRef, Uint8Array][]) =>
   insertUTxOsCBOR(pool, "mempool_ledger", utxosCBOR);
 
-export const retrieve = async (pool: Pool): Promise<[OutRef, string][]> =>
+export const retrieve = async (pool: Pool): Promise<[OutRef, Uint8Array][]> =>
   retrieveUTxOsCBOR(pool, "mempool_ledger");
 
 export const clearUTxOs = async (pool: Pool, refs: OutRef[]) =>

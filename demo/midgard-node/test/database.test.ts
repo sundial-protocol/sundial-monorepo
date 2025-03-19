@@ -465,6 +465,6 @@ const dropTables = async (pool: Pool): Promise<void> => {
   }
 };
 
-function utxoToCBOR(utxo: UTxO): string {
-  return CBOR.encode(utxo).toString("hex");
+function utxoToCBOR(utxo: UTxO): Uint8Array {
+  return CBOR.encode(utxo);
 }
