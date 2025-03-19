@@ -89,13 +89,13 @@ describe("database", () => {
   it("retrieves tx hashes by block hash", async () => {
     const result1 = await BlocksDB.retrieveTxHashesByBlockHash(
       pool,
-      block1Hash,
+      block1Hash
     );
     expect(result1).toEqual([tx1Hash, tx2Hash]);
 
     const result2 = await BlocksDB.retrieveTxHashesByBlockHash(
       pool,
-      block2Hash,
+      block2Hash
     );
     expect(result2).toEqual([]);
   });
@@ -153,7 +153,7 @@ describe("database", () => {
     const nonExistentTxHash = "1234";
     const result1 = await MempoolDB.retrieveTxCborByHash(
       pool,
-      nonExistentTxHash,
+      nonExistentTxHash
     );
     expect(result1).toEqual(Option.none());
 
@@ -182,7 +182,7 @@ describe("database", () => {
     const nonExistentTx = "aaaa1111";
     await MempoolDB.clearTxs(pool, [tx1Hash, nonExistentTx]);
     const result1 = await MempoolDB.retrieve(pool);
-    expect(result1).toEqual([[tx2Hash, tx2]]);
+    expect(result1.map((r) => Object.values(r))).toEqual([[tx2Hash, tx2]]);
   });
 
   it("clears the mempool db", async () => {
@@ -206,7 +206,7 @@ describe("database", () => {
   it("retrieves utxos by address in the mempool ledger db", async () => {
     const result1 = await MempoolLedgerDB.retrieveUTxOsAtAddress(
       pool,
-      "non-existent address",
+      "non-existent address"
     );
     expect(result1).toEqual([]);
 
@@ -270,7 +270,7 @@ describe("database", () => {
     const nonExistentTxHash = "1234";
     const result1 = await ImmutableDB.retrieveTxCborByHash(
       pool,
-      nonExistentTxHash,
+      nonExistentTxHash
     );
     expect(result1).toEqual(Option.none());
 
