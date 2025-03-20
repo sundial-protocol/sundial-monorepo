@@ -78,9 +78,6 @@ importers:
       '@types/pg':
         specifier: ^8.11.11
         version: 8.11.11
-      cbor-x:
-        specifier: ^1.6.0
-        version: 1.6.0
       prettier:
         specifier: ^3.5.2
         version: 3.5.3
