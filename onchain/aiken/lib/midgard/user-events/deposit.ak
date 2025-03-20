@@ -8,20 +8,11 @@ use cardano/certificate.{RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
   Datum as CardanoDatum, OutputReference, Publish, Redeemer, ScriptPurpose,
 }
-use midgard/common/types.{MerkleRoot, PosixTime, Tokens}
-use midgard/user_events
-
-pub type Event =
-  user_events.Event<Info>
-
-pub type Info {
-  l2_address: Address,
-  l2_datum: Option<Data>,
-  tokens: Tokens,
-}
+use midgard/common/types.{MerkleRoot, PosixTime}
+use midgard/ledger_state
 
 pub type Datum {
-  event: Event,
+  event: ledger_state.DepositEvent,
   inclusion_time: PosixTime,
   witness: ScriptHash,
   refund_address: Address,

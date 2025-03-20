@@ -13,8 +13,9 @@ use midgard/common/utils.{plutarch_phas, plutarch_pinsert}
 use midgard/hub_oracle as hub
 use midgard/settlement_queue
 use midgard/user_events
+use midgard/ledger_state
 use midgard/user_events/deposit.{
-  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap, Event, Info,
+  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap,
   MintRedeemer, Refund, SkippedDeposit, SpendRedeemer, TransferToReserve,
   WitnessRedeemer, nonce_out_ref_to_l2_id, validate_witness_redeemer,
   witness_script_prefix,
@@ -65,9 +66,9 @@ validator spend(hub_oracle: ScriptHash) {
 
     expect Some(deposit_datum) = datum
     let Datum {
-      event: user_events.Event {
+      event: ledger_state.DepositEvent {
         id: event_nonce_out_ref,
-        info: Info { tokens: deposited_tokens, .. } as event_info,
+        info: ledger_state.DepositInfo { tokens: deposited_tokens, .. } as event_info,
       },
       inclusion_time,
       refund_address,
@@ -321,9 +322,9 @@ validator mint(hub_oracle: ScriptHash) {
         // Extracting L1 relevant data from the produced deposit datum. Ignored
         // values are user-related and approved simply by depositor's signature.
         expect Datum {
-          event: user_events.Event {
+          event: ledger_state.DepositEvent {
             id: output_deposit_id,
-            info: Info { tokens: output_deposit_tokens, .. },
+            info: ledger_state.DepositInfo { tokens: output_deposit_tokens, .. },
           },
           inclusion_time: output_deposit_inclusion_time,
           witness: output_deposit_witness,
