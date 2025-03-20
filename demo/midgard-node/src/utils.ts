@@ -105,7 +105,7 @@ export const setupLucid = async (
   }
 };
 
-export const findSpentAndProducedUTxOs = (txCBOR: ArrayBufferLike) =>
+export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
   Effect.gen(function* () {
     const spent: OutRef[] = [];
     const produced: UTxO[] = [];
@@ -132,7 +132,7 @@ export const findSpentAndProducedUTxOs = (txCBOR: ArrayBufferLike) =>
   });
 
 export const findAllSpentAndProducedUTxOs = (
-  txCBORs: ArrayBufferLike[],
+  txCBORs: Uint8Array[],
 ): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> =>
   Effect.gen(function* () {
     const allEffects = yield* Effect.all(

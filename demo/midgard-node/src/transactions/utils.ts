@@ -73,7 +73,7 @@ export const handleSignSubmitWithoutConfirmation = (
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: UTxO,
   db: pg.Pool,
-): Effect.Effect<{ txs: ArrayBufferLike[]; headerHash: string }, Error> =>
+): Effect.Effect<{ txs: Uint8Array[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
     const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
