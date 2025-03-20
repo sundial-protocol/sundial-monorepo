@@ -4,7 +4,7 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { LucidEvolution, fromHex } from "@lucid-evolution/lucid";
+import { CML, LucidEvolution, fromHex, getAddressDetails } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -86,38 +86,42 @@ export const listen = (
       }
     });
 
-    // app.get("/utxos", (req, res) => {
-    //   const addr = req.query.addr;
-    //   log(`GET /utxos - Request received for address: ${addr}`);
+    app.get("/utxos", (req, res) => {
+      const addr = req.query.addr;
+      log(`GET /utxos - Request received for address: ${addr}`);
 
-    //   if (typeof addr === "string") {
-    //     try {
-    //       const addrDetails = getAddressDetails(addr);
-    //       if (addrDetails.paymentCredential) {
-    //         MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
-    //           const filtered = allUTxOs.filter(
-    //             (a) => a.address === addrDetails.address.bech32,
-    //           );
-    //           log(
-    //             `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
-    //           );
-    //           res.json({ utxos: filtered });
-    //         });
-    //       } else {
-    //         log(
-    //           `GET /utxos - Invalid address (no payment credential): ${addr}`,
-    //         );
-    //         res.status(400).json({ message: `Invalid address: ${addr}` });
-    //       }
-    //     } catch (e) {
-    //       log(`GET /utxos - Invalid address format: ${addr}, error: ${e}`);
-    //       res.status(400).json({ message: `Invalid address: ${addr}` });
-    //     }
-    //   } else {
-    //     log(`GET /utxos - Invalid address type: ${addr}`);
-    //     res.status(400).json({ message: `Invalid address: ${addr}` });
-    //   }
-    // });
+      if (typeof addr === "string") {
+        try {
+          const addrDetails = getAddressDetails(addr);
+          if (addrDetails.paymentCredential) {
+            MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
+              const filtered = allUTxOs.filter(
+                ({ output }) => {
+                  const cmlOutput = CML.TransactionOutput.from_cbor_bytes(output);
+                  const address = cmlOutput.address().to_bech32();
+                  address === addrDetails.address.bech32
+                },
+              );
+              log(
+                `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
+              );
+              res.json({ utxos: filtered });
+            });
+          } else {
+            log(
+              `GET /utxos - Invalid address (no payment credential): ${addr}`,
+            );
+            res.status(400).json({ message: `Invalid address: ${addr}` });
+          }
+        } catch (e) {
+          log(`GET /utxos - Invalid address format: ${addr}, error: ${e}`);
+          res.status(400).json({ message: `Invalid address: ${addr}` });
+        }
+      } else {
+        log(`GET /utxos - Invalid address type: ${addr}`);
+        res.status(400).json({ message: `Invalid address: ${addr}` });
+      }
+    });
 
     app.get("/block", (req, res) => {
       const hdrHash = req.query.header_hash;
