@@ -3,7 +3,7 @@ use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/address.{Address}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{InlineDatum, Input, Output}
-use midgard/common/types.{POSIXTime, PubKeyHash}
+use midgard/common/types.{PosixTime, PubKeyHash}
 use midgard/common/utils
 
 pub type Datum =
@@ -13,9 +13,9 @@ pub type Datum =
 pub type NodeData {
   deposits_root: ByteArray,
   withdrawals_root: ByteArray,
-  start_time: POSIXTime,
-  end_time: POSIXTime,
-  time_of_claimed_as_resolved: Option<POSIXTime>,
+  start_time: PosixTime,
+  end_time: PosixTime,
+  time_of_claimed_as_resolved: Option<PosixTime>,
   operator: Option<PubKeyHash>,
 }
 

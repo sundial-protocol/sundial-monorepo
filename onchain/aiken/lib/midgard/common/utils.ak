@@ -16,7 +16,8 @@ use env
 use midgard/common/constants.{
   max_validity_range_for_current_time, posix_time_none,
 }
-use midgard/common/types.{MerkleRoot, MerklingInput, H28, H32, PosixTime, Tokens}
+use midgard/common/types.{H28,
+  H32, MerkleRoot, MerklingInput, PosixTime, Tokens}
 
 /// Check whether the interval starts on or after the point.
 pub fn is_hereafter(self: Interval<Int>, point: Int) -> Bool {
@@ -228,6 +229,7 @@ pub fn verify_hash_32(data: Data, data_hash: H32<Data>) {
 // Verify a 28-byte hash (Blake2b-224)
 pub fn verify_hash_28(data: Data, data_hash: H28<Data>) {
   expect blake2b_224(cbor.serialise(data)) == data_hash
+}
 
 /// Given a value, an NFT, and a `Tokens` (structured identical to `Value`, but
 /// safe for storage in datums), this helper ensures that the given `Value` is

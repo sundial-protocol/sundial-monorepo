@@ -8,7 +8,7 @@ use cardano/certificate.{RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
   Datum as CardanoDatum, OutputReference, Publish, Redeemer, ScriptPurpose,
 }
-use midgard/common/types.{MerkleRoot, POSIXTime, Tokens}
+use midgard/common/types.{MerkleRoot, PosixTime, Tokens}
 use midgard/user_events
 
 pub type Event =
@@ -22,7 +22,7 @@ pub type Info {
 
 pub type Datum {
   event: Event,
-  inclusion_time: POSIXTime,
+  inclusion_time: PosixTime,
   witness: ScriptHash,
   refund_address: Address,
   refund_datum: CardanoDatum,
