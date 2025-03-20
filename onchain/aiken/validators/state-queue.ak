@@ -12,7 +12,7 @@ use cardano/transaction.{
 }
 use midgard/active_operators
 use midgard/ledger_state.{ConfirmedState, Header}
-use midgard/protocol_parameters.{shift_duration}
+use midgard/protocol_parameters.{maturity_duration, shift_duration}
 use midgard/registered_operators
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum}
@@ -45,7 +45,6 @@ validator mint(
   retired_operators_script_hash: PolicyId,
   scheduler_script_hash: PolicyId,
   fraud_proof_script_hash: PolicyId,
-  maturity_duration: Int,
 ) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
     let node_in_outputs = get_node_inputs(self.inputs, policy_id)
@@ -154,13 +153,13 @@ validator mint(
 
         // Update the operator's timestamp in the active operators set:
         // (11) The transaction must include an input, spent via the Update
-        //      Commitment Time redeemer, of an `active_operators` node with a key
-        //      matching the `operator`.
+        //      Bond Hold New State redeemer, of an `active_operators` node with
+        //      a key matching the `operator`.
         expect Some(active_operators_redeemer_pair) =
           list.at(self.redeemers, active_operators_redeemer_index)
         expect Spend(active_node_input_output_reference) =
           active_operators_redeemer_pair.1st
-        expect active_operators.UpdateCommitmentTime { .. } =
+        expect active_operators.UpdateBondHoldNewState { .. } =
           active_operators_redeemer_pair.2nd
         expect Some(active_node_input) =
           list.at(self.inputs, active_node_input_index)

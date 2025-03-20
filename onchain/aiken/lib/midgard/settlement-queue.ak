@@ -24,6 +24,7 @@ pub type SpendRedeemer {
     hub_ref_input_index: Int,
     active_operators_node_input_index: Int,
     active_operators_redeemer_index: Int,
+    operator: ByteArray,
   }
   DisproveResolutionClaim {
     node_input_index: Int,

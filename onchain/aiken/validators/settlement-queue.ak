@@ -127,7 +127,7 @@ validator spend(
 
                 // 8. Found redeemer data must have the same structure as active
                 //    operator's update commitment time redeemer.
-                expect active_operators.UpdateCommitmentTime {
+                expect active_operators.UpdateBondHoldNewSettlement {
                   active_node_output_index,
                   ..
                 }: active_operators.SpendRedeemer =
@@ -157,7 +157,7 @@ validator spend(
                   ..
                 }) = list.at(outputs, active_node_output_index)
 
-                // TODO: Update the `UpdateCommitmentTime` redeemer to carry
+                // TODO: Update the `UpdateBondHoldNewSettlement` redeemer to carry
                 // this key, instead of reading it from the output datum.
                 expect ordered.NodeDatum {
                   key: ordered.Key(active_operators_node_key),
@@ -171,8 +171,8 @@ validator spend(
 
                 // 12. Active operator's updated datum is expected to record the
                 //     new commitment time.
-                expect active_operators.Datum{commitment_time: Some(
-                  new_commitment_time,
+                expect active_operators.Datum{bond_unlock_time: Some(
+                  new_bond_unlock_time,
                 )}: active_operators.Datum = active_operators_data
 
                 // 13. The only change in the updated datum must be the addition
@@ -182,7 +182,7 @@ validator spend(
                     ..node_datum,
                     data: NodeData {
                       ..node_data,
-                      time_of_claimed_as_resolved: Some(new_commitment_time),
+                      time_of_claimed_as_resolved: Some(new_bond_unlock_time),
                     },
                   }
                 cont_output_datum_data == expected_cont_output_datum_data

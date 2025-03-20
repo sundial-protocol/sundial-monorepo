@@ -11,13 +11,14 @@ use cardano/transaction.{
 use midgard/active_operators.{
   ActivateOperator, Datum, Deinit, Init, ListStateTransition, MintRedeemer,
   RemoveOperatorBadSettlement, RemoveOperatorBadState, RetireOperator,
-  SpendRedeemer, UpdateCommitmentTime,
+  SpendRedeemer, UpdateBondHoldNewSettlement, UpdateBondHoldNewState,
 }
 use midgard/common/utils as utils
 use midgard/hub_oracle.{Datum as HubOracleDatum}
+use midgard/protocol_parameters.{maturity_duration}
 use midgard/registered_operators
 use midgard/retired_operators.{Datum as RetiredOperatorData}
-use midgard/settlement_queue.{DisproveResolutionClaim}
+use midgard/settlement_queue.{AttachResolutionClaim, DisproveResolutionClaim}
 use midgard/state_queue.{CommitBlockHeader, RemoveFraudulentBlockHeader}
 
 validator spend(
@@ -36,13 +37,11 @@ validator spend(
         ordered.list_state_transition(
           tokens(self.mint, active_operators_mint_script_hash),
         )
-      UpdateCommitmentTime {
+      UpdateBondHoldNewState {
         active_node_output_index,
         hub_oracle_ref_input_index,
         state_queue_redeemer_index,
       } -> {
-        // TODO: Update time when the operator attaches a resolution claim
-        // to a settlement queue node.
         expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
         expect Some(active_node_input) =
           list.find(
@@ -78,7 +77,7 @@ validator spend(
           ),
           //keys are already checked by prove_is_member()
           parsed_active_node_output_datum.link == active_node_input_datum.link,
-          Some(valid_to) == active_node_operator_output_data.commitment_time,
+          Some(valid_to + maturity_duration) == active_node_operator_output_data.bond_unlock_time,
           quantity_of(
             hub_oracle_ref_input.output.value,
             hub_oracle_script_hash,
@@ -87,6 +86,70 @@ validator spend(
           state_queue_redeemer_pair.1st == Mint(
             parsed_hub_oracle_datum.state_queue,
           ),
+          Key(operator) == parsed_active_node_output_datum.key,
+        }
+      }
+      UpdateBondHoldNewSettlement {
+        active_node_output_index,
+        hub_oracle_ref_input_index,
+        settlement_queue_input_index,
+        settlement_queue_redeemer_index,
+      } -> {
+        expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
+        //
+        expect Some(active_node_input) =
+          list.find(
+            self.inputs,
+            fn(input) { input.output_reference == input_out_ref },
+          )
+        expect Some(active_node_input_datum) = datumOpt
+        //
+        expect Some(hub_oracle_ref_input) =
+          list.at(self.reference_inputs, hub_oracle_ref_input_index)
+        expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
+        expect parsed_hub_oracle_datum: HubOracleDatum = hub_oracle_datum
+        //
+        expect Some(active_node_output) =
+          list.at(self.outputs, active_node_output_index)
+        expect InlineDatum(active_node_output_datum) = active_node_output.datum
+        expect parsed_active_node_output_datum: NodeDatum =
+          active_node_output_datum
+        expect active_node_operator_output_data: Datum =
+          parsed_active_node_output_datum.data
+        //
+        expect Some(settlement_queue_redeemer_pair) =
+          list.at(self.redeemers, settlement_queue_redeemer_index)
+        expect AttachResolutionClaim { operator, .. } =
+          settlement_queue_redeemer_pair.2nd
+        // TODO fix performance:
+        expect Some(settlement_queue_input) =
+          list.at(self.inputs, settlement_queue_input_index)
+        expect
+          settlement_queue_input.output.address.payment_credential == Script(
+            parsed_hub_oracle_datum.settlement_queue_addr,
+          )
+        expect
+          settlement_queue_redeemer_pair.1st == Spend(
+            settlement_queue_input.output_reference,
+          )
+        and {
+          no_active_operators_minted(
+            self.mint,
+            active_operators_mint_script_hash,
+          ),
+          ordered.prove_is_member(
+            active_operators_mint_script_hash,
+            parsed_active_node_output_datum.key,
+            active_node_input.output,
+          ),
+          //keys are already checked by prove_is_member()
+          parsed_active_node_output_datum.link == active_node_input_datum.link,
+          Some(valid_to + maturity_duration) == active_node_operator_output_data.bond_unlock_time,
+          quantity_of(
+            hub_oracle_ref_input.output.value,
+            hub_oracle_script_hash,
+            hub_oracle_asset_name,
+          ) == 1,
           Key(operator) == parsed_active_node_output_datum.key,
         }
       }
@@ -151,7 +214,7 @@ validator mint(
             node_outputs,
             node_mint,
           ),
-          active_operator_data.commitment_time == None,
+          active_operator_data.bond_unlock_time == None,
           registered_operators_redeemer_pair.1st == Mint(
             parsed_hub_oracle_datum.registered_operators,
           ),
@@ -216,7 +279,7 @@ validator mint(
           list.at(self.inputs, settlement_queue_input_index)
         expect
           settlement_queue_input.output.address.payment_credential == Script(
-            parsed_hub_oracle_datum.settlement_queue,
+            parsed_hub_oracle_datum.settlement_queue_addr,
           )
         expect
           settlement_queue_redeemer_pair.1st == Spend(
@@ -237,7 +300,6 @@ validator mint(
             node_mint,
           ),
           self.fee >= slashing_penalty,
-          // TODO: use correct settlement queue redeemer
           fraudulent_operator == slashed_active_operator_key,
         }
       }
@@ -288,7 +350,7 @@ validator mint(
             parsed_hub_oracle_datum.retired_operators,
           ),
           new_retired_operator_key == active_operator_key,
-          active_operator_data.commitment_time == retired_operator_data.commitment_time,
+          active_operator_data.bond_unlock_time == retired_operator_data.bond_unlock_time,
         }
       }
     }

@@ -35,7 +35,6 @@ validator spend(retired_operators_mint_script_hash: ByteArray) {
 }
 
 validator mint(
-  maturity_duration: Int,
   slashing_penalty: Int,
   hub_oracle_script_hash: PolicyId,
   hub_oracle_asset_name: ByteArray,
@@ -111,10 +110,9 @@ validator mint(
             node_outputs,
             node_mint,
           ),
-          when retired_operator_data.commitment_time is {
+          when retired_operator_data.bond_unlock_time is {
             None -> True
-            Some(commitment_time) ->
-              valid_from >= commitment_time + maturity_duration
+            Some(bond_unlock_time) -> valid_from >= bond_unlock_time
           },
         }
       }
@@ -166,7 +164,6 @@ validator mint(
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
-        // TODO: use correct settlement queue redeemer
         expect Some(settlement_queue_redeemer_pair) =
           list.at(self.redeemers, settlement_queue_redeemer_index)
         expect DisproveResolutionClaim { fraudulent_operator, .. } =
@@ -176,7 +173,7 @@ validator mint(
           list.at(self.inputs, settlement_queue_input_index)
         expect
           settlement_queue_input.output.address.payment_credential == Script(
-            parsed_hub_oracle_datum.settlement_queue,
+            parsed_hub_oracle_datum.settlement_queue_addr,
           )
         expect
           settlement_queue_redeemer_pair.1st == Spend(
@@ -197,7 +194,6 @@ validator mint(
             node_mint,
           ),
           self.fee >= slashing_penalty,
-          // TODO: use correct settlement queue redeemer
           fraudulent_operator == slashed_retired_operator_key,
         }
       }

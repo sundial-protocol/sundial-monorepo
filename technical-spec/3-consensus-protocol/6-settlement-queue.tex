@@ -113,7 +113,7 @@ Conditions:
         \item The transaction's time-validity upper bound must match the resolution claim's time.
         \item The transaction must include the Midgard hub oracle NFT in a reference input.
         \item Let \code{active\_operators} and \code{scheduler} be the corresponding policy IDs in the Midgard hub oracle.
-        \item The transaction must include an input, spent via the Update Time redeemer, of an \code{active\_operators} node with a key matching the resolution claim's operator.
+        \item The transaction must include an input, spent via the Update Bond Hold New Settlement redeemer, of an \code{active\_operators} node with a key matching the resolution claim's operator.
         \item The transaction must include the \code{scheduler} utxo as a reference input, indicating that the current operator matches the resolution claim's operator.
       \end{enumerate}
   \item[Disprove Resolution Claim.] Disprove and detach a settlement node's resolution claim, slashing the claimant operator.

@@ -1,15 +1,21 @@
 use midgard/common/types.{PosixTime}
 
 pub type Datum {
-  commitment_time: Option<PosixTime>,
+  bond_unlock_time: Option<PosixTime>,
 }
 
 pub type SpendRedeemer {
   ListStateTransition
-  UpdateCommitmentTime {
+  UpdateBondHoldNewState {
     active_node_output_index: Int,
     hub_oracle_ref_input_index: Int,
     state_queue_redeemer_index: Int,
+  }
+  UpdateBondHoldNewSettlement {
+    active_node_output_index: Int,
+    hub_oracle_ref_input_index: Int,
+    settlement_queue_input_index: Int,
+    settlement_queue_redeemer_index: Int,
   }
 }
 
