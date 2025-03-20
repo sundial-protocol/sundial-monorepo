@@ -12,12 +12,12 @@ export const createQuery = `
 
 export const insert = async (
   pool: Pool,
-  txHash: string,
+  txHash: Uint8Array,
   txCbor: Uint8Array,
 ): Promise<void> => {
   const query = `INSERT INTO mempool (tx_hash, tx_cbor) VALUES ($1, $2)`;
   try {
-    await pool.query(query, [Buffer.from(txHash, "hex"), Buffer.from(txCbor)]);
+    await pool.query(query, [txHash, txCbor]);
     // logInfo(`mempool db: tx stored`);
   } catch (err) {
     // logAbort(`mempool db: error inserting tx: ${err}`);
@@ -27,24 +27,24 @@ export const insert = async (
 
 export const retrieveTxCborByHash = async (
   pool: Pool,
-  txHash: string,
+  txHash: Uint8Array,
 ): Promise<Option.Option<Uint8Array>> =>
   utils.retrieveTxCborByHash(pool, "mempool", txHash);
 
 export const retrieveTxCborsByHashes = async (
   pool: Pool,
-  txHashes: string[],
+  txHashes: Uint8Array[],
 ): Promise<Uint8Array[]> =>
   utils.retrieveTxCborsByHashes(pool, "mempool", txHashes);
 
 export const retrieve = async (
   pool: Pool,
-): Promise<{ txHash: string; txCbor: Uint8Array }[]> => {
+): Promise<{ txHash: Uint8Array; txCbor: Uint8Array }[]> => {
   const query = `SELECT * FROM mempool`;
   try {
     const result = await pool.query(query);
     return result.rows.map((row) => ({
-      txHash: row.tx_hash.toString("hex"),
+      txHash: row.tx_hash,
       txCbor: row.tx_cbor,
     }));
   } catch (err) {
@@ -53,7 +53,7 @@ export const retrieve = async (
   }
 };
 
-export const clearTxs = async (pool: Pool, txHashes: string[]) =>
+export const clearTxs = async (pool: Pool, txHashes: Uint8Array[]) =>
   utils.clearTxs(pool, "mempool", txHashes);
 
 export const clear = async (pool: Pool) => clearTable(pool, "mempool");

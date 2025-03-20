@@ -4,8 +4,8 @@ import {
   OutRef,
   TxSignBuilder,
   UTxO,
+  utxoToCore,
 } from "@lucid-evolution/lucid";
-import * as CBOR from "cbor-x";
 import { Effect, Schedule } from "effect";
 import pg from "pg";
 import * as BlocksDB from "../database/blocks.js";
@@ -78,7 +78,11 @@ export const fetchFirstBlockTxs = (
     const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
     const txHashes = yield* Effect.tryPromise({
-      try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),
+      try: () =>
+        BlocksDB.retrieveTxHashesByBlockHash(
+          db,
+          Buffer.from(headerHash, "hex"),
+        ),
       catch: (e) => new Error(`${e}`),
     });
     const txs = yield* Effect.tryPromise({
@@ -102,13 +106,10 @@ export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
   );
 };
 
-export const utxoToOutRefAndCBORArray = (
-  utxo: UTxO,
-): { outRef: OutRef; utxoCBOR: Uint8Array } => ({
-  outRef: utxoToOutRef(utxo),
-  utxoCBOR: utxoToCBOR(utxo),
-});
-
-export function utxoToCBOR(utxo: UTxO): Uint8Array {
-  return CBOR.encode(utxo);
+export function utxoToCBOR(utxo: UTxO): { key: Uint8Array; value: Uint8Array } {
+  const cmlUTxO = utxoToCore(utxo);
+  return {
+    key: cmlUTxO.input().to_cbor_bytes(),
+    value: cmlUTxO.output().to_cbor_bytes(),
+  };
 }

@@ -2,7 +2,6 @@ import { NodeConfig, User } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
-import { utxoToOutRefAndCBORArray } from "@/transactions/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
 import { LucidEvolution } from "@lucid-evolution/lucid";
@@ -52,29 +51,36 @@ export const listen = (
         isHexString(txHash) &&
         txHash.length === 32
       ) {
-        MempoolDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
-          Option.match(ret, {
-            onSome: (retrieved) => {
-              log(`GET /tx - Transaction found in mempool: ${txHash}`);
-              res.json({ tx: retrieved });
-            },
-            onNone: () =>
-              ImmutableDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
-                Option.match(ret, {
-                  onSome: (retrieved) => {
-                    log(`GET /tx - Transaction found in immutable: ${txHash}`);
-                    res.json({ tx: retrieved });
-                  },
-                  onNone: () => {
-                    log(`GET /tx - No transaction found: ${txHash}`);
-                    res
-                      .status(404)
-                      .json({ message: "No matching transactions found" });
-                  },
-                });
-              }),
-          });
-        });
+        MempoolDB.retrieveTxCborByHash(pool, Buffer.from(txHash, "hex")).then(
+          (ret) => {
+            Option.match(ret, {
+              onSome: (retrieved) => {
+                log(`GET /tx - Transaction found in mempool: ${txHash}`);
+                res.json({ tx: retrieved });
+              },
+              onNone: () =>
+                ImmutableDB.retrieveTxCborByHash(
+                  pool,
+                  Buffer.from(txHash, "hex"),
+                ).then((ret) => {
+                  Option.match(ret, {
+                    onSome: (retrieved) => {
+                      log(
+                        `GET /tx - Transaction found in immutable: ${txHash}`,
+                      );
+                      res.json({ tx: retrieved });
+                    },
+                    onNone: () => {
+                      log(`GET /tx - No transaction found: ${txHash}`);
+                      res
+                        .status(404)
+                        .json({ message: "No matching transactions found" });
+                    },
+                  });
+                }),
+            });
+          },
+        );
       } else {
         // log(`GET /tx - Invalid transaction hash: ${txHash}`);
         res
@@ -125,7 +131,10 @@ export const listen = (
         isHexString(hdrHash) &&
         hdrHash.length === 32
       ) {
-        BlocksDB.retrieveTxHashesByBlockHash(pool, hdrHash).then((hashes) => {
+        BlocksDB.retrieveTxHashesByBlockHash(
+          pool,
+          Buffer.from(hdrHash, "hex"),
+        ).then((hashes) => {
           log(
             `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`,
           );
@@ -246,12 +255,9 @@ export const listen = (
           const { spent, produced } = await Effect.runPromise(
             spentAndProducedProgram,
           );
-          await MempoolDB.insert(pool, tx.toHash(), txCBOR);
+          await MempoolDB.insert(pool, Buffer.from(tx.toHash(), "hex"), txCBOR);
           await MempoolLedgerDB.clearUTxOs(pool, spent);
-          await MempoolLedgerDB.insert(
-            pool,
-            produced.map((u) => utxoToOutRefAndCBORArray(u)),
-          );
+          await MempoolLedgerDB.insert(pool, produced);
           Effect.runSync(Metric.increment(txCounter));
           // log(`▫️ L2 Transaction processed successfully: ${tx.toHash()}`);
           res.json({ message: "Successfully submitted the transaction" });
@@ -276,7 +282,11 @@ export const storeTx = async (
   Effect.gen(function* () {
     const txHash = lucid.fromTx(tx).toHash();
     yield* Effect.tryPromise(() =>
-      MempoolDB.insert(pool, txHash, Buffer.from(tx, "hex")),
+      MempoolDB.insert(
+        pool,
+        Buffer.from(txHash, "hex"),
+        Buffer.from(tx, "hex"),
+      ),
     );
   });
 

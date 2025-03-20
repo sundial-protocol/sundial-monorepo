@@ -18,7 +18,7 @@ import { LucidEvolution } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import pg from "pg";
 import { Worker } from "worker_threads";
-import { handleSignSubmit, utxoToOutRefAndCBORArray } from "../utils.js";
+import { handleSignSubmit } from "../utils.js";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
@@ -77,14 +77,10 @@ export const buildAndSubmitCommitmentBlock = (
       const mempoolTxCbors = mempoolTxs.map((tx) => tx.txCbor);
       const mempoolTxHashes = mempoolTxs.map((tx) => tx.txHash);
 
-      const { spent: spentList, produced: producedListUTxOs } =
+      const { spent: spentList, produced: producedList } =
         yield* findAllSpentAndProducedUTxOs(mempoolTxCbors).pipe(
           Effect.withSpan("findAllSpentAndProducedUTxOs"),
         );
-
-      const producedList = producedListUTxOs.map((u) =>
-        utxoToOutRefAndCBORArray(u),
-      );
 
       const latestLedgerUTxOs = yield* Effect.tryPromise(() =>
         LatestLedgerDB.retrieve(db),
@@ -92,7 +88,7 @@ export const buildAndSubmitCommitmentBlock = (
 
       // Remove spent UTxOs from latestLedgerUTxOs
       const filteredUTxOList = latestLedgerUTxOs.filter(
-        (utxo) => !spentList.some((spent) => utxo.outRef == spent),
+        (utxo) => !spentList.some((spent) => utxo.key == spent),
       );
 
       // Merge filtered latestLedgerUTxOs with producedList
@@ -248,7 +244,7 @@ export const buildAndSubmitCommitmentBlock = (
         yield* Effect.tryPromise(() =>
           BlocksDB.insert(
             db,
-            newHeaderHash,
+            Buffer.from(newHeaderHash, "hex"),
             mempoolTxHashes.slice(i, i + batchSize),
           ),
         ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));

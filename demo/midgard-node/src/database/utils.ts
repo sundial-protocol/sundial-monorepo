@@ -1,4 +1,3 @@
-import { OutRef, toHex } from "@lucid-evolution/lucid";
 import { Option } from "effect";
 import { Pool } from "pg";
 import { logAbort, logInfo } from "../utils.js";
@@ -33,18 +32,17 @@ export async function initializeDb(pool: Pool) {
 export const clearUTxOs = async (
   pool: Pool,
   tableName: string,
-  refs: OutRef[],
+  refs: Uint8Array[],
 ): Promise<void> => {
-  const query = `DELETE FROM ${tableName} WHERE (tx_hash, output_index) IN (${refs
-    .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`)
+  const query = `DELETE FROM ${tableName} WHERE (tx_in_cbor) IN (${refs
+    .map((_, i) => `($${i + 1})`)
     .join(", ")})`;
-  const values = refs.flatMap((r) => [
-    Buffer.from(r.txHash, "hex"),
-    r.outputIndex,
-  ]);
+  // const values = refs.flatMap((r) => [
+  //   Buffer.from(r),
+  // ]);
 
   try {
-    const result = await pool.query(query, values);
+    await pool.query(query, refs);
     // logInfo(`${tableName} db: ${result.rowCount} utxos removed`);
   } catch (err) {
     // logAbort(`${tableName} db: utxos removing error: ${err}`);
@@ -55,14 +53,13 @@ export const clearUTxOs = async (
 export const clearTxs = async (
   pool: Pool,
   tableName: string,
-  txHashes: string[],
+  txHashes: Uint8Array[],
 ): Promise<void> => {
   const query = `DELETE FROM ${tableName} WHERE tx_hash IN (${txHashes
     .map((_, i) => `$${i + 1}`)
     .join(", ")})`;
-  const values = txHashes.flatMap((h) => [Buffer.from(h, "hex")]);
   try {
-    const result = await pool.query(query, values);
+    const result = await pool.query(query, txHashes);
     logInfo(`${tableName} db: ${result.rowCount} txs removed`);
   } catch (err) {
     logAbort(`${tableName} db: txs removing error: ${err}`);
@@ -73,11 +70,11 @@ export const clearTxs = async (
 export const retrieveTxCborByHash = async (
   pool: Pool,
   tableName: string,
-  txHash: string,
+  txHash: Uint8Array,
 ): Promise<Option.Option<Uint8Array>> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = $1`;
   try {
-    const result = await pool.query(query, [Buffer.from(txHash, "hex")]);
+    const result = await pool.query(query, [txHash]);
     if (result.rows.length > 0) {
       return Option.some(result.rows[0].tx_cbor);
     } else {
@@ -92,13 +89,11 @@ export const retrieveTxCborByHash = async (
 export const retrieveTxCborsByHashes = async (
   pool: Pool,
   tableName: string,
-  txHashes: string[],
+  txHashes: Uint8Array[],
 ): Promise<Uint8Array[]> => {
   const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ANY($1)`;
   try {
-    const result = await pool.query(query, [
-      txHashes.map((hash) => Buffer.from(hash, "hex")),
-    ]);
+    const result = await pool.query(query, [txHashes]);
     return result.rows.map((row) => row.tx_cbor);
   } catch (err) {
     // logAbort(`${tableName} db: retrieving error: ${err}`);
@@ -124,31 +119,27 @@ export const clearTable = async (
 export const insertUTxOsCBOR = async (
   pool: Pool,
   tableName: string,
-  utxosCBOR: { outRef: OutRef; utxoCBOR: Uint8Array }[],
+  utxosCBOR: { key: Uint8Array; value: Uint8Array }[],
 ): Promise<void> => {
   const query = `
-  INSERT INTO ${tableName} (tx_hash, output_index, utxo_cbor)
+  INSERT INTO ${tableName} (tx_in_cbor, tx_out_cbor)
   VALUES
-  ${utxosCBOR.map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`).join(", ")}
+  ${utxosCBOR.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(", ")}
   `;
-  const values = utxosCBOR.flatMap((u) => [
-    Buffer.from(u.outRef.txHash, "hex"),
-    u.outRef.outputIndex,
-    Buffer.from(u.utxoCBOR),
-  ]);
+  const values = utxosCBOR.flatMap((u) => [u.key, u.value]);
   await pool.query(query, values);
 };
 
 export const retrieveUTxOsCBOR = async (
   pool: Pool,
   tableName: string,
-): Promise<{ outRef: OutRef; utxoCBOR: Uint8Array }[]> => {
+): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
   const query = `SELECT * FROM ${tableName}`;
   const rows = await pool.query(query);
-  const result: { outRef: OutRef; utxoCBOR: Uint8Array }[] = rows.rows.map(
+  const result: { key: Uint8Array; value: Uint8Array }[] = rows.rows.map(
     (r) => ({
-      outRef: { txHash: toHex(r.tx_hash), outputIndex: r.output_index },
-      utxoCBOR: Buffer.from(r.utxo_cbor),
+      key: r.tx_in_cbor,
+      value: r.tx_out_cbor,
     }),
   );
   return result;
