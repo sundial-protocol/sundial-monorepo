@@ -10,10 +10,10 @@ import {
   Network,
   Provider,
   UTxO,
+  utxoToCore,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 import { Effect } from "effect";
-import { utxoToCBOR } from "./transactions/utils.js";
 
 export interface WorkerInput {
   data: {
@@ -24,6 +24,7 @@ export interface WorkerInput {
 
 export interface WorkerOutput {
   root: string;
+  rootType: "txs" | "utxos";
 }
 
 export const chalk = new chalk_.Chalk();
@@ -104,17 +105,30 @@ export const setupLucid = async (
   }
 };
 
+export function utxoToCBOR(utxo: UTxO): {
+  outputReference: Uint8Array;
+  output: Uint8Array;
+} {
+  const cmlUTxO = utxoToCore(utxo);
+  return {
+    outputReference: cmlUTxO.input().to_cbor_bytes(),
+    output: cmlUTxO.output().to_cbor_bytes(),
+  };
+}
+
 export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
   Effect.gen(function* () {
     const spent: Uint8Array[] = [];
-    const produced: { key: Uint8Array; value: Uint8Array }[] = [];
+    const produced: { outputReference: Uint8Array; output: Uint8Array }[] = [];
     const tx = CML.Transaction.from_cbor_bytes(txCBOR);
     const txBody = tx.body();
     const inputs = txBody.inputs();
     const outputs = txBody.outputs();
     for (let i = 0; i < inputs.len(); i++) {
-      // TODO: custom error
-      yield* Effect.try(() => spent.push(inputs.get(i).to_cbor_bytes()));
+      yield* Effect.try({
+        try: () => spent.push(inputs.get(i).to_cbor_bytes()),
+        catch: (e) => new Error(`${e}`),
+      });
     }
     const txHash = CML.hash_transaction(txBody).to_hex();
     for (let i = 0; i < outputs.len(); i++) {
@@ -133,7 +147,10 @@ export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
 export const findAllSpentAndProducedUTxOs = (
   txCBORs: Uint8Array[],
 ): Effect.Effect<
-  { spent: Uint8Array[]; produced: { key: Uint8Array; value: Uint8Array }[] },
+  {
+    spent: Uint8Array[];
+    produced: { outputReference: Uint8Array; output: Uint8Array }[];
+  },
   Error
 > =>
   Effect.gen(function* () {

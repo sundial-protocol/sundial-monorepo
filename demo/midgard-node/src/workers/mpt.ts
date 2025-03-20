@@ -6,16 +6,17 @@ import { WorkerInput, WorkerOutput } from "@/utils.js";
 
 const wrapper = (input: WorkerInput): Effect.Effect<WorkerOutput, Error> =>
   Effect.gen(function* () {
-    const trieProgram = (() => {
-      if (input.data.itemsType === "txs") {
-        return SDK.Utils.mptFromTxs(input.data.items);
-      } else {
-        return SDK.Utils.mptFromUTxOs(input.data.items);
-      }
-    })();
+    const trieProgram =
+      input.data.itemsType === "txs"
+        ? SDK.Utils.mptFromTxs(input.data.items)
+        : SDK.Utils.mptFromUTxOs(input.data.items);
     return yield* Effect.map(
       trieProgram,
-      (t: Trie) => ({ root: t.hash.toString("hex") }) as WorkerOutput,
+      (t: Trie) =>
+        ({
+          root: t.hash.toString("hex"),
+          rootType: input.data.itemsType,
+        }) as WorkerOutput,
     );
   });
 
@@ -34,6 +35,8 @@ Effect.runPromise(
     ),
   ),
 ).then((output) => {
-  Effect.runSync(Effect.logInfo("👷 Work completed."));
+  Effect.runSync(
+    Effect.logInfo(`👷 Work completed (${JSON.stringify(output)}).`),
+  );
   parentPort?.postMessage(output);
 });

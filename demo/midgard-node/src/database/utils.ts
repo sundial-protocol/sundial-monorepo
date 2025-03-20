@@ -119,28 +119,27 @@ export const clearTable = async (
 export const insertUTxOsCBOR = async (
   pool: Pool,
   tableName: string,
-  utxosCBOR: { key: Uint8Array; value: Uint8Array }[],
+  utxosCBOR: { outputReference: Uint8Array; output: Uint8Array }[],
 ): Promise<void> => {
   const query = `
   INSERT INTO ${tableName} (tx_in_cbor, tx_out_cbor)
   VALUES
   ${utxosCBOR.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(", ")}
   `;
-  const values = utxosCBOR.flatMap((u) => [u.key, u.value]);
+  const values = utxosCBOR.flatMap((u) => [u.outputReference, u.output]);
   await pool.query(query, values);
 };
 
 export const retrieveUTxOsCBOR = async (
   pool: Pool,
   tableName: string,
-): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
+): Promise<{ outputReference: Uint8Array; output: Uint8Array }[]> => {
   const query = `SELECT * FROM ${tableName}`;
   const rows = await pool.query(query);
-  const result: { key: Uint8Array; value: Uint8Array }[] = rows.rows.map(
-    (r) => ({
-      key: r.tx_in_cbor,
-      value: r.tx_out_cbor,
-    }),
-  );
+  const result: { outputReference: Uint8Array; output: Uint8Array }[] =
+    rows.rows.map((r) => ({
+      outputReference: r.tx_in_cbor,
+      output: r.tx_out_cbor,
+    }));
   return result;
 };

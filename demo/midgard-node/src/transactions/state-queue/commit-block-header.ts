@@ -14,7 +14,7 @@ import {
   findAllSpentAndProducedUTxOs,
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { LucidEvolution } from "@lucid-evolution/lucid";
+import { LucidEvolution, fromHex } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import pg from "pg";
 import { Worker } from "worker_threads";
@@ -74,8 +74,13 @@ export const buildAndSubmitCommitmentBlock = (
     if (mempoolTxsCount > 0n) {
       yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
 
-      const mempoolTxCbors = mempoolTxs.map((tx) => tx.txCbor);
-      const mempoolTxHashes = mempoolTxs.map((tx) => tx.txHash);
+      const mempoolTxHashes: Uint8Array[] = [];
+      const mempoolTxCbors: Uint8Array[] = [];
+
+      mempoolTxs.map(({ txHash, txCbor }) => {
+        mempoolTxHashes.push(txHash);
+        mempoolTxCbors.push(txCbor);
+      });
 
       const { spent: spentList, produced: producedList } =
         yield* findAllSpentAndProducedUTxOs(mempoolTxCbors).pipe(
@@ -88,7 +93,7 @@ export const buildAndSubmitCommitmentBlock = (
 
       // Remove spent UTxOs from latestLedgerUTxOs
       const filteredUTxOList = latestLedgerUTxOs.filter(
-        (utxo) => !spentList.some((spent) => utxo.key == spent),
+        (utxo) => !spentList.some((spent) => utxo.outputReference == spent),
       );
 
       // Merge filtered latestLedgerUTxOs with producedList
@@ -96,7 +101,9 @@ export const buildAndSubmitCommitmentBlock = (
 
       const workerHelper = (input: WorkerInput) =>
         Effect.async<string, Error, never>((resume) => {
-          Effect.runSync(Effect.logInfo("👷 Starting worker..."));
+          Effect.runSync(
+            Effect.logInfo(`👷 Starting worker for ${input.data.itemsType}...`),
+          );
           const worker = new Worker(new URL("./mpt.js", import.meta.url), {
             workerData: input,
           });
@@ -244,7 +251,7 @@ export const buildAndSubmitCommitmentBlock = (
         yield* Effect.tryPromise(() =>
           BlocksDB.insert(
             db,
-            Buffer.from(newHeaderHash, "hex"),
+            fromHex(newHeaderHash),
             mempoolTxHashes.slice(i, i + batchSize),
           ),
         ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));

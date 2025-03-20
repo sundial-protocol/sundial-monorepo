@@ -4,7 +4,7 @@ import {
   OutRef,
   TxSignBuilder,
   UTxO,
-  utxoToCore,
+  fromHex,
 } from "@lucid-evolution/lucid";
 import { Effect, Schedule } from "effect";
 import pg from "pg";
@@ -78,11 +78,7 @@ export const fetchFirstBlockTxs = (
     const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
     const txHashes = yield* Effect.tryPromise({
-      try: () =>
-        BlocksDB.retrieveTxHashesByBlockHash(
-          db,
-          Buffer.from(headerHash, "hex"),
-        ),
+      try: () => BlocksDB.retrieveTxHashesByBlockHash(db, fromHex(headerHash)),
       catch: (e) => new Error(`${e}`),
     });
     const txs = yield* Effect.tryPromise({
@@ -105,11 +101,3 @@ export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
     outRef0.outputIndex === outRef1.outputIndex
   );
 };
-
-export function utxoToCBOR(utxo: UTxO): { key: Uint8Array; value: Uint8Array } {
-  const cmlUTxO = utxoToCore(utxo);
-  return {
-    key: Buffer.from(cmlUTxO.input().to_cbor_bytes()),
-    value: Buffer.from(cmlUTxO.output().to_cbor_bytes()),
-  };
-}

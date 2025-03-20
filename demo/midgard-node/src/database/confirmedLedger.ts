@@ -12,12 +12,12 @@ export const createQuery = `
 
 export const insert = async (
   pool: Pool,
-  utxosCBOR: { key: Uint8Array; value: Uint8Array }[],
+  utxosCBOR: { outputReference: Uint8Array; output: Uint8Array }[],
 ) => insertUTxOsCBOR(pool, "confirmed_ledger", utxosCBOR);
 
 export const retrieve = async (
   pool: Pool,
-): Promise<{ key: Uint8Array; value: Uint8Array }[]> =>
+): Promise<{ outputReference: Uint8Array; output: Uint8Array }[]> =>
   retrieveUTxOsCBOR(pool, "confirmed_ledger");
 
 export const clearUTxOs = async (pool: Pool, refs: Uint8Array[]) =>
