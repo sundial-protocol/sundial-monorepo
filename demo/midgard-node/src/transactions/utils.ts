@@ -109,7 +109,7 @@ export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
 export function utxoToCBOR(utxo: UTxO): { key: Uint8Array; value: Uint8Array } {
   const cmlUTxO = utxoToCore(utxo);
   return {
-    key: cmlUTxO.input().to_cbor_bytes(),
-    value: cmlUTxO.output().to_cbor_bytes(),
+    key: Buffer.from(cmlUTxO.input().to_cbor_bytes()),
+    value: Buffer.from(cmlUTxO.output().to_cbor_bytes()),
   };
 }
