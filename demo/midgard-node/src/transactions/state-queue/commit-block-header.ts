@@ -87,25 +87,13 @@ export const buildAndSubmitCommitmentBlock = (
           Effect.withSpan("findAllSpentAndProducedUTxOs"),
         );
 
-      const latestLedgerUTxOs = yield* Effect.tryPromise(() =>
-        LatestLedgerDB.retrieve(db),
-      ).pipe(Effect.withSpan("retrieve latest ledger utxo list"));
-
-      // Remove spent UTxOs from latestLedgerUTxOs
-      const filteredUTxOList = latestLedgerUTxOs.filter(
-        (utxo) => !spentList.some((spent) => utxo.outputReference == spent),
-      );
-
-      // Merge filtered latestLedgerUTxOs with producedList
-      const newLatestLedger = [...filteredUTxOList, ...producedList];
-
-      const workerHelper = (input: WorkerInput) =>
-        Effect.async<string, Error, never>((resume) => {
+      const worker =
+        Effect.async<WorkerOutput, Error, never>((resume) => {
           Effect.runSync(
-            Effect.logInfo(`👷 Starting worker for ${input.data.itemsType}...`),
+            Effect.logInfo(`👷 Starting worker...`),
           );
           const worker = new Worker(new URL("./mpt.js", import.meta.url), {
-            workerData: input,
+            workerData: { data: { command: "start" } },
           });
           worker.on("message", (output: WorkerOutput) => {
             if ("error" in output) {
@@ -113,7 +101,7 @@ export const buildAndSubmitCommitmentBlock = (
                 Effect.fail(new Error(`Error in worker: ${output.error}`)),
               );
             } else {
-              resume(Effect.succeed(output.root));
+              resume(Effect.succeed(output));
             }
             worker.terminate();
           });
@@ -133,25 +121,7 @@ export const buildAndSubmitCommitmentBlock = (
           });
         });
 
-      const txRootWorkerProgram = workerHelper({
-        data: {
-          items: mempoolTxs,
-          itemsType: "txs",
-        },
-      });
-
-      const utxoRootWorkerProgram = workerHelper({
-        data: {
-          items: newLatestLedger,
-          itemsType: "utxos",
-        },
-      });
-
-      yield* Effect.logInfo("🔹 Building MPT roots...");
-      const [txRoot, utxoRoot] = yield* Effect.all(
-        [txRootWorkerProgram, utxoRootWorkerProgram],
-        { concurrency: 2 },
-      );
+      const { txRoot, utxoRoot } = yield* worker;
 
       yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot}`);
       yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);

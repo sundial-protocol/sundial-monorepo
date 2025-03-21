@@ -1,7 +1,7 @@
 import { NodeConfig, User } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { AlwaysSucceeds } from "@/services/index.js";
-import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
+import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
 import { CML, LucidEvolution, fromHex, getAddressDetails } from "@lucid-evolution/lucid";

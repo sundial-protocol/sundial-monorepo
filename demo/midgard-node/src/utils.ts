@@ -17,14 +17,13 @@ import { Effect } from "effect";
 
 export interface WorkerInput {
   data: {
-    items: any[];
-    itemsType: "txs" | "utxos";
+    command: string;
   };
 }
 
 export interface WorkerOutput {
-  root: string;
-  rootType: "txs" | "utxos";
+  txRoot: string;
+  utxoRoot: string;
 }
 
 export const chalk = new chalk_.Chalk();
