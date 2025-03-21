@@ -37,6 +37,7 @@ validator spend(
   ) {
     expect Some(node_datum) = m_datum
 
+    // TODO: operator should not be in NodeData
     expect NodeData {
       deposits_root,
       withdrawals_root,
@@ -54,6 +55,8 @@ validator spend(
         hub_ref_input_index,
         active_operators_node_input_index,
         active_operators_redeemer_index,
+        operator,
+        ..
       } |
       DisproveResolutionClaim {
         node_input_index,
@@ -61,6 +64,7 @@ validator spend(
         hub_ref_input_index,
         active_operators_node_input_index,
         active_operators_redeemer_index,
+        operator,
         ..
       } -> {
         let Transaction {
@@ -112,6 +116,9 @@ validator spend(
 
             when redeemer is {
               AttachResolutionClaim { .. } -> {
+                // TODO: check operator of claim
+                // TODO: update bond unlock time of operator
+
                 // 5. Operator must have signed this claim.
                 expect operator_vkey |> utils.has_signed(extra_signatories)
 
@@ -192,7 +199,6 @@ validator spend(
                 unresolved_event_asset_name,
                 event_type,
                 membership_proof,
-                fraudulent_operator,
                 ..
               } -> {
                 let (event_script, events_root) =
@@ -270,7 +276,7 @@ validator spend(
 
                 // 7. Operator vkey found in the slash bond redeemer must match
                 //    the one stored in the spending settlement UTxO.
-                expect slashed_active_operator_key == fraudulent_operator
+                expect slashed_active_operator_key == operator
 
                 // 8. The only change in the datum should be removal of the
                 //    claim, and also removal of the operator.

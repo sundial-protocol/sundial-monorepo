@@ -3,7 +3,6 @@ use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/linked_list/ordered.{
   Key, NodeDatum, get_node_inputs, get_node_outputs,
 }
-use cardano/address.{Script}
 use cardano/assets.{PolicyId, quantity_of, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
@@ -172,9 +171,7 @@ validator mint(
         expect Some(settlement_queue_input) =
           list.at(self.inputs, settlement_queue_input_index)
         expect
-          settlement_queue_input.output.address.payment_credential == Script(
-            parsed_hub_oracle_datum.settlement_queue_addr,
-          )
+          settlement_queue_input.output.address.payment_credential == parsed_hub_oracle_datum.settlement_queue_addr.payment_credential
         expect
           settlement_queue_redeemer_pair.1st == Spend(
             settlement_queue_input.output_reference,

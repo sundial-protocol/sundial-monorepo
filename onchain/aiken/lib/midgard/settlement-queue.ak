@@ -32,11 +32,11 @@ pub type SpendRedeemer {
     hub_ref_input_index: Int,
     active_operators_node_input_index: Int,
     active_operators_redeemer_index: Int,
+    operator: ByteArray,
     unresolved_event_ref_input_index: Int,
     unresolved_event_asset_name: AssetName,
     event_type: EventType,
     membership_proof: mpf.Proof,
-    fraudulent_operator: ByteArray,
   }
 }
 

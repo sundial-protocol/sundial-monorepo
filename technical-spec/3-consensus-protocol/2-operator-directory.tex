@@ -33,10 +33,10 @@ It separates operators into three groups based on their status, with every group
     \item \code{retired\_operators} is a set that tracks retired operators waiting to recover their ADA bonds, implemented as a key-ordered linked list.
 \end{itemize}
 
-The Operator Directory keeps track of the registration time of every registered operator.
+The Operator Directory keeps track of the activation time of every registered operator, which indicates when the operator will become eligible for activation.
 It also keeps track of any holds on the ADA bonds of active and retired operators, which prevent those operators from recovering their bonds until their latest committed blocks and latest settlement resolution claims mature.
 \begin{align*}
-    \T{RegisteredOperator} &\coloneq \Bigl( \T{registration\_time}: \T{PosixTime} \Bigr) \\
+    \T{RegisteredOperator} &\coloneq \Bigl( \T{activation\_time}: \T{PosixTime} \Bigr) \\
     \T{ActiveOperator}     &\coloneq \Bigl( \T{bond\_unlock\_time}:
         \T{Option}(\T{PosixTime}) \Bigr) \\
     \T{RetiredOperator}    &\coloneq \Bigl( \T{bond\_unlock\_time}:
@@ -81,7 +81,7 @@ Redeemers:
                 \item The transaction must Prepend a node into the \code{registered\_operators} queue.
                   Let that node be \code{registered\_node}.
                 \item The \code{key} field of \code{registered\_node} must correspond to a public key hash that signed the transaction.
-                \item The \code{registration\_time} field of \code{registered\_node} must equal the upper bound of the transaction's validity interval.
+                \item The \code{activation\_time} field of \code{registered\_node} must equal the sum of the Midgard \code{registration\_duration} protocol parameter and the upper bound of the transaction's validity interval.
                 \item The Lovelace in the \code{registered\_node} must equal the \code{required\_bond} Midgard parameter.
             \end{enumerate}
             \item Verify that the registrant is not already active or retired.
@@ -99,7 +99,7 @@ Redeemers:
             \begin{enumerate}
                 \item The transaction must Remove a node from the \code{registered\_operators} queue.
                   Let that node be \code{registered\_node}.
-                \item The lower bound of the transaction validity interval must meet or exceed the sum of the \code{registration\_time} and the Midgard \code{registration\_duration} protocol parameter.
+                \item The lower bound of the transaction validity interval must meet or exceed the \code{activation\_time}.
             \end{enumerate}
             \item Verify that the registrant is being added to active operators:
             \begin{enumerate}[resume]
