@@ -1,19 +1,21 @@
-import { Trie } from "@aiken-lang/merkle-patricia-forestry";
+import { Store, Trie } from "@aiken-lang/merkle-patricia-forestry";
 import { Effect } from "effect";
-import { CML } from "@lucid-evolution/lucid";
 
-export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
+const tempFile = "./tmp";
+
+export const mptFromUTxOs = (
+  utxos: { outputReference: Uint8Array; output: Uint8Array }[],
+): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    const data = utxos.map((utxoCbor) => {
-      const cmlUTxO = CML.TransactionUnspentOutput.from_cbor_hex(utxoCbor);
+    const data = utxos.map(({ outputReference, output }) => {
       return {
-        key: cmlUTxO.input().to_cbor_hex(),
-        value: cmlUTxO.output().to_cbor_hex(),
+        key: Buffer.from(outputReference),
+        value: Buffer.from(output),
       };
     });
 
     const trie = yield* Effect.tryPromise({
-      try: () => Trie.fromList(data),
+      try: () => Trie.fromList(data, new Store(tempFile)),
       catch: (e) => new Error(`${e}`),
     });
 
@@ -21,18 +23,39 @@ export const mptFromUTxOs = (utxos: string[]): Effect.Effect<Trie, Error> =>
   });
 
 export const mptFromTxs = (
-  txs: { txHash: string; txCbor: string }[],
+  txs: { txHash: Uint8Array; txCbor: Uint8Array }[],
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    const data = txs.map(({ txHash, txCbor }) => {
+    // const trie = yield* Effect.tryPromise({
+    //   try: () => Trie.fromList([], new Store(tempFile)),
+    //   catch: (e) => new Error(`${e}`),
+    // });
+
+    // yield* Effect.forEach(
+    //   txs,
+    //   ({ txHash, txCbor }) =>
+    //     Effect.tryPromise({
+    //       try: () =>
+    //         trie.insert(
+    //           Buffer.from(hexToBytes(txHash)),
+    //           Buffer.from(hexToBytes(txCbor)),
+    //         ),
+    //       catch: (e) => new Error(`${e}`),
+    //     }),
+    //   { concurrency: 1 }, // omitting this is equivalent to sequential traversal.
+    // );
+
+    // return trie;
+
+    const data = txs.map(({ txCbor, txHash }) => {
       return {
-        key: txHash,
-        value: txCbor,
+        key: Buffer.from(txHash),
+        value: Buffer.from(txCbor),
       };
     });
 
     const trie = yield* Effect.tryPromise({
-      try: () => Trie.fromList(data),
+      try: () => Trie.fromList(data, new Store(tempFile)),
       catch: (e) => new Error(`${e}`),
     });
 
@@ -52,6 +75,8 @@ export const mptFromList = <T>(items: T[]): Effect.Effect<Trie, never, never> =>
       value: "",
     }));
 
-    const trie = yield* Effect.promise(() => Trie.fromList(data));
+    const trie = yield* Effect.promise(() =>
+      Trie.fromList(data, new Store(tempFile)),
+    );
     return trie;
   });
