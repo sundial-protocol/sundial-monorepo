@@ -42,22 +42,23 @@ const wrapper = (
         Effect.withSpan("findAllSpentAndProducedUTxOs"),
       );
 
-    // const latestLedgerUTxOs = yield* Effect.tryPromise(() =>
-    //   LatestLedgerDB.retrieve(pool),
-    // ).pipe(Effect.withSpan("retrieve latest ledger utxo list"));
+    const latestLedgerUTxOs = yield* Effect.tryPromise(() =>
+      LatestLedgerDB.retrieve(pool),
+    ).pipe(Effect.withSpan("retrieve latest ledger utxo list"));
 
-    // // Remove spent UTxOs from latestLedgerUTxOs
-    // const filteredUTxOList = latestLedgerUTxOs.filter(
-    //   (utxo) => !spentList.some((spent) => utxo.outputReference == spent),
-    // );
+    // Remove spent UTxOs from latestLedgerUTxOs
+    const filteredUTxOList = latestLedgerUTxOs.filter(
+      (utxo) => !spentList.some((spent) => utxo.outputReference == spent),
+    );
 
-    // // Merge filtered latestLedgerUTxOs with producedList
-    // const newLatestLedger = [...filteredUTxOList, ...producedList];
+    // Merge filtered latestLedgerUTxOs with producedList
+    const newLatestLedger = [...filteredUTxOList, ...producedList];
 
     const mempoolTxsTrieProgram = SDK.Utils.mptFromTxs(mempoolTxs);
     const newLatestLedgerTrieProgram = SDK.Utils.mptFromUTxOs(
       spentList,
       producedList,
+      newLatestLedger,
     );
 
     const [mempoolTxsTrie, newLatestLedgerTrie] = yield* Effect.all(

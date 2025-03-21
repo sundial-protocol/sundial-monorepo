@@ -85,7 +85,7 @@ export const buildAndSubmitCommitmentBlock = (
         fetchConfig,
       );
 
-      const prevUtxosRoot = SDK.Utils.getLatestBlocksUtxosRoot(latestBlock);
+      // const prevUtxosRoot = SDK.Utils.getLatestBlocksUtxosRoot(latestBlock);
 
       const mempoolTxHashes: Uint8Array[] = [];
       const mempoolTxCbors: Uint8Array[] = [];

@@ -5,24 +5,9 @@ import { inspect } from "node:util";
 export const mptFromUTxOs = (
   spentUtxos: Uint8Array[],
   producedUtxos: { outputReference: Uint8Array; output: Uint8Array }[],
+  ledgerAfterUpdate: { outputReference: Uint8Array; output: Uint8Array }[],
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    // const data = utxos.map(({ outputReference, output }) => {
-    //   return {
-    //     key: Buffer.from(outputReference),
-    //     value: Buffer.from(output),
-    //   };
-    // });
-
-    // const trie = yield* Effect.tryPromise({
-    //   try: () => Trie.fromList(data, new Store(tempFile)),
-    //   catch: (e) => new Error(`${e}`),
-    // });
-
-    // return trie;
-    yield* Effect.logInfo(`SPENT UTXOS: ${spentUtxos}`);
-    yield* Effect.logInfo(`PRODUCED UTXOS: ${producedUtxos}`);
-
     const store = new Store("utxosStore");
 
     yield* Effect.tryPromise({
@@ -35,14 +20,25 @@ export const mptFromUTxOs = (
       catch: (e) => new Error(`${e}`),
     });
 
-    const trie: Trie = yield* Effect.catchAll(trieProgram, (e) => {
-      console.log(`FAILED TO LOAD STORE, STARTING WITH A NEW ONE... ${e}`);
-      return Effect.succeed(new Trie(store));
-    });
+    let trie: Trie = yield* Effect.catchAll(trieProgram, (e) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo(
+          `📁 Failed to load store, starting with a new one... ${e}`,
+        );
+        return new Trie(store);
+      }),
+    );
 
-    yield* Effect.logInfo(`UTxO trie loaded: ${inspect(trie)}`);
+    yield* Effect.logInfo(`🌲 UTxO trie loaded: ${inspect(trie)}`);
 
-    yield* Effect.forEach(producedUtxos, ({ outputReference, output }) =>
+    const deletePrograms = spentUtxos.map((outputReference) =>
+      Effect.tryPromise({
+        try: () => trie.delete(Buffer.from(outputReference)),
+        catch: (e) => new Error(`${e}`),
+      }),
+    );
+
+    const insertPrograms = producedUtxos.map(({ outputReference, output }) =>
       Effect.tryPromise({
         try: () =>
           trie.insert(Buffer.from(outputReference), Buffer.from(output)),
@@ -50,14 +46,30 @@ export const mptFromUTxOs = (
       }),
     );
 
-    // Silently ignoring failed removals.
-    yield* Effect.allSuccesses(
-      spentUtxos.map((outputReference) =>
-        Effect.try(() => trie.delete(Buffer.from(outputReference))),
-      ),
+    // Silently ignoring failed updates and falling back to `fromList`.
+    yield* Effect.catchAll(
+      Effect.all([...deletePrograms, ...insertPrograms], { concurrency: 1 }),
+      (e) =>
+        Effect.gen(function* () {
+          yield* Effect.logInfo(
+            `😔 Fallback to \`fromList\`... Failed to update trie: ${e}`,
+          );
+          yield* Effect.try({
+            try: async () => {
+              trie = await Trie.fromList(
+                ledgerAfterUpdate.map(({ outputReference, output }) => ({
+                  key: Buffer.from(outputReference),
+                  value: Buffer.from(output),
+                })),
+                store,
+              );
+            },
+            catch: (e) => new Error(`${e}`),
+          });
+        }),
     );
 
-    yield* Effect.logInfo(`Updated UTxO trie: ${inspect(trie)}`);
+    yield* Effect.logInfo(`🌲 Updated UTxO trie: ${inspect(trie)}`);
 
     return trie;
   });
@@ -66,7 +78,14 @@ export const mptFromTxs = (
   txs: { txHash: Uint8Array; txCbor: Uint8Array }[],
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
-    const trie = new Trie(new Store("txsStore"));
+    const store = new Store("txsStore");
+
+    yield* Effect.tryPromise({
+      try: () => store.ready(),
+      catch: (e) => new Error(`${e}`),
+    });
+
+    const trie = new Trie(store);
 
     yield* Effect.forEach(
       txs,
@@ -79,20 +98,6 @@ export const mptFromTxs = (
     );
 
     return trie;
-
-    // const data = txs.map(({ txCbor, txHash }) => {
-    //   return {
-    //     key: Buffer.from(txHash),
-    //     value: Buffer.from(txCbor),
-    //   };
-    // });
-
-    // const trie = yield* Effect.tryPromise({
-    //   try: () => Trie.fromList(data, new Store(tempFile)),
-    //   catch: (e) => new Error(`${e}`),
-    // });
-
-    // return trie;
   });
 
 /**
