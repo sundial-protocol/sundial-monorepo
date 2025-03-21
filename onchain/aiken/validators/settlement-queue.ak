@@ -16,10 +16,12 @@ use midgard/active_operators
 use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
+use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/settlement_queue.{
   AppendSettlementNode, AttachResolutionClaim, Datum, Deinit,
   DisproveResolutionClaim, Init, ListStateTransition, MintRedeemer, NodeData,
-  RemoveSettlementNode, SpendRedeemer, settlement_resolution_duration,
+  RemoveSettlementNode, ResolutionClaim, SpendRedeemer,
+  settlement_resolution_duration,
 }
 use midgard/state_queue
 use midgard/user_events
@@ -37,14 +39,8 @@ validator spend(
   ) {
     expect Some(node_datum) = m_datum
 
-    // TODO: operator should not be in NodeData
-    expect NodeData {
-      deposits_root,
-      withdrawals_root,
-      time_of_claimed_as_resolved,
-      operator,
-      ..
-    } as node_data = node_datum.data
+    expect NodeData { deposits_root, withdrawals_root, resolution_claim, .. } as input_node_data =
+      node_datum.data
 
     when redeemer is {
       ListStateTransition ->
@@ -56,251 +52,93 @@ validator spend(
         active_operators_node_input_index,
         active_operators_redeemer_index,
         operator,
-        ..
-      } |
-      DisproveResolutionClaim {
-        node_input_index,
-        node_output_index,
-        hub_ref_input_index,
-        active_operators_node_input_index,
-        active_operators_redeemer_index,
-        operator,
-        ..
+        scheduler_ref_input_index,
       } -> {
-        let Transaction {
-          inputs,
-          outputs,
-          reference_inputs,
-          redeemers,
-          extra_signatories,
+        // 1. The spent input must be a settlement node without a resolution claim.
+        expect resolution_claim == None
+
+        // 2. The spent input must be reproduced as a settlement node with a resolution claim.
+        let Output { address: input_address, value: input_value, .. } =
+          utils.get_own_input_at(tx.inputs, own_out_ref, node_input_index)
+        //
+        expect Some(Output {
+          address: cont_output_address,
+          value: cont_output_value,
+          datum: InlineDatum(cont_output_datum),
           ..
-        } = tx
-        let hub.Datum {
-          deposit: deposit_script_hash,
-          withdrawal: withdrawal_script_hash,
-          active_operators_addr,
-          active_operators: active_operators_policy_id,
+        }) = tx.outputs |> list.at(node_output_index)
+        expect NodeData {
+          resolution_claim: Some(ResolutionClaim {
+            resolution_time,
+            operator: resolution_operator,
+          }) as output_resolution_claim,
           ..
-        } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+        } as output_node_data = cont_output_datum
+        //
+        expect input_address == cont_output_address
+        expect input_value == cont_output_value
+        // TODO: inefficient but implicitly safe
+        expect
+          output_node_data == NodeData {
+            ..input_node_data,
+            resolution_claim: output_resolution_claim,
+          }
 
-        // Using the singular one-to-one indexer design pattern.
-        singular_utxo_indexer.spend(
-          fn(in_ix, input, _redeemer, out_ix, output) {
-            // 1. Prevent double satisfaction (TODO: this is probably not
-            //    needed).
-            expect in_ix == out_ix
+        // 3. The transaction must be signed by the resolution claim's operator.
+        expect operator == resolution_operator
+        expect operator |> utils.has_signed(tx.extra_signatories)
 
-            let Input {
-              output: Output { address: input_address, value: input_value, .. },
-              ..
-            } = input
+        // 4. The transaction must include the Midgard hub oracle NFT in a reference input.
+        // 5. hub_oracle.{active_operators, scheduler}
+        let hub.Datum { active_operators_addr, scheduler, .. } =
+          hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
 
-            expect Output {
-              address: cont_output_address,
-              value: cont_output_value,
-              datum: InlineDatum(cont_output_datum_data),
-              ..
-            } = output
+        // 6. The transaction must include an input (`operator_node`), spent via the Update Bond
+        //    Hold New Settlement redeemer, of an `active_operators` node with a key matching
+        //    the resolution claim's operator.
+        expect Some(
+          Pair(Spend(active_operators_spend_purpose_out_ref),
+          active_operators_spend_redeemer_data),
+        ) = list.at(tx.redeemers, active_operators_redeemer_index)
+        //
+        expect active_operators.UpdateBondHoldNewSettlement {
+          new_bond_unlock_time,
+          ..
+        }: active_operators.SpendRedeemer = active_operators_spend_redeemer_data
+        //
+        expect Some(Input {
+          output: Output { address: active_operators_node_address, .. },
+          output_reference: active_operators_out_ref,
+        }) = list.at(tx.inputs, active_operators_node_input_index)
+        //
+        expect and {
+            active_operators_out_ref == active_operators_spend_purpose_out_ref,
+            active_operators_node_address == active_operators_addr,
+          }
 
-            // 2. Make sure the UTxO is reproduced at own address.
-            expect input_address == cont_output_address
+        // 7. The `bond_unlock_time` of the `operator_node` must match the `resolution_time`
+        //    of the resolution claim.
+        expect resolution_time == new_bond_unlock_time
 
-            // 3. Spent value must be reproduced unchanged. TODO: This is
-            //    relying on some additional ADA being available (i.e. to be
-            //    paid to the active operator).
-            expect input_value == cont_output_value
+        // 8. The transaction must include the `scheduler` utxo as a reference input,
+        //    indicating that the current operator matches the resolution claim's operator.
+        expect Some(scheduler_ref_input) =
+          list.at(tx.reference_inputs, scheduler_ref_input_index)
+        expect InlineDatum(scheduler_state_datum) =
+          scheduler_ref_input.output.datum
+        expect parsed_scheduler_state_datum: SchedulerDatum =
+          scheduler_state_datum
+        expect
+          Pair(scheduler_asset_name, 1) == utils.get_singleton_asset_with_policy(
+            scheduler_ref_input.output.value,
+            scheduler,
+          )
+        expect operator == parsed_scheduler_state_datum.operator
 
-            // 4. The UTxO must not have been subject to fraudulent activity
-            //    before.
-            expect Some(operator_vkey) = operator
-
-            when redeemer is {
-              AttachResolutionClaim { .. } -> {
-                // TODO: check operator of claim
-                // TODO: update bond unlock time of operator
-
-                // 5. Operator must have signed this claim.
-                expect operator_vkey |> utils.has_signed(extra_signatories)
-
-                // 6. The UTxO must not have been claimed as resolved prior to
-                //    this transaction.
-                expect time_of_claimed_as_resolved == None
-
-                // 7. Expect a spend redeemer at the specified redeemer index.
-                expect Some(
-                  Pair(Spend(active_operators_spend_purpose_out_ref),
-                  active_operators_spend_redeemer_data),
-                ) = list.at(redeemers, active_operators_redeemer_index)
-
-                // 8. Found redeemer data must have the same structure as active
-                //    operator's update commitment time redeemer.
-                expect active_operators.UpdateBondHoldNewSettlement {
-                  active_node_output_index,
-                  ..
-                }: active_operators.SpendRedeemer =
-                  active_operators_spend_redeemer_data
-
-                // Grab the active operators contract's input UTxO to validate
-                // its address, and also to make sure the output reference here
-                // matches the one from the `redeemers`.
-                expect Some(Input {
-                  output: Output { address: active_operators_node_address, .. },
-                  output_reference: active_operators_out_ref,
-                }) = list.at(inputs, active_operators_node_input_index)
-
-                // 9. The picked active operators contract redeemer must point
-                //    to the same input found based on the settlement queue's
-                //    redeemer.
-                expect
-                  active_operators_out_ref == active_operators_spend_purpose_out_ref
-
-                // 10. Provided input index of an active operator node must come
-                //     from the address found from the hub oracle.
-                expect active_operators_node_address == active_operators_addr
-
-                // Grab the continued output of the active operators contract.
-                expect Some(Output {
-                  datum: InlineDatum(cont_active_operators_node_datum_data),
-                  ..
-                }) = list.at(outputs, active_node_output_index)
-
-                // TODO: Update the `UpdateBondHoldNewSettlement` redeemer to carry
-                // this key, instead of reading it from the output datum.
-                expect ordered.NodeDatum {
-                  key: ordered.Key(active_operators_node_key),
-                  data: active_operators_data,
-                  ..
-                }: ordered.NodeDatum = cont_active_operators_node_datum_data
-
-                // 11. The key of the node must be the same as current
-                //     settlement queue's recorded operator validation key hash.
-                expect active_operators_node_key == operator_vkey
-
-                // 12. Active operator's updated datum is expected to record the
-                //     new commitment time.
-                expect active_operators.Datum{bond_unlock_time: Some(
-                  new_bond_unlock_time,
-                )}: active_operators.Datum = active_operators_data
-
-                // 13. The only change in the updated datum must be the addition
-                //     of the new commitment time as the moment of claim.
-                let expected_cont_output_datum_data: Data =
-                  NodeDatum {
-                    ..node_datum,
-                    data: NodeData {
-                      ..node_data,
-                      time_of_claimed_as_resolved: Some(new_bond_unlock_time),
-                    },
-                  }
-                cont_output_datum_data == expected_cont_output_datum_data
-              }
-              DisproveResolutionClaim {
-                unresolved_event_ref_input_index,
-                unresolved_event_asset_name,
-                event_type,
-                membership_proof,
-                ..
-              } -> {
-                let (event_script, events_root) =
-                  when event_type is {
-                    settlement_queue.Deposit ->
-                      (deposit_script_hash, deposits_root)
-                    settlement_queue.Withdrawal ->
-                      (withdrawal_script_hash, withdrawals_root)
-                  }
-
-                // 2. Find the specified (via its token name) event UTxO as a
-                //    ref. input at given index. Its NFT must have the same
-                //    policy as its address script hash.
-                expect Input {
-                  output: Output { datum: InlineDatum(event_datum_data), .. },
-                  ..
-                } =
-                  utils.get_authentic_input_of(
-                    reference_inputs,
-                    event_script,
-                    unresolved_event_asset_name,
-                    unresolved_event_ref_input_index,
-                  )
-
-                // Unsafe coercion is fine here as we have already validated the
-                // authenticity of the UTxO.
-                let Pair(event_key, event_value) =
-                  user_events.unsafe_to_key_value_pair(event_datum_data)
-
-                // 3. The specified deposit event must be present in the stored
-                //    tree of the settlement datum that's been flagged as fully
-                //    resolved by its operator.
-                expect
-                  merkelized_validator.generic_delegated_validation(
-                    staking_validator: plutarch_phas_validator_hash,
-                    withdraw_redeemer_validator: fn(
-                      membership_validator_redeemer: Data,
-                    ) -> Bool {
-                      expect [
-                        input_root_data, input_key_data, input_value_data,
-                        input_proof_data,
-                        ..
-                      ] = builtin.unconstr_fields(membership_validator_redeemer)
-                      let mpf_root_data: Data = events_root
-                      let proof_data: Data = membership_proof
-                      and {
-                        mpf_root_data == input_root_data,
-                        event_key == input_key_data,
-                        event_value == input_value_data,
-                        proof_data == input_proof_data,
-                      }
-                    },
-                    redeemers: redeemers,
-                  )
-
-                // 4. Expect a mint redeemer at the specified redeemer index.
-                expect Some(
-                  Pair(Mint(active_operators_mint_purpose_policy_id),
-                  active_operators_mint_redeemer_data),
-                ) = list.at(redeemers, active_operators_redeemer_index)
-
-                // 5. The policy ID found via the redeemer must match the one
-                //    found in the hub oracle.
-                expect
-                  active_operators_mint_purpose_policy_id == active_operators_policy_id
-
-                // 6. Found redeemer data must have the same structure as active
-                //    operator's bond slash redeemer.
-                // TODO: the fraudulent operator can also be retired
-                expect active_operators.RemoveOperatorBadSettlement {
-                  slashed_active_operator_key,
-                  ..
-                }: active_operators.MintRedeemer =
-                  active_operators_mint_redeemer_data
-
-                // 7. Operator vkey found in the slash bond redeemer must match
-                //    the one stored in the spending settlement UTxO.
-                expect slashed_active_operator_key == operator
-
-                // 8. The only change in the datum should be removal of the
-                //    claim, and also removal of the operator.
-                let expected_cont_output_datum_data: Data =
-                  NodeDatum {
-                    ..node_datum,
-                    data: NodeData {
-                      ..node_data,
-                      time_of_claimed_as_resolved: None,
-                      operator: None,
-                    },
-                  }
-                cont_output_datum_data == expected_cont_output_datum_data
-              }
-              _ -> False
-            }
-          },
-          redeemer,
-          node_input_index,
-          node_output_index,
-          own_out_ref,
-          tx,
-        )
+        // Done. 
+        True
       }
+      _ -> False
     }
   }
 
@@ -391,7 +229,6 @@ validator mint(hub_oracle: ScriptHash) {
           )
         expect block_datum: state_queue.Datum = block_datum_data
         expect ledger_state.Header {
-          operator_vkey,
           deposits_root,
           withdrawals_root,
           start_time,
@@ -412,8 +249,7 @@ validator mint(hub_oracle: ScriptHash) {
             withdrawals_root,
             start_time,
             end_time,
-            time_of_claimed_as_resolved: None,
-            operator: Some(operator_vkey),
+            resolution_claim: None,
           }
         parsed_settlement_output_datum.data == expected_produced_node_data
       }
@@ -427,10 +263,10 @@ validator mint(hub_oracle: ScriptHash) {
           node_in_outputs |> list.at(removed_node_input_index)
         expect parsed_removed_node_datum: Datum = removed_node_datum_data
         expect NodeData {
-          time_of_claimed_as_resolved: Some(
-            unwrapped_time_of_claimed_as_resolved,
-          ),
-          operator: Some(operator_vkey),
+          resolution_claim: Some(ResolutionClaim {
+            resolution_time: unwrapped_time_of_claimed_as_resolved,
+            operator: operator_vkey,
+          }),
           ..
         }: NodeData = parsed_removed_node_datum.data
         and {

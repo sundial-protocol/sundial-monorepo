@@ -1,19 +1,23 @@
+use aiken/crypto.{VerificationKey}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName}
-use midgard/common/types.{PosixTime, PubKeyHash}
+use midgard/common/types.{PosixTime}
 
 pub type Datum =
   NodeDatum
 
-/// The `operator` is optional to model UTxOs subject to proven frauds..
 pub type NodeData {
   deposits_root: ByteArray,
   withdrawals_root: ByteArray,
   start_time: PosixTime,
   end_time: PosixTime,
-  time_of_claimed_as_resolved: Option<PosixTime>,
-  operator: Option<PubKeyHash>,
+  resolution_claim: Option<ResolutionClaim>,
+}
+
+pub type ResolutionClaim {
+  resolution_time: PosixTime,
+  operator: VerificationKey,
 }
 
 pub type SpendRedeemer {
@@ -24,7 +28,8 @@ pub type SpendRedeemer {
     hub_ref_input_index: Int,
     active_operators_node_input_index: Int,
     active_operators_redeemer_index: Int,
-    operator: ByteArray,
+    operator: VerificationKey,
+    scheduler_ref_input_index: Int,
   }
   DisproveResolutionClaim {
     node_input_index: Int,
@@ -32,7 +37,7 @@ pub type SpendRedeemer {
     hub_ref_input_index: Int,
     active_operators_node_input_index: Int,
     active_operators_redeemer_index: Int,
-    operator: ByteArray,
+    operator: VerificationKey,
     unresolved_event_ref_input_index: Int,
     unresolved_event_asset_name: AssetName,
     event_type: EventType,

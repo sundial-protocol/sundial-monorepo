@@ -16,6 +16,7 @@ pub type SpendRedeemer {
     hub_oracle_ref_input_index: Int,
     settlement_queue_input_index: Int,
     settlement_queue_redeemer_index: Int,
+    new_bond_unlock_time: PosixTime,
   }
 }
 

@@ -11,11 +11,12 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
 }
 use midgard/active_operators
+use midgard/common/utils
 use midgard/ledger_state.{ConfirmedState, Header}
 use midgard/protocol_parameters.{maturity_duration, shift_duration}
 use midgard/registered_operators
 use midgard/retired_operators
-use midgard/scheduler.{Datum as SchedulerDatum}
+use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/state_queue.{
   CommitBlockHeader, Deinit, Init, MergeToConfirmedState, MintRedeemer,
   RemoveFraudulentBlockHeader,
@@ -61,8 +62,7 @@ validator mint(
         }
       CommitBlockHeader {
         operator,
-        scheduler_asset_name,
-        scheduler_state_ref_input_index,
+        scheduler_ref_input_index,
         active_node_input_index,
         header_node_output_index,
         previous_header_node_output_index,
@@ -117,18 +117,17 @@ validator mint(
         // according to the scheduler:
         // (6) The transaction must include a reference input with the scheduler NFT.
         //     Let that input be the `scheduler_state`.
-        expect Some(scheduler_state_ref_input) =
-          list.at(self.reference_inputs, scheduler_state_ref_input_index)
+        expect Some(scheduler_ref_input) =
+          list.at(self.reference_inputs, scheduler_ref_input_index)
         expect InlineDatum(scheduler_state_datum) =
-          scheduler_state_ref_input.output.datum
+          scheduler_ref_input.output.datum
         expect parsed_scheduler_state_datum: SchedulerDatum =
           scheduler_state_datum
         expect
-          quantity_of(
-            scheduler_state_ref_input.output.value,
+          Pair(scheduler_asset_name, 1) == utils.get_singleton_asset_with_policy(
+            scheduler_ref_input.output.value,
             scheduler_script_hash,
-            scheduler_asset_name,
-          ) == 1
+          )
 
         // (7) The `operator` field of `scheduler_state` must match `operator`.
         expect operator == parsed_scheduler_state_datum.operator

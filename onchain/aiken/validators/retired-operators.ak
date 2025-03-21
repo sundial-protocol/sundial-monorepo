@@ -165,7 +165,7 @@ validator mint(
         expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
         expect Some(settlement_queue_redeemer_pair) =
           list.at(self.redeemers, settlement_queue_redeemer_index)
-        expect DisproveResolutionClaim { fraudulent_operator, .. } =
+        expect DisproveResolutionClaim { operator, .. } =
           settlement_queue_redeemer_pair.2nd
         // TODO fix performance:
         expect Some(settlement_queue_input) =
@@ -191,7 +191,7 @@ validator mint(
             node_mint,
           ),
           self.fee >= slashing_penalty,
-          fraudulent_operator == slashed_retired_operator_key,
+          operator == slashed_retired_operator_key,
         }
       }
     }

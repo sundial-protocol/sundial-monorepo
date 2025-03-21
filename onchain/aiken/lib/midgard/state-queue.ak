@@ -24,8 +24,7 @@ pub type MintRedeemer {
   Deinit
   CommitBlockHeader {
     operator: ByteArray,
-    scheduler_asset_name: ByteArray,
-    scheduler_state_ref_input_index: Int,
+    scheduler_ref_input_index: Int,
     active_node_input_index: Int,
     header_node_output_index: Int,
     previous_header_node_output_index: Int,

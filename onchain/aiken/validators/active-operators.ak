@@ -93,6 +93,7 @@ validator spend(
         hub_oracle_ref_input_index,
         settlement_queue_input_index,
         settlement_queue_redeemer_index,
+        new_bond_unlock_time,
       } -> {
         expect Finite(valid_to) = self.validity_range.upper_bound.bound_type
         //
@@ -141,7 +142,10 @@ validator spend(
           ),
           //keys are already checked by prove_is_member()
           parsed_active_node_output_datum.link == active_node_input_datum.link,
-          Some(valid_to + maturity_duration) == active_node_operator_output_data.bond_unlock_time,
+          valid_to + maturity_duration == new_bond_unlock_time,
+          active_node_operator_output_data.bond_unlock_time == Some(
+            new_bond_unlock_time,
+          ),
           quantity_of(
             hub_oracle_ref_input.output.value,
             hub_oracle_script_hash,
@@ -269,7 +273,7 @@ validator mint(
         //
         expect Some(settlement_queue_redeemer_pair) =
           list.at(self.redeemers, settlement_queue_redeemer_index)
-        expect DisproveResolutionClaim { fraudulent_operator, .. } =
+        expect DisproveResolutionClaim { operator, .. } =
           settlement_queue_redeemer_pair.2nd
         // TODO fix performance:
         expect Some(settlement_queue_input) =
@@ -295,7 +299,7 @@ validator mint(
             node_mint,
           ),
           self.fee >= slashing_penalty,
-          fraudulent_operator == slashed_active_operator_key,
+          operator == slashed_active_operator_key,
         }
       }
       RetireOperator {
