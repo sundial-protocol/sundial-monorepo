@@ -87,39 +87,32 @@ export const buildAndSubmitCommitmentBlock = (
           Effect.withSpan("findAllSpentAndProducedUTxOs"),
         );
 
-      const worker =
-        Effect.async<WorkerOutput, Error, never>((resume) => {
-          Effect.runSync(
-            Effect.logInfo(`👷 Starting worker...`),
-          );
-          const worker = new Worker(new URL("./mpt.js", import.meta.url), {
-            workerData: { data: { command: "start" } },
-          });
-          worker.on("message", (output: WorkerOutput) => {
-            if ("error" in output) {
-              resume(
-                Effect.fail(new Error(`Error in worker: ${output.error}`)),
-              );
-            } else {
-              resume(Effect.succeed(output));
-            }
-            worker.terminate();
-          });
-          worker.on("error", (e: Error) => {
-            resume(Effect.fail(new Error(`Error in worker: ${e}`)));
-            worker.terminate();
-          });
-          worker.on("exit", (code: number) => {
-            if (code !== 0) {
-              resume(
-                Effect.fail(new Error(`Worker exited with code: ${code}`)),
-              );
-            }
-          });
-          return Effect.sync(() => {
-            worker.terminate();
-          });
+      const worker = Effect.async<WorkerOutput, Error, never>((resume) => {
+        Effect.runSync(Effect.logInfo(`👷 Starting worker...`));
+        const worker = new Worker(new URL("./mpt.js", import.meta.url), {
+          workerData: { data: { command: "start" } },
         });
+        worker.on("message", (output: WorkerOutput) => {
+          if ("error" in output) {
+            resume(Effect.fail(new Error(`Error in worker: ${output.error}`)));
+          } else {
+            resume(Effect.succeed(output));
+          }
+          worker.terminate();
+        });
+        worker.on("error", (e: Error) => {
+          resume(Effect.fail(new Error(`Error in worker: ${e}`)));
+          worker.terminate();
+        });
+        worker.on("exit", (code: number) => {
+          if (code !== 0) {
+            resume(Effect.fail(new Error(`Worker exited with code: ${code}`)));
+          }
+        });
+        return Effect.sync(() => {
+          worker.terminate();
+        });
+      });
 
       const { txRoot, utxoRoot } = yield* worker;
 

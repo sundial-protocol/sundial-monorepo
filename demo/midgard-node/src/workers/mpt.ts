@@ -1,13 +1,14 @@
-import { Trie } from "@aiken-lang/merkle-patricia-forestry";
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect, pipe } from "effect";
-import { WorkerInput, WorkerOutput, findAllSpentAndProducedUTxOs } from "@/utils.js";
-import { NodeConfig, User } from "@/config.js";
+import {
+  WorkerInput,
+  WorkerOutput,
+  findAllSpentAndProducedUTxOs,
+} from "@/utils.js";
+import { NodeConfig } from "@/config.js";
 import pg from "pg";
 import { LatestLedgerDB, MempoolDB } from "@/database/index.js";
-import {AlwaysSucceedsContract} from "@/services/always-succeeds.js";
-
 
 const wrapper = (
   _input: WorkerInput,
@@ -53,8 +54,13 @@ const wrapper = (
     // Merge filtered latestLedgerUTxOs with producedList
     const newLatestLedger = [...filteredUTxOList, ...producedList];
 
-    const mempoolTxsTrie = yield* SDK.Utils.mptFromTxs(mempoolTxs);
-    const newLatestLedgerTrie = yield* SDK.Utils.mptFromUTxOs(newLatestLedger);
+    const mempoolTxsTrieProgram = SDK.Utils.mptFromTxs(mempoolTxs);
+    const newLatestLedgerTrieProgram = SDK.Utils.mptFromUTxOs(newLatestLedger);
+
+    const [mempoolTxsTrie, newLatestLedgerTrie] = yield* Effect.all(
+      [mempoolTxsTrieProgram, newLatestLedgerTrieProgram],
+      { concurrency: 2 },
+    );
 
     return {
       txRoot: mempoolTxsTrie.hash.toString("hex"),
@@ -68,10 +74,7 @@ if (parentPort === null) {
 
 const inputData = workerData as WorkerInput;
 
-const program = pipe(
-  wrapper(inputData),
-  Effect.provide(NodeConfig.layer),
-);
+const program = pipe(wrapper(inputData), Effect.provide(NodeConfig.layer));
 
 Effect.runPromise(
   program.pipe(

@@ -4,7 +4,12 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { CML, LucidEvolution, fromHex, getAddressDetails } from "@lucid-evolution/lucid";
+import {
+  CML,
+  LucidEvolution,
+  fromHex,
+  getAddressDetails,
+} from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -95,13 +100,11 @@ export const listen = (
           const addrDetails = getAddressDetails(addr);
           if (addrDetails.paymentCredential) {
             MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
-              const filtered = allUTxOs.filter(
-                ({ output }) => {
-                  const cmlOutput = CML.TransactionOutput.from_cbor_bytes(output);
-                  const address = cmlOutput.address().to_bech32();
-                  address === addrDetails.address.bech32
-                },
-              );
+              const filtered = allUTxOs.filter(({ output }) => {
+                const cmlOutput = CML.TransactionOutput.from_cbor_bytes(output);
+                const address = cmlOutput.address().to_bech32();
+                address === addrDetails.address.bech32;
+              });
               log(
                 `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
               );
