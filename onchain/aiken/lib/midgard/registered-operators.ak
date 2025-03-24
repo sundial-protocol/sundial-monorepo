@@ -4,7 +4,7 @@ pub type Datum {
   activation_time: PosixTime,
 }
 
-pub type WitnessStatus {
+pub type OperatorStatus {
   Registered
   Active
   Retired
@@ -45,6 +45,6 @@ pub type MintRedeemer {
     duplicate_node_ref_input_asset_name: ByteArray,
     removed_node_input_index: Int,
     anchor_node_input_index: Int,
-    witness_status: WitnessStatus,
+    witness_status: OperatorStatus,
   }
 }

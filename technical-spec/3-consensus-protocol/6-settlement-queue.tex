@@ -120,21 +120,24 @@ Conditions:
     Conditions:
       \begin{enumerate}
         \item The spent input must be a settlement node with a resolution claim.
-          Let \code{fraudulent\_operator} be the operator of that claim.
+          Let \code{operator} be the operator of that claim.
         \item The spent input must be reproduced as a settlement node without a resolution claim.
+        \item The transaction must include the Midgard hub oracle NFT in a reference input.
+        \item Let \code{active\_operators}, \code{deposit}, and \code{withdrawal} be the corresponding policy IDs in the Midgard hub oracle.
         \item The transaction must include either a deposit or a withdrawal order as a reference input.
           Let that reference input be \code{unprocessed\_event}.
         \item A valid membership proof must be provided, proving that \code{unprocessed\_event} is a member of the corresponding tree in the settlement node.
-        \item Let \code{operator\_status} be a redeemer argument indicating whether the fraudulent operator is active or retired.
+        \item The transaction's time-validity upper bound must be earlier than the resolution claim's \code{resolution\_time}.
+        \item Let \code{operator\_status} be a redeemer argument indicating whether \code{operator} is active or retired.
         \item If \code{operator\_status} is active:
             \begin{enumerate}
                 \item The transaction must Remove a node from the \code{active\_operators} set via the Remove Operator Bad Settlement redeemer.
-                  The \code{slashed\_operator} argument provided to that redeemer must match \code{fraudulent\_operator}.
+                  The \code{slashed\_operator} argument provided to that redeemer must match \code{operator}.
             \end{enumerate}
         \item Otherwise:
             \begin{enumerate}
                 \item The transaction must Remove a node from the \code{retired\_operators} set via the Remove Operator Bad Settlement redeemer.
-                  The \code{slashed\_operator} argument provided to that redeemer must match \code{fraudulent\_operator}.
+                  The \code{slashed\_operator} argument provided to that redeemer must match \code{operator}.
             \end{enumerate}
       \end{enumerate}
 \end{description}

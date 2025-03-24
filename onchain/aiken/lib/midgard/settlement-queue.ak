@@ -3,6 +3,7 @@ use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName}
 use midgard/common/types.{PosixTime}
+use midgard/registered_operators.{OperatorStatus}
 
 pub type Datum =
   NodeDatum
@@ -35,9 +36,9 @@ pub type SpendRedeemer {
     node_input_index: Int,
     node_output_index: Int,
     hub_ref_input_index: Int,
-    active_operators_node_input_index: Int,
-    active_operators_redeemer_index: Int,
+    operators_redeemer_index: Int,
     operator: VerificationKey,
+    operator_status: OperatorStatus,
     unresolved_event_ref_input_index: Int,
     unresolved_event_asset_name: AssetName,
     event_type: EventType,

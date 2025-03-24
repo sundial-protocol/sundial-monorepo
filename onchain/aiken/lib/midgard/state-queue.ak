@@ -1,7 +1,7 @@
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName}
 use cardano/transaction.{OutputReference}
-use midgard/registered_operators.{WitnessStatus}
+use midgard/registered_operators.{OperatorStatus}
 
 /// TODO?
 /// > [!NOTE]
@@ -43,6 +43,6 @@ pub type MintRedeemer {
     fraud_proof_ref_input_index: Int,
     fraud_proof_asset_name: ByteArray,
     fraudulent_operator: ByteArray,
-    operator_status: WitnessStatus,
+    operator_status: OperatorStatus,
   }
 }

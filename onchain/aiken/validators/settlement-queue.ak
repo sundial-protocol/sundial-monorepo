@@ -2,12 +2,10 @@ use aiken/builtin
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite, Interval}
-use aiken_design_patterns/linked_list/ordered
 use aiken_design_patterns/linked_list/unordered.{
   Key, NodeDatum, get_node_inputs, get_node_outputs, list_state_transition,
 }
 use aiken_design_patterns/merkelized_validator
-use aiken_design_patterns/singular_utxo_indexer
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
@@ -16,6 +14,8 @@ use midgard/active_operators
 use midgard/common/utils
 use midgard/hub_oracle as hub
 use midgard/ledger_state
+use midgard/registered_operators
+use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/settlement_queue.{
   AppendSettlementNode, AttachResolutionClaim, Datum, Deinit,
@@ -67,6 +67,7 @@ validator spend(
           datum: InlineDatum(cont_output_datum),
           ..
         }) = tx.outputs |> list.at(node_output_index)
+        //
         expect NodeData {
           resolution_claim: Some(ResolutionClaim {
             resolution_time,
@@ -138,7 +139,156 @@ validator spend(
         // Done. 
         True
       }
-      _ -> False
+      DisproveResolutionClaim {
+        node_input_index,
+        node_output_index,
+        hub_ref_input_index,
+        operators_redeemer_index,
+        operator,
+        operator_status,
+        unresolved_event_ref_input_index,
+        unresolved_event_asset_name,
+        event_type,
+        membership_proof,
+      } -> {
+        // 1. The spent input must be a settlement node with a resolution claim.
+        expect Some(ResolutionClaim {
+          resolution_time,
+          operator: resolution_operator,
+        }) = resolution_claim
+        expect operator == resolution_operator
+
+        // 2. The spent input must be reproduced as a settlement node without a resolution claim.
+        let Output { address: input_address, value: input_value, .. } =
+          utils.get_own_input_at(tx.inputs, own_out_ref, node_input_index)
+        //
+        expect Some(Output {
+          address: cont_output_address,
+          value: cont_output_value,
+          datum: InlineDatum(cont_output_datum),
+          ..
+        }) = tx.outputs |> list.at(node_output_index)
+        //
+        expect NodeData { .. } as output_node_data = cont_output_datum
+        //
+        expect input_address == cont_output_address
+        expect input_value == cont_output_value
+        // TODO: inefficient but implicitly safe
+        expect
+          output_node_data == NodeData {
+            ..input_node_data,
+            resolution_claim: None,
+          }
+
+        // 3. The transaction must include the Midgard hub oracle NFT in a reference input.
+        // 4. hub_oracle.{active_operators, deposit, withdrawal}
+        let hub.Datum {
+          active_operators,
+          deposit: deposit_script_hash,
+          withdrawal: withdrawal_script_hash,
+          retired_operators,
+          ..
+        } = hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
+
+        // 5. The transaction must include either a deposit or a withdrawal order as a reference
+        //    input. Let that reference input be `unprocessed_event`.
+        let (event_script, events_root) =
+          when event_type is {
+            settlement_queue.Deposit -> (deposit_script_hash, deposits_root)
+            settlement_queue.Withdrawal ->
+              (withdrawal_script_hash, withdrawals_root)
+          }
+        //
+        expect Input {
+          output: Output { datum: InlineDatum(event_datum_data), .. },
+          ..
+        } =
+          utils.get_authentic_input_of(
+            tx.reference_inputs,
+            event_script,
+            unresolved_event_asset_name,
+            unresolved_event_ref_input_index,
+          )
+        // Unsafe coercion is fine here as we have already validated the
+        // authenticity of the UTxO.
+        let Pair(event_key, event_value) =
+          user_events.unsafe_to_key_value_pair(event_datum_data)
+
+        // 6. A valid membership proof must be provided, proving that `unprocessed_event` is a
+        //    member of the corresponding tree in the settlement node.
+        expect
+          merkelized_validator.generic_delegated_validation(
+            staking_validator: plutarch_phas_validator_hash,
+            withdraw_redeemer_validator: fn(membership_validator_redeemer: Data) -> Bool {
+              expect [
+                input_root_data, input_key_data, input_value_data,
+                input_proof_data,
+                ..
+              ] = builtin.unconstr_fields(membership_validator_redeemer)
+              let mpf_root_data: Data = events_root
+              let proof_data: Data = membership_proof
+              and {
+                mpf_root_data == input_root_data,
+                event_key == input_key_data,
+                event_value == input_value_data,
+                proof_data == input_proof_data,
+              }
+            },
+            redeemers: tx.redeemers,
+          )
+
+        // 7. The transaction's time-validity upper bound must be earlier than
+        //    the resolution claim's resolution time.
+        expect Finite(valid_to) = tx.validity_range.upper_bound.bound_type
+        expect valid_to < resolution_time
+
+        // 8. Let `operator_status` be a redeemer argument indicating whether `operator`
+        //    is active or retired.
+        // TODO: define a sub-type that is only active or retired. (Not registered)
+        when operator_status is {
+          registered_operators.Active -> {
+            // 9. The transaction must remove a node from the active operators list
+            //    via the Remove Operator Bad Settlement redeemer.
+            expect Some(
+              Pair(Mint(active_operators_mint_purpose_policy_id),
+              active_operators_mint_redeemer_data),
+            ) = list.at(tx.redeemers, operators_redeemer_index)
+            //
+            expect active_operators_mint_purpose_policy_id == active_operators
+            //
+            expect active_operators.RemoveOperatorBadSettlement {
+              slashed_active_operator_key,
+              ..
+            }: active_operators.MintRedeemer =
+              active_operators_mint_redeemer_data
+            //
+            expect slashed_active_operator_key == operator
+            //
+            True
+          }
+          registered_operators.Retired -> {
+            // 10. The transaction must remove a node from the retired operators list
+            //     via the Remove Operator Bad Settlement redeemer.
+            expect Some(
+              Pair(Mint(retired_operators_mint_purpose_policy_id),
+              retired_operators_mint_redeemer_data),
+            ) = list.at(tx.redeemers, operators_redeemer_index)
+            //
+            expect retired_operators_mint_purpose_policy_id == retired_operators
+            //
+            expect retired_operators.RemoveOperatorBadSettlement {
+              slashed_retired_operator_key,
+              ..
+            }: retired_operators.MintRedeemer =
+              retired_operators_mint_redeemer_data
+            //
+            expect slashed_retired_operator_key == operator
+            //
+            True
+          }
+          _ -> fail @"Bad operator status"
+        }
+      }
     }
   }
 
