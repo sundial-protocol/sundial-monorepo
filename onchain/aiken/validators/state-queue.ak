@@ -188,8 +188,9 @@ validator mint(
         //     its predecessor node before removal,
         //     and `confirmed_state_node_output` be the remaining node after removal.
         expect Some(header_node_input) =
-          list.at(self.outputs, header_node_input_index)
-        expect InlineDatum(header_node_input_datum) = header_node_input.datum
+          list.at(self.inputs, header_node_input_index)
+        expect InlineDatum(header_node_input_datum) =
+          header_node_input.output.datum
         expect parsed_header_node_input_datum: NodeDatum =
           header_node_input_datum
         expect Header { start_time, end_time, protocol_version, .. } =
