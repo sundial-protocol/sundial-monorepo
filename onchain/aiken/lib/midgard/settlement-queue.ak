@@ -55,6 +55,7 @@ pub type MintRedeemer {
   Init
   Deinit
   AppendSettlementNode {
+    key_to_add: ByteArray,
     anchor_node_output_index: Int,
     node_output_index: Int,
     state_queue_merge_redeemer_index: Int,

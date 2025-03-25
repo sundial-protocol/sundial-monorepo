@@ -324,6 +324,7 @@ validator mint(hub_oracle: ScriptHash) {
           unordered.deinit(node_in_outputs, node_mint, own_policy),
         }
       AppendSettlementNode {
+        key_to_add,
         anchor_node_output_index,
         node_output_index,
         state_queue_merge_redeemer_index,
@@ -337,17 +338,19 @@ validator mint(hub_oracle: ScriptHash) {
         // 3. The transaction must Remove a `state_queue` node via the Merge To Confirmed
         //    State redeemer. Let `merged_block` be the block being merged to the confirmed
         //    state, and let `header_hash` be its header-hash key.
-        expect Some(state_queue_redeemer_pair) =
-          redeemers |> list.at(state_queue_merge_redeemer_index)
         //
         // Note: we trust the redeemer arguments provided to state_queue
-        // because we expect that minting policy to check them.
+        // because we expect it to check them.
+        expect Some(state_queue_redeemer_pair) =
+          redeemers |> list.at(state_queue_merge_redeemer_index)
         expect state_queue_redeemer_pair.1st == Mint(state_queue)
         expect state_queue.MergeToConfirmedState {
           header_node_key,
           header_node_input_index,
           ..
         }: state_queue.MintRedeemer = state_queue_redeemer_pair.2nd
+        //
+        expect header_node_key == key_to_add
         //
         expect Some(merged_block) = list.at(tx.inputs, header_node_input_index)
         expect Input {
@@ -368,7 +371,7 @@ validator mint(hub_oracle: ScriptHash) {
         // `header_hash`. Let `new_settlement_node` be the node being appended.
         expect
           unordered.append_unsafe(
-            Key(header_node_key),
+            Key(key_to_add),
             node_output_index,
             anchor_node_output_index,
             node_in_outputs,
