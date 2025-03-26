@@ -96,7 +96,7 @@ pub type DepositId =
 pub type DepositInfo {
   l2_address: Address,
   l2_datum: Option<Data>,
-  tokens: Tokens,
+  midgard_tokens: Tokens,
 }
 
 pub type DepositEvent {
@@ -113,7 +113,7 @@ pub type WithdrawalInfo {
   l2_out_ref: OutputReference,
   l1_address: Address,
   l1_datum: Option<Data>,
-  tokens: Tokens,
+  midgard_tokens: Tokens,
 }
 
 pub type WithdrawalEvent {
