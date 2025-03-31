@@ -22,6 +22,14 @@ pub type ExclusionProofUtxo {
   utxo_to_root_proof_path: Proof,
 }
 
+pub type InclusionProofTx {
+  prev_txs_root: ByteArray,
+  current_block_txs_root: ByteArray,
+  invalid_tx: ByteArray,
+  invalid_tx_info_hash: ByteArray,
+  tx_to_root_proof_path: Proof,
+}
+
 // Last step datum for fraud proofs
 pub type FraudProofDatum {
   fraud_prover: ByteArray,
