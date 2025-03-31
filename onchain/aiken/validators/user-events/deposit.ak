@@ -68,7 +68,7 @@ validator spend(hub_oracle: ScriptHash) {
     let Datum {
       event: ledger_state.DepositEvent {
         id: event_nonce_out_ref,
-        info: ledger_state.DepositInfo { tokens: deposited_tokens, .. } as event_info,
+        info: event_info,
       },
       inclusion_time,
       refund_address,
@@ -102,15 +102,12 @@ validator spend(hub_oracle: ScriptHash) {
           reference_script: None,
         } = output
 
-        // 3. The tokens specified in the deposit event must be present in the
-        //    spending UTxO.
-        expect
-          utils.authentic_value_has_tokens(
-            own_value,
-            deposit_policy_id,
-            burn_asset_name,
-            deposited_tokens,
-          )
+        // 3. Output value must be the same as the input value, except for the
+        //    deposit NFT.
+        //    TODO: Reserve contract might end up requiring an NFT.
+        //    TODO: Fees must be deduced whenever we have a clear plan for them
+        //          (for `TransferToReserve` endpoint).
+        expect output_value == (own_value |> assets.add(deposit_policy_id, burn_asset_name, -1))
 
         when spend_purpose is {
           TransferToReserve { merkle_proof } -> {
@@ -118,51 +115,27 @@ validator spend(hub_oracle: ScriptHash) {
             let event_id_data: Data = event_nonce_out_ref
             let event_info_data: Data = event_info
 
-            expect and {
-                // 4. The referenced settlement node's deposit tree must contain
-                //    the subjected deposit event.
-                plutarch_phas(
-                  deposits_root,
-                  event_id_data,
-                  event_info_data,
-                  merkle_proof,
-                  redeemers,
-                ),
-                // 5. Inclusion time of the subjected deposit must fall within
-                //    the time range of the specified settlement node.
-                //    TODO: Should any of the comparisons be exclusive?
-                //    TODO: This is probably redundant.
-                inclusion_time <= settlement_end_time,
-                inclusion_time >= settlement_start_time,
-              }
-
-            // 6. Assert no datum is attached to the produced UTxO.
-            expect output_datum == NoDatum
-
-            expect and {
-                // 7. Deposit must go to the reserve.
-                output_address == reserve_addr,
-                // 8. UTxO at reserve must only contain ADA.
-                output_value == assets.from_lovelace(
-                  assets.lovelace_of(own_value),
-                ),
-              }
-
-            // We already expect the deposit NFT to be burnt, so we remove it
-            // from `mint`, and also negate the result to step closer to what
-            // tokens are included in the deposit UTxO.
-            let negated_mint_without_deposit_nft =
-              mint
-                |> assets.add(deposit_policy_id, burn_asset_name, 1)
-                |> assets.negate
-
-            // 9. Only the deposit NFT, and the deposited tokens must be burnt
-            //    in this transaction.
-            assets.match(
-              negated_mint_without_deposit_nft,
-              deposited_tokens,
-              fn(_, tokens_ada) { tokens_ada == 0 },
-            )
+            and {
+              // 4. The referenced settlement node's deposit tree must contain
+              //    the subjected deposit event.
+              plutarch_phas(
+                deposits_root,
+                event_id_data,
+                event_info_data,
+                merkle_proof,
+                redeemers,
+              ),
+              // 5. Inclusion time of the subjected deposit must fall within the
+              //    time range of the specified settlement node.
+              //    TODO: Should any of the comparisons be exclusive?
+              //    TODO: This is probably redundant.
+              inclusion_time <= settlement_end_time,
+              inclusion_time >= settlement_start_time,
+              // 6. Assert no datum is attached to the produced UTxO.
+              output_datum == NoDatum
+              // 7. Deposit must go to the reserve.
+              output_address == reserve_addr,
+            }
           }
           Refund { refund_approach } -> {
             expect and {
@@ -324,7 +297,7 @@ validator mint(hub_oracle: ScriptHash) {
         expect Datum {
           event: ledger_state.DepositEvent {
             id: output_deposit_id,
-            info: ledger_state.DepositInfo { tokens: output_deposit_tokens, .. },
+            ..,
           },
           inclusion_time: output_deposit_inclusion_time,
           witness: output_deposit_witness,

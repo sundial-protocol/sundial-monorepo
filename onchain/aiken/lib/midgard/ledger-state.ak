@@ -22,7 +22,7 @@ use cardano/assets.{Lovelace, Value}
 use cardano/transaction.{
   Output, OutputReference, Redeemer, ScriptPurpose, TransactionId, ValidityRange,
 }
-use midgard/common/types.{H28, H32, MerkleRoot, PosixTime, PubKeyHash, Tokens}
+use midgard/common/types.{H28, H32, MerkleRoot, PosixTime, PubKeyHash}
 
 // # Ledger state types
 
@@ -96,7 +96,6 @@ pub type DepositId =
 pub type DepositInfo {
   l2_address: Address,
   l2_datum: Option<Data>,
-  midgard_tokens: Tokens,
 }
 
 pub type DepositEvent {
@@ -113,7 +112,6 @@ pub type WithdrawalInfo {
   l2_out_ref: OutputReference,
   l1_address: Address,
   l1_datum: Option<Data>,
-  midgard_tokens: Tokens,
 }
 
 pub type WithdrawalEvent {

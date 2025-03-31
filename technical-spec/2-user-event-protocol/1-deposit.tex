@@ -10,8 +10,7 @@ A user deposits funds into Midgard by submitting an L1 transaction that performs
     \item Spend an input \code{l1\_nonce}, which uniquely identifies this deposit transaction.
     \item Register a staking script credential to witness the deposit.
       The script is parametrized by \code{l2\_id} (which is Blake2b256 hash of \code{l1\_nonce}), and the credential's purpose is to disprove the existence of the deposit whenever the credential is \emph{not} registered.\footnote{Cardano's ledger lacks a more direct method to disprove the existence of a utxo to a Plutus script.}
-    \item If any Midgard-compatible tokens are included in the deposit, they must be recorded in \code{DepositEvent}, and withheld within the utxo until maturity. However, all these tokens must be burnt when transferring deposits to the Midgard reserve.
-    \item Total count of tokens (i.e. Midgard-compatible tokens and tokens that don't have the mint/burn logic for cross-layer transfers) must not exceed \code{max\_transfer\_token\_count}, a Midgard protocol pararmeter.
+    \item Total count of tokens in the deposit must not exceed \code{max\_transfer\_token\_count}, a Midgard protocol pararmeter.
     \item Mint a deposit auth token to verify the following datum:
         \begin{equation*}
         \T{DepositDatum} \coloneq \left\{
@@ -65,7 +64,6 @@ It oversees correctness of datums, and registration/unregistration of events' co
         \item The redeemer used for registrering the witness script must be correct. Namely, it must have been provided with \code{deposit} policy ID and \code{l2\_id}.
         \item Let \code{deposit\_addr} be the address of the deposit contract from Midgard's hub oracle.
         \item Deposit utxo must be produced at \code{deposit\_addr}.
-        \item Specified list of Midgard-compatible tokens in the deposit event must be included in the produced utxo, along with some ADA and the deposit NFT.
         \item Total number of tokens included in the deposit utxo must not exceed \code{max\_transfer\_token\_count}.
         \item Recorded \code{l1\_nonce} in the deposit event must be correct.
         \item The deposit's \code{inclusion\_time} must be equal to transaction's time-validity upper bound plus \code{event\_wait\_duration} Midgard protocol parameter.
@@ -97,8 +95,7 @@ It's responsible for concluding deposits, whether for transfering them to Midgar
       \item Let \code{reserve\_addr} be the address of the Midgard reserve retrieved from hub oracle.
       \item The utxo produced at \code{reserve\_addr} must only contain the ADA from deposit utxo.
       \item The deposit NFT must be burnt.
-      \item If any Midgard-compatible tokens have been included in the deposit, they must be burnt.
-      \item Other tokens must be included in the produced utxo.
+      \item All deposited tokens must be included in the produced utxo.
       \item No datum and no reference script must be attached to the reserve utxo.
     \end{enumerate}
   \item[Refund.] 
