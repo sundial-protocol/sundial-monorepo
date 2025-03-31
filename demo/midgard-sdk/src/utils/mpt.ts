@@ -3,8 +3,8 @@ import { Effect } from "effect";
 import { inspect } from "node:util";
 
 export const mptFromUTxOs = (
-  spentUtxos: Uint8Array[],
-  producedUtxos: { outputReference: Uint8Array; output: Uint8Array }[],
+  _spentUtxos: Uint8Array[],
+  _producedUtxos: { outputReference: Uint8Array; output: Uint8Array }[],
   ledgerAfterUpdate: { outputReference: Uint8Array; output: Uint8Array }[],
 ): Effect.Effect<Trie, Error> =>
   Effect.gen(function* () {
@@ -15,6 +15,7 @@ export const mptFromUTxOs = (
       catch: (e) => new Error(`${e}`),
     });
 
+    /*
     const trieProgram = Effect.tryPromise({
       try: async () => Trie.load(store),
       catch: (e) => new Error(`${e}`),
@@ -69,6 +70,17 @@ export const mptFromUTxOs = (
               }),
           );
         }),
+    );
+    */
+
+    const trie = new Trie(store);
+
+    yield* Effect.forEach(ledgerAfterUpdate, ({ outputReference, output }) =>
+      Effect.tryPromise({
+        try: () =>
+          trie.insert(Buffer.from(outputReference), Buffer.from(output)),
+        catch: (e) => new Error(`${e}`),
+      }),
     );
 
     yield* Effect.logInfo(`🌲 Updated UTxO trie: ${inspect(trie)}`);
