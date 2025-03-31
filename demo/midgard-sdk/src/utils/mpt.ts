@@ -73,6 +73,8 @@ export const mptFromUTxOs = (
     );
     */
 
+    yield* Effect.logInfo(`Building UTxO root from scratch...`);
+
     const trie = new Trie(store);
 
     yield* Effect.forEach(ledgerAfterUpdate, ({ outputReference, output }) =>
