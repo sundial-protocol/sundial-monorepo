@@ -772,3 +772,61 @@ pdivCeil = phoistAcyclic $
 
 pisScriptCredential :: Term s (PAsData PCredential) -> Term s PBool 
 pisScriptCredential cred = ((pfstBuiltin # (pasConstr # (pforgetData cred))) #== 1)
+
+stakingWrapper1 :: Term s ((PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
+stakingWrapper1 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+    _ <- pmatchC $ checkStakingWrapperCtx # ctx'
+    PRedeemer redData' <- pmatchC red'
+    pure $ pif
+        (validationFunction # redData')
+        (pconstant ())
+        perror
+
+stakingWrapper2 :: Term s ((PData :--> PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
+stakingWrapper2 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+    _ <- pmatchC $ checkStakingWrapperCtx # ctx'
+    PRedeemer redData' <- pmatchC red'
+    let lst = pasList # redData'
+        a = lst #!! 0
+        b = lst #!! 1
+    pure $ pif
+        (validationFunction # a # b)
+        (pconstant ())
+        perror
+
+stakingWrapper3 :: Term s ((PData :--> PData :--> PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
+stakingWrapper3 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+    _ <- pmatchC $ checkStakingWrapperCtx # ctx'
+    PRedeemer redData' <- pmatchC red'
+    let lst = pasList # redData'
+        a = lst #!! 0
+        b = lst #!! 1
+        c = lst #!! 2
+    pure $ pif
+        (validationFunction # a # b # c)
+        (pconstant ())
+        perror
+
+stakingWrapper4 :: Term s ((PData :--> PData :--> PData :--> PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
+stakingWrapper4 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+    _ <- pmatchC $ checkStakingWrapperCtx # ctx'
+    PRedeemer redData' <- pmatchC red'
+    let lst = pasList # redData'
+        a = lst #!! 0
+        b = lst #!! 1
+        c = lst #!! 2
+        d = lst #!! 3
+    pure $ pif
+        (validationFunction # a # b # c # d)
+        (pconstant ())
+        perror
+
+checkStakingWrapperCtx :: Term s (PScriptContext :--> PUnit)
+checkStakingWrapperCtx = plam $ \ctx' -> unTermCont $ do
+    PScriptContext ctx <- pmatchC ctx'
+    pure $ pmatch (pfield @"scriptInfo" # ctx) $ \case
+        PRewardingScript{}       -> pconstant ()
+        PCertifyingScript cert -> pmatch (pfield @"_1" # cert) $ \case
+            PTxCertRegStaking{} -> pconstant ()
+            _                   -> perror
+        _                        -> perror
