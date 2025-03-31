@@ -16,6 +16,8 @@ pub type StepRedeemer {
     bad_input_tx_to_root_proof_path: Proof,
     index_output: Int,
     computation_thread_redeemer_index: Int,
-    da_index: Int,
+    previous_tx: MidgardTxCompact,
+    previous_tx_body: MidgardTxBodyCompact,
+    real_outputs: Data,
   }
 }

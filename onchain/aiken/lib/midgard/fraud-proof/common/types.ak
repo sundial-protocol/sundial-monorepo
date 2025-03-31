@@ -23,7 +23,6 @@ pub type ExclusionProofUtxo {
 }
 
 pub type InclusionProofTx {
-  prev_txs_root: ByteArray,
   current_block_txs_root: ByteArray,
   invalid_tx: ByteArray,
   invalid_tx_info_hash: ByteArray,

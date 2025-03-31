@@ -7,11 +7,10 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{Input, OutputReference, Transaction}
 use midgard/common/utils.{verify_hash_32}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proof/common/types.{InclusionProofTx, MembershipProofInputs}
+use midgard/fraud_proof/common/types.{MembershipProofInputs}
 use midgard/fraud_proof/common/utils.{
-  get_prev_txs_root, get_singleton_ct_token, get_tx_root_validate_block_hash,
-  handle_cancel, validate_final_step_output, validate_inclusion_tx_proof,
-  validate_membership_proof,
+  get_singleton_ct_token, get_tx_root_validate_block_hash, handle_cancel,
+  validate_final_step_output, validate_membership_proof,
 } as fraud_proof_utils
 use midgard/fraud_proof/non_existing_input_no_index/step.{
   Cancel, Continue, StepRedeemer as Step1Redeemer,
@@ -23,7 +22,7 @@ validator main(
   // Script hash of stake validator (forwarded merkle proof logic)
   plutarch_midgard_merkle_validator_inclusion: ScriptHash,
   // Script hash of stake validator (forwarded merkle proof logic)
-  plutarch_midgard_merkle_validator_tx_inclusion: ScriptHash,
+  plutarch_midgard_merkle_validator_input_hash_inclusion: ScriptHash,
   // Computation thread token policy
   ct_token_policy_id: PolicyId,
 ) {
@@ -63,7 +62,9 @@ validator main(
         bad_input_tx_to_root_proof_path,
         index_output,
         computation_thread_redeemer_index,
-        da_index,
+        previous_tx,
+        previous_tx_body,
+        real_outputs,
       } -> {
         let ct_token_asset_name =
           get_singleton_ct_token(own_input, ct_token_policy_id)
@@ -76,6 +77,8 @@ validator main(
 
         // -------- Non-existent input: validation-specific logic START --------
         // Membership proof for tx1
+        //we have a transaction that is attemping to spend utxo HASH#INDEX
+        //HASH is actually inside the current block however the INDEX is an invalid index
         expect
           validate_membership_proof(
             tx,
@@ -89,31 +92,41 @@ validator main(
           )
 
         // Membership of the bad_input among the tx1 spent inputs
+        //validation of the redeemer data
         verify_hash_32(bad_tx, bad_tx_hash)
         verify_hash_32(bad_tx_body, bad_tx.body)
         verify_hash_32(bad_spend_inputs, bad_tx_body.spend_inputs)
 
+        //redeemer data is correct, but does it include the bad input?
         expect list.has(builtin.un_list_data(bad_spend_inputs), bad_input)
 
-        // Inclusion proof that input is part the block's prev_txs_root. (or that is in current block txs)
-        let extracted_prev_txs_root =
-          get_prev_txs_root(tx, bad_state_queue_node_ref_input_index)
+        // Inclusion proof that the transaction id of the bad input is in current block txs
         expect invalid_input: Input = bad_input
         expect
-          validate_inclusion_tx_proof(
+          validate_membership_proof(
             tx,
-            plutarch_midgard_merkle_validator_tx_inclusion,
-            InclusionProofTx {
-              prev_txs_root: extracted_prev_txs_root,
-              current_block_txs_root: extracted_tx_root,
-              invalid_tx: invalid_input.output_reference.transaction_id,
-              invalid_tx_info_hash: bad_input_tx_info_hash,
+            plutarch_midgard_merkle_validator_input_hash_inclusion,
+            MembershipProofInputs {
+              tx_root: extracted_tx_root,
+              tx_hash: invalid_input.output_reference.transaction_id,
+              tx_info_hash: bad_input_tx_info_hash,
               tx_to_root_proof_path: bad_input_tx_to_root_proof_path,
             },
           )
 
-        //now we know that we have an input that has a proper txHash because it's in a merkle tree, however the index provided in DA is smaller than the index of the input
-        expect da_index < invalid_input.output_reference.output_index
+        //now we know that we have an input that has a proper txHash because it's in a merkle tree
+        //Validation of the redeemer info regardin the previous transaction
+        verify_hash_32(
+          previous_tx,
+          invalid_input.output_reference.transaction_id,
+        )
+        verify_hash_32(previous_tx_body, previous_tx.body)
+        verify_hash_32(real_outputs, previous_tx_body.outputs)
+        //the previous transaction ouput size is smaller than the output index of the invalid utxo, doing -1 because size=1 means output index=0
+        expect
+          invalid_input.output_reference.output_index > list.length(
+            builtin.un_list_data(real_outputs),
+          ) - 1
 
         // -------- Non-existent input: validation-specific logic END --------
         expect
