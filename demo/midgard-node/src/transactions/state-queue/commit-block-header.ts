@@ -229,6 +229,7 @@ export const buildAndSubmitCommitmentBlock = (
         MempoolDB.clearTxs(db, mempoolTxHashes),
       ).pipe(Effect.withSpan("clear mempool"));
 
+      global.BLOCKS_IN_QUEUE = true;
       yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
     } else {
       yield* Effect.logInfo("🔹 No transactions were found in MempoolDB.");

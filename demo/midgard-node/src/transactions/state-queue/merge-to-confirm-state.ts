@@ -42,6 +42,14 @@ export const buildAndSubmitMergeTx = (
     yield* Effect.logInfo(
       "🔸 Fetching confirmed state and the first block in queue from L1...",
     );
+
+    if (!global.BLOCKS_IN_QUEUE) {
+      yield* Effect.logInfo(
+        "🔸 In memory flag indicates there are no blocks in queue. Aborted.",
+      );
+      return;
+    }
+
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
       yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
         lucid,
@@ -123,6 +131,7 @@ export const buildAndSubmitMergeTx = (
       ).pipe(Effect.withSpan("clear-block-from-BlocksDB"));
       yield* Effect.logInfo("🔸 ☑️  Merge transaction completed.");
     } else {
+      global.BLOCKS_IN_QUEUE = false;
       yield* Effect.logInfo("🔸 No blocks found in queue.");
       return;
     }
