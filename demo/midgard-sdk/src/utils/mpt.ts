@@ -46,26 +46,28 @@ export const mptFromUTxOs = (
       }),
     );
 
-    // Silently ignoring failed updates and falling back to `fromList`.
+    // Silently ignoring failed updates and falling back to restarting from an
+    // empty trie.
     yield* Effect.catchAll(
       Effect.all([...deletePrograms, ...insertPrograms], { concurrency: 1 }),
       (e) =>
         Effect.gen(function* () {
           yield* Effect.logInfo(
-            `😔 Fallback to \`fromList\`... Failed to update trie: ${e}`,
+            `😔 Fallback to restarting from scratch... Failed to update trie: ${e}`,
           );
-          yield* Effect.try({
-            try: async () => {
-              trie = await Trie.fromList(
-                ledgerAfterUpdate.map(({ outputReference, output }) => ({
-                  key: Buffer.from(outputReference),
-                  value: Buffer.from(output),
-                })),
-                store,
-              );
-            },
-            catch: (e) => new Error(`${e}`),
-          });
+          trie = new Trie(store);
+          yield* Effect.forEach(
+            ledgerAfterUpdate,
+            ({ outputReference, output }) =>
+              Effect.tryPromise({
+                try: () =>
+                  trie.insert(
+                    Buffer.from(outputReference),
+                    Buffer.from(output),
+                  ),
+                catch: (e) => new Error(`${e}`),
+              }),
+          );
         }),
     );
 
