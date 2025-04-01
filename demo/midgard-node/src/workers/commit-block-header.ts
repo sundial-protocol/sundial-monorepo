@@ -266,7 +266,11 @@ if (parentPort === null) {
 
 const inputData = workerData as WorkerInput;
 
-const program = pipe(wrapper(inputData), Effect.provide(NodeConfig.layer));
+const program = pipe(
+  wrapper(inputData),
+  Effect.provide(User.layer),
+  Effect.provide(NodeConfig.layer),
+);
 
 Effect.runPromise(
   program.pipe(
