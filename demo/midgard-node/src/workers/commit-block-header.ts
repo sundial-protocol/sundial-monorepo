@@ -86,6 +86,23 @@ SELECT * FROM ${LatestLedgerDB.tableName}`),
       const mempoolTxHashes: Uint8Array[] = [];
       let sizeOfBlocksTxs = 0;
 
+      // Fetching latest committed block before starting the costly computation
+      // to avoid wasted work.
+      const { policyId, spendScript, spendScriptAddress, mintScript } =
+        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+      const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+        stateQueueAddress: spendScriptAddress,
+        stateQueuePolicyId: policyId,
+      };
+      yield* Effect.logInfo("🔹 Fetching latest commited block...");
+      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
+        lucid,
+        fetchConfig,
+      );
+
+      yield* Effect.logInfo(
+        "🔹 Going through mempool txs and finding roots...",
+      );
       yield* Effect.forEach(mempoolTxs, ({ txHash, txCbor }) =>
         Effect.gen(function* () {
           mempoolTxHashes.push(txHash);
@@ -141,18 +158,6 @@ SELECT * FROM ${LatestLedgerDB.tableName}`),
 
       yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot}`);
       yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
-
-      const { policyId, spendScript, spendScriptAddress, mintScript } =
-        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
-      const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-        stateQueueAddress: spendScriptAddress,
-        stateQueuePolicyId: policyId,
-      };
-      yield* Effect.logInfo("🔹 Fetching latest commited block...");
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
-        lucid,
-        fetchConfig,
-      );
 
       yield* Effect.logInfo("🔹 Finding updated block datum and new header...");
       const { nodeDatum: updatedNodeDatum, header: newHeader } =
