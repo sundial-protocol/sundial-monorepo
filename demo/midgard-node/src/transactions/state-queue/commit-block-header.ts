@@ -58,180 +58,44 @@ const commitBlockTxSizeGauge = Metric.gauge("commit_block_tx_size", {
 
 // Build and submit the commitment block using these 2 roots
 
-export const buildAndSubmitCommitmentBlock = (
-  lucid: LucidEvolution,
-  db: pg.Pool,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
-  endTime: number,
-) =>
+export const buildAndSubmitCommitmentBlock = () =>
   Effect.gen(function* () {
-    yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
-    const mempoolTxs = yield* Effect.tryPromise(() =>
-      MempoolDB.retrieve(db),
-    ).pipe(Effect.withSpan("retrieve mempool transaction"));
-    const mempoolTxsCount = BigInt(mempoolTxs.length);
-
-    if (mempoolTxsCount > 0n) {
-      yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
-
-      const nodeConfig = yield* makeConfig;
-
-      const { policyId, spendScript, mintScript } =
-        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
-
-      yield* Effect.logInfo("🔹 Fetching latest commited block...");
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
-        lucid,
-        fetchConfig,
-      );
-
-      // const prevUtxosRoot = SDK.Utils.getLatestBlocksUtxosRoot(latestBlock);
-
-      const mempoolTxHashes: Uint8Array[] = [];
-      const mempoolTxCbors: Uint8Array[] = [];
-
-      mempoolTxs.map(({ txHash, txCbor }) => {
-        mempoolTxHashes.push(txHash);
-        mempoolTxCbors.push(txCbor);
+    const worker = Effect.async<WorkerOutput, Error, never>((resume) => {
+      Effect.runSync(Effect.logInfo(`👷 Starting worker...`));
+      const worker = new Worker(new URL("./commit-block-header.js", import.meta.url), {
+        workerData: { data: { command: "start" } },
       });
-
-      const { spent: spentList, produced: producedList } =
-        yield* findAllSpentAndProducedUTxOs(mempoolTxCbors).pipe(
-          Effect.withSpan("findAllSpentAndProducedUTxOs"),
-        );
-
-      const worker = Effect.async<WorkerOutput, Error, never>((resume) => {
-        Effect.runSync(Effect.logInfo(`👷 Starting worker...`));
-        const worker = new Worker(new URL("./mpt.js", import.meta.url), {
-          workerData: { data: { command: "start" } },
-        });
-        worker.on("message", (output: WorkerOutput) => {
-          if ("error" in output) {
-            resume(Effect.fail(new Error(`Error in worker: ${output.error}`)));
-          } else {
-            resume(Effect.succeed(output));
-          }
-          worker.terminate();
-        });
-        worker.on("error", (e: Error) => {
-          resume(Effect.fail(new Error(`Error in worker: ${e}`)));
-          worker.terminate();
-        });
-        worker.on("exit", (code: number) => {
-          if (code !== 0) {
-            resume(Effect.fail(new Error(`Worker exited with code: ${code}`)));
-          }
-        });
-        return Effect.sync(() => {
-          worker.terminate();
-        });
+      worker.on("message", (output: WorkerOutput) => {
+        if ("error" in output) {
+          resume(Effect.fail(new Error(`Error in worker: ${output.error}`)));
+        } else {
+          resume(Effect.succeed(output));
+        }
+        worker.terminate();
       });
+      worker.on("error", (e: Error) => {
+        resume(Effect.fail(new Error(`Error in worker: ${e}`)));
+        worker.terminate();
+      });
+      worker.on("exit", (code: number) => {
+        if (code !== 0) {
+          resume(Effect.fail(new Error(`Worker exited with code: ${code}`)));
+        }
+      });
+      return Effect.sync(() => {
+        worker.terminate();
+      });
+    });
 
-      const { txRoot, utxoRoot } = yield* worker;
+    const { txSize, mempoolTxsCount, sizeOfBlocksTxs } = yield* worker;
 
-      yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot}`);
-      yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
-
-      yield* Effect.logInfo("🔹 Finding updated block datum and new header...");
-      const { nodeDatum: updatedNodeDatum, header: newHeader } =
-        yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
-          lucid,
-          latestBlock,
-          utxoRoot,
-          txRoot,
-          BigInt(endTime),
-        );
-      const newHeaderHash = yield* SDK.Utils.hashHeader(newHeader);
-
-      yield* Effect.logInfo(`🔹 New header hash is: ${newHeaderHash}`);
-
-      // Build commitment block
-      const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
-        anchorUTxO: latestBlock,
-        updatedAnchorDatum: updatedNodeDatum,
-        newHeader: newHeader,
-        stateQueueSpendingScript: spendScript,
-        policyId,
-        stateQueueMintingScript: mintScript,
-      };
-
-      const aoUpdateCommitmentTimeParams = {};
-
-      yield* Effect.logInfo("🔹 Building block commitment transaction...");
-      const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
-        lucid,
-        fetchConfig,
-        commitBlockParams,
-        aoUpdateCommitmentTimeParams,
-      );
-
-      const txSize = txBuilder.toCBOR().length / 2;
-      yield* Effect.logInfo(
-        `🔹 Transaction built successfully. Size: ${txSize}`,
-      );
-
-      // Using sign and submit helper with confirmation so that databases are
-      // only updated after a successful on-chain registration of the block.
-      yield* handleSignSubmit(lucid, txBuilder).pipe(
-        Effect.withSpan("handleSignSubmit-commit-block"),
-      );
-
-      const totalTxSize = mempoolTxCbors.reduce(
-        (acc, cbor) => acc + cbor.length / 2,
-        0,
-      );
-
+    if (txSize > 0) {
       yield* commitBlockTxSizeGauge(Effect.succeed(txSize));
       yield* commitBlockNumTxGauge(Effect.succeed(mempoolTxsCount));
       yield* Metric.increment(commitBlockCounter);
       yield* Metric.incrementBy(commitBlockTxCounter, mempoolTxsCount);
-      yield* totalTxSizeGauge(Effect.succeed(totalTxSize));
+      yield* totalTxSizeGauge(Effect.succeed(sizeOfBlocksTxs));
 
-      const batchSize = 100;
-
-      yield* Effect.logInfo("🔹 Clearing spent UTxOs from LatestLedgerDB...");
-      for (let i = 0; i < spentList.length; i += batchSize) {
-        yield* Effect.tryPromise(() =>
-          LatestLedgerDB.clearUTxOs(db, spentList.slice(i, i + batchSize)),
-        ).pipe(Effect.withSpan(`latest-ledger-clearUTxOs-${i}`));
-      }
-
-      yield* Effect.logInfo(
-        "🔹 Inserting produced UTxOs into LatestLedgerDB...",
-      );
-      for (let i = 0; i < producedList.length; i += batchSize) {
-        yield* Effect.tryPromise(() =>
-          LatestLedgerDB.insert(db, producedList.slice(i, i + batchSize)),
-        ).pipe(Effect.withSpan(`latest-ledger-insert-${i}`));
-      }
-
-      yield* Effect.logInfo(
-        "🔹 Inserting included transactions into ImmutableDB and BlocksDB...",
-      );
-      for (let i = 0; i < mempoolTxsCount; i += batchSize) {
-        yield* Effect.tryPromise(() =>
-          ImmutableDB.insertTxs(db, mempoolTxs.slice(i, i + batchSize)),
-        ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));
-
-        yield* Effect.tryPromise(() =>
-          BlocksDB.insert(
-            db,
-            fromHex(newHeaderHash),
-            mempoolTxHashes.slice(i, i + batchSize),
-          ),
-        ).pipe(Effect.withSpan(`immutable-db-insert-${i}`));
-      }
-
-      yield* Effect.logInfo(
-        "🔹 Clearing included transactions from MempoolDB...",
-      );
-      yield* Effect.tryPromise(() =>
-        MempoolDB.clearTxs(db, mempoolTxHashes),
-      ).pipe(Effect.withSpan("clear mempool"));
-
-      global.BLOCKS_IN_QUEUE = true;
       yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
-    } else {
-      yield* Effect.logInfo("🔹 No transactions were found in MempoolDB.");
     }
   });
