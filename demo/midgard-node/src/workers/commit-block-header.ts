@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, pipe } from "effect";
+import { Effect, Schedule, pipe } from "effect";
 import {
   WorkerInput,
   WorkerOutput,
@@ -86,20 +86,6 @@ SELECT * FROM ${LatestLedgerDB.tableName}`),
       const mempoolTxHashes: Uint8Array[] = [];
       let sizeOfBlocksTxs = 0;
 
-      // Fetching latest committed block before starting the costly computation
-      // to avoid wasted work.
-      const { policyId, spendScript, spendScriptAddress, mintScript } =
-        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
-      const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-        stateQueueAddress: spendScriptAddress,
-        stateQueuePolicyId: policyId,
-      };
-      yield* Effect.logInfo("🔹 Fetching latest commited block...");
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
-        lucid,
-        fetchConfig,
-      );
-
       yield* Effect.logInfo(
         "🔹 Going through mempool txs and finding roots...",
       );
@@ -158,6 +144,24 @@ SELECT * FROM ${LatestLedgerDB.tableName}`),
 
       yield* Effect.logInfo(`🔹 Mempool tx root found: ${txRoot}`);
       yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
+
+      const { policyId, spendScript, spendScriptAddress, mintScript } =
+        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+      const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+        stateQueueAddress: spendScriptAddress,
+        stateQueuePolicyId: policyId,
+      };
+      const retryPolicy = Schedule.exponential("100 millis").pipe(
+        Schedule.compose(Schedule.recurs(4)),
+      );
+      yield* Effect.logInfo("🔹 Fetching latest commited block...");
+      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
+        lucid,
+        fetchConfig,
+      ).pipe(
+        Effect.retry(retryPolicy),
+        Effect.withSpan("fetchLatestCommittedBlockProgram"),
+      );
 
       yield* Effect.logInfo("🔹 Finding updated block datum and new header...");
       const { nodeDatum: updatedNodeDatum, header: newHeader } =
