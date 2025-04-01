@@ -1,24 +1,8 @@
 // Build a tx Merkle root with all the mempool txs
 
-import { makeConfig } from "@/config.js";
-import {
-  BlocksDB,
-  ImmutableDB,
-  LatestLedgerDB,
-  MempoolDB,
-} from "@/database/index.js";
-import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
-import {
-  WorkerInput,
-  WorkerOutput,
-  findAllSpentAndProducedUTxOs,
-} from "@/utils.js";
-import * as SDK from "@al-ft/midgard-sdk";
-import { LucidEvolution, fromHex } from "@lucid-evolution/lucid";
+import { WorkerOutput } from "@/utils.js";
 import { Effect, Metric } from "effect";
-import pg from "pg";
 import { Worker } from "worker_threads";
-import { handleSignSubmit } from "../utils.js";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
@@ -62,9 +46,12 @@ export const buildAndSubmitCommitmentBlock = () =>
   Effect.gen(function* () {
     const worker = Effect.async<WorkerOutput, Error, never>((resume) => {
       Effect.runSync(Effect.logInfo(`👷 Starting worker...`));
-      const worker = new Worker(new URL("./commit-block-header.js", import.meta.url), {
-        workerData: { data: { command: "start" } },
-      });
+      const worker = new Worker(
+        new URL("./commit-block-header.js", import.meta.url),
+        {
+          workerData: { data: { command: "start" } },
+        },
+      );
       worker.on("message", (output: WorkerOutput) => {
         if ("error" in output) {
           resume(Effect.fail(new Error(`Error in worker: ${output.error}`)));
@@ -91,9 +78,9 @@ export const buildAndSubmitCommitmentBlock = () =>
 
     if (txSize > 0) {
       yield* commitBlockTxSizeGauge(Effect.succeed(txSize));
-      yield* commitBlockNumTxGauge(Effect.succeed(mempoolTxsCount));
+      yield* commitBlockNumTxGauge(Effect.succeed(BigInt(mempoolTxsCount)));
       yield* Metric.increment(commitBlockCounter);
-      yield* Metric.incrementBy(commitBlockTxCounter, mempoolTxsCount);
+      yield* Metric.incrementBy(commitBlockTxCounter, BigInt(mempoolTxsCount));
       yield* totalTxSizeGauge(Effect.succeed(sizeOfBlocksTxs));
 
       yield* Effect.logInfo("🔹 ☑️  Block submission completed.");

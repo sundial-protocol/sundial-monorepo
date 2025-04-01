@@ -275,8 +275,9 @@ export const listen = (
 const makeBlockCommitmentAction = () =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔹 New block commitment process started.");
-    yield* StateQueueTx.buildAndSubmitCommitmentBlock()
-      .pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));
+    yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
+      Effect.withSpan("buildAndSubmitCommitmentBlock"),
+    );
   });
 
 const makeMergeAction = (db: pg.Pool) =>
@@ -395,7 +396,9 @@ export const runNode = Effect.gen(function* () {
 
   const appThread = listen(user, pool, nodeConfig.PORT);
 
-  const blockCommitmentThread = blockCommitmentFork(nodeConfig.POLLING_INTERVAL);
+  const blockCommitmentThread = blockCommitmentFork(
+    nodeConfig.POLLING_INTERVAL,
+  );
 
   const mergeThread = pipe(
     mergeFork(pool, nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),

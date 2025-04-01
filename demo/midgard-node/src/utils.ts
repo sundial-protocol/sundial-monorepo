@@ -23,7 +23,7 @@ export interface WorkerInput {
 
 export interface WorkerOutput {
   txSize: number;
-  mempoolTxsCount: bigint;
+  mempoolTxsCount: number;
   sizeOfBlocksTxs: number;
 }
 
