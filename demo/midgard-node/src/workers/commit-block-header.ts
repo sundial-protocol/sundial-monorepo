@@ -56,7 +56,7 @@ const wrapper = (
       // let updatedLatestLedgerUTxOs = latestLedgerUTxOs;
 
       const utxoStore = new Store("utxosStore");
-      const txsStore = new Store("txssStore");
+      const txsStore = new Store("txsStore");
       yield* Effect.tryPromise({
         try: () => utxoStore.ready(),
         catch: (e) => new Error(`${e}`),
