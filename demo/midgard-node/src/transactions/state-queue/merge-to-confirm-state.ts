@@ -39,17 +39,22 @@ export const buildAndSubmitMergeTx = (
   mintScript: Script,
 ) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(
-      "🔸 Fetching confirmed state and the first block in queue from L1...",
-    );
-
     if (!global.BLOCKS_IN_QUEUE) {
       yield* Effect.logInfo(
-        "🔸 In memory flag indicates there are no blocks in queue. Aborted.",
+        "🔸 In-memory flag indicates there are no blocks in queue. Aborted.",
+      );
+      return;
+    }
+    if (global.BLOCK_SUBMISSION_IN_PROGRESS) {
+      yield* Effect.logInfo(
+        "🔸 In-memory flag indicates there is a block submission in progress. Aborted.",
       );
       return;
     }
 
+    yield* Effect.logInfo(
+      "🔸 Fetching confirmed state and the first block in queue from L1...",
+    );
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
       yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
         lucid,

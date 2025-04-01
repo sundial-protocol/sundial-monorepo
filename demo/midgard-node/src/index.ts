@@ -10,8 +10,9 @@ import dotenv from "dotenv";
 import { AlwaysSucceeds } from "./services/index.js";
 import { NodeRuntime } from "@effect/platform-node";
 
-// Initialize global flag for blocks in state queue.
+// Initialize global flags:
 global.BLOCKS_IN_QUEUE = true;
+global.BLOCK_SUBMISSION_IN_PROGRESS = false;
 
 dotenv.config();
 const VERSION = packageJson.version;
