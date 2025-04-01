@@ -245,9 +245,6 @@ SELECT * FROM ${tempTableName}
         catch: (e) => new Error(`${e}`),
       }).pipe(Effect.withSpan("clear mempool"));
 
-      global.BLOCKS_IN_QUEUE = true;
-      yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
-
       client.release();
 
       const output: WorkerOutput = {
