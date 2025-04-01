@@ -282,8 +282,6 @@ const makeBlockCommitmentAction = () =>
 
 const makeMergeAction = (db: pg.Pool) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo("🔸 Merging of oldest block started.");
-
     const { user: lucid } = yield* User;
     const { spendScriptAddress, policyId, spendScript, mintScript } =
       yield* AlwaysSucceeds.AlwaysSucceedsContract;

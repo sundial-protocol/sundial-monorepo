@@ -40,17 +40,19 @@ export const buildAndSubmitMergeTx = (
 ) =>
   Effect.gen(function* () {
     if (!global.BLOCKS_IN_QUEUE) {
-      yield* Effect.logInfo(
-        "🔸 In-memory flag indicates there are no blocks in queue. Aborted.",
-      );
+      // yield* Effect.logInfo(
+      //   "🔸 In-memory flag indicates there are no blocks in queue. Aborted.",
+      // );
       return;
     }
     if (global.BLOCK_SUBMISSION_IN_PROGRESS) {
-      yield* Effect.logInfo(
-        "🔸 In-memory flag indicates there is a block submission in progress. Aborted.",
-      );
+      // yield* Effect.logInfo(
+      //   "🔸 In-memory flag indicates there is a block submission in progress. Aborted.",
+      // );
       return;
     }
+
+    yield* Effect.logInfo("🔸 Merging of oldest block started.");
 
     yield* Effect.logInfo(
       "🔸 Fetching confirmed state and the first block in queue from L1...",
