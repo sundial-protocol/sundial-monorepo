@@ -145,25 +145,21 @@ pub fn get_single_asset_from_value_apart_from_ada(
   (sym, tn, qty)
 }
 
-/// For beacon UTxOs with specific policy IDs at a given address.
-pub fn get_authentic_input_with_policy_at_address(
+/// For beacon UTxOs with specific policy IDs. Note that the address is not
+/// checked.
+pub fn get_authentic_input_with_policy_at(
   inputs: List<Input>,
-  address: Address,
   nft_policy_id: PolicyId,
-  nft_token_name: ByteArray,
   input_index: Int,
 ) -> Input {
   expect Some(
-    Input { output: Output { address: input_addr, value: input_value, .. }, .. } as found_input,
+    Input { output: Output { value: input_value, .. }, .. } as found_input,
   ) = list.at(inputs, input_index)
 
-  let input_nft_triplet =
+  expect (input_nft_policy_id, _, 1) =
     get_single_asset_from_value_apart_from_ada(input_value)
 
-  expect and {
-      input_addr == address,
-      input_nft_triplet == (nft_policy_id, nft_token_name, 1),
-    }
+  expect input_nft_policy_id == nft_policy_id
 
   found_input
 }
@@ -305,6 +301,7 @@ pub fn plutarch_pinsert(
     output_data_coercer: builtin.un_b_data,
     redeemers: redeemers,
   )
+}
 
 pub fn get_verification_key_hash(key: VerificationKey) -> VerificationKeyHash {
   blake2b_224(key)

@@ -11,14 +11,13 @@ use cardano/transaction.{
 use midgard/common/parameter_validation
 use midgard/common/utils.{plutarch_phas, plutarch_pinsert}
 use midgard/hub_oracle as hub
+use midgard/ledger_state
 use midgard/settlement_queue
 use midgard/user_events
-use midgard/ledger_state
 use midgard/user_events/deposit.{
-  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap,
-  MintRedeemer, Refund, SkippedDeposit, SpendRedeemer, TransferToReserve,
-  WitnessRedeemer, nonce_out_ref_to_l2_id, validate_witness_redeemer,
-  witness_script_prefix,
+  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap, MintRedeemer,
+  Refund, SkippedDeposit, SpendRedeemer, TransferToReserve, WitnessRedeemer,
+  nonce_out_ref_to_l2_id, validate_witness_redeemer, witness_script_prefix,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -35,7 +34,6 @@ validator spend(hub_oracle: ScriptHash) {
       output_index,
       hub_ref_input_index,
       settlement_ref_input_index,
-      settlement_node_asset_name,
       mint_redeemer_index,
       purpose,
     } = redeemer
@@ -43,7 +41,6 @@ validator spend(hub_oracle: ScriptHash) {
     let hub.Datum {
       deposit: deposit_policy_id,
       settlement_queue: settlement_queue_policy_id,
-      settlement_queue_addr,
       reserve_addr,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
@@ -51,9 +48,7 @@ validator spend(hub_oracle: ScriptHash) {
     let parsed_settlement_node_datum =
       settlement_queue.get_datum(
         reference_inputs,
-        settlement_queue_addr,
         settlement_queue_policy_id,
-        settlement_node_asset_name,
         settlement_ref_input_index,
       )
 
@@ -107,7 +102,10 @@ validator spend(hub_oracle: ScriptHash) {
         //    TODO: Reserve contract might end up requiring an NFT.
         //    TODO: Fees must be deduced whenever we have a clear plan for them
         //          (for `TransferToReserve` endpoint).
-        expect output_value == (own_value |> assets.add(deposit_policy_id, burn_asset_name, -1))
+        expect
+          output_value == (
+            own_value |> assets.add(deposit_policy_id, burn_asset_name, -1)
+          )
 
         when spend_purpose is {
           TransferToReserve { merkle_proof } -> {
@@ -187,9 +185,7 @@ validator spend(hub_oracle: ScriptHash) {
                 let parsed_settlement_link_datum =
                   settlement_queue.get_datum(
                     reference_inputs,
-                    settlement_queue_addr,
                     settlement_queue_policy_id,
-                    unordered.serialize_key(parsed_settlement_node_datum.key),
                     settlement_link_ref_input_index,
                   )
                 expect
@@ -295,10 +291,7 @@ validator mint(hub_oracle: ScriptHash) {
         // Extracting L1 relevant data from the produced deposit datum. Ignored
         // values are user-related and approved simply by depositor's signature.
         expect Datum {
-          event: ledger_state.DepositEvent {
-            id: output_deposit_id,
-            ..,
-          },
+          event: ledger_state.DepositEvent { id: output_deposit_id, .. },
           inclusion_time: output_deposit_inclusion_time,
           witness: output_deposit_witness,
           ..

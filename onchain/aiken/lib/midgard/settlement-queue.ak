@@ -1,8 +1,10 @@
 use aiken/crypto.{VerificationKey}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
-use cardano/assets.{AssetName}
+use cardano/assets.{AssetName, PolicyId}
+use cardano/transaction.{InlineDatum, Input, Output}
 use midgard/common/types.{PosixTime}
+use midgard/common/utils
 use midgard/registered_operators.{OperatorStatus}
 
 pub type Datum =
@@ -69,3 +71,23 @@ pub type MintRedeemer {
 }
 
 pub const settlement_resolution_duration: Int = 0
+
+pub fn get_datum(
+  reference_inputs: List<Input>,
+  settlement_queue_policy_id: PolicyId,
+  settlement_ref_input_index: Int,
+) -> Datum {
+  expect Input {
+    output: Output { datum: InlineDatum(settlement_node_datum_data), .. },
+    ..
+  } =
+    reference_inputs
+      |> utils.get_authentic_input_with_policy_at(
+          settlement_queue_policy_id,
+          settlement_ref_input_index,
+        )
+
+  expect parsed_settlement_node_datum: Datum = settlement_node_datum_data
+
+  parsed_settlement_node_datum
+}

@@ -24,7 +24,6 @@ pub type SpendRedeemer {
   output_index: Int,
   hub_ref_input_index: Int,
   settlement_ref_input_index: Int,
-  settlement_node_asset_name: AssetName,
   mint_redeemer_index: Int,
   purpose: SpendPurpose,
 }
