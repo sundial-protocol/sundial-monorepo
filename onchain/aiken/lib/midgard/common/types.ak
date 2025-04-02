@@ -1,4 +1,4 @@
-use aiken/crypto.{Blake2b_224, Blake2b_256, Hash, VerificationKeyHash}
+use aiken/crypto.{Blake2b_224, Blake2b_256, Hash}
 use aiken/merkle_patricia_forestry as mpf
 use cardano/assets.{AssetName, PolicyId}
 
@@ -9,10 +9,6 @@ pub type PosixTime =
 /// A duration of milliseconds to be added/removed from a PosixTime
 pub type PosixTimeDuration =
   Int
-
-/// A commonly used synonym for a verification key hash.
-pub type PubKeyHash =
-  VerificationKeyHash
 
 pub type Tokens =
   Pairs<PolicyId, Pairs<AssetName, Int>>

@@ -2,7 +2,9 @@ use aiken/builtin
 use aiken/cbor
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/crypto.{ScriptHash, VerificationKeyHash, blake2b_224, blake2b_256}
+use aiken/crypto.{
+  ScriptHash, VerificationKey, VerificationKeyHash, blake2b_224, blake2b_256,
+}
 use aiken/interval.{Finite, Interval, NegativeInfinity, PositiveInfinity}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/merkelized_validator
@@ -303,4 +305,7 @@ pub fn plutarch_pinsert(
     output_data_coercer: builtin.un_b_data,
     redeemers: redeemers,
   )
+
+pub fn get_verification_key_hash(key: VerificationKey) -> VerificationKeyHash {
+  blake2b_224(key)
 }
