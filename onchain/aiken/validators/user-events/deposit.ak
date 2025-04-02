@@ -132,7 +132,7 @@ validator spend(hub_oracle: ScriptHash) {
               inclusion_time <= settlement_end_time,
               inclusion_time >= settlement_start_time,
               // 6. Assert no datum is attached to the produced UTxO.
-              output_datum == NoDatum
+              output_datum == NoDatum,
               // 7. Deposit must go to the reserve.
               output_address == reserve_addr,
             }
