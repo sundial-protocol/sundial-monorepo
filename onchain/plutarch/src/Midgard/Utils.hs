@@ -773,53 +773,59 @@ pdivCeil = phoistAcyclic $
 pisScriptCredential :: Term s (PAsData PCredential) -> Term s PBool 
 pisScriptCredential cred = ((pfstBuiltin # (pasConstr # (pforgetData cred))) #== 1)
 
-stakingWrapper1 :: Term s ((PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
-stakingWrapper1 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+stakingWrapper1 :: PIsData a => Term s ((PData :--> PBool) :--> a :--> PScriptContext :--> PUnit)
+stakingWrapper1 = plam $ \validationFunction a ctx' -> unTermCont $ do
   _ <- pmatchC $ checkStakingWrapperCtx # ctx'
-  PRedeemer redData' <- pmatchC red'
   pure $ pif
-    (validationFunction # redData')
+    (validationFunction # pdataImpl a)
     (pconstant ())
     perror
 
-stakingWrapper2 :: Term s ((PData :--> PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
-stakingWrapper2 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+stakingWrapper2 :: PIsData a => Term s ((PData :--> PData :--> PBool) :--> PList a :--> PScriptContext :--> PUnit)
+stakingWrapper2 = plam $ \validationFunction lst ctx' -> unTermCont $ do
   _ <- pmatchC $ checkStakingWrapperCtx # ctx'
-  PRedeemer redData' <- pmatchC red'
-  let lst = pasList # redData'
-      a = lst #!! 0
-      b = lst #!! 1
-  pure $ pif
-    (validationFunction # a # b)
-    (pconstant ())
+  _ <- pmatchC $ pelimList
+    (\_ xs -> unTermCont $ do
+      PSCons a xs' <- pmatchC xs
+      PSCons b _ <- pmatchC xs'
+      pure $ pif (validationFunction # pdataImpl a # pdataImpl b) (pconstant ()) perror)
     perror
+    lst
+  pure $ pconstant ()
 
-stakingWrapper3 :: Term s ((PData :--> PData :--> PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
-stakingWrapper3 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+stakingWrapper3 :: PIsData a => Term s ((PData :--> PData :--> PData :--> PBool) :--> PList a :--> PScriptContext :--> PUnit)
+stakingWrapper3 = plam $ \validationFunction lst ctx' -> unTermCont $ do
   _ <- pmatchC $ checkStakingWrapperCtx # ctx'
-  PRedeemer redData' <- pmatchC red'
-  let lst = pasList # redData'
-      a = lst #!! 0
-      b = lst #!! 1
-      c = lst #!! 2
-  pure $ pif
-    (validationFunction # a # b # c)
-    (pconstant ())
+  _ <- pmatchC $ pelimList
+    (\_ xs -> unTermCont $ do
+      PSCons a xs'  <- pmatchC xs
+      PSCons b xs'' <- pmatchC xs'
+      PSCons c _    <- pmatchC xs''
+      pure $ pif
+        (validationFunction # pdataImpl a # pdataImpl b # pdataImpl c)
+        (pconstant ())
+        perror)
     perror
+    lst
+  pure $ pconstant ()
 
-stakingWrapper4 :: Term s ((PData :--> PData :--> PData :--> PData :--> PBool) :--> PDatum :--> PRedeemer :--> PScriptContext :--> PUnit)
-stakingWrapper4 = plam $ \validationFunction _ red' ctx' -> unTermCont $ do
+
+stakingWrapper4 :: PIsData a => Term s ((PData :--> PData :--> PData :--> PData :--> PBool) :--> PList a :--> PScriptContext :--> PUnit)
+stakingWrapper4 = plam $ \validationFunction lst ctx' -> unTermCont $ do
   _ <- pmatchC $ checkStakingWrapperCtx # ctx'
-  PRedeemer redData' <- pmatchC red'
-  let lst = pasList # redData'
-      a = lst #!! 0
-      b = lst #!! 1
-      c = lst #!! 2
-      d = lst #!! 3
-  pure $ pif
-    (validationFunction # a # b # c # d)
-    (pconstant ())
+  _ <- pmatchC $ pelimList
+    (\_ xs -> unTermCont $ do
+      PSCons a xs'   <- pmatchC xs
+      PSCons b xs''  <- pmatchC xs'
+      PSCons c xs''' <- pmatchC xs''
+      PSCons d _     <- pmatchC xs'''
+      pure $ pif
+        (validationFunction # pdataImpl a # pdataImpl b # pdataImpl c # pdataImpl d)
+        (pconstant ())
+        perror)
     perror
+    lst
+  pure $ pconstant ()
 
 checkStakingWrapperCtx :: Term s (PScriptContext :--> PUnit)
 checkStakingWrapperCtx = plam $ \ctx' -> unTermCont $ do
