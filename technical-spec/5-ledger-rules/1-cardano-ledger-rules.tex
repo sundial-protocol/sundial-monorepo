@@ -273,7 +273,7 @@ Formal specification:
         paymentHK(addr(u))
         \;\middle|\;
         \begin{array}{l}
-           (r, u) \in utxos_{post} \\
+           (r, u) \in utxos \\
            r \in spend\_inputs(t) \\
            addr(u) \in Addr^{vkey}
         \end{array}
@@ -293,7 +293,7 @@ A transaction $t$ is in the ledger, and it violates the "Required signatures" pr
 Formal specification:
 \begin{equation*}
 \begin{split}
-  &\exists t \in txs,\; \exists r \in spend\_inputs(t),\; \exists u \in output(t): \\
+  &\exists t \in txs,\; \exists r \in spend\_inputs(t),\; \exists u : UTxO: \\
     &\quad
       (r, u) \in utxos_{post} \;\land\\
     &\quad paymentHK(addr(u)) \notin required\_signer\_hashes(t) \;\land\\
@@ -308,6 +308,7 @@ Fraud proof construction:
   \item A DA layer proof must be presented that shows that $r \in spend\_inputs(t)$
   \item A membership proof must be generated that shows that $(r, u) \in utxos_{post}$
   \item A DA layer proof must be shown that proves that \\ $paymentHK(addr(u)) \notin required\_signer\_hashes(t)$
+  \item Note: the address must be a verification key hash
 \end{enumerate}
 
 \subsubsection{NON-REQ-SIGNER violation}
