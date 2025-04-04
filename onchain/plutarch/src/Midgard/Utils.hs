@@ -18,6 +18,7 @@ import Plutarch.Builtin
 import Plutarch.Num
 import Plutarch.DataRepr.Internal.Field
     ( HRec(..), Labeled(Labeled) )  
+import Plutarch.Unsafe (punsafeDowncast)
 
 type PPosixTimeRange = PInterval PPosixTime
 
@@ -775,70 +776,108 @@ pisScriptCredential cred = ((pfstBuiltin # (pasConstr # (pforgetData cred))) #==
 
 stakingWrapper1 :: Term s ((a :--> PBool) :--> PScriptContext :--> PUnit)
 stakingWrapper1 = plam $ \validationFunction ctx' -> unTermCont $ do
-  PRedeemer redData <- pmatchC $ checkStakingWrapperCtx # ctx'
-  pure $ pif
-    (validationFunction # punsafeCoerce redData)
-    (pconstant ())
-    perror
+  sciptInfo <- pmatchC $ pfield @"scriptInfo" # ctx'
+  case sciptInfo of
+    PCertifyingScript cert' -> do
+      cert <- pmatchC $ pfield @"_1" # cert'
+      pure $ case cert of
+        PTxCertRegStaking{} -> pconstant ()
+        _ -> perror
+
+    PRewardingScript{}     -> do
+      PRedeemer redData <- pmatchC $ pfield @"redeemer" # ctx'
+      pure $ pif
+        (validationFunction # punsafeCoerce redData)
+        (pconstant ())
+        perror
+
+    _ -> pure perror
 
 stakingWrapper2 :: (PIsData a, PIsData b) => Term s ((a :--> b :--> PBool) :--> PScriptContext :--> PUnit)
 stakingWrapper2 = plam $ \validationFunction ctx' -> unTermCont $ do
-  PRedeemer redData <- pmatchC $ checkStakingWrapperCtx # ctx'
-  pure $ pelimList
-    (\(pfromDataImpl . punsafeCoerce -> a) xs -> pelimList
-      (\(pfromDataImpl . punsafeCoerce -> b) _ ->
-          pif (validationFunction # a # b) (pconstant ()) perror
-      )
-      perror
-      xs
-    )
-    perror
-    (pasList # redData)
+  sciptInfo <- pmatchC $ pfield @"scriptInfo" # ctx'
+  case sciptInfo of
+    PCertifyingScript cert' -> do
+      cert <- pmatchC $ pfield @"_1" # cert'
+      pure $ case cert of
+        PTxCertRegStaking{} -> pconstant ()
+        _ -> perror
+
+    PRewardingScript{}     -> do
+      PRedeemer redData <- pmatchC $ pfield @"redeemer" # ctx'
+      pure $ pelimList
+        (\(pfromDataImpl . punsafeCoerce -> a) xs -> pelimList
+          (\(pfromDataImpl . punsafeCoerce -> b) _ ->
+              pif (validationFunction # a # b) (pconstant ()) perror
+          )
+          perror
+          xs
+        )
+        perror
+        (pasList # redData)
+
+    _ -> pure perror
+
 
 stakingWrapper3 :: (PIsData a, PIsData b, PIsData c) => Term s ((a :--> b :--> c :--> PBool) :--> PScriptContext :--> PUnit)
 stakingWrapper3 = plam $ \validationFunction ctx' -> unTermCont $ do
-  PRedeemer redData <- pmatchC $ checkStakingWrapperCtx # ctx'
-  pure $ pelimList
-    (\(pfromDataImpl . punsafeCoerce -> a) xs -> pelimList
-      (\(pfromDataImpl . punsafeCoerce -> b) xs' -> pelimList
-          (\(pfromDataImpl . punsafeCoerce -> c) _ -> pif (validationFunction # a # b # c) (pconstant ()) perror
+  sciptInfo <- pmatchC $ pfield @"scriptInfo" # ctx'
+  case sciptInfo of
+    PCertifyingScript cert' -> do
+      cert <- pmatchC $ pfield @"_1" # cert'
+      pure $ case cert of
+        PTxCertRegStaking{} -> pconstant ()
+        _ -> perror
+
+    PRewardingScript{}     -> do
+      PRedeemer redData <- pmatchC $ pfield @"redeemer" # ctx'
+      pure $ pelimList
+        (\(pfromDataImpl . punsafeCoerce -> a) xs -> pelimList
+          (\(pfromDataImpl . punsafeCoerce -> b) xs' -> pelimList
+              (\(pfromDataImpl . punsafeCoerce -> c) _ ->
+                pif (validationFunction # a # b # c) (pconstant ()) perror
+              )
+              perror
+              xs'
           )
           perror
-          xs'
-      )
-      perror
-      xs
-    )
-    perror
-    (pasList # redData)
+          xs
+        )
+        perror
+        (pasList # redData)
 
-stakingWrapper4 :: (PIsData a, PIsData b, PIsData c, PIsData d) =>Term s ((a :--> b :--> c :--> d :--> PBool) :--> PScriptContext :--> PUnit)
+    _ -> pure perror
+
+stakingWrapper4 :: (PIsData a, PIsData b, PIsData c, PIsData d) =>
+  Term s ((a :--> b :--> c :--> d :--> PBool) :--> PScriptContext :--> PUnit)
 stakingWrapper4 = plam $ \validationFunction ctx' -> unTermCont $ do
-  PRedeemer redData <- pmatchC $ checkStakingWrapperCtx # ctx'
-  pure $ pelimList
-    (\(pfromDataImpl . punsafeCoerce -> a) xs -> pelimList
-      (\(pfromDataImpl . punsafeCoerce -> b) xs' -> pelimList
-          (\(pfromDataImpl . punsafeCoerce -> c) xs'' -> pelimList
-            (\(pfromDataImpl . punsafeCoerce -> d) _ -> pif (validationFunction # a # b # c # d) (pconstant ()) perror
-            )
-            perror
-            xs''
+  sciptInfo <- pmatchC $ pfield @"scriptInfo" # ctx'
+  case sciptInfo of
+    PCertifyingScript cert' -> do
+      cert <- pmatchC $ pfield @"_1" # cert'
+      pure $ case cert of
+        PTxCertRegStaking{} -> pconstant ()
+        _ -> perror
+
+    PRewardingScript{}     -> do
+      PRedeemer redData <- pmatchC $ pfield @"redeemer" # ctx'
+      pure $ pelimList
+        (\(pfromDataImpl . punsafeCoerce -> a) xs -> pelimList
+          (\(pfromDataImpl . punsafeCoerce -> b) xs' -> pelimList
+              (\(pfromDataImpl . punsafeCoerce -> c) xs'' -> pelimList
+                (\(pfromDataImpl . punsafeCoerce -> d) _ ->
+                  pif (validationFunction # a # b # c # d) (pconstant ()) perror
+                )
+                perror
+                xs''
+              )
+              perror
+              xs'
           )
           perror
-          xs'
-      )
-      perror
-      xs
-    )
-    perror
-    (pasList # redData)
+          xs
+        )
+        perror
+        (pasList # redData)
 
-checkStakingWrapperCtx :: Term s (PScriptContext :--> PRedeemer)
-checkStakingWrapperCtx = plam $ \ctx' -> unTermCont $ do
-  PScriptContext ctx <- pmatchC ctx'
-  pure $ pmatch (pfield @"scriptInfo" # ctx) $ \case
-    PRewardingScript{}     -> pfield @"redeemer" # ctx
-    PCertifyingScript cert -> pmatch (pfield @"_1" # cert) $ \case
-      PTxCertRegStaking{} -> pfield @"redeemer" # ctx
-      _                   -> perror
-    _                        -> perror
+    _ -> pure perror
