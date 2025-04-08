@@ -71,8 +71,6 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = deposit_datum
 
-    let expected_l2_id = nonce_out_ref_to_l2_id(event_nonce_out_ref)
-
     expect BurnDepositNFT { l2_id: burn_asset_name, .. }: MintRedeemer =
       utils.get_redeemer_at(
         redeemers,
@@ -80,16 +78,11 @@ validator spend(hub_oracle: ScriptHash) {
         mint_redeemer_index,
       )
 
-    expect burn_asset_name == expected_l2_id
-
     singular_utxo_indexer.spend(
       fn(in_ix, input, spend_purpose, out_ix, output) {
-        // 1. Prevent double satisfaction (TODO: probably not needed).
-        expect in_ix == out_ix
-
         let Input { output: Output { value: own_value, .. }, .. } = input
 
-        // 2. The produced UTxO must not have any scripts attached to it.
+        // 1. The produced UTxO must not have any scripts attached to it.
         expect Output {
           address: output_address,
           value: output_value,
@@ -97,7 +90,7 @@ validator spend(hub_oracle: ScriptHash) {
           reference_script: None,
         } = output
 
-        // 3. Output value must be the same as the input value, except for the
+        // 2. Output value must be the same as the input value, except for the
         //    deposit NFT.
         //    TODO: Reserve contract might end up requiring an NFT.
         //    TODO: Fees must be deduced whenever we have a clear plan for them
@@ -114,7 +107,7 @@ validator spend(hub_oracle: ScriptHash) {
             let event_info_data: Data = event_info
 
             and {
-              // 4. The referenced settlement node's deposit tree must contain
+              // 3. The referenced settlement node's deposit tree must contain
               //    the subjected deposit event.
               plutarch_phas(
                 deposits_root,
@@ -123,28 +116,28 @@ validator spend(hub_oracle: ScriptHash) {
                 merkle_proof,
                 redeemers,
               ),
-              // 5. Inclusion time of the subjected deposit must fall within the
+              // 4. Inclusion time of the subjected deposit must fall within the
               //    time range of the specified settlement node.
               //    TODO: Should any of the comparisons be exclusive?
               //    TODO: This is probably redundant.
               inclusion_time <= settlement_end_time,
               inclusion_time >= settlement_start_time,
-              // 6. Assert no datum is attached to the produced UTxO.
+              // 5. Assert no datum is attached to the produced UTxO.
               output_datum == NoDatum,
-              // 7. Deposit must go to the reserve.
+              // 6. Deposit must go to the reserve.
               output_address == reserve_addr,
             }
           }
           Refund { refund_approach } -> {
             expect and {
-                // 4. The specified address must be the recepient.
+                // 3. The specified address must be the recepient.
                 output_address == refund_address,
-                // 5. The whole value must get refunded (excluding the NFT).
+                // 4. The whole value must get refunded (excluding the NFT).
                 output_value == (
                   own_value
                     |> assets.add(deposit_policy_id, burn_asset_name, -1)
                 ),
-                // 6. The attached datum must be as specified.
+                // 5. The attached datum must be as specified.
                 output_datum == refund_datum,
               }
 
@@ -166,11 +159,11 @@ validator spend(hub_oracle: ScriptHash) {
                   )
 
                 and {
-                  // 7. It must be proven that this event can successfully be
+                  // 6. It must be proven that this event can successfully be
                   //    inserted into the existing tree of the settlement node
                   //    (i.e. the event doesn't exist in the tree).
                   root_after_insertion == insertion_root,
-                  // 8. Inclusion time of the deposit subject to this refund
+                  // 7. Inclusion time of the deposit subject to this refund
                   //    logic must fall within the time range of the specified
                   //    settlement node. TODO: Should any of the comparisons be
                   //    exclusive?
@@ -179,7 +172,7 @@ validator spend(hub_oracle: ScriptHash) {
                 }
               }
               DepositInTimeGap { settlement_link_ref_input_index } -> {
-                // 7. Grab the immediate next settlement node, and ensure
+                // 6. Grab the immediate next settlement node, and ensure
                 //    correct linkage (authenticity of the reference UTxO is
                 //    checked with `settlement_queue.get_datum`).
                 let parsed_settlement_link_datum =
@@ -191,7 +184,7 @@ validator spend(hub_oracle: ScriptHash) {
                 expect
                   parsed_settlement_node_datum.link == parsed_settlement_link_datum.key
 
-                // 8. Inclusion time of the deposit subject to this refund logic
+                // 7. Inclusion time of the deposit subject to this refund logic
                 //    must fall within the time gap between the two settlement
                 //    nodes. TODO: Should any of the comparisons be inclusive?
                 expect settlement_queue.NodeData {
