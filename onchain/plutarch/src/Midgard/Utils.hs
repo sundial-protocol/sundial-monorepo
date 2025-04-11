@@ -773,8 +773,8 @@ pdivCeil = phoistAcyclic $
 pisScriptCredential :: Term s (PAsData PCredential) -> Term s PBool 
 pisScriptCredential cred = ((pfstBuiltin # (pasConstr # (pforgetData cred))) #== 1)
 
-stakingWrapper1 :: PIsData a => Term s ((a :--> PBool) :--> PScriptContext :--> PUnit)
-stakingWrapper1 = plam $ \validationFunction ctx -> unTermCont $ do
+stakingWrapper :: PIsData a => Term s ((a :--> PBool) :--> PScriptContext :--> PUnit)
+stakingWrapper = plam $ \validationFunction ctx -> unTermCont $ do
   sciptInfo <- pmatchC $ pfield @"scriptInfo" # ctx
   case sciptInfo of
     PCertifyingScript cert' -> do
