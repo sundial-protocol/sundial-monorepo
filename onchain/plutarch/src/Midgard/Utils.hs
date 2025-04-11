@@ -18,7 +18,6 @@ import Plutarch.Builtin
 import Plutarch.Num
 import Plutarch.DataRepr.Internal.Field
     ( HRec(..), Labeled(Labeled) )  
-import Plutarch.Unsafe (punsafeDowncast)
 
 type PPosixTimeRange = PInterval PPosixTime
 
