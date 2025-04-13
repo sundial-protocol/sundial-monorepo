@@ -67,5 +67,3 @@ pub type MintRedeemer {
     anchor_node_input_index: Int,
   }
 }
-
-pub const settlement_resolution_duration: Int = 0
