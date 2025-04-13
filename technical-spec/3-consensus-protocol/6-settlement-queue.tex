@@ -28,10 +28,10 @@ The settlement queue's nodes are arranged as an L1 linked list in the same chron
 This chronological order makes it possible to prove that an unspent L1 event is \emph{stranded}---it has not been included in any existing confirmed block but cannot be included in any new block.
 
 For example, suppose an operator block fraudulently excludes an L1 deposit, but no fraud prover removes the block before its confirmation.
-In that case, the deposit cannot be included in any subsequent block, spent into the reserves, or spent to pay out a withdrawal.
+In that case, the deposit cannot be included in any subsequent block or spent into the reserves.
 Without the refund mechanism based on proof of stranding, the deposit would stay stranded forever at Midgard's deposit address.
 
-Any L1 event is stranded and can be refunded if it satisfies all of the following conditions:
+An L1 event is stranded (and can therefore be refunded) if it satisfies all of the following conditions:
 \begin{enumerate}
   \item The event's inclusion time is earlier than the confirmed state's end time.
   \item Any of the following conditions hold:
@@ -42,7 +42,7 @@ Any L1 event is stranded and can be refunded if it satisfies all of the followin
     \end{enumerate}
 \end{enumerate}
 
-In this way, while the Midgard protocol prevents deposits from ever being stranded in the first place (as long as fraud proofs are promptly submitted), the refund mechanism ensures that they can still be refunded if they occur.
+In this way, while the Midgard protocol prevents deposits from ever being stranded in the first place (as long as fraud proofs are promptly submitted), the refund mechanism ensures that they can still be retrieved if they occur.
 
 \subsection{Minting policy}
 \label{h:settlement-queue-minting-policy}
