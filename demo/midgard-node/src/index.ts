@@ -11,7 +11,7 @@ import { AlwaysSucceeds } from "./services/index.js";
 import { NodeRuntime } from "@effect/platform-node";
 
 // Initialize global flags:
-global.BLOCKS_IN_QUEUE = true;
+global.BLOCKS_IN_QUEUE = 0;
 global.BLOCK_SUBMISSION_IN_PROGRESS = false;
 
 dotenv.config();

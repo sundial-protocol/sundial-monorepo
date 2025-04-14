@@ -81,7 +81,7 @@ export const buildAndSubmitCommitmentBlock = () =>
     const { txSize, mempoolTxsCount, sizeOfBlocksTxs } = yield* worker;
 
     if (txSize > 0) {
-      global.BLOCKS_IN_QUEUE = true;
+      global.BLOCKS_IN_QUEUE += 1;
 
       yield* commitBlockTxSizeGauge(Effect.succeed(txSize));
       yield* commitBlockNumTxGauge(Effect.succeed(BigInt(mempoolTxsCount)));
