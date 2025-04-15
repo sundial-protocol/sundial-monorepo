@@ -18,8 +18,7 @@ use env
 use midgard/common/constants.{
   max_validity_range_for_current_time, posix_time_none,
 }
-use midgard/common/types.{H28,
-  H32, MerkleRoot, MerklingInput, PosixTime, Tokens}
+use midgard/common/types.{H28, H32, PosixTime, Tokens}
 
 /// Check whether the interval starts on or after the point.
 pub fn is_hereafter(self: Interval<Int>, point: Int) -> Bool {

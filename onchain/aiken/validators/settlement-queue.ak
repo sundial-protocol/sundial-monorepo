@@ -1,11 +1,9 @@
-use aiken/builtin
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/linked_list/unordered.{
   Key, NodeDatum, get_node_inputs, get_node_outputs, list_state_transition,
 }
-use aiken_design_patterns/merkelized_validator
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
@@ -25,10 +23,7 @@ use midgard/settlement_queue.{
 use midgard/state_queue
 use midgard/user_events
 
-validator spend(
-  hub_oracle: ScriptHash,
-  settlement_policy_id: ScriptHash,
-) {
+validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
   spend(
     m_datum: Option<Datum>,
     redeemer: SpendRedeemer,

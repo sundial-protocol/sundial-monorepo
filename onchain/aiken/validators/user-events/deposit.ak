@@ -1,25 +1,23 @@
 use aiken/collection/list
 use aiken/crypto.{Blake2b_256, Hash, ScriptHash}
 use aiken/interval.{Finite, Interval}
-use aiken_design_patterns/linked_list/unordered
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/assets.{PolicyId}
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
   InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Transaction,
 }
+use env
 use midgard/common/parameter_validation
 use midgard/common/utils.{plutarch_pexcluding, plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
-use midgard/user_events
 use midgard/user_events/deposit.{
   AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap, MintRedeemer,
   Refund, SkippedDeposit, SpendRedeemer, TransferToReserve, WitnessRedeemer,
   nonce_out_ref_to_l2_id, validate_witness_redeemer, witness_script_prefix,
 }
-use env
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
@@ -28,7 +26,7 @@ validator spend(hub_oracle: ScriptHash) {
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    let Transaction { reference_inputs, mint, redeemers, .. } = tx
+    let Transaction { reference_inputs, redeemers, .. } = tx
 
     let SpendRedeemer {
       input_index,
@@ -308,8 +306,8 @@ validator mint(hub_oracle: ScriptHash) {
           assets.quantity_of(mint, own_policy, l2_id) == -1,
           // 2. Witness staking script corresponding to the NFT must be getting
           //    unregistered.
-          // 3. `WitnessRedeemer` for unregistration must have correct values
-          //    (i.e. `own_policy` and `l2_id`).
+          // 3. `WitnessRedeemer` for unregistration must be equal to
+          //    `own_policy`
           validate_witness_redeemer(
             expected_witness_script_hash: expected_witness_script_hash,
             witness_redeemer_index: witness_unregistration_redeemer_index,
