@@ -268,37 +268,45 @@ pub fn plutarch_phas(
     staking_validator: env.plutarch_phas_validator_hash,
     withdraw_redeemer_validator: fn(membership_validator_redeemer: Data) -> Bool {
       expect [
-        input_root_data, input_key_data, input_value_data, input_proof_data,
+        redeemer_root_data, redeemer_key_data, redeemer_value_data,
+        redeemer_proof_data,
         ..
       ] = builtin.unconstr_fields(membership_validator_redeemer)
+
       let mpf_root_data: Data = mpf_root
+
       let proof_data: Data = membership_proof
+
       and {
-        mpf_root_data == input_root_data,
-        key == input_key_data,
-        value == input_value_data,
-        proof_data == input_proof_data,
+        redeemer_root_data == mpf_root_data,
+        redeemer_key_data == key,
+        redeemer_value_data == value,
+        redeemer_proof_data == proof_data,
       }
     },
     redeemers: redeemers,
   )
 }
 
-pub fn plutarch_pinsert(
-  root: ByteArray,
+pub fn plutarch_pexcluding(
   key: Data,
-  value: Data,
   proof: mpf.Proof,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
-) -> MerkleRoot {
-  merkelized_validator.delegated_compute(
-    function_input: MerklingInput { root, key, value, proof },
-    staking_validator: env.plutarch_pinsert_validator_hash,
-    input_data_coercer: fn(input: Data) {
-      expect coerced: MerklingInput = input
-      coerced
+) -> Bool {
+  merkelized_validator.generic_delegated_validation(
+    staking_validator: env.plutarch_pexcluding_validator_hash,
+    withdraw_redeemer_validator: fn(excluding_validator_redeemer: Data) -> Bool {
+      expect [redeemer_key_data,
+        redeemer_proof_data, ..] =
+        builtin.unconstr_fields(excluding_validator_redeemer)
+
+      let proof_data: Data = proof
+
+      and {
+        redeemer_key_data == key,
+        redeemer_proof_data == proof_data,
+      }
     },
-    output_data_coercer: builtin.un_b_data,
     redeemers: redeemers,
   )
 }

@@ -2,7 +2,7 @@ use aiken/crypto.{VerificationKey}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{PolicyId}
-use cardano/transaction.{Input, Output, InlineDatum}
+use cardano/transaction.{InlineDatum, Input, Output}
 use midgard/common/types.{PosixTime}
 use midgard/common/utils
 use midgard/registered_operators.{OperatorStatus}

@@ -79,7 +79,7 @@ validator spend(hub_oracle: ScriptHash) {
       )
 
     singular_utxo_indexer.spend(
-      fn(in_ix, input, spend_purpose, out_ix, output) {
+      fn(_in_ix, input, spend_purpose, _out_ix, output) {
         let Input { output: Output { value: own_value, .. }, .. } = input
 
         // 1. The produced UTxO must not have any scripts attached to it.
@@ -108,7 +108,8 @@ validator spend(hub_oracle: ScriptHash) {
 
             and {
               // 3. The referenced settlement node's deposit tree must contain
-              //    the subjected deposit event.
+              //    the subjected deposit event. No need to check for the
+              //    inclusion time of the deposit.
               plutarch_phas(
                 deposits_root,
                 event_id_data,
@@ -116,15 +117,11 @@ validator spend(hub_oracle: ScriptHash) {
                 merkle_proof,
                 redeemers,
               ),
-              // 4. Inclusion time of the subjected deposit must fall within the
-              //    time range of the specified settlement node.
-              //    TODO: Should any of the comparisons be exclusive?
-              //    TODO: This is probably redundant.
-              inclusion_time <= settlement_end_time,
-              inclusion_time >= settlement_start_time,
-              // 5. Assert no datum is attached to the produced UTxO.
+              // 4. Assert no datum is attached to the produced UTxO.
+              //    TODO: This might change depending on implementation of
+              //          reserve.
               output_datum == NoDatum,
-              // 6. Deposit must go to the reserve.
+              // 5. Deposit must go to the reserve.
               output_address == reserve_addr,
             }
           }
@@ -142,28 +139,14 @@ validator spend(hub_oracle: ScriptHash) {
               }
 
             when refund_approach is {
-              SkippedDeposit { insertion_root, merkle_proof } -> {
-                // Downcast values already extracted from the datum.
+              SkippedDeposit { merkle_proof } -> {
+                // Downcast the key, which is already extracted from the datum.
                 let event_id_data: Data = event_nonce_out_ref
-                let event_info_data: Data = event_info
-
-                // Find the deposit root after this event has been inserted into
-                // the settlement node's deposit tree.
-                let root_after_insertion =
-                  plutarch_pinsert(
-                    deposits_root,
-                    event_id_data,
-                    event_info_data,
-                    merkle_proof,
-                    redeemers,
-                  )
 
                 and {
-                  // 6. It must be proven that this event can successfully be
-                  //    inserted into the existing tree of the settlement node
-                  //    (i.e. the event doesn't exist in the tree).
-                  root_after_insertion == insertion_root,
-                  // 7. Inclusion time of the deposit subject to this refund
+                  // 7. The deposit event must be absent from the deposit tree.
+                  plutarch_pexcluding(event_id_data, merkle_proof, redeemers),
+                  // 8. Inclusion time of the deposit subject to this refund
                   //    logic must fall within the time range of the specified
                   //    settlement node. TODO: Should any of the comparisons be
                   //    exclusive?

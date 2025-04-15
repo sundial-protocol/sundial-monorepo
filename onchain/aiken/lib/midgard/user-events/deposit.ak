@@ -34,7 +34,7 @@ pub type SpendPurpose {
 }
 
 pub type RefundApproach {
-  SkippedDeposit { insertion_root: MerkleRoot, merkle_proof: mpf.Proof }
+  SkippedDeposit { merkle_proof: mpf.Proof }
   DepositInTimeGap { settlement_link_ref_input_index: Int }
 }
 
