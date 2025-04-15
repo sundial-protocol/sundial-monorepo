@@ -1,7 +1,6 @@
 import {
   Blockfrost,
   CML,
-  coreToOutRef,
   coreToTxOutput,
   Koios,
   Kupmios,
@@ -9,22 +8,23 @@ import {
   LucidEvolution,
   Maestro,
   Network,
-  OutRef,
   Provider,
   UTxO,
+  utxoToCore,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 import { Effect } from "effect";
 
 export interface WorkerInput {
   data: {
-    items: any[];
-    itemsType: "txs" | "utxos";
-  }
+    command: string;
+  };
 }
 
 export interface WorkerOutput {
-  root: string;
+  txSize: number;
+  mempoolTxsCount: number;
+  sizeOfBlocksTxs: number;
 }
 
 export const chalk = new chalk_.Chalk();
@@ -105,35 +105,57 @@ export const setupLucid = async (
   }
 };
 
-export const findSpentAndProducedUTxOs = (txCBOR: string) =>
+export function utxoToCBOR(utxo: UTxO): {
+  outputReference: Uint8Array;
+  output: Uint8Array;
+} {
+  const cmlUTxO = utxoToCore(utxo);
+  return {
+    outputReference: cmlUTxO.input().to_cbor_bytes(),
+    output: cmlUTxO.output().to_cbor_bytes(),
+  };
+}
+
+export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
   Effect.gen(function* () {
-    const spent: OutRef[] = [];
-    const produced: UTxO[] = [];
-    const tx = CML.Transaction.from_cbor_hex(txCBOR);
+    const spent: Uint8Array[] = [];
+    const produced: { outputReference: Uint8Array; output: Uint8Array }[] = [];
+    const tx = CML.Transaction.from_cbor_bytes(txCBOR);
     const txBody = tx.body();
     const inputs = txBody.inputs();
     const outputs = txBody.outputs();
     for (let i = 0; i < inputs.len(); i++) {
-      // TODO: custom error
-      yield* Effect.try(() => spent.push(coreToOutRef(inputs.get(i))));
+      yield* Effect.try({
+        try: () => spent.push(inputs.get(i).to_cbor_bytes()),
+        catch: (e) => new Error(`${e}`),
+      });
     }
     const txHash = CML.hash_transaction(txBody).to_hex();
     for (let i = 0; i < outputs.len(); i++) {
-      yield* Effect.try(() => {
-        const utxo: UTxO = {
-          txHash: txHash,
-          outputIndex: i,
-          ...coreToTxOutput(outputs.get(i)),
-        };
-        produced.push(utxo);
+      yield* Effect.try({
+        try: () => {
+          const utxo: UTxO = {
+            txHash: txHash,
+            outputIndex: i,
+            ...coreToTxOutput(outputs.get(i)),
+          };
+          produced.push(utxoToCBOR(utxo));
+        },
+        catch: (e) => new Error(`${e}`),
       });
     }
     return { spent, produced };
   });
 
 export const findAllSpentAndProducedUTxOs = (
-  txCBORs: string[],
-): Effect.Effect<{ spent: OutRef[]; produced: UTxO[] }, Error> =>
+  txCBORs: Uint8Array[],
+): Effect.Effect<
+  {
+    spent: Uint8Array[];
+    produced: { outputReference: Uint8Array; output: Uint8Array }[];
+  },
+  Error
+> =>
   Effect.gen(function* () {
     const allEffects = yield* Effect.all(
       txCBORs.map(findSpentAndProducedUTxOs),

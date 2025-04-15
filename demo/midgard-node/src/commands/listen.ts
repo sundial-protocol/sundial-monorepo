@@ -1,9 +1,18 @@
 import { NodeConfig, User } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
-import { StateQueueTx, UtilsTx } from "@/transactions/index.js";
+import { AlwaysSucceeds } from "@/services/index.js";
+import { StateQueueTx } from "@/transactions/index.js";
+import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { getAddressDetails, LucidEvolution } from "@lucid-evolution/lucid";
+import {
+  CML,
+  LucidEvolution,
+  fromHex,
+  getAddressDetails,
+} from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Duration, Effect, Metric, Option, pipe, Schedule } from "effect";
 import express from "express";
 import pg from "pg";
@@ -17,10 +26,6 @@ import {
   UtilsDB,
 } from "../database/index.js";
 import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
-import * as SDK from "@al-ft/midgard-sdk";
-import { AlwaysSucceeds } from "@/services/index.js";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -51,27 +56,31 @@ export const listen = (
         isHexString(txHash) &&
         txHash.length === 32
       ) {
-        MempoolDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
+        MempoolDB.retrieveTxCborByHash(pool, fromHex(txHash)).then((ret) => {
           Option.match(ret, {
             onSome: (retrieved) => {
               log(`GET /tx - Transaction found in mempool: ${txHash}`);
               res.json({ tx: retrieved });
             },
             onNone: () =>
-              ImmutableDB.retrieveTxCborByHash(pool, txHash).then((ret) => {
-                Option.match(ret, {
-                  onSome: (retrieved) => {
-                    log(`GET /tx - Transaction found in immutable: ${txHash}`);
-                    res.json({ tx: retrieved });
-                  },
-                  onNone: () => {
-                    log(`GET /tx - No transaction found: ${txHash}`);
-                    res
-                      .status(404)
-                      .json({ message: "No matching transactions found" });
-                  },
-                });
-              }),
+              ImmutableDB.retrieveTxCborByHash(pool, fromHex(txHash)).then(
+                (ret) => {
+                  Option.match(ret, {
+                    onSome: (retrieved) => {
+                      log(
+                        `GET /tx - Transaction found in immutable: ${txHash}`,
+                      );
+                      res.json({ tx: retrieved });
+                    },
+                    onNone: () => {
+                      log(`GET /tx - No transaction found: ${txHash}`);
+                      res
+                        .status(404)
+                        .json({ message: "No matching transactions found" });
+                    },
+                  });
+                },
+              ),
           });
         });
       } else {
@@ -91,9 +100,11 @@ export const listen = (
           const addrDetails = getAddressDetails(addr);
           if (addrDetails.paymentCredential) {
             MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
-              const filtered = allUTxOs.filter(
-                (a) => a.address === addrDetails.address.bech32,
-              );
+              const filtered = allUTxOs.filter(({ output }) => {
+                const cmlOutput = CML.TransactionOutput.from_cbor_bytes(output);
+                const address = cmlOutput.address().to_bech32();
+                address === addrDetails.address.bech32;
+              });
               log(
                 `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
               );
@@ -124,12 +135,14 @@ export const listen = (
         isHexString(hdrHash) &&
         hdrHash.length === 32
       ) {
-        BlocksDB.retrieveTxHashesByBlockHash(pool, hdrHash).then((hashes) => {
-          log(
-            `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`,
-          );
-          res.json({ hashes });
-        });
+        BlocksDB.retrieveTxHashesByBlockHash(pool, fromHex(hdrHash)).then(
+          (hashes) => {
+            log(
+              `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`,
+            );
+            res.json({ hashes });
+          },
+        );
       } else {
         log(`GET /block - Invalid block header hash: ${hdrHash}`);
         res
@@ -161,12 +174,7 @@ export const listen = (
     app.get("/commit", async (_req, res) => {
       log("GET /commit - Manual block commitment order received");
       try {
-        const program = pipe(
-          makeBlockCommitmentAction(pool),
-          Effect.provide(User.layer),
-          Effect.provide(AlwaysSucceedsContract.layer),
-          Effect.provide(NodeConfig.layer),
-        );
+        const program = makeBlockCommitmentAction();
         const txHash = await Effect.runPromise(program);
         log(`GET /commit - Block commitment successful: ${txHash}`);
         res.json({ message: `Block commitment successful: ${txHash}` });
@@ -233,18 +241,19 @@ export const listen = (
     });
 
     app.post("/submit", async (req, res) => {
-      const txCBOR = req.query.tx_cbor;
+      const txString = req.query.tx_cbor;
 
       // log("◻️ Submit request received for transaction");
 
-      if (typeof txCBOR === "string" && isHexString(txCBOR)) {
+      if (typeof txString === "string" && isHexString(txString)) {
         try {
-          const tx = lucid.fromTx(txCBOR);
+          const txCBOR = fromHex(txString);
+          const tx = lucid.fromTx(txString);
           const spentAndProducedProgram = findSpentAndProducedUTxOs(txCBOR);
           const { spent, produced } = await Effect.runPromise(
             spentAndProducedProgram,
           );
-          await MempoolDB.insert(pool, tx.toHash(), txCBOR);
+          await MempoolDB.insert(pool, fromHex(tx.toHash()), txCBOR);
           await MempoolLedgerDB.clearUTxOs(pool, spent);
           await MempoolLedgerDB.insert(pool, produced);
           Effect.runSync(Metric.increment(txCounter));
@@ -263,61 +272,16 @@ export const listen = (
     app.listen(port, () => log(`Server running at http://localhost:${port}`));
   });
 
-export const storeTx = async (
-  lucid: LucidEvolution,
-  pool: pg.Pool,
-  tx: string,
-) =>
-  Effect.gen(function* () {
-    const txHash = lucid.fromTx(tx).toHash();
-    yield* Effect.tryPromise(() => MempoolDB.insert(pool, txHash, tx));
-  });
-
-const makeBlockCommitmentAction = (db: pg.Pool) =>
+const makeBlockCommitmentAction = () =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔹 New block commitment process started.");
-    const { user: lucid } = yield* User;
-    const { spendScriptAddress, policyId } =
-      yield* AlwaysSucceeds.AlwaysSucceedsContract;
-    const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-      stateQueueAddress: spendScriptAddress,
-      stateQueuePolicyId: policyId,
-    };
-    yield* Effect.logInfo(
-      "🔹 Querying mempool to see if there are transactions present for inclusion in the block...",
+    yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
+      Effect.withSpan("buildAndSubmitCommitmentBlock"),
     );
-    const txList = yield* Effect.tryPromise(() => MempoolDB.retrieve(db));
-    const numTx = BigInt(txList.length);
-    // yield* mempoolTxGauge(Effect.succeed(numTx));
-    if (numTx > 0) {
-      yield* Effect.logInfo(`🔹 Found ${numTx} transaction(s) in mempool.`);
-      yield* Effect.logInfo("🔹 Fetching the latest block from L1...");
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
-        lucid,
-        fetchConfig,
-      ).pipe(Effect.withSpan("fetchLatestCommittedBlockProgram"));
-      const fetchedBlocksOutRef = UtilsTx.utxoToOutRef(latestBlock);
-
-      yield* Effect.logInfo(
-        `🔹 Success, its out ref is: ${fetchedBlocksOutRef.txHash}#${fetchedBlocksOutRef.outputIndex}`,
-      );
-
-      yield* StateQueueTx.buildAndSubmitCommitmentBlock(
-        lucid,
-        db,
-        fetchConfig,
-        Date.now(),
-      ).pipe(Effect.withSpan("buildAndSubmitCommitmentBlock"));
-    } else {
-      yield* Effect.logInfo(
-        "🔹 There are no transactions in mempool, block submission aborted.",
-      );
-    }
   });
 
 const makeMergeAction = (db: pg.Pool) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo("🔸 Merging of oldest block started.");
     const { user: lucid } = yield* User;
     const { spendScriptAddress, policyId, spendScript, mintScript } =
       yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -325,6 +289,7 @@ const makeMergeAction = (db: pg.Pool) =>
       stateQueueAddress: spendScriptAddress,
       stateQueuePolicyId: policyId,
     };
+
     yield* StateQueueTx.buildAndSubmitMergeTx(
       lucid,
       db,
@@ -341,11 +306,11 @@ const makeMempoolAction = (db: pg.Pool) =>
     yield* mempoolTxGauge(Effect.succeed(numTx));
   });
 
-const blockCommitmentFork = (db: pg.Pool, pollingInterval: number) =>
+const blockCommitmentFork = (pollingInterval: number) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔵 Block commitment fork started.");
-      const action = makeBlockCommitmentAction(db).pipe(
+      const action = makeBlockCommitmentAction().pipe(
         Effect.withSpan("block-commitment-fork"),
         Effect.catchAllCause(Effect.logWarning),
       );
@@ -429,11 +394,8 @@ export const runNode = Effect.gen(function* () {
 
   const appThread = listen(user, pool, nodeConfig.PORT);
 
-  const blockCommitmentThread = pipe(
-    blockCommitmentFork(pool, nodeConfig.POLLING_INTERVAL),
-    Effect.provide(User.layer),
-    Effect.provide(AlwaysSucceedsContract.layer),
-    Effect.provide(NodeConfig.layer),
+  const blockCommitmentThread = blockCommitmentFork(
+    nodeConfig.POLLING_INTERVAL,
   );
 
   const mergeThread = pipe(

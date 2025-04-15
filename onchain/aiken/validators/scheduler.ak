@@ -203,7 +203,7 @@ validator spend(
             parsed_scheduler_output_datum.operator,
           )
         //10.
-        expect Key(root_node_link_as_bytearray) =
+        expect Key { key: root_node_link_as_bytearray } =
           parsed_active_root_node_datum.link
         expect
           builtin.less_than_equals_bytearray(

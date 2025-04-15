@@ -1,14 +1,16 @@
+import * as SDK from "@al-ft/midgard-sdk";
 import {
   LucidEvolution,
   OutRef,
   TxSignBuilder,
   UTxO,
+  fromHex,
 } from "@lucid-evolution/lucid";
 import { Effect, Schedule } from "effect";
-import * as SDK from "@al-ft/midgard-sdk";
+import pg from "pg";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
-import pg from "pg";
+
 /**
  * Handle the signing and submission of a transaction.
  *
@@ -22,6 +24,7 @@ export const handleSignSubmit = (
 ): Effect.Effect<string, Error> =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign.withWallet().completeProgram();
+    yield* Effect.logInfo("✉️  Submitting transaction...");
     const txHash = yield* signed
       .submitProgram()
       .pipe(
@@ -71,12 +74,12 @@ export const handleSignSubmitWithoutConfirmation = (
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: UTxO,
   db: pg.Pool,
-): Effect.Effect<{ txs: string[]; headerHash: string }, Error> =>
+): Effect.Effect<{ txs: Uint8Array[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
     const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
     const txHashes = yield* Effect.tryPromise({
-      try: () => BlocksDB.retrieveTxHashesByBlockHash(db, headerHash),
+      try: () => BlocksDB.retrieveTxHashesByBlockHash(db, fromHex(headerHash)),
       catch: (e) => new Error(`${e}`),
     });
     const txs = yield* Effect.tryPromise({

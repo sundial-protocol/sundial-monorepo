@@ -21,7 +21,6 @@ use midgard/settlement_queue.{
   AppendSettlementNode, AttachResolutionClaim, Datum, Deinit,
   DisproveResolutionClaim, Init, ListStateTransition, MintRedeemer, NodeData,
   RemoveSettlementNode, ResolutionClaim, SpendRedeemer,
-  settlement_resolution_duration,
 }
 use midgard/state_queue
 use midgard/user_events
@@ -198,7 +197,8 @@ validator spend(
             settlement_queue.Withdrawal ->
               (withdrawal_script_hash, withdrawals_root)
           }
-        //
+        // TODO:
+        // https://github.com/Anastasia-Labs/midgard/pull/174#discussion_r2012732492
         expect Input {
           output: Output { datum: InlineDatum(event_datum_data), .. },
           ..
@@ -349,7 +349,7 @@ validator mint(hub_oracle: ScriptHash) {
           header_node_input_index,
           ..
         }: state_queue.MintRedeemer = state_queue_redeemer_pair.2nd
-        //
+        // We verify this redeemer argument so that other scripts can use it:
         expect header_node_key == key_to_add
         //
         expect Some(merged_block) = list.at(tx.inputs, header_node_input_index)
@@ -439,8 +439,7 @@ validator mint(hub_oracle: ScriptHash) {
         // 4. The transaction's time-validity lower bound must match or exceed the
         //    `resolution_time` of the `resolution_claim`.
         expect Finite(valid_from) = validity_range.lower_bound.bound_type
-        expect
-          unwrapped_time_of_claimed_as_resolved + settlement_resolution_duration <= valid_from
+        expect unwrapped_time_of_claimed_as_resolved <= valid_from
 
         // Done.
         True
