@@ -204,6 +204,7 @@ validator spend(
         } =
           utils.get_authentic_input_with_policy_at(
             tx.reference_inputs,
+            deposit_script_hash,
             unresolved_event_ref_input_index,
           )
         // Unsafe coercion is fine here as we have already validated the
