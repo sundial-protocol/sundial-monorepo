@@ -1,9 +1,6 @@
 use aiken/builtin
 use cardano/transaction.{OutputReference}
 
-/// TODO
-pub const wait_duration: Int = 60_000
-
 /// Wrapper datatype for both deposit and withdraw events. This allows a unified
 /// serialization function to be defined.
 pub type Event<info> {

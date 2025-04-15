@@ -9,7 +9,7 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Transaction,
 }
 use midgard/common/parameter_validation
-use midgard/common/utils.{plutarch_phas, plutarch_pinsert}
+use midgard/common/utils.{plutarch_pexcluding, plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
@@ -19,6 +19,7 @@ use midgard/user_events/deposit.{
   Refund, SkippedDeposit, SpendRedeemer, TransferToReserve, WitnessRedeemer,
   nonce_out_ref_to_l2_id, validate_witness_redeemer, witness_script_prefix,
 }
+use env
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
@@ -108,7 +109,7 @@ validator spend(hub_oracle: ScriptHash) {
 
             and {
               // 3. The referenced settlement node's deposit tree must contain
-              //    the subjected deposit event. No need to check for the
+              //    the subject deposit event. No need to check for the
               //    inclusion time of the deposit.
               plutarch_phas(
                 deposits_root,
@@ -227,7 +228,7 @@ validator mint(hub_oracle: ScriptHash) {
           inputs |> list.at(nonce_input_index)
 
         // The deposit will be represented on L2 as a UTxO, where its `tx_hash`
-        // is Blake2b256 hash of the serialised nonce input output reference,
+        // is Blake2b256 hash of the serialised nonce input's output reference,
         // and its output index is 0.
         let l2_id = nonce_out_ref_to_l2_id(nonce_input_out_ref)
 
@@ -244,8 +245,7 @@ validator mint(hub_oracle: ScriptHash) {
           )
 
         // 2. Validate this script hash is being registered.
-        // 3. Validate the policy ID and L2 ID passed in its redeemer are
-        //    correct.
+        // 3. Validate the policy ID passed in its redeemer is correct.
         expect
           validate_witness_redeemer(
             expected_witness_script_hash: expected_witness_script_hash,
@@ -264,6 +264,10 @@ validator mint(hub_oracle: ScriptHash) {
           reference_script: None,
         }) = outputs |> list.at(deposit_output_index)
 
+        // 4. Deposit UTxO must contain only one other token apart from ADA.
+        let output_deposit_nft_triplet =
+          utils.get_single_asset_from_value_apart_from_ada(output_deposit_value)
+
         // Extracting L1 relevant data from the produced deposit datum. Ignored
         // values are user-related and approved simply by depositor's signature.
         expect Datum {
@@ -274,26 +278,18 @@ validator mint(hub_oracle: ScriptHash) {
         }: Datum = output_deposit_datum_data
 
         and {
-          // 4. Deposit UTxO must be produced at the deposit script's address
+          // 5. Deposit UTxO must be produced at the deposit script's address
           //    from hub oracle.
           output_deposit_address == deposit_addr,
-          // 5. Specified list of tokens in the deposit event must be included
-          //    in the value of the deposit UTxO (along with its NFT). The only
-          //    validation on ADA is that `output_deposit_tokens` must have 0
-          //    of it (it still can contain `("", "", 0)`, TODO?).
-          utils.authentic_value_has_tokens(
-            output_deposit_value,
-            own_policy,
-            l2_id,
-            output_deposit_tokens,
-          ),
-          // 6. ID of the deposit event must match the specified nonce input's
+          // 6. Deposit NFT must be included in the produced UTxO.
+          output_deposit_nft_triplet == (own_policy, l2_id, 1),
+          // 7. ID of the deposit event must match the specified nonce input's
           //    output reference.
           output_deposit_id == nonce_input_out_ref,
-          // 7. Specified inclusion time of the event must be some time in the
+          // 8. Specified inclusion time of the event must be some time in the
           //    future.
-          output_deposit_inclusion_time == valid_to + user_events.wait_duration,
-          // 8. Recorded witness must be correct.
+          output_deposit_inclusion_time == valid_to + env.user_events_wait_duration,
+          // 9. Recorded witness must be correct.
           output_deposit_witness == expected_witness_script_hash,
         }
       }

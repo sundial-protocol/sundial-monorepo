@@ -8,7 +8,7 @@ use cardano/certificate.{RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
   Datum as CardanoDatum, OutputReference, Publish, Redeemer, ScriptPurpose,
 }
-use midgard/common/types.{MerkleRoot, PosixTime}
+use midgard/common/types.{PosixTime}
 use midgard/ledger_state
 
 pub type Datum {

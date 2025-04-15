@@ -11,7 +11,7 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
 }
 use midgard/active_operators
-use midgard/common/utils
+use midgard/common/utils.{plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/registered_operators
@@ -28,7 +28,6 @@ use midgard/user_events
 validator spend(
   hub_oracle: ScriptHash,
   settlement_policy_id: ScriptHash,
-  plutarch_phas_validator_hash: ScriptHash,
 ) {
   spend(
     m_datum: Option<Datum>,
@@ -204,7 +203,7 @@ validator spend(
         } =
           utils.get_authentic_input_with_policy_at(
             tx.reference_inputs,
-            deposit_script_hash,
+            event_script,
             unresolved_event_ref_input_index,
           )
         // Unsafe coercion is fine here as we have already validated the
@@ -215,24 +214,12 @@ validator spend(
         // 6. A valid membership proof must be provided, proving that `unprocessed_event` is a
         //    member of the corresponding tree in the settlement node.
         expect
-          merkelized_validator.generic_delegated_validation(
-            staking_validator: plutarch_phas_validator_hash,
-            withdraw_redeemer_validator: fn(membership_validator_redeemer: Data) -> Bool {
-              expect [
-                input_root_data, input_key_data, input_value_data,
-                input_proof_data,
-                ..
-              ] = builtin.unconstr_fields(membership_validator_redeemer)
-              let mpf_root_data: Data = events_root
-              let proof_data: Data = membership_proof
-              and {
-                mpf_root_data == input_root_data,
-                event_key == input_key_data,
-                event_value == input_value_data,
-                proof_data == input_proof_data,
-              }
-            },
-            redeemers: tx.redeemers,
+          plutarch_phas(
+            events_root,
+            event_key,
+            event_value,
+            membership_proof,
+            tx.redeemers,
           )
 
         // 7. The transaction's time-validity upper bound must be earlier than

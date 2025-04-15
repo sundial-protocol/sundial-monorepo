@@ -271,7 +271,7 @@ pub fn plutarch_phas(
         redeemer_root_data, redeemer_key_data, redeemer_value_data,
         redeemer_proof_data,
         ..
-      ] = builtin.unconstr_fields(membership_validator_redeemer)
+      ] = builtin.un_list_data(membership_validator_redeemer)
 
       let mpf_root_data: Data = mpf_root
 
@@ -298,7 +298,7 @@ pub fn plutarch_pexcluding(
     withdraw_redeemer_validator: fn(excluding_validator_redeemer: Data) -> Bool {
       expect [redeemer_key_data,
         redeemer_proof_data, ..] =
-        builtin.unconstr_fields(excluding_validator_redeemer)
+        builtin.un_list_data(excluding_validator_redeemer)
 
       let proof_data: Data = proof
 
