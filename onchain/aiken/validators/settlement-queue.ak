@@ -146,7 +146,6 @@ validator spend(
         operator,
         operator_status,
         unresolved_event_ref_input_index,
-        unresolved_event_asset_name,
         event_type,
         membership_proof,
       } -> {
@@ -203,10 +202,8 @@ validator spend(
           output: Output { datum: InlineDatum(event_datum_data), .. },
           ..
         } =
-          utils.get_authentic_input_of(
+          utils.get_authentic_input_with_policy_at(
             tx.reference_inputs,
-            event_script,
-            unresolved_event_asset_name,
             unresolved_event_ref_input_index,
           )
         // Unsafe coercion is fine here as we have already validated the
