@@ -1,3 +1,4 @@
+use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{Blake2b_256, Hash, ScriptHash}
 use aiken/interval.{Finite, Interval}
@@ -262,9 +263,29 @@ validator mint(hub_oracle: ScriptHash) {
           reference_script: None,
         }) = outputs |> list.at(deposit_output_index)
 
-        // 4. Deposit UTxO must contain only one other token apart from ADA.
-        let output_deposit_nft_triplet =
-          utils.get_single_asset_from_value_apart_from_ada(output_deposit_value)
+        // 4. Going through all the tokens of the produced UTxO and counting its
+        //    tokens, while also validating that it only contains one valid
+        //    authentication NFT.
+        let
+          output_deposit_nft_is_valid,
+          total_token_count,
+        <-
+          list.foldl2(
+            output_deposit_value |> assets.to_dict |> dict.to_pairs,
+            False,
+            0,
+            fn(policy_tokens_pair, beacon_found, token_count_so_far, return) {
+              if !beacon_found && policy_tokens_pair.1st == own_policy {
+                expect [output_deposit_nft_tn_qty] =
+                  policy_tokens_pair.2nd |> dict.to_pairs
+                expect output_deposit_nft_tn_qty == Pair(l2_id, 1)
+                return(True, token_count_so_far)
+              } else {
+                let policy_token_count = dict.size(policy_tokens_pair.2nd)
+                return(beacon_found, token_count_so_far + policy_token_count)
+              }
+            },
+          )
 
         // Extracting L1 relevant data from the produced deposit datum. Ignored
         // values are user-related and approved simply by depositor's signature.
@@ -280,14 +301,17 @@ validator mint(hub_oracle: ScriptHash) {
           //    from hub oracle.
           output_deposit_address == deposit_addr,
           // 6. Deposit NFT must be included in the produced UTxO.
-          output_deposit_nft_triplet == (own_policy, l2_id, 1),
-          // 7. ID of the deposit event must match the specified nonce input's
+          output_deposit_nft_is_valid,
+          // 7. Total token count in the deposit UTxO (including ADA) must not
+          //    exceed the relevant protocol parameter.
+          total_token_count <= env.max_token_count_allowed_in_deposits,
+          // 8. ID of the deposit event must match the specified nonce input's
           //    output reference.
           output_deposit_id == nonce_input_out_ref,
-          // 8. Specified inclusion time of the event must be some time in the
+          // 9. Specified inclusion time of the event must be some time in the
           //    future.
           output_deposit_inclusion_time == valid_to + env.user_events_wait_duration,
-          // 9. Recorded witness must be correct.
+          // 10. Recorded witness must be correct.
           output_deposit_witness == expected_witness_script_hash,
         }
       }
