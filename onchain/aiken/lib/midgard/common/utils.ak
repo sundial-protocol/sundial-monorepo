@@ -265,12 +265,12 @@ pub fn plutarch_phas(
 ) -> Bool {
   merkelized_validator.generic_delegated_validation(
     staking_validator: env.plutarch_phas_validator_hash,
-    withdraw_redeemer_validator: fn(membership_validator_redeemer: Data) -> Bool {
+    withdraw_redeemer_validator: fn(phas_validator_redeemer: Data) -> Bool {
       expect [
         redeemer_root_data, redeemer_key_data, redeemer_value_data,
         redeemer_proof_data,
         ..
-      ] = builtin.un_list_data(membership_validator_redeemer)
+      ] = builtin.un_list_data(phas_validator_redeemer)
 
       let mpf_root_data: Data = mpf_root
 
@@ -287,21 +287,26 @@ pub fn plutarch_phas(
   )
 }
 
-pub fn plutarch_pexcluding(
+pub fn plutarch_pexcludes(
+  mpf_root: ByteArray,
   key: Data,
-  proof: mpf.Proof,
+  non_membership_proof: mpf.Proof,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
 ) -> Bool {
   merkelized_validator.generic_delegated_validation(
-    staking_validator: env.plutarch_pexcluding_validator_hash,
-    withdraw_redeemer_validator: fn(excluding_validator_redeemer: Data) -> Bool {
-      expect [redeemer_key_data,
+    staking_validator: env.plutarch_pexcludes_validator_hash,
+    withdraw_redeemer_validator: fn(pexcludes_validator_redeemer: Data) -> Bool {
+      expect [redeemer_root_data,
+        redeemer_key_data,
         redeemer_proof_data, ..] =
-        builtin.un_list_data(excluding_validator_redeemer)
+        builtin.un_list_data(pexcludes_validator_redeemer)
 
-      let proof_data: Data = proof
+      let mpf_root_data: Data = mpf_root
+
+      let proof_data: Data = non_membership_proof
 
       and {
+        redeemer_root_data == mpf_root_data,
         redeemer_key_data == key,
         redeemer_proof_data == proof_data,
       }

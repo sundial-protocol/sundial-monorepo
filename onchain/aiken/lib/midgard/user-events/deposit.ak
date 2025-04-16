@@ -29,13 +29,13 @@ pub type SpendRedeemer {
 }
 
 pub type SpendPurpose {
-  TransferToReserve { merkle_proof: mpf.Proof }
+  TransferToReserve { membership_proof: mpf.Proof }
   Refund { refund_approach: RefundApproach }
 }
 
 pub type RefundApproach {
-  SkippedDeposit { merkle_proof: mpf.Proof }
-  DepositInTimeGap { settlement_link_ref_input_index: Int }
+  SkippedDeposit { non_membership_proof: mpf.Proof }
+  DepositInSettlementGap { settlement_link_ref_input_index: Int }
 }
 
 pub type MintRedeemer {
@@ -64,6 +64,7 @@ pub fn nonce_out_ref_to_l2_id(nonce_out_ref: OutputReference) -> AssetName {
   cbor.serialise(nonce_out_ref) |> blake2b_256
 }
 
+// TODO: It might be possible to move this to the broader `user_events` module.
 pub fn validate_witness_redeemer(
   expected_witness_script_hash: ScriptHash,
   witness_redeemer_index: Int,
@@ -75,8 +76,8 @@ pub fn validate_witness_redeemer(
   expect Some(witness_redeemer_pair) =
     redeemers |> list.at(witness_redeemer_index)
 
-  // Grab the included script hash (no validation on `certificate` index,
-  // TODO?).
+  // Grab the included `Publish` script hash (no validation on `certificate`
+  // index, TODO?).
   let present_witness_script_hash =
     if for_registration {
       expect Publish {
@@ -98,12 +99,14 @@ pub fn validate_witness_redeemer(
       witness_unregistration_script_hash
     }
 
+  // Since `WitnessRedeemer` is an alias for `PolicyId`, acting as a dependency
+  // proxy between deposit/withdrawal policy and witness scripts.
   let expected_witness_redeemer: Data = event_policy_id
 
   and {
     // 1. Registered script must match the expected witness.
     present_witness_script_hash == expected_witness_script_hash,
-    // 2. Deposit policy ID, and L2 ID must be correctly set.
+    // 2. Deposit/withdrawal policy ID, and L2 ID must be correctly set.
     witness_redeemer_pair.2nd == expected_witness_redeemer,
   }
 }

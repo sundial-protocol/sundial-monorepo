@@ -59,23 +59,23 @@ It oversees correctness of datums, and registration/unregistration of events' co
       \begin{enumerate}
         \item Let \code{l1\_nonce} be the output reference of a utxo on L1 that is spent in the deposit transaction.
         \item Let \code{l2\_id} be the Blake2b256 hash of \code{l1\_nonce}.
-        \item An NFT with own policy ID and asset name of \code{l2\_id} must be minted.
+        \item An NFT with own policy ID and asset name of \code{l2\_id} must be minted and included in the deposit utxo.
         \item The witness staking script, instantiated with \code{l2\_id} must be registered in the transaction.
-        \item The redeemer used for registrering the witness script must be correct. Namely, it must have been provided with \code{deposit} policy ID and \code{l2\_id}.
+        \item The redeemer used for registering the witness script must be equal to the \code{deposit} policy ID.
         \item Let \code{deposit\_addr} be the address of the deposit contract from Midgard's hub oracle.
         \item Deposit utxo must be produced at \code{deposit\_addr}.
-        \item Total number of tokens included in the deposit utxo must not exceed \code{max\_transfer\_token\_count}.
+        \item Total number of deposited tokens (including ADA) must not exceed \code{max\_tokens\_allowed\_in\_deposits}, a protocol parameter.
         \item Recorded \code{l1\_nonce} in the deposit event must be correct.
         \item The deposit's \code{inclusion\_time} must be equal to transaction's time-validity upper bound plus \code{event\_wait\_duration} Midgard protocol parameter.
         \item The hash of the witness script must be correctly stored in the deposit datum.
       \end{enumerate}
-  \item[Burn Deposit NFT.] Oversee conclusion of a deposit event by requiring its NFTs to be burnt.
+    \item[Burn Deposit NFT.] Oversee conclusion of a deposit event (i.e.\ either its transfer to reserve or its refund) by requiring its NFTs to be burnt.
     Conditions:
       \begin{enumerate}
         \item Let \code{l2\_id} be the corresponding ID of the target deposit event, provided via the redeemer.
         \item An NFT with own policy ID and asset name of \code{l2\_id} must be burnt.
         \item The witness staking script, instantiated with \code{l2\_id} must be unregistered in the transaction.
-        \item The redeemer used for unregistrering the witness script must be correct. Namely, it must have been provided with \code{deposit} policy ID and \code{l2\_id}.
+        \item The redeemer used for unregistrering the witness script must be correct. Namely, it must be equal to \code{deposit} policy ID.
       \end{enumerate}
 \end{description}
 
@@ -91,35 +91,36 @@ It's responsible for concluding deposits, whether for transfering them to Midgar
     \begin{enumerate}
       \item Let \code{settlement\_node} be the referenced settlement node.
       \item The deposit must be included in the deposit tree of \code{settlement\_node}.
-      \item Inclusion time of the deposit must fall within the time interval of \code{settlement\_node}.
+        This also implies the inclusion time of the deposit falls within the time interval of \code{settlement\_node}.
       \item Let \code{reserve\_addr} be the address of the Midgard reserve retrieved from hub oracle.
-      \item The utxo produced at \code{reserve\_addr} must only contain the ADA from deposit utxo.
-      \item The deposit NFT must be burnt.
-      \item All deposited tokens must be included in the produced utxo.
+      \item The utxo produced at \code{reserve\_addr} must contain all the tokens from the deposit utxo, except for the deposit NFT.
+      \item The \code{BurnDepositNFT} endpoint of the deposit minting script must be invoked with the corresponding \code{l2\_id} of the deposit utxo.
       \item No datum and no reference script must be attached to the reserve utxo.
     \end{enumerate}
   \item[Refund.] 
     Conditions:
     \begin{enumerate}
+      \item The \code{BurnDepositNFT} endpoint of the deposit minting script must be invoked with the corresponding \code{l2\_id} of the deposit utxo.
       \item All the tokens included in the deposit utxo (except for the deposit NFT) must go to the \code{refund\_address} specified in the deposit datum.
       \item The datum attached to the produced utxo must also match the one stated in deposit datum.
       \item 
         \begin{itemize}
-          \item If inclusion time of the stranded deposit falls within the time range of an existing settlement node, refund can only be allowed if the settlement node's corresponding tree does not contain the deposit (proven by providing an insertion proof).
-          \item Otherwise, if the inclusion time falls in one of the time gaps of settlement queue, refund request is valid.
+          \item If inclusion time of the stranded deposit falls within the time range of an existing settlement node, refund can only be allowed if the settlement node's corresponding tree does not contain the deposit (proven by providing a non-membership proof).
+          \item Otherwise, if the inclusion time falls in one of the time gaps of settlement queue, refund request is considered valid by referencing the immediate settlement node and showing the inclusion time falls in the gap.
         \end{itemize}
     \end{enumerate}
 \end{description}
 
 \subsection{Staking script}
 \label{h:deposit-staking-script}
-The \code{witness} script is parameterized by transaction ID of the resulting L2 output reference from a deposit, which obtained by hashing the serialized L1 output reference with Blake2b256.
+The \code{witness} script is parameterized by transaction ID of the resulting L2 output reference from a deposit, which is obtained by hashing the serialized L1 output reference with Blake2b256.
 The registration state of this script is the mechanism that allows related fraud proofs to function.
 Conditions:
 
 \begin{enumerate}
   \item Let \code{l2\_id} be the Blake2b256 hash of deposit event's \code{deposit\_id} (L1 nonce output reference).
-  \item Registration/unregsitration of this witness script is respectively tied to the \code{deposit} minting policy's mint/burn logic. 
+  \item Let \code{deposit\_minting\_policy} be the policy ID of the deposit NFT, accessed via the redeemer.
+  \item Registration/unregsitration of this witness script is respectively tied to the \code{deposit\_minting\_policy}'s mint/burn logic. 
     \begin{itemize}
       \item Registeration is allowed if a deposit NFT with asset name of \code{l2\_id} is minted.
       \item Unregistration is allowed if a deposit NFT with asset name of \code{l2\_id} is burnt.

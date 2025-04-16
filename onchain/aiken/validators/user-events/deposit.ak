@@ -10,14 +10,15 @@ use cardano/transaction.{
 }
 use env
 use midgard/common/parameter_validation
-use midgard/common/utils.{plutarch_pexcluding, plutarch_phas}
+use midgard/common/utils.{plutarch_pexcludes, plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
 use midgard/user_events/deposit.{
-  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInTimeGap, MintRedeemer,
-  Refund, SkippedDeposit, SpendRedeemer, TransferToReserve, WitnessRedeemer,
-  nonce_out_ref_to_l2_id, validate_witness_redeemer, witness_script_prefix,
+  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInSettlementGap,
+  MintRedeemer, Refund, SkippedDeposit, SpendRedeemer, TransferToReserve,
+  WitnessRedeemer, nonce_out_ref_to_l2_id, validate_witness_redeemer,
+  witness_script_prefix,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -101,7 +102,7 @@ validator spend(hub_oracle: ScriptHash) {
           )
 
         when spend_purpose is {
-          TransferToReserve { merkle_proof } -> {
+          TransferToReserve { membership_proof } -> {
             // Downcast values already extracted from the datum.
             let event_id_data: Data = event_nonce_out_ref
             let event_info_data: Data = event_info
@@ -114,7 +115,7 @@ validator spend(hub_oracle: ScriptHash) {
                 deposits_root,
                 event_id_data,
                 event_info_data,
-                merkle_proof,
+                membership_proof,
                 redeemers,
               ),
               // 4. Assert no datum is attached to the produced UTxO.
@@ -139,22 +140,27 @@ validator spend(hub_oracle: ScriptHash) {
               }
 
             when refund_approach is {
-              SkippedDeposit { merkle_proof } -> {
+              SkippedDeposit { non_membership_proof } -> {
                 // Downcast the key, which is already extracted from the datum.
                 let event_id_data: Data = event_nonce_out_ref
 
                 and {
                   // 7. The deposit event must be absent from the deposit tree.
-                  plutarch_pexcluding(event_id_data, merkle_proof, redeemers),
+                  plutarch_pexcludes(
+                    deposits_root,
+                    event_id_data,
+                    non_membership_proof,
+                    redeemers,
+                  ),
                   // 8. Inclusion time of the deposit subject to this refund
                   //    logic must fall within the time range of the specified
-                  //    settlement node. TODO: Should any of the comparisons be
-                  //    exclusive?
+                  //    settlement node.
+                  //    TODO: Should any of the comparisons be exclusive?
                   inclusion_time <= settlement_end_time,
                   inclusion_time >= settlement_start_time,
                 }
               }
-              DepositInTimeGap { settlement_link_ref_input_index } -> {
+              DepositInSettlementGap { settlement_link_ref_input_index } -> {
                 // 6. Grab the immediate next settlement node, and ensure
                 //    correct linkage (authenticity of the reference UTxO is
                 //    checked with `settlement_queue.get_datum`).
@@ -169,7 +175,8 @@ validator spend(hub_oracle: ScriptHash) {
 
                 // 7. Inclusion time of the deposit subject to this refund logic
                 //    must fall within the time gap between the two settlement
-                //    nodes. TODO: Should any of the comparisons be inclusive?
+                //    nodes.
+                //    TODO: Should any of the comparisons be inclusive?
                 expect settlement_queue.NodeData {
                   start_time: settlement_link_start_time,
                   ..
@@ -231,7 +238,7 @@ validator mint(hub_oracle: ScriptHash) {
         // and its output index is 0.
         let l2_id = nonce_out_ref_to_l2_id(nonce_input_out_ref)
 
-        // 1. Only 1 deposit NFT must be minted.
+        // 1. This deposit NFT must be minted with a quantity of 1.
         expect assets.quantity_of(mint, own_policy, l2_id) == 1
 
         // Script hash of the witness script, required to be registered in this
@@ -304,13 +311,13 @@ validator mint(hub_oracle: ScriptHash) {
           output_deposit_nft_is_valid,
           // 7. Total token count in the deposit UTxO (including ADA) must not
           //    exceed the relevant protocol parameter.
-          total_token_count <= env.max_token_count_allowed_in_deposits,
+          total_token_count <= env.max_tokens_allowed_in_deposits,
           // 8. ID of the deposit event must match the specified nonce input's
           //    output reference.
           output_deposit_id == nonce_input_out_ref,
           // 9. Specified inclusion time of the event must be some time in the
           //    future.
-          output_deposit_inclusion_time == valid_to + env.user_events_wait_duration,
+          output_deposit_inclusion_time == valid_to + env.event_wait_duration,
           // 10. Recorded witness must be correct.
           output_deposit_witness == expected_witness_script_hash,
         }
