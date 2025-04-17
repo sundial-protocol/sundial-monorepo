@@ -39,7 +39,7 @@ const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   bigint: true,
 });
 
-const ledgerSizeGauge = Metric.gauge("ledger_size", {
+const ledgerSizeGauge = Metric.gauge("ledger_utxo_count", {
   description: "A gauge for tracking the current size of the ledger",
   bigint: true,
 });
