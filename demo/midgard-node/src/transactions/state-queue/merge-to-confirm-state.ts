@@ -47,8 +47,7 @@ export const buildAndSubmitMergeTx = (
     // Avoid a merge tx if the queue is too short while a block submission is in
     // progress (performing a merge with such conditions has a chance of wasting
     // the work done for root computaions).
-    if (global.BLOCKS_IN_QUEUE < 2 && global.BLOCK_SUBMISSION_IN_PROGRESS) {
-
+    if (global.BLOCKS_IN_QUEUE < 4 && global.BLOCK_SUBMISSION_IN_PROGRESS) {
       // yield* Effect.logInfo(
       //   "🔸 There are too few blocks in queue while a block submission is in progress.
       // );
