@@ -20,10 +20,10 @@ import {
   BlocksDB,
   ConfirmedLedgerDB,
   ImmutableDB,
+  InitDB,
   LatestLedgerDB,
   MempoolDB,
   MempoolLedgerDB,
-  UtilsDB,
 } from "../database/index.js";
 import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
 
@@ -392,7 +392,7 @@ export const runNode = Effect.gen(function* () {
     connectionTimeoutMillis: 2000,
   });
   yield* Effect.tryPromise({
-    try: () => UtilsDB.initializeDb(pool),
+    try: () => InitDB.initializeDb(pool),
     catch: (e) => new Error(`${e}`),
   });
 

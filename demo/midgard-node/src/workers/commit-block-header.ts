@@ -13,6 +13,7 @@ import pg from "pg";
 import {
   BlocksDB,
   ImmutableDB,
+  LatestLedgerCloneDB,
   LatestLedgerDB,
   MempoolDB,
   UtilsDB,
@@ -36,11 +37,6 @@ const wrapper = (
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 2000,
-    });
-
-    const client = yield* Effect.tryPromise({
-      try: () => pool.connect(),
-      catch: (e) => new Error(`${e}`),
     });
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
@@ -73,12 +69,15 @@ const wrapper = (
       });
       const utxoTrie = new Trie(utxoStore);
       const txsTrie = new Trie(txsStore);
-      const tempTableName = `temp_${LatestLedgerDB.tableName}`;
+
+      yield* Effect.tryPromise({
+        try: () => LatestLedgerCloneDB.clear(pool),
+        catch: (e) => new Error(`${e}`),
+      });
       yield* Effect.tryPromise({
         try: () =>
-          client.query(`
-CREATE TEMPORARY TABLE ${tempTableName}
-AS
+          pool.query(`
+INSERT INTO ${LatestLedgerCloneDB.tableName}
 SELECT * FROM ${LatestLedgerDB.tableName}`),
         catch: (e) => new Error(`${e}`),
       });
@@ -106,22 +105,18 @@ SELECT * FROM ${LatestLedgerDB.tableName}`),
           ).pipe(Effect.withSpan("findSpentAndProducedUTxOs"));
 
           yield* Effect.tryPromise({
-            try: () => UtilsDB.clearUTxOs(client, tempTableName, spent),
+            try: () => LatestLedgerCloneDB.clearUTxOs(pool, spent),
             catch: (e) => new Error(`${e}`),
           });
           yield* Effect.tryPromise({
-            try: () => UtilsDB.insertUTxOsCBOR(client, tempTableName, produced),
+            try: () => LatestLedgerCloneDB.insert(pool, produced),
             catch: (e) => new Error(`${e}`),
           });
-
-          // updatedLatestLedgerUTxOs = [...updatedLatestLedgerUTxOs.filter(
-          //   (utxo) => !spent.some((spent) => utxo.outputReference == spent),
-          // ), ...produced];
         }),
       );
 
       const updatedLatestLedgerUTxOs = yield* Effect.tryPromise({
-        try: () => UtilsDB.retrieveUTxOsCBOR(client, tempTableName),
+        try: () => LatestLedgerCloneDB.retrieve(pool),
         catch: (e) => new Error(`${e}`),
       });
 
@@ -211,16 +206,16 @@ SELECT * FROM ${LatestLedgerDB.tableName}`),
 
       yield* Effect.logInfo("🔹 Clearing LatestLedgerDB...");
       yield* Effect.tryPromise({
-        try: () => UtilsDB.clearTable(client, LatestLedgerDB.tableName),
+        try: () => LatestLedgerDB.clear(pool),
         catch: (e) => new Error(`${e}`),
       });
 
       yield* Effect.logInfo("🔹 Inserting updated UTxO set LatestLedgerDB...");
       yield* Effect.tryPromise({
         try: () =>
-          client.query(`
+          pool.query(`
 INSERT INTO ${LatestLedgerDB.tableName}
-SELECT * FROM ${tempTableName}
+SELECT * FROM ${LatestLedgerCloneDB.tableName}
 `),
         catch: (e) => new Error(`${e}`),
       });
@@ -253,8 +248,6 @@ SELECT * FROM ${tempTableName}
         try: () => MempoolDB.clearTxs(pool, mempoolTxHashes),
         catch: (e) => new Error(`${e}`),
       }).pipe(Effect.withSpan("clear mempool"));
-
-      client.release();
 
       const output: WorkerOutput = {
         txSize,
