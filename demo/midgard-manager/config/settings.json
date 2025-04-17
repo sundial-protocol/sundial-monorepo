@@ -1,9 +1,9 @@
 {
   "node": {
-    "endpoint": "http://localhost:3000"
+    "endpoint": "http://38.242.137.103:3000"
   },
   "generator": {
-    "enabled": false,
+    "enabled": true,
     "batchSize": 10,
     "intervalMs": 1000
   }
