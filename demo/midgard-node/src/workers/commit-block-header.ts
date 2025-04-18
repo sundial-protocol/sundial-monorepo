@@ -16,7 +16,6 @@ import {
   LatestLedgerCloneDB,
   LatestLedgerDB,
   MempoolDB,
-  UtilsDB,
 } from "@/database/index.js";
 import { handleSignSubmit } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
