@@ -1,33 +1,6 @@
 import { Option } from "effect";
 import { Pool, PoolClient } from "pg";
 import { logAbort, logInfo } from "../utils.js";
-import * as blocks from "./blocks.js";
-import * as confirmedLedger from "./confirmedLedger.js";
-import * as immutable from "./immutable.js";
-import * as latestLedger from "./latestLedger.js";
-import * as mempool from "./mempool.js";
-import * as mempoolLedger from "./mempoolLedger.js";
-
-export async function initializeDb(pool: Pool) {
-  try {
-    await pool.query(`
-      SET default_transaction_isolation TO 'serializable';
-    `);
-
-    await pool.query(blocks.createQuery);
-    await pool.query(mempool.createQuery);
-    await pool.query(mempoolLedger.createQuery);
-    await pool.query(immutable.createQuery);
-    await pool.query(confirmedLedger.createQuery);
-    await pool.query(latestLedger.createQuery);
-
-    logInfo("Connected to the PostgreSQL database");
-    return pool;
-  } catch (err) {
-    logAbort(`Error initializing database: ${err}`);
-    throw err;
-  }
-}
 
 export const clearUTxOs = async (
   pool: Pool | PoolClient,
