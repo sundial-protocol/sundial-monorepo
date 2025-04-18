@@ -99,7 +99,7 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("POSTGRES_DB").pipe(Config.withDefault("midgard")),
   ]);
 
-  yield* Effect.logInfo("📚 Openning connection to db...");
+  yield* Effect.logInfo("📚 Opening connection to db...");
 
   const pool = new pg.Pool({
     host: config[12],
