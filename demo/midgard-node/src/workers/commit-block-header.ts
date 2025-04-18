@@ -9,14 +9,12 @@ import {
 import { NodeConfig, User } from "@/config.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { Store, Trie } from "@aiken-lang/merkle-patricia-forestry";
-import pg from "pg";
 import {
   BlocksDB,
   ImmutableDB,
   LatestLedgerCloneDB,
   LatestLedgerDB,
   MempoolDB,
-  UtilsDB,
 } from "@/database/index.js";
 import { handleSignSubmit } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
@@ -28,16 +26,7 @@ const wrapper = (
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
-
-    const pool = new pg.Pool({
-      host: nodeConfig.POSTGRES_HOST,
-      user: nodeConfig.POSTGRES_USER,
-      password: nodeConfig.POSTGRES_PASSWORD,
-      database: nodeConfig.POSTGRES_DB,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
+    const pool = nodeConfig.DB_CONN;
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
     const mempoolTxs = yield* Effect.tryPromise({
