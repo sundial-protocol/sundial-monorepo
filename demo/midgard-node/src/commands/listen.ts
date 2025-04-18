@@ -382,19 +382,7 @@ const ledgerFork = (db: pg.Pool) =>
 export const runNode = Effect.gen(function* () {
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
-  const pool = new pg.Pool({
-    host: nodeConfig.POSTGRES_HOST,
-    user: nodeConfig.POSTGRES_USER,
-    password: nodeConfig.POSTGRES_PASSWORD,
-    database: nodeConfig.POSTGRES_DB,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-  });
-  yield* Effect.tryPromise({
-    try: () => InitDB.initializeDb(pool),
-    catch: (e) => new Error(`${e}`),
-  });
+  const pool = nodeConfig.DB_CONN;
 
   const prometheusExporter = new PrometheusExporter(
     {
