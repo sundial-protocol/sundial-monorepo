@@ -20,7 +20,6 @@ import {
   BlocksDB,
   ConfirmedLedgerDB,
   ImmutableDB,
-  InitDB,
   LatestLedgerDB,
   MempoolDB,
   MempoolLedgerDB,
