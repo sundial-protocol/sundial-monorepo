@@ -8,9 +8,9 @@ export const tableName = "immutable";
 
 export const createQuery = `
   CREATE TABLE IF NOT EXISTS ${tableName} (
-    tx_hash BYTEA NOT NULL UNIQUE,
-    tx_cbor BYTEA NOT NULL UNIQUE,
-    PRIMARY KEY (tx_hash)
+    key BYTEA NOT NULL UNIQUE,
+    value BYTEA NOT NULL UNIQUE,
+    PRIMARY KEY (key)
   );
 `;
 
@@ -19,7 +19,7 @@ export const insert = async (
   txHash: Uint8Array,
   txCbor: Uint8Array,
 ): Promise<void> => {
-  const query = `INSERT INTO ${tableName} (tx_hash, tx_cbor) VALUES ($1, $2)`;
+  const query = `INSERT INTO ${tableName} (key, value) VALUES ($1, $2)`;
   try {
     await pool.query(query, [txHash, txCbor]);
     logInfo(`${tableName} db: tx stored`);
@@ -31,33 +31,29 @@ export const insert = async (
 
 export const insertTxs = async (
   pool: Pool,
-  txs: { txHash: Uint8Array; txCbor: Uint8Array }[],
+  txs: { key: Uint8Array; value: Uint8Array }[],
 ): Promise<void> => {
-  const query = `INSERT INTO ${tableName} (tx_hash, tx_cbor) VALUES ($1, $2)`;
-
+  const query = `INSERT INTO ${tableName} (key, value) VALUES ($1, $2)`;
   try {
-    for (const { txHash, txCbor } of txs) {
-      await pool.query(query, [txHash, txCbor]);
-      // logInfo(`${tableName} db: tx stored`);
+    for (const { key, value } of txs) {
+      await pool.query(query, [key, value]);
     }
   } catch (err) {
-    // logAbort(`${tableName} db: error inserting tx: ${err}`);
     throw err;
   }
 };
 
 export const retrieve = async (
   pool: Pool,
-): Promise<{ txHash: Uint8Array; txCbor: Uint8Array }[]> => {
+): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
   const query = `SELECT * FROM ${tableName}`;
   try {
     const result = await pool.query(query);
     return result.rows.map((row) => ({
-      txHash: row.tx_hash,
-      txCbor: row.tx_cbor,
+      key: row.key,
+      value: row.value,
     }));
   } catch (err) {
-    // logAbort(`${tableName} db: retrieving error: ${err}`);
     throw err;
   }
 };
@@ -66,12 +62,11 @@ export const retrieveTxCborByHash = async (
   pool: Pool,
   txHash: Uint8Array,
 ): Promise<Option.Option<Uint8Array>> =>
-  utils.retrieveTxCborByHash(pool, tableName, txHash);
+  utils.retrieveValue(pool, tableName, txHash);
 
 export const retrieveTxCborsByHashes = async (
   pool: Pool,
   txHashes: Uint8Array[],
-): Promise<Uint8Array[]> =>
-  utils.retrieveTxCborsByHashes(pool, tableName, txHashes);
+): Promise<Uint8Array[]> => utils.retrieveValues(pool, tableName, txHashes);
 
 export const clear = async (pool: Pool) => clearTable(pool, tableName);

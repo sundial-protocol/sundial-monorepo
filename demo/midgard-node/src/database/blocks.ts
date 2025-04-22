@@ -23,9 +23,7 @@ export const insert = async (
 
   try {
     await pool.query(query, values);
-    // logInfo(`${tableName} db: ${txHashes.length} new tx_hashes added`);
   } catch (err) {
-    // logAbort(`${tableName} db: inserting error: ${err}`);
     throw err;
   }
 };
@@ -39,7 +37,6 @@ export const retrieveTxHashesByBlockHash = async (
     const result = await pool.query(query, [blockHash]);
     return result.rows.map((row) => row.tx_hash);
   } catch (err) {
-    // logAbort(`${tableName} db: retrieving error: ${err}`);
     throw err;
   }
 };
@@ -57,7 +54,6 @@ export const retrieveBlockHashByTxHash = async (
       return Option.none();
     }
   } catch (err) {
-    // logAbort(`${tableName} db: retrieving error: ${err}`);
     throw err;
   }
 };
@@ -69,9 +65,7 @@ export const clearBlock = async (
   const query = `DELETE FROM ${tableName} WHERE header_hash = $1`;
   try {
     await pool.query(query, [blockHash]);
-    // logInfo(`${tableName} db: cleared`);
   } catch (err) {
-    // logAbort(`${tableName} db: clearing error: ${err}`);
     throw err;
   }
 };
@@ -84,7 +78,6 @@ export const retrieve = async (
     const result = await pool.query(query);
     return result.rows.map((row) => [row.header_hash, row.tx_hash]);
   } catch (err) {
-    // logAbort(`${tableName} db: retrieving error: ${err}`);
     throw err;
   }
 };

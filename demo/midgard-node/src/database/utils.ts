@@ -2,37 +2,23 @@ import { Option } from "effect";
 import { Pool, PoolClient } from "pg";
 import { logAbort, logInfo } from "../utils.js";
 
-export const clearUTxOs = async (
+export const mkKeyValueCreateQuery = (tableName: string) => `
+  CREATE TABLE IF NOT EXISTS ${tableName} (
+    key BYTEA NOT NULL,
+    value BYTEA NOT NULL,
+    PRIMARY KEY (key)
+  );`;
+
+export const delMultiple = async (
   pool: Pool | PoolClient,
   tableName: string,
-  refs: Uint8Array[],
+  keys: Uint8Array[],
 ): Promise<void> => {
-  const query = `DELETE FROM ${tableName} WHERE (tx_in_cbor) IN (${refs
-    .map((_, i) => `($${i + 1})`)
-    .join(", ")})`;
-  // const values = refs.flatMap((r) => [
-  //   Buffer.from(r),
-  // ]);
-
-  try {
-    await pool.query(query, refs);
-    // logInfo(`${tableName} db: ${result.rowCount} utxos removed`);
-  } catch (err) {
-    // logAbort(`${tableName} db: utxos removing error: ${err}`);
-    throw err;
-  }
-};
-
-export const clearTxs = async (
-  pool: Pool | PoolClient,
-  tableName: string,
-  txHashes: Uint8Array[],
-): Promise<void> => {
-  const query = `DELETE FROM ${tableName} WHERE tx_hash IN (${txHashes
+  const query = `DELETE FROM ${tableName} WHERE key IN (${keys
     .map((_, i) => `$${i + 1}`)
     .join(", ")})`;
   try {
-    const result = await pool.query(query, txHashes);
+    const result = await pool.query(query, keys);
     logInfo(`${tableName} db: ${result.rowCount} txs removed`);
   } catch (err) {
     logAbort(`${tableName} db: txs removing error: ${err}`);
@@ -40,36 +26,34 @@ export const clearTxs = async (
   }
 };
 
-export const retrieveTxCborByHash = async (
+export const retrieveValue = async (
   pool: Pool | PoolClient,
   tableName: string,
-  txHash: Uint8Array,
+  key: Uint8Array,
 ): Promise<Option.Option<Uint8Array>> => {
-  const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = $1`;
+  const query = `SELECT value FROM ${tableName} WHERE key = $1`;
   try {
-    const result = await pool.query(query, [txHash]);
+    const result = await pool.query(query, [key]);
     if (result.rows.length > 0) {
-      return Option.some(result.rows[0].tx_cbor);
+      return Option.some(result.rows[0].value);
     } else {
       return Option.none();
     }
   } catch (err) {
-    // logAbort(`db: retrieving error: ${err}`);
     throw err;
   }
 };
 
-export const retrieveTxCborsByHashes = async (
+export const retrieveValues = async (
   pool: Pool | PoolClient,
   tableName: string,
-  txHashes: Uint8Array[],
+  keys: Uint8Array[],
 ): Promise<Uint8Array[]> => {
-  const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ANY($1)`;
+  const query = `SELECT value FROM ${tableName} WHERE key = ANY($1)`;
   try {
-    const result = await pool.query(query, [txHashes]);
-    return result.rows.map((row) => row.tx_cbor);
+    const result = await pool.query(query, [keys]);
+    return result.rows.map((row) => row.value);
   } catch (err) {
-    // logAbort(`${tableName} db: retrieving error: ${err}`);
     throw err;
   }
 };
@@ -82,37 +66,36 @@ export const clearTable = async (
 
   try {
     await pool.query(query);
-    // logInfo(`${tableName} db: cleared`);
   } catch (err) {
-    // logAbort(`${tableName} db: clearing error: ${err}`);
     throw err;
   }
 };
 
-export const insertUTxOsCBOR = async (
+export const insertKeyValues = async (
   pool: Pool | PoolClient,
   tableName: string,
-  utxosCBOR: { outputReference: Uint8Array; output: Uint8Array }[],
+  utxosCBOR: { key: Uint8Array; value: Uint8Array }[],
 ): Promise<void> => {
   const query = `
-  INSERT INTO ${tableName} (tx_in_cbor, tx_out_cbor)
+  INSERT INTO ${tableName} (key, value)
   VALUES
   ${utxosCBOR.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(", ")}
   `;
-  const values = utxosCBOR.flatMap((u) => [u.outputReference, u.output]);
+  const values = utxosCBOR.flatMap((u) => [u.key, u.value]);
   await pool.query(query, values);
 };
 
-export const retrieveUTxOsCBOR = async (
+export const retrieveKeyValues = async (
   pool: Pool | PoolClient,
   tableName: string,
-): Promise<{ outputReference: Uint8Array; output: Uint8Array }[]> => {
+): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
   const query = `SELECT * FROM ${tableName}`;
   const rows = await pool.query(query);
-  const result: { outputReference: Uint8Array; output: Uint8Array }[] =
-    rows.rows.map((r) => ({
-      outputReference: r.tx_in_cbor,
-      output: r.tx_out_cbor,
-    }));
+  const result: { key: Uint8Array; value: Uint8Array }[] = rows.rows.map(
+    (r) => ({
+      key: r.key,
+      value: r.value,
+    }),
+  );
   return result;
 };

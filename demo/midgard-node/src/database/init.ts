@@ -2,7 +2,6 @@ import * as BlocksDB from "./blocks.js";
 import * as ConfirmedLedgerDB from "./confirmedLedger.js";
 import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
-import * as LatestLedgerCloneDB from "./latestLedgerClone.js";
 import * as MempoolDB from "./mempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Pool } from "pg";
@@ -20,7 +19,6 @@ export const initializeDb = async (pool: Pool) => {
     await pool.query(ImmutableDB.createQuery);
     await pool.query(ConfirmedLedgerDB.createQuery);
     await pool.query(LatestLedgerDB.createQuery);
-    await pool.query(LatestLedgerCloneDB.createQuery);
 
     logInfo("Connected to the PostgreSQL database");
     return pool;
