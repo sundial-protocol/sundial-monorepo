@@ -38,11 +38,6 @@ const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   bigint: true,
 });
 
-const ledgerSizeGauge = Metric.gauge("ledger_utxo_count", {
-  description: "A gauge for tracking the current size of the ledger",
-  bigint: true,
-});
-
 export const listen = (
   lucid: LucidEvolution,
   pool: pg.Pool,
@@ -310,15 +305,6 @@ const makeMempoolAction = (db: pg.Pool) =>
     yield* mempoolTxGauge(Effect.succeed(numTx));
   });
 
-const makeLedgerAction = (db: pg.Pool) =>
-  Effect.gen(function* () {
-    const utxoList = yield* Effect.tryPromise(() =>
-      LatestLedgerDB.retrieve(db),
-    );
-    const utxoCount = BigInt(utxoList.length);
-    yield* ledgerSizeGauge(Effect.succeed(utxoCount));
-  });
-
 const blockCommitmentFork = (pollingInterval: number) =>
   pipe(
     Effect.gen(function* () {
@@ -366,18 +352,6 @@ const mempoolFork = (db: pg.Pool) =>
     Effect.catchAllCause(Effect.logWarning),
   );
 
-const ledgerFork = (db: pg.Pool) =>
-  pipe(
-    Effect.gen(function* () {
-      yield* Effect.logInfo("📒 Ledger fork started.");
-      const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(1000),
-      );
-      yield* Effect.repeat(makeLedgerAction(db), schedule);
-    }),
-    Effect.catchAllCause(Effect.logWarning),
-  );
-
 export const runNode = Effect.gen(function* () {
   const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
@@ -420,15 +394,12 @@ export const runNode = Effect.gen(function* () {
 
   const monitorMempoolThread = pipe(mempoolFork(pool));
 
-  const monitorLedgerThread = pipe(ledgerFork(pool));
-
   const program = Effect.all(
     [
       appThread,
       blockCommitmentThread,
       mergeThread,
       monitorMempoolThread,
-      monitorLedgerThread,
     ],
     {
       concurrency: "unbounded",
