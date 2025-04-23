@@ -3,7 +3,7 @@ import { UtilsDB } from "@/database/index.js";
 import { BatchDBOp, DB } from "@ethereumjs/util";
 import { Effect, pipe } from "effect";
 import pg from "pg";
-import { fromHex } from "@lucid-evolution/lucid";
+import { fromHex, toHex } from "@lucid-evolution/lucid";
 
 export class PostgresDB<TKey extends string, TValue extends Uint8Array>
   implements DB<TKey, TValue>
@@ -23,39 +23,43 @@ export class PostgresDB<TKey extends string, TValue extends Uint8Array>
     });
   }
 
-  async open(copyFromReference?: true) {
+  open = async (copyFromReference?: true) => {
     if (!this._pool) {
       const pool = await Effect.runPromise(
         pipe(this._database, Effect.provide(NodeConfig.layer)),
       );
       this._pool = pool;
-      await pool.query(`
-CREATE TABLE IF NOT EXISTS ${this._tableName} (
-  key BYTEA NOT NULL,
-  value BYTEA NOT NULL,
-  PRIMARY KEY (key)
-);`);
-      await this.clear();
     }
+    await this._pool.query(UtilsDB.mkKeyValueCreateQuery(this._tableName));
     if (this._referenceTableName && copyFromReference) {
       try {
+        await this._pool.query(`BEGIN`);
+        await this.clear();
         await this._pool.query(`
 INSERT INTO ${this._tableName}
 SELECT * FROM ${this._referenceTableName}`);
+        await this._pool.query(`COMMIT`);
       } catch (e) {
+        await this._pool.query(`ROLLBACK`);
+        throw e;
+      }
+    } else {
+      try {
+        await this.clear();
+      } catch(e) {
         throw e;
       }
     }
   }
 
-  async conclude() {
+  conclude = async () => {
     if (this._pool) {
       await this.transferToReference();
       await this._pool.end();
     }
   }
 
-  async get(key: TKey): Promise<TValue | undefined> {
+  get = async (key: TKey): Promise<TValue | undefined> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else {
@@ -63,7 +67,7 @@ SELECT * FROM ${this._referenceTableName}`);
       try {
         const result = await this._pool.query(query, [fromHex(key)]);
         if (result.rows.length > 0) {
-          return result.rows[0].tx_cbor;
+          return result.rows[0].value;
         } else {
           return undefined;
         }
@@ -73,16 +77,16 @@ SELECT * FROM ${this._referenceTableName}`);
     }
   }
 
-  async put(key: TKey, val: TValue): Promise<void> {
+  put = async (key: TKey, val: TValue): Promise<void> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else {
-      const query = `INSERT INTO ${this._tableName} (key, value) VALUES ($1, $2)`;
+      const query = `INSERT INTO ${this._tableName} (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`;
       await this._pool.query(query, [fromHex(key), val]);
     }
   }
 
-  async del(key: TKey): Promise<void> {
+  del = async (key: TKey): Promise<void> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else {
@@ -91,12 +95,12 @@ SELECT * FROM ${this._referenceTableName}`);
     }
   }
 
-  async batch(opStack: BatchDBOp<TKey, TValue>[]): Promise<void> {
+  batch = async (opStack: BatchDBOp<TKey, TValue>[]): Promise<void> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else {
       try {
-        await this._pool.query("BEGIN");
+        // await this._pool.query("BEGIN");
         for (const op of opStack) {
           if (op.type === "del") {
             await this.del(op.key);
@@ -106,15 +110,15 @@ SELECT * FROM ${this._referenceTableName}`);
             await this.put(op.key, op.value);
           }
         }
-        await this._pool.query("COMMIT");
+        // await this._pool.query("COMMIT");
       } catch (err) {
-        await this._pool.query("ROLLBACK");
+        // await this._pool.query("ROLLBACK");
         throw err;
       }
     }
   }
 
-  async getAll(): Promise<{ key: Uint8Array; value: Uint8Array }[]> {
+  getAll = async (): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else {
@@ -126,9 +130,9 @@ SELECT * FROM ${this._referenceTableName}`);
     }
   }
 
-  async getAllFromReference(): Promise<
+  getAllFromReference = async (): Promise<
     { key: Uint8Array; value: Uint8Array }[]
-  > {
+  > => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
@@ -144,7 +148,7 @@ SELECT * FROM ${this._referenceTableName}`);
     }
   }
 
-  async clear(): Promise<void> {
+  clear = async (): Promise<void> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else {
@@ -152,7 +156,7 @@ SELECT * FROM ${this._referenceTableName}`);
     }
   }
 
-  async clearReference(): Promise<void> {
+  clearReference = async (): Promise<void> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
@@ -162,7 +166,7 @@ SELECT * FROM ${this._referenceTableName}`);
     }
   }
 
-  async transferToReference(): Promise<void> {
+  transferToReference = async (): Promise<void> => {
     if (!this._pool) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
@@ -182,7 +186,7 @@ SELECT * FROM ${this._tableName}`);
     }
   }
 
-  shallowCopy(): DB<TKey, TValue> {
+  shallowCopy = (): DB<TKey, TValue> => {
     return new PostgresDB(
       this._tableName,
       this._referenceTableName,

@@ -104,7 +104,7 @@ export const listen = (
           const addrDetails = getAddressDetails(addr);
           if (addrDetails.paymentCredential) {
             MempoolLedgerDB.retrieve(pool).then((allUTxOs) => {
-              const filtered = allUTxOs.filter(({ output }) => {
+              const filtered = allUTxOs.filter(({ value: output }) => {
                 const cmlOutput = CML.TransactionOutput.from_cbor_bytes(output);
                 const address = cmlOutput.address().to_bech32();
                 address === addrDetails.address.bech32;

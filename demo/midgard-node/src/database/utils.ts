@@ -1,6 +1,5 @@
 import { Option } from "effect";
 import { Pool, PoolClient } from "pg";
-import { logAbort, logInfo } from "../utils.js";
 
 export const mkKeyValueCreateQuery = (tableName: string) => `
   CREATE TABLE IF NOT EXISTS ${tableName} (
@@ -18,10 +17,8 @@ export const delMultiple = async (
     .map((_, i) => `$${i + 1}`)
     .join(", ")})`;
   try {
-    const result = await pool.query(query, keys);
-    logInfo(`${tableName} db: ${result.rowCount} txs removed`);
+    await pool.query(query, keys);
   } catch (err) {
-    logAbort(`${tableName} db: txs removing error: ${err}`);
     throw err;
   }
 };
