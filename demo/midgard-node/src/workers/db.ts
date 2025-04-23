@@ -3,7 +3,7 @@ import { UtilsDB } from "@/database/index.js";
 import { BatchDBOp, DB } from "@ethereumjs/util";
 import { Effect, pipe } from "effect";
 import pg from "pg";
-import { fromHex, toHex } from "@lucid-evolution/lucid";
+import { fromHex } from "@lucid-evolution/lucid";
 
 export class PostgresDB<TKey extends string, TValue extends Uint8Array>
   implements DB<TKey, TValue>
@@ -100,7 +100,7 @@ SELECT * FROM ${this._referenceTableName}`);
       throw new Error("Database not open");
     } else {
       try {
-        // await this._pool.query("BEGIN");
+        await this._pool.query("BEGIN");
         for (const op of opStack) {
           if (op.type === "del") {
             await this.del(op.key);
@@ -110,9 +110,9 @@ SELECT * FROM ${this._referenceTableName}`);
             await this.put(op.key, op.value);
           }
         }
-        // await this._pool.query("COMMIT");
+        await this._pool.query("COMMIT");
       } catch (err) {
-        // await this._pool.query("ROLLBACK");
+        await this._pool.query("ROLLBACK");
         throw err;
       }
     }

@@ -9,6 +9,7 @@ import {
   Maestro,
   Network,
   Provider,
+  toHex,
   UTxO,
   utxoToCore,
 } from "@lucid-evolution/lucid";
