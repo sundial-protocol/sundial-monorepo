@@ -251,7 +251,11 @@ const wrapper = (
 
       return output;
     } else {
-      yield* Effect.logInfo("🔹 No transactions were found in MempoolDB.");
+      yield* Effect.logInfo("🔹 No transactions were found in MempoolDB, closing the connection...");
+      yield* Effect.tryPromise({
+        try: () => pool.end(),
+        catch: (e) => new Error(`${e}`),
+      });
       const output: WorkerOutput = {
         txSize: 0,
         mempoolTxsCount: 0,
