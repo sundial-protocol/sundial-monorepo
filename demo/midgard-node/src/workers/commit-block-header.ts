@@ -104,7 +104,6 @@ const wrapper = (
 
           sizeOfBlocksTxs += txCbor.length;
 
-          yield* Effect.logInfo(`🔹 mempoolTrie put`);
           yield* Effect.tryPromise({
             try: () => mempoolTrie.put(txHash, txCbor),
             catch: (e) => new Error(`${e}`),
