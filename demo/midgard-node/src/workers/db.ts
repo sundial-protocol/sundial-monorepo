@@ -2,7 +2,7 @@ import { NodeConfig } from "@/config.js";
 import { UtilsDB } from "@/database/index.js";
 import { BatchDBOp, DB } from "@ethereumjs/util";
 import { Effect, pipe } from "effect";
-import { Sql } from "postgres";
+import { Sql, TransactionSql } from "postgres";
 import { fromHex } from "@lucid-evolution/lucid";
 
 export class PostgresDB<TKey extends string, TValue extends Uint8Array>
@@ -33,14 +33,15 @@ export class PostgresDB<TKey extends string, TValue extends Uint8Array>
     await UtilsDB.mkKeyValueCreateQuery(this._sql, this._tableName);
     if (this._referenceTableName && copyFromReference) {
       try {
-        await this._sql`BEGIN`;
-        await this.clear();
-        await this._sql`
-INSERT INTO ${this._sql(this._tableName)}
-SELECT * FROM ${this._sql(this._referenceTableName)}`;
-        await this._sql`COMMIT`;
+        const tableName = this._sql(this._tableName);
+        const refTableName = this._sql(this._referenceTableName);
+        await this._sql.begin(async (sql) => {
+          await UtilsDB.clearTable(sql, this._tableName);
+          await sql`
+INSERT INTO ${tableName}
+SELECT * FROM ${refTableName}`;
+        });
       } catch (e) {
-        await this._sql`ROLLBACK`;
         throw e;
       }
     } else {
@@ -86,6 +87,10 @@ SELECT * FROM ${this._sql(this._referenceTableName)}`;
     }
   };
 
+  _put = async (sql: TransactionSql, key: TKey, val: TValue): Promise<void> => {
+    await sql`INSERT INTO ${sql(this._tableName)} (key, value) VALUES (${fromHex(key)}, ${val}) ON CONFLICT (key) DO UPDATE SET value = ${val}`;
+  };
+
   del = async (key: TKey): Promise<void> => {
     if (!this._sql) {
       throw new Error("Database not open");
@@ -94,24 +99,27 @@ SELECT * FROM ${this._sql(this._referenceTableName)}`;
     }
   };
 
+  _del = async (sql: TransactionSql, key: TKey): Promise<void> => {
+    await sql`DELETE FROM ${this._tableName} WHERE key = ${fromHex(key)}`;
+  };
+
   batch = async (opStack: BatchDBOp<TKey, TValue>[]): Promise<void> => {
     if (!this._sql) {
       throw new Error("Database not open");
     } else {
       try {
-        await this._sql`BEGIN`;
-        for (const op of opStack) {
-          if (op.type === "del") {
-            await this.del(op.key);
-          }
+        await this._sql.begin(async (sql) => {
+          for (const op of opStack) {
+            if (op.type === "del") {
+              await this._del(sql, op.key);
+            }
 
-          if (op.type === "put") {
-            await this.put(op.key, op.value);
+            if (op.type === "put") {
+              await this._put(sql, op.key, op.value);
+            }
           }
-        }
-        await this._sql`COMMIT`;
+        });
       } catch (err) {
-        await this._sql`ROLLBACK`;
         throw err;
       }
     }
@@ -163,19 +171,28 @@ SELECT * FROM ${this._sql(this._referenceTableName)}`;
     }
   };
 
+  _clearReference = async (sql: TransactionSql): Promise<void> => {
+    if (this._referenceTableName) {
+      await UtilsDB.clearTable(sql, this._referenceTableName);
+    } else {
+      throw new Error("No reference tables set");
+    }
+  };
+
   transferToReference = async (): Promise<void> => {
     if (!this._sql) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
       try {
-        await this._sql`BEGIN`;
-        await this.clearReference();
-        await this._sql`
-INSERT INTO ${this._sql(this._referenceTableName)}
-SELECT * FROM ${this._sql(this._tableName)}`;
-        await this._sql`COMMIT`;
+        const tableName = this._sql(this._tableName);
+        const refTableName = this._sql(this._referenceTableName);
+        await this._sql.begin(async (sql) => {
+          await this._clearReference(sql);
+          await sql`
+INSERT INTO ${refTableName}
+SELECT * FROM ${tableName}`;
+        });
       } catch (e) {
-        await this._sql`ROLLBACK`;
         throw e;
       }
     } else {

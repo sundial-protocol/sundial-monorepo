@@ -16,9 +16,9 @@ export const insert = async (
   txHashes: Uint8Array[],
 ): Promise<void> => {
   try {
-    await sql`INSERT INTO ${sql(tableName)} (header_hash, tx_hash) VALUES ${sql(
+    await sql`INSERT INTO ${sql(tableName)} ${sql(
       txHashes.map((txHash) => ({header_hash: headerHash, tx_hash: txHash})),
-    )} ON CONFLICT (tx_hash) DO NOTHING`;
+    )}`;
   } catch (err) {
     throw err;
   }
