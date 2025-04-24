@@ -259,7 +259,7 @@ export const listen = (
           // log(`▫️ L2 Transaction processed successfully: ${tx.toHash()}`);
           res.json({ message: "Successfully submitted the transaction" });
         } catch (e) {
-          log(`▫️ L2 transaction failed: ${e}`);
+          // log(`▫️ L2 transaction failed: ${e}`);
           res.status(400).json({ message: `Something went wrong: ${e}` });
         }
       } else {

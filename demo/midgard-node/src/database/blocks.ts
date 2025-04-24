@@ -18,7 +18,7 @@ export const insert = async (
   try {
     await sql`INSERT INTO ${sql(tableName)} ${sql(
       txHashes.map((txHash) => ({header_hash: headerHash, tx_hash: txHash})),
-    )}`;
+    )} ON CONFLICT (tx_hash) DO UPDATE SET header_hash = ${headerHash}`;
   } catch (err) {
     throw err;
   }

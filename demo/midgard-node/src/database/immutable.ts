@@ -11,7 +11,10 @@ export const insert = async (
   txCbor: Uint8Array
 ): Promise<void> => {
   try {
-    await sql`INSERT INTO ${sql(tableName)} (key, value) VALUES (${txHash}, ${txCbor})`;
+    await sql`INSERT INTO ${sql(tableName)} ${sql({
+      key: txHash,
+      value: txCbor,
+    })} ON CONFLICT (key) DO UPDATE SET value = ${txCbor}`;
   } catch (err) {
     throw err;
   }
@@ -25,7 +28,9 @@ export const insertTxs = async (
     if (txs.length === 0) {
       return;
     }
-    await sql`INSERT INTO ${sql(tableName)} ${sql(txs)}`;
+    await sql`INSERT INTO ${sql(tableName)} ${sql(
+      txs,
+    )} ON CONFLICT (key) DO NOTHING`;
   } catch (err) {
     throw err;
   }

@@ -14,7 +14,7 @@ export const delMultiple = async (
   keys: Uint8Array[]
 ): Promise<void> => {
   try {
-    await sql`DELETE FROM ${sql(tableName)} WHERE key IN (${keys})`;
+    await sql`DELETE FROM ${sql(tableName)} WHERE key = ANY(${sql(keys)})`;
   } catch (err) {
     throw err;
   }
@@ -45,7 +45,7 @@ export const retrieveValues = async (
 ): Promise<Uint8Array[]> => {
   try {
     const result =
-      await sql`SELECT value FROM ${sql(tableName)} WHERE key = ANY(${keys})`;
+      await sql`SELECT value FROM ${sql(tableName)} WHERE key = ANY(${sql(keys)})`;
     return result.map((row) => row.value);
   } catch (err) {
     throw err;
