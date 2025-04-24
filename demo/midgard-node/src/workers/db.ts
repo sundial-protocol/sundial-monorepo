@@ -30,6 +30,7 @@ export class PostgresDB<TKey extends string, TValue extends Uint8Array>
       );
       this._sql = pool;
     }
+    await this._sql`SET client_min_messages = 'error'`;
     await UtilsDB.mkKeyValueCreateQuery(this._sql, this._tableName);
     if (this._referenceTableName && copyFromReference) {
       try {
