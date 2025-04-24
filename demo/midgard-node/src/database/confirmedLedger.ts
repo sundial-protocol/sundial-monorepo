@@ -1,7 +1,6 @@
-import { Pool } from "pg";
+import { Sql } from "postgres";
 import {
   clearTable,
-  mkKeyValueCreateQuery,
   insertKeyValues,
   retrieveKeyValues,
   delMultiple,
@@ -9,19 +8,17 @@ import {
 
 export const tableName = "confirmed_ledger";
 
-export const createQuery = mkKeyValueCreateQuery(tableName);
-
 export const insert = async (
-  pool: Pool,
+  sql: Sql,
   utxosCBOR: { key: Uint8Array; value: Uint8Array }[],
-) => insertKeyValues(pool, tableName, utxosCBOR);
+) => insertKeyValues(sql, tableName, utxosCBOR);
 
 export const retrieve = async (
-  pool: Pool,
+  sql: Sql,
 ): Promise<{ key: Uint8Array; value: Uint8Array }[]> =>
-  retrieveKeyValues(pool, tableName);
+  retrieveKeyValues(sql, tableName);
 
-export const clearUTxOs = async (pool: Pool, refs: Uint8Array[]) =>
-  delMultiple(pool, tableName, refs);
+export const clearUTxOs = async (sql: Sql, refs: Uint8Array[]) =>
+  delMultiple(sql, tableName, refs);
 
-export const clear = async (pool: Pool) => clearTable(pool, tableName);
+export const clear = async (sql: Sql) => clearTable(sql, tableName);

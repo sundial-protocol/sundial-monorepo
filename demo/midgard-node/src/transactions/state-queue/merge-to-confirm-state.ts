@@ -12,7 +12,7 @@ import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { LucidEvolution, Script, fromHex } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
-import pg from "pg";
+import { Sql } from "postgres";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
@@ -33,7 +33,7 @@ const mergeBlockCounter = Metric.counter("merge_block_count", {
  */
 export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
-  db: pg.Pool,
+  db: Sql,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   spendScript: Script,
   mintScript: Script,

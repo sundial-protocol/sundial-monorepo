@@ -1,38 +1,35 @@
 import { Option } from "effect";
-import { Pool, PoolClient } from "pg";
+import { Sql } from "postgres";
 
-export const mkKeyValueCreateQuery = (tableName: string) => `
-  CREATE TABLE IF NOT EXISTS ${tableName} (
+export const mkKeyValueCreateQuery = (sql: Sql, tableName: string) => sql`
+  CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
     key BYTEA NOT NULL,
     value BYTEA NOT NULL,
     PRIMARY KEY (key)
   );`;
 
 export const delMultiple = async (
-  pool: Pool | PoolClient,
+  sql: Sql,
   tableName: string,
-  keys: Uint8Array[],
+  keys: Uint8Array[]
 ): Promise<void> => {
-  const query = `DELETE FROM ${tableName} WHERE key IN (${keys
-    .map((_, i) => `$${i + 1}`)
-    .join(", ")})`;
   try {
-    await pool.query(query, keys);
+    await sql`DELETE FROM ${sql(tableName)} WHERE key IN (${keys})`;
   } catch (err) {
     throw err;
   }
 };
 
 export const retrieveValue = async (
-  pool: Pool | PoolClient,
+  sql: Sql,
   tableName: string,
-  key: Uint8Array,
+  key: Uint8Array
 ): Promise<Option.Option<Uint8Array>> => {
-  const query = `SELECT value FROM ${tableName} WHERE key = $1`;
   try {
-    const result = await pool.query(query, [key]);
-    if (result.rows.length > 0) {
-      return Option.some(result.rows[0].value);
+    const result =
+      await sql`SELECT value FROM ${sql(tableName)} WHERE key = ${key}`;
+    if (result.length > 0) {
+      return Option.some(result[0].value);
     } else {
       return Option.none();
     }
@@ -42,57 +39,48 @@ export const retrieveValue = async (
 };
 
 export const retrieveValues = async (
-  pool: Pool | PoolClient,
+  sql: Sql,
   tableName: string,
-  keys: Uint8Array[],
+  keys: Uint8Array[]
 ): Promise<Uint8Array[]> => {
-  const query = `SELECT value FROM ${tableName} WHERE key = ANY($1)`;
   try {
-    const result = await pool.query(query, [keys]);
-    return result.rows.map((row) => row.value);
+    const result =
+      await sql`SELECT value FROM ${sql(tableName)} WHERE key = ANY(${keys})`;
+    return result.map((row) => row.value);
   } catch (err) {
     throw err;
   }
 };
 
 export const clearTable = async (
-  pool: Pool | PoolClient,
-  tableName: string,
+  sql: Sql,
+  tableName: string
 ): Promise<void> => {
-  const query = `TRUNCATE TABLE ${tableName} CASCADE;`;
-
   try {
-    await pool.query(query);
+    await sql`TRUNCATE TABLE ${sql(tableName)} CASCADE`;
   } catch (err) {
     throw err;
   }
 };
 
 export const insertKeyValues = async (
-  pool: Pool | PoolClient,
+  sql: Sql,
   tableName: string,
-  utxosCBOR: { key: Uint8Array; value: Uint8Array }[],
+  utxosCBOR: { key: Uint8Array; value: Uint8Array }[]
 ): Promise<void> => {
-  const query = `
-  INSERT INTO ${tableName} (key, value)
-  VALUES
-  ${utxosCBOR.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(", ")}
-  `;
-  const values = utxosCBOR.flatMap((u) => [u.key, u.value]);
-  await pool.query(query, values);
+  if (utxosCBOR.length === 0) {
+    return;
+  }
+  await sql`INSERT INTO ${sql(tableName)} (key, value) VALUES ${sql(utxosCBOR)}`;
 };
 
 export const retrieveKeyValues = async (
-  pool: Pool | PoolClient,
-  tableName: string,
+  sql: Sql,
+  tableName: string
 ): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
-  const query = `SELECT * FROM ${tableName}`;
-  const rows = await pool.query(query);
-  const result: { key: Uint8Array; value: Uint8Array }[] = rows.rows.map(
-    (r) => ({
-      key: r.key,
-      value: r.value,
-    }),
-  );
-  return result;
+  const rows = await sql`SELECT * FROM ${sql(tableName)}`;
+  return rows.map((row) => ({
+    key: row.key,
+    value: row.value,
+  }));
 };

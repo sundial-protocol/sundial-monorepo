@@ -7,7 +7,7 @@ import {
   fromHex,
 } from "@lucid-evolution/lucid";
 import { Effect, Schedule } from "effect";
-import pg from "pg";
+import { Sql } from "postgres";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
 
@@ -73,7 +73,7 @@ export const handleSignSubmitWithoutConfirmation = (
  */
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: UTxO,
-  db: pg.Pool,
+  db: Sql,
 ): Effect.Effect<{ txs: Uint8Array[]; headerHash: string }, Error> =>
   Effect.gen(function* () {
     const blockHeader = yield* SDK.Utils.getHeaderFromBlockUTxO(firstBlockUTxO);

@@ -1,55 +1,49 @@
 import { Option } from "effect";
-import { Pool } from "pg";
+import { Sql } from "postgres";
 import { clearTable } from "./utils.js";
 
 export const tableName = "blocks";
 
-export const createQuery = `
-  CREATE TABLE IF NOT EXISTS ${tableName} (
+export const createQuery = (sql: Sql) => sql`
+  CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
     header_hash BYTEA NOT NULL,
     tx_hash BYTEA NOT NULL UNIQUE
   );`;
 
 export const insert = async (
-  pool: Pool,
+  sql: Sql,
   headerHash: Uint8Array,
   txHashes: Uint8Array[],
 ): Promise<void> => {
-  const query = `
-      INSERT INTO ${tableName} (header_hash, tx_hash)
-      VALUES
-      ${txHashes.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(", ")}`;
-  const values = txHashes.flatMap((txHash) => [headerHash, txHash]);
-
   try {
-    await pool.query(query, values);
+    await sql`INSERT INTO ${sql(tableName)} (header_hash, tx_hash) VALUES ${sql(
+      txHashes.map((txHash) => ({header_hash: headerHash, tx_hash: txHash})),
+    )} ON CONFLICT (tx_hash) DO NOTHING`;
   } catch (err) {
     throw err;
   }
 };
 
 export const retrieveTxHashesByBlockHash = async (
-  pool: Pool,
+  sql: Sql,
   blockHash: Uint8Array,
 ): Promise<Uint8Array[]> => {
-  const query = `SELECT tx_hash FROM ${tableName} WHERE header_hash = $1`;
   try {
-    const result = await pool.query(query, [blockHash]);
-    return result.rows.map((row) => row.tx_hash);
+    const result = await sql`SELECT tx_hash FROM ${sql(tableName)} WHERE header_hash = ${blockHash}`;
+    return result.map((row) => row.tx_hash);
   } catch (err) {
     throw err;
   }
 };
 
 export const retrieveBlockHashByTxHash = async (
-  pool: Pool,
+  sql: Sql,
   txHash: Uint8Array,
 ): Promise<Option.Option<Uint8Array>> => {
-  const query = `SELECT header_hash FROM ${tableName} WHERE tx_hash = $1`;
   try {
-    const result = await pool.query(query, [txHash]);
-    if (result.rows.length > 0) {
-      return Option.some(result.rows[0].header_hash);
+    const result = await sql`SELECT header_hash FROM ${sql(tableName)} WHERE tx_hash = ${txHash}`;
+    if (result.length > 0) {
+      return Option.some(result[0].header_hash);
     } else {
       return Option.none();
     }
@@ -59,27 +53,25 @@ export const retrieveBlockHashByTxHash = async (
 };
 
 export const clearBlock = async (
-  pool: Pool,
+  sql: Sql,
   blockHash: Uint8Array,
 ): Promise<void> => {
-  const query = `DELETE FROM ${tableName} WHERE header_hash = $1`;
   try {
-    await pool.query(query, [blockHash]);
+    await sql`DELETE FROM ${sql(tableName)} WHERE header_hash = ${blockHash}`;
   } catch (err) {
     throw err;
   }
 };
 
 export const retrieve = async (
-  pool: Pool,
+  sql: Sql,
 ): Promise<[Uint8Array, Uint8Array][]> => {
-  const query = `SELECT * FROM ${tableName}`;
   try {
-    const result = await pool.query(query);
-    return result.rows.map((row) => [row.header_hash, row.tx_hash]);
+    const result = await sql`SELECT * FROM ${sql(tableName)}`;;
+    return result.map((row) => [row.header_hash, row.tx_hash]);
   } catch (err) {
     throw err;
   }
 };
 
-export const clear = async (pool: Pool) => clearTable(pool, tableName);
+export const clear = async (sql: Sql) => clearTable(sql, tableName);
