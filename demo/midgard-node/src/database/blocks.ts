@@ -18,8 +18,8 @@ export const insert = async (
   try {
     const headerHashBuffer: Buffer = Buffer.from(headerHash);
     const pairs = txHashes.map((txHash) => ({
-      key: headerHashBuffer,
-      value: Buffer.from(txHash),
+      header_hash: headerHashBuffer,
+      tx_hash: Buffer.from(txHash),
     }));
     await sql`INSERT INTO ${sql(tableName)} ${sql(
       pairs,
