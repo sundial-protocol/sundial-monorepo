@@ -395,12 +395,7 @@ export const runNode = Effect.gen(function* () {
   const monitorMempoolThread = pipe(mempoolFork(db));
 
   const program = Effect.all(
-    [
-      appThread,
-      blockCommitmentThread,
-      mergeThread,
-      monitorMempoolThread,
-    ],
+    [appThread, blockCommitmentThread, mergeThread, monitorMempoolThread],
     {
       concurrency: "unbounded",
     },

@@ -26,7 +26,7 @@ export class PostgresDB<TKey extends string, TValue extends Uint8Array>
   open = async (copyFromReference?: true) => {
     if (!this._sql) {
       const pool = await Effect.runPromise(
-        pipe(this._database, Effect.provide(NodeConfig.layer))
+        pipe(this._database, Effect.provide(NodeConfig.layer)),
       );
       this._sql = pool;
     }
@@ -96,7 +96,8 @@ SELECT * FROM ${refTableName}`;
     if (!this._sql) {
       throw new Error("Database not open");
     } else {
-      await this._sql`DELETE FROM ${this._tableName} WHERE key = ${fromHex(key)}`;
+      await this
+        ._sql`DELETE FROM ${this._tableName} WHERE key = ${fromHex(key)}`;
     }
   };
 
@@ -130,7 +131,8 @@ SELECT * FROM ${refTableName}`;
     if (!this._sql) {
       throw new Error("Database not open");
     } else {
-      const result = await this._sql`SELECT * FROM ${this._sql(this._tableName)}`;
+      const result = await this
+        ._sql`SELECT * FROM ${this._sql(this._tableName)}`;
       return result.map((row) => ({
         key: row.key,
         value: row.value,
@@ -144,7 +146,8 @@ SELECT * FROM ${refTableName}`;
     if (!this._sql) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
-      const result = await this._sql`SELECT * FROM ${this._sql(this._referenceTableName)}`;
+      const result = await this
+        ._sql`SELECT * FROM ${this._sql(this._referenceTableName)}`;
       return result.map((row) => ({
         key: row.key,
         value: row.value,

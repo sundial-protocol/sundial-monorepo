@@ -16,9 +16,14 @@ export const insert = async (
   txHashes: Uint8Array[],
 ): Promise<void> => {
   try {
-    await sql`INSERT INTO ${sql(tableName)} ${sql(
-      txHashes.map((txHash) => ({header_hash: headerHash, tx_hash: txHash})),
-    )} ON CONFLICT (tx_hash) DO UPDATE SET header_hash = ${headerHash}`;
+    const headerHashBuffer: Buffer = Buffer.from(headerHash);
+    const pairs: [Buffer, Buffer][] = txHashes.map((txHash) => [
+      headerHashBuffer,
+      Buffer.from(txHash),
+    ]);
+    await sql`INSERT INTO ${sql(tableName)} (header_hash, tx_hash) VALUES ${
+      pairs
+    } ON CONFLICT (tx_hash) DO NOTHING`;
   } catch (err) {
     throw err;
   }
@@ -29,7 +34,9 @@ export const retrieveTxHashesByBlockHash = async (
   blockHash: Uint8Array,
 ): Promise<Uint8Array[]> => {
   try {
-    const result = await sql`SELECT tx_hash FROM ${sql(tableName)} WHERE header_hash = ${blockHash}`;
+    const result = await sql`SELECT tx_hash FROM ${sql(
+      tableName,
+    )} WHERE header_hash = ${Buffer.from(blockHash)}`;
     return result.map((row) => row.tx_hash);
   } catch (err) {
     throw err;
@@ -41,7 +48,9 @@ export const retrieveBlockHashByTxHash = async (
   txHash: Uint8Array,
 ): Promise<Option.Option<Uint8Array>> => {
   try {
-    const result = await sql`SELECT header_hash FROM ${sql(tableName)} WHERE tx_hash = ${txHash}`;
+    const result = await sql`SELECT header_hash FROM ${sql(
+      tableName,
+    )} WHERE tx_hash = ${Buffer.from(txHash)}`;
     if (result.length > 0) {
       return Option.some(result[0].header_hash);
     } else {
@@ -57,7 +66,7 @@ export const clearBlock = async (
   blockHash: Uint8Array,
 ): Promise<void> => {
   try {
-    await sql`DELETE FROM ${sql(tableName)} WHERE header_hash = ${blockHash}`;
+    await sql`DELETE FROM ${sql(tableName)} WHERE header_hash = ${Buffer.from(blockHash)}`;
   } catch (err) {
     throw err;
   }
@@ -67,8 +76,11 @@ export const retrieve = async (
   sql: Sql,
 ): Promise<[Uint8Array, Uint8Array][]> => {
   try {
-    const result = await sql`SELECT * FROM ${sql(tableName)}`;;
-    return result.map((row) => [row.header_hash, row.tx_hash]);
+    const result = await sql`SELECT * FROM ${sql(tableName)}`;
+    return result.map((row) => [
+      Uint8Array.from(row.header_hash),
+      Uint8Array.from(row.tx_hash),
+    ]);
   } catch (err) {
     throw err;
   }
