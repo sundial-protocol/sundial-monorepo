@@ -32,7 +32,7 @@ export const retrieveValue = async (
       tableName,
     )} WHERE key = ${Buffer.from(key)}`;
     if (result.length > 0) {
-      return Option.some(result[0].value);
+      return Option.some(Uint8Array.from(result[0].value));
     } else {
       return Option.none();
     }
@@ -49,8 +49,8 @@ export const retrieveValues = async (
   try {
     const result = await sql`SELECT value FROM ${sql(
       tableName,
-    )} WHERE key = ANY(${sql(keys.map(Buffer.from))})`;
-    return result.map((row) => Buffer.from(row.value));
+    )} WHERE key = ANY(${sql.array(keys.map(Buffer.from))})`;
+    return result.map((row) => Uint8Array.from(row.value));
   } catch (err) {
     throw err;
   }

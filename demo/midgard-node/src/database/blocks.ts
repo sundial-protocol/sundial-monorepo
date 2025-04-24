@@ -37,7 +37,7 @@ export const retrieveTxHashesByBlockHash = async (
     const result = await sql`SELECT tx_hash FROM ${sql(
       tableName,
     )} WHERE header_hash = ${Buffer.from(blockHash)}`;
-    return result.map((row) => row.tx_hash);
+    return result.map((row) => Uint8Array.from(row.tx_hash));
   } catch (err) {
     throw err;
   }
