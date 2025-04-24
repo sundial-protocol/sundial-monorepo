@@ -1,22 +1,22 @@
 import { NodeConfig } from "@/config.js";
 import { UtilsDB } from "@/database/index.js";
 import { BatchDBOp, DB } from "@ethereumjs/util";
-import { Effect, pipe } from "effect";
-import pg from "pg";
 import { fromHex } from "@lucid-evolution/lucid";
+import { Effect, pipe } from "effect";
+import { Sql, TransactionSql } from "postgres";
 
 export class PostgresDB<TKey extends string, TValue extends Uint8Array>
   implements DB<TKey, TValue>
 {
-  _pool: pg.Pool | undefined;
-  _database: Effect.Effect<pg.Pool, Error, NodeConfig>;
+  _sql: Sql | undefined;
+  _database: Effect.Effect<Sql, Error, NodeConfig>;
   _tableName: string;
   _referenceTableName: string | undefined;
 
-  constructor(tableName: string, referenceTableName?: string, pool?: pg.Pool) {
+  constructor(tableName: string, referenceTableName?: string, sql?: Sql) {
     this._tableName = tableName;
     this._referenceTableName = referenceTableName;
-    this._pool = pool;
+    this._sql = sql;
     this._database = Effect.gen(function* () {
       const nodeConfig = yield* NodeConfig;
       return nodeConfig.DB_CONN;
@@ -24,50 +24,52 @@ export class PostgresDB<TKey extends string, TValue extends Uint8Array>
   }
 
   open = async (copyFromReference?: true) => {
-    if (!this._pool) {
+    if (!this._sql) {
       const pool = await Effect.runPromise(
         pipe(this._database, Effect.provide(NodeConfig.layer)),
       );
-      this._pool = pool;
+      this._sql = pool;
     }
-    await this._pool.query(UtilsDB.mkKeyValueCreateQuery(this._tableName));
+    await this._sql`SET client_min_messages = 'error'`;
+    await UtilsDB.mkKeyValueCreateQuery(this._sql, this._tableName);
     if (this._referenceTableName && copyFromReference) {
       try {
-        await this._pool.query(`BEGIN`);
-        await this.clear();
-        await this._pool.query(`
-INSERT INTO ${this._tableName}
-SELECT * FROM ${this._referenceTableName}`);
-        await this._pool.query(`COMMIT`);
+        const tableName = this._sql(this._tableName);
+        const refTableName = this._sql(this._referenceTableName);
+        await this._sql.begin(async (sql) => {
+          await UtilsDB.clearTable(sql, this._tableName);
+          await sql`
+INSERT INTO ${tableName}
+SELECT * FROM ${refTableName}`;
+        });
       } catch (e) {
-        await this._pool.query(`ROLLBACK`);
         throw e;
       }
     } else {
       try {
         await this.clear();
-      } catch(e) {
+      } catch (e) {
         throw e;
       }
     }
-  }
+  };
 
   conclude = async () => {
-    if (this._pool) {
+    if (this._sql) {
       await this.transferToReference();
-      await this._pool.end();
+      await this._sql.end();
     }
-  }
+  };
 
   get = async (key: TKey): Promise<TValue | undefined> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else {
-      const query = `SELECT value FROM ${this._tableName} WHERE key = $1`;
       try {
-        const result = await this._pool.query(query, [fromHex(key)]);
-        if (result.rows.length > 0) {
-          return result.rows[0].value;
+        const result = await this
+          ._sql`SELECT value FROM ${this._sql(this._tableName)} WHERE key = ${Buffer.from(fromHex(key))}`;
+        if (result.length > 0) {
+          return result[0].value;
         } else {
           return undefined;
         }
@@ -75,122 +77,134 @@ SELECT * FROM ${this._referenceTableName}`);
         throw err;
       }
     }
-  }
+  };
 
   put = async (key: TKey, val: TValue): Promise<void> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else {
-      const query = `INSERT INTO ${this._tableName} (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2`;
-      await this._pool.query(query, [fromHex(key), val]);
+      await this
+        ._sql`INSERT INTO ${this._sql(this._tableName)} (key, value) VALUES (${Buffer.from(fromHex(key))}, ${Buffer.from(val)}) ON CONFLICT (key) DO UPDATE SET value = ${Buffer.from(val)}`;
     }
-  }
+  };
+
+  _put = async (sql: TransactionSql, key: TKey, val: TValue): Promise<void> => {
+    await sql`INSERT INTO ${sql(this._tableName)} (key, value) VALUES (${Buffer.from(fromHex(key))}, ${Buffer.from(val)}) ON CONFLICT (key) DO UPDATE SET value = ${Buffer.from(val)}`;
+  };
 
   del = async (key: TKey): Promise<void> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else {
-      const query = `DELETE FROM ${this._tableName} WHERE key = $1`;
-      await this._pool.query(query, [fromHex(key)]);
+      await this
+        ._sql`DELETE FROM ${this._tableName} WHERE key = ${Buffer.from(fromHex(key))}`;
     }
-  }
+  };
+
+  _del = async (sql: TransactionSql, key: TKey): Promise<void> => {
+    await sql`DELETE FROM ${this._tableName} WHERE key = ${Buffer.from(fromHex(key))}`;
+  };
 
   batch = async (opStack: BatchDBOp<TKey, TValue>[]): Promise<void> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else {
       try {
-        await this._pool.query("BEGIN");
-        for (const op of opStack) {
-          if (op.type === "del") {
-            await this.del(op.key);
-          }
+        await this._sql.begin(async (sql) => {
+          for (const op of opStack) {
+            if (op.type === "del") {
+              await this._del(sql, op.key);
+            }
 
-          if (op.type === "put") {
-            await this.put(op.key, op.value);
+            if (op.type === "put") {
+              await this._put(sql, op.key, op.value);
+            }
           }
-        }
-        await this._pool.query("COMMIT");
+        });
       } catch (err) {
-        await this._pool.query("ROLLBACK");
         throw err;
       }
     }
-  }
+  };
 
   getAll = async (): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else {
-      const result = await this._pool.query(`SELECT * FROM ${this._tableName}`);
-      return result.rows.map((row) => ({
+      const result = await this
+        ._sql`SELECT * FROM ${this._sql(this._tableName)}`;
+      return result.map((row) => ({
         key: row.key,
         value: row.value,
       }));
     }
-  }
+  };
 
   getAllFromReference = async (): Promise<
     { key: Uint8Array; value: Uint8Array }[]
   > => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
-      const result = await this._pool.query(
-        `SELECT * FROM ${this._referenceTableName}`,
-      );
-      return result.rows.map((row) => ({
+      const result = await this
+        ._sql`SELECT * FROM ${this._sql(this._referenceTableName)}`;
+      return result.map((row) => ({
         key: row.key,
         value: row.value,
       }));
     } else {
       throw new Error("No reference tables set");
     }
-  }
+  };
 
   clear = async (): Promise<void> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else {
-      await UtilsDB.clearTable(this._pool, this._tableName);
+      await UtilsDB.clearTable(this._sql, this._tableName);
     }
-  }
+  };
 
   clearReference = async (): Promise<void> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
-      await UtilsDB.clearTable(this._pool, this._referenceTableName);
+      await UtilsDB.clearTable(this._sql, this._referenceTableName);
     } else {
       throw new Error("No reference tables set");
     }
-  }
+  };
+
+  _clearReference = async (sql: TransactionSql): Promise<void> => {
+    if (this._referenceTableName) {
+      await UtilsDB.clearTable(sql, this._referenceTableName);
+    } else {
+      throw new Error("No reference tables set");
+    }
+  };
 
   transferToReference = async (): Promise<void> => {
-    if (!this._pool) {
+    if (!this._sql) {
       throw new Error("Database not open");
     } else if (this._referenceTableName) {
       try {
-        await this._pool.query(`BEGIN`);
-        await this.clearReference();
-        await this._pool.query(`
-INSERT INTO ${this._referenceTableName}
-SELECT * FROM ${this._tableName}`);
-        await this._pool.query(`COMMIT`);
+        const tableName = this._sql(this._tableName);
+        const refTableName = this._sql(this._referenceTableName);
+        await this._sql.begin(async (sql) => {
+          await this._clearReference(sql);
+          await sql`
+INSERT INTO ${refTableName}
+SELECT * FROM ${tableName}`;
+        });
       } catch (e) {
-        await this._pool.query(`ROLLBACK`);
         throw e;
       }
     } else {
       throw new Error("No reference tables set");
     }
-  }
+  };
 
   shallowCopy = (): DB<TKey, TValue> => {
-    return new PostgresDB(
-      this._tableName,
-      this._referenceTableName,
-      this._pool,
-    );
-  }
+    return new PostgresDB(this._tableName, this._referenceTableName, this._sql);
+  };
 }

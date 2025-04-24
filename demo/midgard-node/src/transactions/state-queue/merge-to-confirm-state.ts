@@ -12,7 +12,7 @@ import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { LucidEvolution, Script, fromHex } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
-import pg from "pg";
+import { Sql } from "postgres";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
@@ -33,7 +33,7 @@ const mergeBlockCounter = Metric.counter("merge_block_count", {
  */
 export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
-  db: pg.Pool,
+  db: Sql,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   spendScript: Script,
   mintScript: Script,
@@ -52,6 +52,22 @@ export const buildAndSubmitMergeTx = (
       //   "🔸 There are too few blocks in queue while a block submission is in progress.
       // );
       return;
+    }
+
+    if (global.BLOCK_SUBMISSION_IN_PROGRESS) {
+      yield* Effect.logInfo(
+        "🔸 Fetching state queue length to ensure it won't interfere with block submission that's in progress...",
+      );
+      const stateQueueUtxos = yield* Effect.tryPromise({
+        try: () => lucid.utxosAt(fetchConfig.stateQueueAddress),
+        catch: (e) => new Error(`${e}`),
+      });
+
+      global.BLOCKS_IN_QUEUE = stateQueueUtxos.length;
+
+      if (global.BLOCKS_IN_QUEUE < 4) {
+        return;
+      }
     }
 
     yield* Effect.logInfo("🔸 Merging of oldest block started.");
@@ -93,12 +109,6 @@ export const buildAndSubmitMergeTx = (
         },
       ).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
 
-      // Increment the merge block counter before successful L1 as it seems
-      // confirmation can timeout.
-      yield* Metric.increment(mergeBlockCounter).pipe(
-        Effect.withSpan("increment-merge-block-counter"),
-      );
-
       // Submit the transaction
       yield* handleSignSubmit(lucid, txBuilder).pipe(
         Effect.withSpan("handleSignSubmit-merge-tx"),
@@ -139,6 +149,11 @@ export const buildAndSubmitMergeTx = (
         BlocksDB.clearBlock(db, fromHex(headerHash)),
       ).pipe(Effect.withSpan("clear-block-from-BlocksDB"));
       yield* Effect.logInfo("🔸 ☑️  Merge transaction completed.");
+
+      yield* Metric.increment(mergeBlockCounter).pipe(
+        Effect.withSpan("increment-merge-block-counter"),
+      );
+
       global.BLOCKS_IN_QUEUE -= 1;
     } else {
       global.BLOCKS_IN_QUEUE = 0;
