@@ -1,6 +1,7 @@
 import { NodeConfig } from "@/config.js";
 import { UtilsDB } from "@/database/index.js";
 import { BatchDBOp, DB } from "@ethereumjs/util";
+import { fromHex } from "@lucid-evolution/lucid";
 import { Effect, pipe } from "effect";
 import { Sql, TransactionSql } from "postgres";
 
@@ -66,7 +67,7 @@ SELECT * FROM ${refTableName}`;
     } else {
       try {
         const result = await this
-          ._sql`SELECT value FROM ${this._sql(this._tableName)} WHERE key = \\x${key}::BYTEA`;
+          ._sql`SELECT value FROM ${this._sql(this._tableName)} WHERE key = ${Buffer.from(fromHex(key))}`;
         if (result.length > 0) {
           return result[0].value;
         } else {
@@ -83,12 +84,12 @@ SELECT * FROM ${refTableName}`;
       throw new Error("Database not open");
     } else {
       await this
-        ._sql`INSERT INTO ${this._sql(this._tableName)} (key, value) VALUES (\\x${key}, ${Buffer.from(val)}) ON CONFLICT (key) DO UPDATE SET value = ${Buffer.from(val)}`;
+        ._sql`INSERT INTO ${this._sql(this._tableName)} (key, value) VALUES (${Buffer.from(fromHex(key))}, ${Buffer.from(val)}) ON CONFLICT (key) DO UPDATE SET value = ${Buffer.from(val)}`;
     }
   };
 
   _put = async (sql: TransactionSql, key: TKey, val: TValue): Promise<void> => {
-    await sql`INSERT INTO ${sql(this._tableName)} (key, value) VALUES (\\x${key}, ${Buffer.from(val)}) ON CONFLICT (key) DO UPDATE SET value = ${Buffer.from(val)}`;
+    await sql`INSERT INTO ${sql(this._tableName)} (key, value) VALUES (${Buffer.from(fromHex(key))}, ${Buffer.from(val)}) ON CONFLICT (key) DO UPDATE SET value = ${Buffer.from(val)}`;
   };
 
   del = async (key: TKey): Promise<void> => {
@@ -96,12 +97,12 @@ SELECT * FROM ${refTableName}`;
       throw new Error("Database not open");
     } else {
       await this
-        ._sql`DELETE FROM ${this._tableName} WHERE key = \\x${key}::BYTEA`;
+        ._sql`DELETE FROM ${this._tableName} WHERE key = ${Buffer.from(fromHex(key))}`;
     }
   };
 
   _del = async (sql: TransactionSql, key: TKey): Promise<void> => {
-    await sql`DELETE FROM ${this._tableName} WHERE key = \\x${key}::BYTEA`;
+    await sql`DELETE FROM ${this._tableName} WHERE key = ${Buffer.from(fromHex(key))}`;
   };
 
   batch = async (opStack: BatchDBOp<TKey, TValue>[]): Promise<void> => {
