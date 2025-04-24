@@ -17,13 +17,13 @@ export const insert = async (
 ): Promise<void> => {
   try {
     const headerHashBuffer: Buffer = Buffer.from(headerHash);
-    const pairs: [Buffer, Buffer][] = txHashes.map((txHash) => [
-      headerHashBuffer,
-      Buffer.from(txHash),
-    ]);
-    await sql`INSERT INTO ${sql(tableName)} (header_hash, tx_hash) VALUES ${
-      pairs
-    } ON CONFLICT (tx_hash) DO NOTHING`;
+    const pairs = txHashes.map((txHash) => ({
+      key: headerHashBuffer,
+      value: Buffer.from(txHash),
+    }));
+    await sql`INSERT INTO ${sql(tableName)} ${sql(
+      pairs,
+    )} ON CONFLICT (tx_hash) DO NOTHING`;
   } catch (err) {
     throw err;
   }

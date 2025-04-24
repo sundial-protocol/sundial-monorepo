@@ -75,9 +75,11 @@ export const insertKeyValue = async (
 ): Promise<void> => {
   try {
     const valueBuffer: Buffer = Buffer.from(value);
-    await sql`INSERT INTO ${sql(tableName)} (key, value) VALUES (${Buffer.from(
-      key,
-    )}, ${valueBuffer}) ON CONFLICT (key) DO UPDATE SET value = ${valueBuffer}`;
+    await sql`INSERT INTO ${sql(tableName)} ${sql(
+      { key: Buffer.from(key), value: valueBuffer },
+      "key",
+      "value",
+    )} ON CONFLICT (key) DO UPDATE SET value = ${valueBuffer}`;
   } catch (err) {
     throw err;
   }
@@ -91,11 +93,11 @@ export const insertKeyValues = async (
   if (utxosCBOR.length === 0) {
     return;
   }
-  const pairs: [Buffer, Buffer][] = utxosCBOR.map((p) => [
-    Buffer.from(p.key),
-    Buffer.from(p.value),
-  ]);
-  await sql`INSERT INTO ${sql(tableName)} (key, value) VALUES ${pairs}`;
+  const pairs = utxosCBOR.map((kv) => ({
+    key: Buffer.from(kv.key),
+    value: Buffer.from(kv.value),
+  }));
+  await sql`INSERT INTO ${sql(tableName)} ${sql(pairs)}`;
 };
 
 export const retrieveKeyValues = async (
