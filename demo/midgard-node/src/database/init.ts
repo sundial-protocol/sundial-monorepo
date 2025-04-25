@@ -2,28 +2,27 @@ import * as BlocksDB from "./blocks.js";
 import * as ConfirmedLedgerDB from "./confirmedLedger.js";
 import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
-import * as LatestLedgerCloneDB from "./latestLedgerClone.js";
 import * as MempoolDB from "./mempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { Pool } from "pg";
+import { mkKeyValueCreateQuery } from "./utils.js";
+import { Sql } from "postgres";
 import { logAbort, logInfo } from "@/utils.js";
 
-export const initializeDb = async (pool: Pool) => {
+export const initializeDb = async (sql: Sql) => {
   try {
-    await pool.query(`
-      SET default_transaction_isolation TO 'serializable';
-    `);
+    // await sql`SET default_transaction_read_only TO 'off'`;
+    await sql`SET client_min_messages = 'error'`;
+    await sql`SET default_transaction_isolation TO 'serializable'`;
 
-    await pool.query(BlocksDB.createQuery);
-    await pool.query(MempoolDB.createQuery);
-    await pool.query(MempoolLedgerDB.createQuery);
-    await pool.query(ImmutableDB.createQuery);
-    await pool.query(ConfirmedLedgerDB.createQuery);
-    await pool.query(LatestLedgerDB.createQuery);
-    await pool.query(LatestLedgerCloneDB.createQuery);
+    await BlocksDB.createQuery(sql);
+    await mkKeyValueCreateQuery(sql, MempoolDB.tableName);
+    await mkKeyValueCreateQuery(sql, MempoolLedgerDB.tableName);
+    await mkKeyValueCreateQuery(sql, ImmutableDB.tableName);
+    await mkKeyValueCreateQuery(sql, ConfirmedLedgerDB.tableName);
+    await mkKeyValueCreateQuery(sql, LatestLedgerDB.tableName);
 
     logInfo("Connected to the PostgreSQL database");
-    return pool;
+    return sql;
   } catch (err) {
     logAbort(`Error initializing database: ${err}`);
     throw err;
