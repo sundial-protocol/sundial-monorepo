@@ -102,7 +102,7 @@ export const listen = (
               const filtered = allUTxOs.filter(({ value: output }) => {
                 const cmlOutput = CML.TransactionOutput.from_cbor_bytes(output);
                 const address = cmlOutput.address().to_bech32();
-                address === addrDetails.address.bech32;
+                return (address === addrDetails.address.bech32);
               });
               log(
                 `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
