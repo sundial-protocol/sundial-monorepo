@@ -1,145 +1,112 @@
 import { Option } from "effect";
-import { Pool, PoolClient } from "pg";
-import { logAbort, logInfo } from "../utils.js";
-import * as blocks from "./blocks.js";
-import * as confirmedLedger from "./confirmedLedger.js";
-import * as immutable from "./immutable.js";
-import * as latestLedger from "./latestLedger.js";
-import * as mempool from "./mempool.js";
-import * as mempoolLedger from "./mempoolLedger.js";
+import { Sql } from "postgres";
 
-export async function initializeDb(pool: Pool) {
-  try {
-    await pool.query(`
-      SET default_transaction_isolation TO 'serializable';
-    `);
+export const mkKeyValueCreateQuery = (sql: Sql, tableName: string) => sql`
+  CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+    key BYTEA NOT NULL,
+    value BYTEA NOT NULL,
+    PRIMARY KEY (key)
+  );`;
 
-    await pool.query(blocks.createQuery);
-    await pool.query(mempool.createQuery);
-    await pool.query(mempoolLedger.createQuery);
-    await pool.query(immutable.createQuery);
-    await pool.query(confirmedLedger.createQuery);
-    await pool.query(latestLedger.createQuery);
-
-    logInfo("Connected to the PostgreSQL database");
-    return pool;
-  } catch (err) {
-    logAbort(`Error initializing database: ${err}`);
-    throw err;
-  }
-}
-
-export const clearUTxOs = async (
-  pool: Pool | PoolClient,
+export const delMultiple = async (
+  sql: Sql,
   tableName: string,
-  refs: Uint8Array[],
+  keys: Uint8Array[],
 ): Promise<void> => {
-  const query = `DELETE FROM ${tableName} WHERE (tx_in_cbor) IN (${refs
-    .map((_, i) => `($${i + 1})`)
-    .join(", ")})`;
-  // const values = refs.flatMap((r) => [
-  //   Buffer.from(r),
-  // ]);
-
   try {
-    await pool.query(query, refs);
-    // logInfo(`${tableName} db: ${result.rowCount} utxos removed`);
+    await sql`DELETE FROM ${sql(tableName)} WHERE key = ANY(${sql.array(
+      keys.map(Buffer.from),
+    )})`;
   } catch (err) {
-    // logAbort(`${tableName} db: utxos removing error: ${err}`);
     throw err;
   }
 };
 
-export const clearTxs = async (
-  pool: Pool | PoolClient,
+export const retrieveValue = async (
+  sql: Sql,
   tableName: string,
-  txHashes: Uint8Array[],
-): Promise<void> => {
-  const query = `DELETE FROM ${tableName} WHERE tx_hash IN (${txHashes
-    .map((_, i) => `$${i + 1}`)
-    .join(", ")})`;
-  try {
-    const result = await pool.query(query, txHashes);
-    logInfo(`${tableName} db: ${result.rowCount} txs removed`);
-  } catch (err) {
-    logAbort(`${tableName} db: txs removing error: ${err}`);
-    throw err;
-  }
-};
-
-export const retrieveTxCborByHash = async (
-  pool: Pool | PoolClient,
-  tableName: string,
-  txHash: Uint8Array,
+  key: Uint8Array,
 ): Promise<Option.Option<Uint8Array>> => {
-  const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = $1`;
   try {
-    const result = await pool.query(query, [txHash]);
-    if (result.rows.length > 0) {
-      return Option.some(result.rows[0].tx_cbor);
+    const result = await sql`SELECT value FROM ${sql(
+      tableName,
+    )} WHERE key = ${Buffer.from(key)}`;
+    if (result.length > 0) {
+      return Option.some(Uint8Array.from(result[0].value));
     } else {
       return Option.none();
     }
   } catch (err) {
-    // logAbort(`db: retrieving error: ${err}`);
     throw err;
   }
 };
 
-export const retrieveTxCborsByHashes = async (
-  pool: Pool | PoolClient,
+export const retrieveValues = async (
+  sql: Sql,
   tableName: string,
-  txHashes: Uint8Array[],
+  keys: Uint8Array[],
 ): Promise<Uint8Array[]> => {
-  const query = `SELECT tx_cbor FROM ${tableName} WHERE tx_hash = ANY($1)`;
   try {
-    const result = await pool.query(query, [txHashes]);
-    return result.rows.map((row) => row.tx_cbor);
+    const result = await sql`SELECT value FROM ${sql(
+      tableName,
+    )} WHERE key = ANY(${sql.array(keys.map(Buffer.from))})`;
+    return result.map((row) => Uint8Array.from(row.value));
   } catch (err) {
-    // logAbort(`${tableName} db: retrieving error: ${err}`);
     throw err;
   }
 };
 
 export const clearTable = async (
-  pool: Pool | PoolClient,
+  sql: Sql,
   tableName: string,
 ): Promise<void> => {
-  const query = `TRUNCATE TABLE ${tableName} CASCADE;`;
-
   try {
-    await pool.query(query);
-    // logInfo(`${tableName} db: cleared`);
+    await sql`TRUNCATE TABLE ${sql(tableName)} CASCADE`;
   } catch (err) {
-    // logAbort(`${tableName} db: clearing error: ${err}`);
     throw err;
   }
 };
 
-export const insertUTxOsCBOR = async (
-  pool: Pool | PoolClient,
+export const insertKeyValue = async (
+  sql: Sql,
   tableName: string,
-  utxosCBOR: { outputReference: Uint8Array; output: Uint8Array }[],
+  key: Uint8Array,
+  value: Uint8Array,
 ): Promise<void> => {
-  const query = `
-  INSERT INTO ${tableName} (tx_in_cbor, tx_out_cbor)
-  VALUES
-  ${utxosCBOR.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`).join(", ")}
-  `;
-  const values = utxosCBOR.flatMap((u) => [u.outputReference, u.output]);
-  await pool.query(query, values);
+  try {
+    const valueBuffer: Buffer = Buffer.from(value);
+    await sql`INSERT INTO ${sql(tableName)} ${sql(
+      { key: Buffer.from(key), value: valueBuffer },
+      "key",
+      "value",
+    )} ON CONFLICT (key) DO UPDATE SET value = ${valueBuffer}`;
+  } catch (err) {
+    throw err;
+  }
 };
 
-export const retrieveUTxOsCBOR = async (
-  pool: Pool | PoolClient,
+export const insertKeyValues = async (
+  sql: Sql,
   tableName: string,
-): Promise<{ outputReference: Uint8Array; output: Uint8Array }[]> => {
-  const query = `SELECT * FROM ${tableName}`;
-  const rows = await pool.query(query);
-  const result: { outputReference: Uint8Array; output: Uint8Array }[] =
-    rows.rows.map((r) => ({
-      outputReference: r.tx_in_cbor,
-      output: r.tx_out_cbor,
-    }));
-  return result;
+  utxosCBOR: { key: Uint8Array; value: Uint8Array }[],
+): Promise<void> => {
+  if (utxosCBOR.length === 0) {
+    return;
+  }
+  const pairs = utxosCBOR.map((kv) => ({
+    key: Buffer.from(kv.key),
+    value: Buffer.from(kv.value),
+  }));
+  await sql`INSERT INTO ${sql(tableName)} ${sql(pairs)}`;
+};
+
+export const retrieveKeyValues = async (
+  sql: Sql,
+  tableName: string,
+): Promise<{ key: Uint8Array; value: Uint8Array }[]> => {
+  const rows = await sql`SELECT * FROM ${sql(tableName)}`;
+  return rows.map((row) => ({
+    key: new Uint8Array(row.key),
+    value: new Uint8Array(row.value),
+  }));
 };
