@@ -81,6 +81,11 @@ pub type ConfirmedState {
 
 // ## User events
 
+pub fn unsafe_event_to_key_data(event_datum_data: Data) -> Data {
+  expect [id_data, ..] = builtin.unconstr_fields(event_datum_data)
+  id_data
+}
+
 pub fn unsafe_event_to_key_value_pair(
   event_datum_data: Data,
 ) -> Pair<Data, Data> {

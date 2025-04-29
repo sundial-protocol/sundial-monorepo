@@ -1,5 +1,4 @@
 use aiken/merkle_patricia_forestry as mpf
-use cardano/assets.{AssetName}
 use midgard/ledger_state
 use midgard/user_events
 
@@ -23,17 +22,4 @@ pub type SpendPurpose {
 pub type RefundApproach {
   SkippedDeposit { non_membership_proof: mpf.Proof }
   DepositInSettlementGap { settlement_link_ref_input_index: Int }
-}
-
-pub type MintRedeemer {
-  AuthenticateDeposit {
-    nonce_input_index: Int,
-    deposit_output_index: Int,
-    hub_ref_input_index: Int,
-    witness_registration_redeemer_index: Int,
-  }
-  BurnDepositNFT {
-    l2_id: AssetName,
-    witness_unregistration_redeemer_index: Int,
-  }
 }

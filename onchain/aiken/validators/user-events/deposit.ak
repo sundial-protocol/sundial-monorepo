@@ -1,25 +1,20 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
-use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Transaction,
+  Input, Mint, NoDatum, Output, OutputReference, Transaction,
 }
 use env
-use midgard/common/parameter_validation
 use midgard/common/utils.{plutarch_pexcludes, plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
 use midgard/user_events
 use midgard/user_events/deposit.{
-  AuthenticateDeposit, BurnDepositNFT, Datum, DepositInSettlementGap,
-  MintRedeemer, Refund, SkippedDeposit, SpendRedeemer, TransferToReserve,
-}
-use midgard/user_events/witness.{
-  validate_witness_redeemer, witness_script_prefix,
+  Datum, DepositInSettlementGap, Refund, SkippedDeposit, SpendRedeemer,
+  TransferToReserve,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -73,7 +68,7 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = deposit_datum
 
-    expect BurnDepositNFT { l2_id: burn_asset_name, .. }: MintRedeemer =
+    expect user_events.BurnEventNFT { nonce_asset_name: burn_asset_name, .. }: user_events.MintRedeemer =
       utils.get_redeemer_at(
         redeemers,
         Mint(deposit_policy_id),
@@ -211,15 +206,12 @@ validator mint(hub_oracle: ScriptHash) {
     tx: Transaction,
   ) {
     // 1. Perform numerous validations and grant access to:
-    //    - Serialized nonce based on the output reference of a specified input
-    //      UTxO
+    //    - Serialized and hashed nonce based on the output reference of a
+    //      specified input UTxO
     //    - The output value of the UTxO at the deposit address
-    //    - Data encoded `DepositInfo` (which we are ignoring here, implicitly
-    //      relying on user signature for its correctness)
     let
       l2_id,
       output_deposit_value,
-      _output_deposit_event_info_data,
     <-
       user_events.validate_mint(
         hub_oracle,

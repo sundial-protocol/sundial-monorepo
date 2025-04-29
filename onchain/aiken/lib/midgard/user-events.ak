@@ -48,7 +48,7 @@ pub fn validate_mint(
   redeemer: MintRedeemer,
   own_policy: PolicyId,
   tx: Transaction,
-  event_info_validation: fn(AssetName, Value, Data) -> Bool,
+  event_value_validator: fn(AssetName, Value) -> Bool,
 ) {
   when redeemer is {
     AuthenticateEvent {
@@ -118,8 +118,7 @@ pub fn validate_mint(
         ..
       }: Datum<Data> = output_event_datum_data
 
-      let Pair(event_id, event_info) =
-        ledger_state.unsafe_event_to_key_value_pair(event)
+      let event_id = ledger_state.unsafe_event_to_key_data(event)
 
       let nonce_input_out_ref_data: Data = nonce_input_out_ref
 
@@ -142,7 +141,7 @@ pub fn validate_mint(
         // 7. Recorded witness must be correct.
         output_event_witness == expected_witness_script_hash,
         // 8. The provided validation function must pass.
-        event_info_validation(nonce, output_event_value, event_info),
+        event_value_validator(nonce, output_event_value),
       }
     }
     BurnEventNFT { nonce_asset_name, witness_unregistration_redeemer_index } -> {
