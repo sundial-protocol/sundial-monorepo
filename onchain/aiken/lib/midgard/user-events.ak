@@ -1,14 +1,8 @@
-use aiken/builtin
+use aiken/cbor
+use aiken/crypto.{blake2b_256}
+use cardano/assets.{AssetName}
 use cardano/transaction.{OutputReference}
 
-/// Wrapper datatype for both deposit and withdraw events. This allows a unified
-/// serialization function to be defined.
-pub type Event<info> {
-  id: OutputReference,
-  info: info,
-}
-
-pub fn unsafe_to_key_value_pair(event_datum_data: Data) -> Pair<Data, Data> {
-  expect [id_data, info_data, ..] = builtin.unconstr_fields(event_datum_data)
-  Pair(id_data, info_data)
+pub fn hash_out_ref(nonce_out_ref: OutputReference) -> AssetName {
+  cbor.serialise(nonce_out_ref) |> blake2b_256
 }

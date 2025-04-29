@@ -1,10 +1,9 @@
 use aiken/collection/dict
 use aiken/collection/list
-use aiken/crypto.{Blake2b_256, Hash, ScriptHash}
+use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/assets.{PolicyId}
-use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{
   InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Transaction,
 }
@@ -14,11 +13,13 @@ use midgard/common/utils.{plutarch_pexcludes, plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
+use midgard/user_events.{hash_out_ref}
 use midgard/user_events/deposit.{
   AuthenticateDeposit, BurnDepositNFT, Datum, DepositInSettlementGap,
   MintRedeemer, Refund, SkippedDeposit, SpendRedeemer, TransferToReserve,
-  WitnessRedeemer, nonce_out_ref_to_l2_id, validate_witness_redeemer,
-  witness_script_prefix,
+}
+use midgard/user_events/witness.{
+  validate_witness_redeemer, witness_script_prefix,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -236,7 +237,7 @@ validator mint(hub_oracle: ScriptHash) {
         // The deposit will be represented on L2 as a UTxO, where its `tx_hash`
         // is Blake2b256 hash of the serialised nonce input's output reference,
         // and its output index is 0.
-        let l2_id = nonce_out_ref_to_l2_id(nonce_input_out_ref)
+        let l2_id = hash_out_ref(nonce_input_out_ref)
 
         // 1. This deposit NFT must be minted with a quantity of 1.
         expect assets.quantity_of(mint, own_policy, l2_id) == 1
@@ -337,7 +338,7 @@ validator mint(hub_oracle: ScriptHash) {
           assets.quantity_of(mint, own_policy, l2_id) == -1,
           // 2. Witness staking script corresponding to the NFT must be getting
           //    unregistered.
-          // 3. `WitnessRedeemer` for unregistration must be equal to
+          // 3. `PublishRedeemer` for unregistration must be equal to
           //    `own_policy`
           validate_witness_redeemer(
             expected_witness_script_hash: expected_witness_script_hash,
@@ -349,36 +350,6 @@ validator mint(hub_oracle: ScriptHash) {
         }
       }
     }
-  }
-
-  else(_) {
-    fail
-  }
-}
-
-validator witness(nonce: Hash<Blake2b_256, ByteArray>) {
-  publish(redeemer: WitnessRedeemer, certificate: Certificate, tx: Transaction) {
-    parameter_validation.prehashed_param_no_datum_wrapper(
-      validator_function: fn(
-        l2_id: Hash<Blake2b_256, ByteArray>,
-        deposit_minting_policy: WitnessRedeemer,
-        cert: Certificate,
-        tx: Transaction,
-      ) -> Bool {
-        let mint_qty =
-          tx.mint |> assets.quantity_of(deposit_minting_policy, l2_id)
-
-        when cert is {
-          RegisterCredential { .. } -> mint_qty == 1
-          UnregisterCredential { .. } -> mint_qty == -1
-          _ -> False
-        }
-      },
-      param: nonce,
-      redeemer: redeemer,
-      variable_arg: certificate,
-      tx: tx,
-    )
   }
 
   else(_) {
