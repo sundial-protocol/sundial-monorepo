@@ -1,18 +1,10 @@
-use aiken/crypto.{ScriptHash}
 use aiken/merkle_patricia_forestry as mpf
-use cardano/address.{Address}
 use cardano/assets.{AssetName}
-use cardano/transaction.{Datum as CardanoDatum, Publish, Redeemer}
-use midgard/common/types.{PosixTime}
 use midgard/ledger_state
+use midgard/user_events
 
-pub type Datum {
-  event: ledger_state.DepositEvent,
-  inclusion_time: PosixTime,
-  witness: ScriptHash,
-  refund_address: Address,
-  refund_datum: CardanoDatum,
-}
+pub type Datum =
+  user_events.Datum<ledger_state.DepositEvent>
 
 pub type SpendRedeemer {
   input_index: Int,
