@@ -20,9 +20,10 @@ use aiken/crypto.{ScriptHash, Signature, VerificationKey, VerificationKeyHash}
 use cardano/address.{Address}
 use cardano/assets.{Lovelace, Value}
 use cardano/transaction.{
-  Output, OutputReference, Redeemer, ScriptPurpose, TransactionId, ValidityRange,
+  Datum as CardanoDatum, Output, OutputReference, Redeemer, ScriptPurpose,
+  TransactionId, ValidityRange,
 }
-use midgard/common/types.{H28, H32, MerkleRoot, PosixTime}
+use midgard/common/types.{H28, H32, MerkleRoot, PosixTime, Tokens}
 
 // # Ledger state types
 
@@ -115,8 +116,9 @@ pub type WithdrawalId =
 
 pub type WithdrawalInfo {
   l2_out_ref: OutputReference,
+  l2_value: Tokens,
   l1_address: Address,
-  l1_datum: Option<Data>,
+  l1_datum: CardanoDatum,
 }
 
 pub type WithdrawalEvent {

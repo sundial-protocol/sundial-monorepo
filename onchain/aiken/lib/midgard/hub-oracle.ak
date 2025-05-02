@@ -28,6 +28,7 @@ pub type Datum {
   withdrawal_addr: Address,
   settlement_queue_addr: Address,
   reserve_addr: Address,
+  reserve_observer: ScriptHash,
 }
 
 /// The assumption here is that the UTxO with the datum is authenticated with an

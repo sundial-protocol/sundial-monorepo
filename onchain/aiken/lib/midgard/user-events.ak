@@ -1,21 +1,19 @@
-use aiken/builtin
 use aiken/cbor
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, blake2b_256}
 use aiken/interval.{Finite}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeKey}
-use aiken_design_patterns/singular_utxo_indexer
 use cardano/address.{Address}
 use cardano/assets.{AssetName, PolicyId, Value}
 use cardano/transaction.{
-  Datum as CardanoDatum, InlineDatum, Input, Mint, Output, OutputReference,
-  Redeemer, ScriptPurpose, Transaction,
+  Datum as CardanoDatum, InlineDatum, Input, Output, OutputReference, Redeemer,
+  ScriptPurpose, Transaction,
 }
 use env
 use midgard/common/parameter_validation
 use midgard/common/types.{MerkleRoot, PosixTime}
-use midgard/common/utils.{plutarch_pexcludes, plutarch_phas}
+use midgard/common/utils.{plutarch_pexcludes}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue

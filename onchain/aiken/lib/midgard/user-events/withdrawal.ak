@@ -6,7 +6,7 @@ pub type Datum =
   user_events.Datum<ledger_state.WithdrawalEvent>
 
 pub type SpendPurpose {
-  Finalize { membership_proof: mpf.Proof, reserve_redeemer_index: Int }
+  Conclude { membership_proof: mpf.Proof, reserve_redeemer_index: Int }
   Refund { refund_approach: user_events.RefundApproach }
 }
 

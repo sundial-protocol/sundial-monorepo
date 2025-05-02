@@ -20,6 +20,7 @@ A withdrawal event in a Midgard block acknowledges that a user has created an L1
     \T{WithdrawalInfo} &\coloneq \left\{
         \begin{array}{ll}
             \T{l2\_outref} :& \T{OutputRef} \\
+            \T{l2\_value} :& \T{Value} \\
             \T{l1\_address} : & \T{Address} \\
             \T{l1\_datum} : & \T{Option(Data)} \\
             \T{midgard\_tokens} : & \T{Pairs(PolicyId, Pairs(AssetName, Int))}

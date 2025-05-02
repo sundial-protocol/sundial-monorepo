@@ -7,7 +7,7 @@ use cardano/transaction.{
   Input, Mint, NoDatum, Output, OutputReference, Transaction,
 }
 use env
-use midgard/common/utils.{plutarch_pexcludes, plutarch_phas}
+use midgard/common/utils.{plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
@@ -97,7 +97,7 @@ validator spend(hub_oracle: ScriptHash) {
 
         when spend_purpose is {
           TransferToReserve { membership_proof } -> {
-            let deposit_event_pair =
+            let Pair(deposit_event_id, deposit_event_info) =
               ledger_state.unsafe_event_to_key_value_pair(deposit_event)
 
             and {
@@ -106,8 +106,8 @@ validator spend(hub_oracle: ScriptHash) {
               //    inclusion time of the deposit.
               plutarch_phas(
                 deposits_root,
-                deposit_event_pair.1st,
-                deposit_event_pair.2nd,
+                deposit_event_id,
+                deposit_event_info,
                 membership_proof,
                 redeemers,
               ),
