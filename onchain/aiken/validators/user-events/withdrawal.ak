@@ -1,18 +1,17 @@
 use aiken/crypto.{ScriptHash}
 use aiken_design_patterns/singular_utxo_indexer
-use cardano/address.{Script}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
-  Input, Mint, Output, OutputReference, Transaction, Withdraw,
+  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use midgard/common/utils.{plutarch_phas}
+use midgard/escrow
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/reserve
 use midgard/settlement_queue
 use midgard/user_events
 use midgard/user_events/withdrawal.{
-  Conclude, Datum, Refund, SpendPurpose, SpendRedeemer,
+  Datum, Refund, SpendRedeemer, TransferToEscrow,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -24,23 +23,21 @@ validator spend(hub_oracle: ScriptHash) {
   ) {
     let Transaction { reference_inputs, redeemers, .. } = tx
 
-    let user_events.SpendRedeemer {
+    let SpendRedeemer {
       input_index,
       output_index,
       hub_ref_input_index,
       settlement_ref_input_index,
-      mint_redeemer_index,
+      burn_redeemer_index,
+      escrow_mint_redeemer_index,
       purpose,
     } = redeemer
-
-    // TODO: We can also use `builtin.un_constr_data` to manually match on
-    //       different constructor indices.
-    expect purpose: SpendPurpose = purpose
 
     let hub.Datum {
       withdrawal: withdrawal_policy_id,
       settlement_queue: settlement_queue_policy_id,
-      reserve_observer,
+      escrow: escrow_policy_id,
+      escrow_addr,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
@@ -71,31 +68,40 @@ validator spend(hub_oracle: ScriptHash) {
       utils.get_redeemer_at(
         redeemers,
         Mint(withdrawal_policy_id),
-        mint_redeemer_index,
+        burn_redeemer_index,
       )
+
+    expect escrow.MintRedeemer { withdrawal_utxo_out_ref }: escrow.MintRedeemer =
+      utils.get_redeemer_at(
+        redeemers,
+        Mint(escrow_policy_id),
+        escrow_mint_redeemer_index,
+      )
+    expect withdrawal_utxo_out_ref == own_out_ref
 
     singular_utxo_indexer.spend(
       fn(_in_ix, input, spend_purpose, _out_ix, output) {
         let Input { output: Output { value: own_value, .. }, .. } = input
 
-        let Output {
+        // 1. The produced UTxO must not have any scripts attached to it.
+        expect Output {
           address: output_address,
           value: output_value,
           datum: output_datum,
-          ..
+          reference_script: None,
         } = output
 
-        // 1. Output value must be the same as the input value, except for the
-        //    withdrawal NFT.
-        //    TODO: Fees must be deduced whenever we have a clear plan for them
-        //          (for `TransferToReserve` endpoint).
+        // 2. Output value must be the same as the input value, without the
+        //    withdrawal NFT, with escrow NFT added.
         expect
           output_value == (
-            own_value |> assets.add(withdrawal_policy_id, burn_asset_name, -1)
+            own_value
+              |> assets.add(withdrawal_policy_id, burn_asset_name, -1)
+              |> assets.add(escrow_policy_id, burn_asset_name, 1)
           )
 
         when spend_purpose is {
-          Conclude { membership_proof, reserve_redeemer_index } -> {
+          TransferToEscrow { membership_proof } -> {
             let Pair(withdrawal_event_id, withdrawal_event_info) =
               ledger_state.unsafe_event_to_key_value_pair(withdrawal_event)
 
@@ -111,40 +117,25 @@ validator spend(hub_oracle: ScriptHash) {
                 redeemers,
               )
 
-            expect ledger_state.WithdrawalInfo {
+            expect ledger_state.WithdrawalInfo { body: withdrawal_body, .. } =
+              withdrawal_event_info
+
+            let ledger_state.WithdrawalBody {
               l2_value,
               l1_address,
               l1_datum,
               ..
-            } = withdrawal_event_info
+            } = withdrawal_body
 
-            expect and {
-                // 4. Output value must contain all the value from L2.
-                //    TODO: No fees taken into account yet.
-                assets.match(
-                  output_value,
-                  l2_value,
-                  fn(value_ada, tokens_ada) { value_ada == tokens_ada },
-                ),
-                // 5. Assert specified datum is attached.
-                output_datum == l1_datum,
-                // 6. Withdrawal must go to the specified address.
-                output_address == l1_address,
-              }
+            let expected_output_datum: Data =
+              escrow.Datum { l2_value, l1_address, l1_datum }
 
-            // 7. The observer script of reserve contract must be present in the
-            //    transaction (withdraw-0 trick), with a matching redeemer.
-            expect reserve.ValidateWithdrawals { withdrawal_input_index, .. }: reserve.WithdrawRedeemer =
-              utils.get_redeemer_at(
-                redeemers,
-                Withdraw(Script(reserve_observer)),
-                reserve_redeemer_index,
-              )
-
-            // 8. The withdrawal input index from reserve's observer script
-            //    (i.e. withdraw-0 trick) must mach the input index for this
-            //    spend validation.
-            withdrawal_input_index == input_index
+            and {
+              // 4. Assert proper datum is attached to the escrow UTxO.
+              output_datum == InlineDatum(expected_output_datum),
+              // 5. Withdrawal must go to the escrow contract.
+              output_address == escrow_addr,
+            }
           }
           Refund { refund_approach } ->
             user_events.validate_refund(

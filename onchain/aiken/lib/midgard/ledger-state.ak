@@ -23,7 +23,7 @@ use cardano/transaction.{
   Datum as CardanoDatum, Output, OutputReference, Redeemer, ScriptPurpose,
   TransactionId, ValidityRange,
 }
-use midgard/common/types.{H28, H32, MerkleRoot, PosixTime, Tokens}
+use midgard/common/types.{H28, H32, MerkleRoot, PosixTime, ValuePairs}
 
 // # Ledger state types
 
@@ -114,11 +114,30 @@ pub type DepositEvent {
 pub type WithdrawalId =
   OutputReference
 
-pub type WithdrawalInfo {
+pub type WithdrawalBody {
   l2_out_ref: OutputReference,
-  l2_value: Tokens,
+  l2_owner: VerificationKeyHash,
+  l2_value: ValuePairs,
   l1_address: Address,
   l1_datum: CardanoDatum,
+}
+
+pub type WithdrawalSignature =
+  Pair<VerificationKey, Signature>
+
+pub type WithdrawalInvalidity {
+  NonExistentWithdrawalUtxo
+  SpentWithdrawalUtxo { l2_tx_hash: H32<MidgardTxCompact> }
+  IncorrectWithdrawalOwner
+  IncorrectWithdrawalValue
+  IncorrectWithdrawalSignature
+  TooManyTokensInWithdrawal
+}
+
+pub type WithdrawalInfo {
+  body: WithdrawalBody,
+  signature: WithdrawalSignature,
+  invalidity: Option<WithdrawalInvalidity>,
 }
 
 pub type WithdrawalEvent {

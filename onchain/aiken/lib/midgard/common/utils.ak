@@ -1,6 +1,6 @@
 use aiken/builtin
 use aiken/cbor
-use aiken/collection/dict
+use aiken/collection/dict.{Dict}
 use aiken/collection/list
 use aiken/crypto.{
   ScriptHash, VerificationKey, VerificationKeyHash, blake2b_224, blake2b_256,
@@ -18,7 +18,7 @@ use env
 use midgard/common/constants.{
   max_validity_range_for_current_time, posix_time_none,
 }
-use midgard/common/types.{H28, H32, PosixTime, Tokens}
+use midgard/common/types.{H28, H32, PosixTime, ValuePairs}
 
 /// Check whether the interval starts on or after the point.
 pub fn is_hereafter(self: Interval<Int>, point: Int) -> Bool {
@@ -199,7 +199,8 @@ pub fn get_asset_name_from_value_with_policy(
 ) -> AssetName {
   expect [Pair(asset_name, _)] =
     value
-      |> assets.tokens(policy_id) //return dict of policy id to asset name and quantity
+      |> assets.tokens(policy_id)
+      //return dict of policy id to asset name and quantity
       |> dict.to_pairs
 
   asset_name
@@ -212,7 +213,8 @@ pub fn get_singleton_asset_with_policy(
 ) -> Pair<AssetName, Int> {
   expect [p] =
     value
-      |> assets.tokens(policy_id) //return dict of policy id to asset name and quantity
+      |> assets.tokens(policy_id)
+      //return dict of policy id to asset name and quantity
       |> dict.to_pairs
 
   p
@@ -228,22 +230,94 @@ pub fn verify_hash_28(data: Data, data_hash: H28<Data>) {
   expect blake2b_224(cbor.serialise(data)) == data_hash
 }
 
-/// Given a value, an NFT, and a `Tokens` (structured identical to `Value`, but
-/// safe for storage in datums), this helper ensures that the given `Value` is
-/// a correct representation of the given `Tokens`. Meaning it expects `Value`
-/// to only have the `Tokens`, the NFT, and some ADA. It also validates that 0
-/// ADA is included in `Tokens` (this does NOT validate the absence of ADA
-/// policy ID and asset name in `Tokens`, TODO?).
+/// Given a value, an NFT, and a `ValuePairs` (structured identical to `Value`,
+/// but safe for storage in datums), this helper ensures that the given `Value`
+/// is a correct representation of the given `ValuePairs`. Meaning it expects
+/// `Value` to only have the `ValuePairs`, the NFT, and some ADA. It also
+/// validates that 0 ADA is included in `ValuePairs` (this does NOT validate the
+/// absence of ADA policy ID and asset name in `ValuePairs`, TODO?).
 pub fn authentic_value_has_tokens(
   value: Value,
   nft_policy_id: PolicyId,
   nft_asset_name: AssetName,
-  tokens: Tokens,
+  tokens: ValuePairs,
 ) -> Bool {
   let without_nft =
     value
       |> assets.add(nft_policy_id, nft_asset_name, -1)
   assets.match(without_nft, tokens, fn(_, tokens_ada) { tokens_ada == 0 })
+}
+
+pub fn zip_foldl(
+  self: List<a>,
+  bs: List<b>,
+  acc: c,
+  with: fn(a, b, c) -> c,
+) -> c {
+  when self is {
+    [] -> acc
+    [x, ..xs] ->
+      when bs is {
+        [] -> acc
+        [y, ..ys] -> {
+          let c = zip_foldl(xs, ys, acc, with)
+          with(x, y, c)
+        }
+      }
+  }
+}
+
+pub fn zip_foldr(
+  self: List<a>,
+  bs: List<b>,
+  acc: c,
+  with: fn(a, b, c) -> c,
+) -> c {
+  when self is {
+    [] -> acc
+    [x, ..xs] ->
+      when bs is {
+        [] -> acc
+        [y, ..ys] -> {
+          let c = with(x, y, acc)
+          zip_foldr(xs, ys, c, with)
+        }
+      }
+  }
+}
+
+/// Function for comparing a `Value` (presumably coming from script context),
+/// agains a `ValuePairs` (presumably coming from a datum). This helper only
+/// works for values that are identical, apart from the quantities.
+///
+/// As an example use-case, this allows checking the `Value` has still not
+/// reached the target `ValuePairs`.
+pub fn compare_authentic_value_with_target(
+  value: Value,
+  nft_policy_id: PolicyId,
+  nft_asset_name: AssetName,
+  target: ValuePairs,
+  quantity_predicate: fn(Int, Int) -> Bool,
+) -> Bool {
+  let value_without_nft: Pairs<PolicyId, Dict<AssetName, Int>> =
+    value
+      |> assets.add(nft_policy_id, nft_asset_name, -1)
+      |> assets.to_dict
+      |> dict.to_pairs
+  let
+    value_policy_pair,
+    target_policy_pair,
+    _,
+  <- zip_foldr(value_without_nft, target, True)
+  expect value_policy_pair.1st == target_policy_pair.1st
+  let value_token_pairs = value_policy_pair.2nd |> dict.to_pairs
+  let
+    value_token_pair,
+    target_token_pair,
+    _,
+  <- zip_foldr(value_token_pairs, target_policy_pair.2nd, True)
+  expect value_token_pair.1st == target_token_pair.1st
+  quantity_predicate(value_token_pair.2nd, target_token_pair.2nd)
 }
 
 pub fn get_redeemer_at(
