@@ -66,6 +66,9 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = deposit_datum
 
+    // 1. Spending a user event UTxO must also be accompanied by the burning of
+    //    its NFT (and consequently deregistration of its witness staking
+    //    script).
     expect user_events.BurnEventNFT { nonce_asset_name: burn_asset_name, .. }: user_events.MintRedeemer =
       utils.get_redeemer_at(
         redeemers,
@@ -77,7 +80,7 @@ validator spend(hub_oracle: ScriptHash) {
       fn(_in_ix, input, spend_purpose, _out_ix, output) {
         let Input { output: Output { value: own_value, .. }, .. } = input
 
-        // 1. The produced UTxO must not have any scripts attached to it.
+        // 2. The produced UTxO must not have any scripts attached to it.
         expect Output {
           address: output_address,
           value: output_value,
@@ -85,23 +88,23 @@ validator spend(hub_oracle: ScriptHash) {
           reference_script: None,
         } = output
 
-        // 2. Output value must be the same as the input value, except for the
-        //    deposit NFT.
-        //    TODO: Reserve contract might end up requiring an NFT.
-        //    TODO: Fees must be deduced whenever we have a clear plan for them
-        //          (for `TransferToReserve` endpoint).
-        expect
-          output_value == (
-            own_value |> assets.add(deposit_policy_id, burn_asset_name, -1)
-          )
-
         when spend_purpose is {
           TransferToReserve { membership_proof } -> {
+            // 3. Output value must be the same as the input value, except for
+            //    the deposit NFT.
+            //    TODO: Reserve contract might end up requiring an NFT.
+            //    TODO: Fees must be deduced whenever we have a clear plan for
+            //          them (for `TransferToReserve` endpoint).
+            expect
+              output_value == (
+                own_value |> assets.add(deposit_policy_id, burn_asset_name, -1)
+              )
+
             let Pair(deposit_event_id, deposit_event_info) =
               ledger_state.unsafe_event_to_key_value_pair(deposit_event)
 
             and {
-              // 3. The referenced settlement node's deposit tree must contain
+              // 4. The referenced settlement node's deposit tree must contain
               //    the subject deposit event. No need to check for the
               //    inclusion time of the deposit.
               plutarch_phas(
@@ -111,15 +114,16 @@ validator spend(hub_oracle: ScriptHash) {
                 membership_proof,
                 redeemers,
               ),
-              // 4. Assert no datum is attached to the produced UTxO.
+              // 5. Assert no datum is attached to the produced UTxO.
               //    TODO: This might change depending on implementation of
               //          reserve.
               output_datum == NoDatum,
-              // 5. Deposit must go to the reserve.
+              // 6. Deposit must go to the reserve.
               output_address == reserve_addr,
             }
           }
           Refund { refund_approach } ->
+            // 3. Numerous validations for the refund logic.
             user_events.validate_refund(
               own_value,
               deposit_policy_id,

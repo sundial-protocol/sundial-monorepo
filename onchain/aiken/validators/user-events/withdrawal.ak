@@ -64,6 +64,9 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = withdrawal_datum
 
+    // 1. Spending a user event UTxO must also be accompanied by the burning of
+    //    its NFT (and consequently deregistration of its witness staking
+    //    script).
     expect user_events.BurnEventNFT { nonce_asset_name: burn_asset_name, .. }: user_events.MintRedeemer =
       utils.get_redeemer_at(
         redeemers,
@@ -71,19 +74,11 @@ validator spend(hub_oracle: ScriptHash) {
         burn_redeemer_index,
       )
 
-    expect escrow.MintRedeemer { withdrawal_utxo_out_ref }: escrow.MintRedeemer =
-      utils.get_redeemer_at(
-        redeemers,
-        Mint(escrow_policy_id),
-        escrow_mint_redeemer_index,
-      )
-    expect withdrawal_utxo_out_ref == own_out_ref
-
     singular_utxo_indexer.spend(
       fn(_in_ix, input, spend_purpose, _out_ix, output) {
         let Input { output: Output { value: own_value, .. }, .. } = input
 
-        // 1. The produced UTxO must not have any scripts attached to it.
+        // 2. The produced UTxO must not have any scripts attached to it.
         expect Output {
           address: output_address,
           value: output_value,
@@ -91,21 +86,31 @@ validator spend(hub_oracle: ScriptHash) {
           reference_script: None,
         } = output
 
-        // 2. Output value must be the same as the input value, without the
-        //    withdrawal NFT, with escrow NFT added.
-        expect
-          output_value == (
-            own_value
-              |> assets.add(withdrawal_policy_id, burn_asset_name, -1)
-              |> assets.add(escrow_policy_id, burn_asset_name, 1)
-          )
-
         when spend_purpose is {
           TransferToEscrow { membership_proof } -> {
+            // 3. Output value must be the same as the input value, without the
+            //    withdrawal NFT, and with the escrow NFT added.
+            expect
+              output_value == (
+                own_value
+                  |> assets.add(withdrawal_policy_id, burn_asset_name, -1)
+                  |> assets.add(escrow_policy_id, burn_asset_name, 1)
+              )
+
+            // 4. TODO: Anticipating what the escrow mint redeemer should look
+            //          like.
+            expect escrow.MintRedeemer { withdrawal_utxo_out_ref }: escrow.MintRedeemer =
+              utils.get_redeemer_at(
+                redeemers,
+                Mint(escrow_policy_id),
+                escrow_mint_redeemer_index,
+              )
+            expect withdrawal_utxo_out_ref == own_out_ref
+
             let Pair(withdrawal_event_id, withdrawal_event_info) =
               ledger_state.unsafe_event_to_key_value_pair(withdrawal_event)
 
-            // 3. The referenced settlement node's withdrawal tree must contain
+            // 5. The referenced settlement node's withdrawal tree must contain
             //    the subject withdrawal event. No need to check for the
             //    inclusion time of the withdrawal.
             expect
@@ -131,13 +136,14 @@ validator spend(hub_oracle: ScriptHash) {
               escrow.Datum { l2_value, l1_address, l1_datum }
 
             and {
-              // 4. Assert proper datum is attached to the escrow UTxO.
+              // 6. Assert proper datum is attached to the escrow UTxO.
               output_datum == InlineDatum(expected_output_datum),
-              // 5. Withdrawal must go to the escrow contract.
+              // 7. Withdrawal must go to the escrow contract.
               output_address == escrow_addr,
             }
           }
-          Refund { refund_approach } ->
+          Refund { refund_approach } -> {
+            // 3. Numerous validations for the refund logic.
             user_events.validate_refund(
               own_value,
               withdrawal_policy_id,
@@ -158,6 +164,7 @@ validator spend(hub_oracle: ScriptHash) {
               reference_inputs,
               redeemers,
             )
+          }
         }
       },
       purpose,

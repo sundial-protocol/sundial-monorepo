@@ -115,7 +115,7 @@ pub type WithdrawalId =
   OutputReference
 
 pub type WithdrawalBody {
-  l2_out_ref: OutputReference,
+  l2_outref: OutputReference,
   l2_owner: VerificationKeyHash,
   l2_value: ValuePairs,
   l1_address: Address,
