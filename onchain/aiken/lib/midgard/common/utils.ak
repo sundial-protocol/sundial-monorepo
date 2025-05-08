@@ -248,25 +248,6 @@ pub fn authentic_value_has_tokens(
   assets.match(without_nft, tokens, fn(_, tokens_ada) { tokens_ada == 0 })
 }
 
-pub fn zip_foldl(
-  self: List<a>,
-  bs: List<b>,
-  acc: c,
-  with: fn(a, b, c) -> c,
-) -> c {
-  when self is {
-    [] -> acc
-    [x, ..xs] ->
-      when bs is {
-        [] -> acc
-        [y, ..ys] -> {
-          let c = zip_foldl(xs, ys, acc, with)
-          with(x, y, c)
-        }
-      }
-  }
-}
-
 pub fn zip_foldr(
   self: List<a>,
   bs: List<b>,
@@ -279,8 +260,27 @@ pub fn zip_foldr(
       when bs is {
         [] -> acc
         [y, ..ys] -> {
+          let c = zip_foldr(xs, ys, acc, with)
+          with(x, y, c)
+        }
+      }
+  }
+}
+
+pub fn zip_foldl(
+  self: List<a>,
+  bs: List<b>,
+  acc: c,
+  with: fn(a, b, c) -> c,
+) -> c {
+  when self is {
+    [] -> acc
+    [x, ..xs] ->
+      when bs is {
+        [] -> acc
+        [y, ..ys] -> {
           let c = with(x, y, acc)
-          zip_foldr(xs, ys, c, with)
+          zip_foldl(xs, ys, c, with)
         }
       }
   }
