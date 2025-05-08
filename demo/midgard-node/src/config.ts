@@ -1,6 +1,5 @@
 import { Blockfrost, Kupmios, Lucid, Network } from "@lucid-evolution/lucid";
 import { Config, Context, Effect, Layer, pipe } from "effect";
-import postgres, { Sql } from "postgres";
 import { InitDB } from "@/database/index.js";
 
 const SUPPORTED_PROVIDERS = ["kupmios", "blockfrost"] as const;
@@ -23,7 +22,10 @@ export type NodeConfigDep = {
   CONFIRMED_STATE_POLLING_INTERVAL: number;
   PROM_METRICS_PORT: number;
   OLTP_EXPORTER_URL: string;
-  DB_CONN: Sql;
+  POSTGRES_USER: string;
+  POSTGRES_PASSWORD: string;
+  POSTGRES_DB: string;
+  POSTGRES_HOST: string;
 };
 
 export const makeUserFn = (nodeConfig: NodeConfigDep) =>
@@ -99,23 +101,6 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("POSTGRES_DB").pipe(Config.withDefault("midgard")),
   ]);
 
-  yield* Effect.logInfo("📚 Opening connection to db...");
-
-  const db = postgres({
-    host: config[12],
-    username: config[13],
-    password: config[14],
-    database: config[15],
-    max: 20,
-    idle_timeout: 30000,
-    connect_timeout: 2000,
-  });
-
-  yield* Effect.tryPromise({
-    try: () => InitDB.initializeDb(db),
-    catch: (e) => new Error(`${e}`),
-  });
-
   yield* Effect.logInfo("📚 Done");
 
   const provider = config[0].toLowerCase();
@@ -137,7 +122,10 @@ export const makeConfig = Effect.gen(function* () {
     CONFIRMED_STATE_POLLING_INTERVAL: config[9],
     PROM_METRICS_PORT: config[10],
     OLTP_EXPORTER_URL: config[11],
-    DB_CONN: db,
+    POSTGRES_USER: config[12],
+    POSTGRES_PASSWORD: config[13],
+    POSTGRES_DB: config[14],
+    POSTGRES_HOST: config[15],
   };
 }).pipe(Effect.orDie);
 

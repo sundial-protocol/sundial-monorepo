@@ -9,6 +9,7 @@ import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
 import { AlwaysSucceeds } from "./services/index.js";
 import { NodeRuntime } from "@effect/platform-node";
+import { Database } from "./services/database.js";
 
 // Initialize global flags:
 global.BLOCKS_IN_QUEUE = 0;
@@ -59,6 +60,7 @@ program.version(VERSION).description(
 program.command("listen").action(async () => {
   const program = pipe(
     runNode,
+    Effect.provide(Database.layer),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceeds.AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),

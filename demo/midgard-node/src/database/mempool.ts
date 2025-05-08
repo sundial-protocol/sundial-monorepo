@@ -1,5 +1,4 @@
 import { Option } from "effect";
-import { Sql } from "postgres";
 import {
   clearTable,
   insertKeyValue,
@@ -11,28 +10,24 @@ import {
 
 export const tableName = "mempool";
 
-export const insert = async (
-  sql: Sql,
+export const insert = (
   txHash: Uint8Array,
   txCbor: Uint8Array,
-): Promise<void> => insertKeyValue(sql, tableName, txHash, txCbor);
+)=> insertKeyValue(tableName, txHash, txCbor);
 
-export const retrieveTxCborByHash = async (
-  sql: Sql,
+export const retrieveTxCborByHash = (
   txHash: Uint8Array,
-): Promise<Option.Option<Uint8Array>> => retrieveValue(sql, tableName, txHash);
+)  => retrieveValue(tableName, txHash);
 
-export const retrieveTxCborsByHashes = async (
-  sql: Sql,
+export const retrieveTxCborsByHashes = (
   txHashes: Uint8Array[],
-): Promise<Uint8Array[]> => retrieveValues(sql, tableName, txHashes);
+) => retrieveValues(tableName, txHashes);
 
-export const retrieve = async (
-  sql: Sql,
-): Promise<{ key: Uint8Array; value: Uint8Array }[]> =>
-  retrieveKeyValues(sql, tableName);
+export const retrieve = (
+) =>
+  retrieveKeyValues(tableName);
 
-export const clearTxs = async (sql: Sql, txHashes: Uint8Array[]) =>
-  delMultiple(sql, tableName, txHashes);
+export const clearTxs = (txHashes: Uint8Array[]) =>
+  delMultiple(tableName, txHashes);
 
-export const clear = async (sql: Sql) => clearTable(sql, tableName);
+export const clear = () => clearTable(tableName);
