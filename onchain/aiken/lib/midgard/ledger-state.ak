@@ -125,7 +125,8 @@ pub type WithdrawalBody {
 pub type WithdrawalSignature =
   Pair<VerificationKey, Signature>
 
-pub type WithdrawalInvalidity {
+pub type WithdrawalValidity {
+  WithdrawalIsValid
   NonExistentWithdrawalUtxo
   SpentWithdrawalUtxo { l2_tx_hash: H32<MidgardTxCompact> }
   IncorrectWithdrawalOwner
@@ -137,7 +138,7 @@ pub type WithdrawalInvalidity {
 pub type WithdrawalInfo {
   body: WithdrawalBody,
   signature: WithdrawalSignature,
-  invalidity: Option<WithdrawalInvalidity>,
+  validity: WithdrawalValidity,
 }
 
 pub type WithdrawalEvent {

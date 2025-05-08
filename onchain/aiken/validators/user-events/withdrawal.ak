@@ -189,7 +189,8 @@ validator mint(hub_oracle: ScriptHash) {
     // 1. Perform numerous validations and grant access to:
     //    - Serialized and hashed nonce based on the output reference of a
     //      specified input UTxO
-    //    - The output value of the UTxO at the withdrawal address
+    //    - The output value of the UTxO at the withdrawal address for the
+    //      minting (not burning) endpoint
     let
       l1_id,
       output_withdrawal_order_value,
