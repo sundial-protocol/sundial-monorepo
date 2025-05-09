@@ -163,6 +163,25 @@ pub fn get_authentic_input_with_policy_at(
   found_input
 }
 
+/// For beacon UTxOs with specific NFTs. Note that the address is not checked.
+pub fn get_authentic_input_with_nft_at(
+  inputs: List<Input>,
+  nft_policy_id: PolicyId,
+  nft_asset_name: AssetName,
+  input_index: Int,
+) -> Input {
+  expect Some(
+    Input { output: Output { value: input_value, .. }, .. } as found_input,
+  ) = list.at(inputs, input_index)
+
+  expect (input_nft_policy_id, _, 1) =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect input_nft_triplet == (nft_policy_id, nft_asset_name, 1)
+
+  found_input
+}
+
 /// For beacon UTxOs of validators which their NFTs have policy IDs equal to
 /// their payment credentials.
 pub fn get_authentic_input_of(

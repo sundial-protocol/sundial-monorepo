@@ -13,6 +13,7 @@ pub type Datum =
 pub type NodeData {
   deposits_root: ByteArray,
   withdrawals_root: ByteArray,
+  tx_orders_root: ByteArray,
   start_time: PosixTime,
   end_time: PosixTime,
   resolution_claim: Option<ResolutionClaim>,
@@ -50,6 +51,7 @@ pub type SpendRedeemer {
 pub type EventType {
   Deposit
   Withdrawal
+  TxOrder
 }
 
 pub type MintRedeemer {
