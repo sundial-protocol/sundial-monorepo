@@ -18,4 +18,3 @@ pub type SpendRedeemer {
   burn_redeemer_index: Int,
   purpose: SpendPurpose,
 }
-

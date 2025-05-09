@@ -1,7 +1,7 @@
 use aiken/crypto.{VerificationKey}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
-use cardano/assets.{PolicyId}
+use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{InlineDatum, Input, Output}
 use midgard/common/types.{PosixTime}
 use midgard/common/utils
@@ -43,6 +43,7 @@ pub type SpendRedeemer {
     operator: VerificationKey,
     operator_status: OperatorStatus,
     unresolved_event_ref_input_index: Int,
+    unresolved_event_asset_name: AssetName,
     event_type: EventType,
     membership_proof: mpf.Proof,
   }

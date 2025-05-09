@@ -174,7 +174,7 @@ pub fn get_authentic_input_with_nft_at(
     Input { output: Output { value: input_value, .. }, .. } as found_input,
   ) = list.at(inputs, input_index)
 
-  expect (input_nft_policy_id, _, 1) =
+  let input_nft_triplet =
     get_single_asset_from_value_apart_from_ada(input_value)
 
   expect input_nft_triplet == (nft_policy_id, nft_asset_name, 1)

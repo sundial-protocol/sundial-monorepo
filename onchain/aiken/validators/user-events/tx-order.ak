@@ -1,18 +1,13 @@
 use aiken/crypto.{ScriptHash}
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/assets.{PolicyId}
-use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
-}
+use cardano/transaction.{Input, Mint, Output, OutputReference, Transaction}
 use midgard/common/utils.{plutarch_phas}
-use midgard/escrow
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
 use midgard/user_events
-use midgard/user_events/tx_order.{
-  Datum, Refund, SpendRedeemer, Conclude,
-}
+use midgard/user_events/tx_order.{Conclude, Datum, Refund, SpendRedeemer}
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
@@ -35,8 +30,6 @@ validator spend(hub_oracle: ScriptHash) {
     let hub.Datum {
       tx_order: tx_order_policy_id,
       settlement_queue: settlement_queue_policy_id,
-      escrow: escrow_policy_id,
-      escrow_addr,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
@@ -48,7 +41,7 @@ validator spend(hub_oracle: ScriptHash) {
       )
 
     expect settlement_queue.NodeData {
-      withdrawals_root,
+      tx_orders_root,
       start_time: settlement_start_time,
       end_time: settlement_end_time,
       ..
@@ -96,8 +89,7 @@ validator spend(hub_oracle: ScriptHash) {
 
         when spend_purpose is {
           Conclude { membership_proof } -> {
-
-            let Pair(tx_order_event_id, tx_order_event_info) =
+            let Pair(tx_order_event_id, tx_order_event_tx) =
               ledger_state.unsafe_event_to_key_value_pair(tx_order_event)
 
             // 5. The referenced settlement node's tx_order tree must contain
@@ -105,31 +97,18 @@ validator spend(hub_oracle: ScriptHash) {
             //    inclusion time of the tx_order.
             expect
               plutarch_phas(
-                withdrawals_root,
-                withdrawal_event_id,
-                withdrawal_event_info,
+                tx_orders_root,
+                tx_order_event_id,
+                tx_order_event_tx,
                 membership_proof,
                 redeemers,
               )
 
-            expect ledger_state.WithdrawalInfo { body: withdrawal_body, .. } =
-              withdrawal_event_info
-
-            let ledger_state.WithdrawalBody {
-              l2_value,
-              l1_address,
-              l1_datum,
-              ..
-            } = withdrawal_body
-
-            let expected_output_datum: Data =
-              escrow.Datum { l2_value, l1_address, l1_datum }
-
             and {
-              // 6. Assert proper datum is attached to the escrow UTxO.
-              output_datum == InlineDatum(expected_output_datum),
-              // 7. Withdrawal must go to the escrow contract.
-              output_address == escrow_addr,
+              // 6. Assert refund datum is attached to the output.
+              output_datum == refund_datum,
+              // 7. Refund address must be the recipient.
+              output_address == refund_address,
             }
           }
           Refund { refund_approach } ->
@@ -144,8 +123,8 @@ validator spend(hub_oracle: ScriptHash) {
               refund_address,
               refund_datum,
               refund_approach,
-              withdrawals_root,
-              ledger_state.unsafe_event_to_id_data(withdrawal_event),
+              tx_orders_root,
+              ledger_state.unsafe_event_to_id_data(tx_order_event),
               settlement_queue_policy_id,
               parsed_settlement_node_datum.link,
               settlement_start_time,
@@ -182,27 +161,25 @@ validator mint(hub_oracle: ScriptHash) {
     //      minting (not burning) endpoint
     let
       l1_id,
-      output_withdrawal_order_value,
+      output_tx_order_value,
     <-
       user_events.validate_mint(
         hub_oracle,
         fn(hub_datum) {
-          let hub.Datum { withdrawal_addr, .. } = hub_datum
-          withdrawal_addr
+          let hub.Datum { tx_order_addr, .. } = hub_datum
+          tx_order_addr
         },
         redeemer,
         own_policy,
         tx,
       )
 
-    let output_withdrawal_order_nft_triplet =
-      utils.get_single_asset_from_value_apart_from_ada(
-        output_withdrawal_order_value,
-      )
+    let output_tx_order_nft_triplet =
+      utils.get_single_asset_from_value_apart_from_ada(output_tx_order_value)
 
     // 2. The output value of the UTxO at the withdrawal address must contain
     //    only ADA and the authentication NFT.
-    output_withdrawal_order_nft_triplet == (own_policy, l1_id, 1)
+    output_tx_order_nft_triplet == (own_policy, l1_id, 1)
   }
 
   else(_) {
