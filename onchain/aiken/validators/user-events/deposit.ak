@@ -12,9 +12,8 @@ use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
 use midgard/user_events
-use midgard/user_events/deposit.{
-  Datum, Refund, SpendPurpose, SpendRedeemer, TransferToReserve,
-}
+use midgard/user_events/deposit.{Datum,
+  Refund, SpendRedeemer, TransferToReserve}
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
@@ -25,7 +24,7 @@ validator spend(hub_oracle: ScriptHash) {
   ) {
     let Transaction { reference_inputs, redeemers, .. } = tx
 
-    let user_events.SpendRedeemer {
+    let SpendRedeemer {
       input_index,
       output_index,
       hub_ref_input_index,
@@ -33,8 +32,6 @@ validator spend(hub_oracle: ScriptHash) {
       mint_redeemer_index,
       purpose,
     } = redeemer
-
-    expect purpose: SpendPurpose = purpose
 
     let hub.Datum {
       deposit: deposit_policy_id,

@@ -31,15 +31,6 @@ pub type Datum<event_type> {
   refund_datum: CardanoDatum,
 }
 
-pub type SpendRedeemer<spend_purpose> {
-  input_index: Int,
-  output_index: Int,
-  hub_ref_input_index: Int,
-  settlement_ref_input_index: Int,
-  mint_redeemer_index: Int,
-  purpose: Data<spend_purpose>,
-}
-
 pub type RefundApproach {
   SkippedEvent { non_membership_proof: mpf.Proof }
   EventInSettlementGap { settlement_link_ref_input_index: Int }
