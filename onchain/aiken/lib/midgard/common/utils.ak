@@ -199,8 +199,7 @@ pub fn get_asset_name_from_value_with_policy(
 ) -> AssetName {
   expect [Pair(asset_name, _)] =
     value
-      |> assets.tokens(policy_id)
-      //return dict of policy id to asset name and quantity
+      |> assets.tokens(policy_id) //return dict of policy id to asset name and quantity
       |> dict.to_pairs
 
   asset_name
@@ -213,8 +212,7 @@ pub fn get_singleton_asset_with_policy(
 ) -> Pair<AssetName, Int> {
   expect [p] =
     value
-      |> assets.tokens(policy_id)
-      //return dict of policy id to asset name and quantity
+      |> assets.tokens(policy_id) //return dict of policy id to asset name and quantity
       |> dict.to_pairs
 
   p

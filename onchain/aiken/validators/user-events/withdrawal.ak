@@ -142,7 +142,7 @@ validator spend(hub_oracle: ScriptHash) {
               output_address == escrow_addr,
             }
           }
-          Refund { refund_approach } -> {
+          Refund { refund_approach } ->
             // 3. Numerous validations for the refund logic.
             user_events.validate_refund(
               own_value,
@@ -164,7 +164,6 @@ validator spend(hub_oracle: ScriptHash) {
               reference_inputs,
               redeemers,
             )
-          }
         }
       },
       purpose,
