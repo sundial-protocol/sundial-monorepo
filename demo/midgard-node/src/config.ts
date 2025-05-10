@@ -96,9 +96,9 @@ export const makeConfig = Effect.gen(function* () {
       Config.withDefault("http://0.0.0.0:4318/v1/traces"),
     ),
     Config.string("POSTGRES_HOST").pipe(Config.withDefault("postgres")), // service name
-    Config.string("POSTGRES_USER").pipe(Config.withDefault("postgres")),
     Config.string("POSTGRES_PASSWORD").pipe(Config.withDefault("postgres")),
     Config.string("POSTGRES_DB").pipe(Config.withDefault("midgard")),
+    Config.string("POSTGRES_USER").pipe(Config.withDefault("postgres")),
   ]);
 
   yield* Effect.logInfo("📚 Done");
@@ -122,10 +122,10 @@ export const makeConfig = Effect.gen(function* () {
     CONFIRMED_STATE_POLLING_INTERVAL: config[9],
     PROM_METRICS_PORT: config[10],
     OLTP_EXPORTER_URL: config[11],
-    POSTGRES_USER: config[12],
+    POSTGRES_HOST: config[12],
     POSTGRES_PASSWORD: config[13],
     POSTGRES_DB: config[14],
-    POSTGRES_HOST: config[15],
+    POSTGRES_USER: config[15],
   };
 }).pipe(Effect.orDie);
 
