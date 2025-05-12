@@ -60,7 +60,6 @@ program.version(VERSION).description(
 program.command("listen").action(async () => {
   const program = pipe(
     runNode,
-    Effect.provide(Database.layer),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceeds.AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),

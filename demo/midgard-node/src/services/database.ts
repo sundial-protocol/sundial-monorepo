@@ -1,12 +1,12 @@
 import { Effect, Layer, Redacted } from "effect";
+import { SqlClient } from "@effect/sql";
+import { NodeConfigDep } from "@/config.js";
 import { PgClient } from "@effect/sql-pg";
-import { SqlClient, SqlError } from "@effect/sql";
-import { NodeConfig } from "@/config.js";
-import { ConfigError } from "effect/ConfigError";
 
-export const createPgLayerEffect = Effect.gen(function* () {
-  const nodeConfig = yield* NodeConfig;
-  const pgConfig = {
+export type Database = SqlClient.SqlClient;
+
+export const mkPgConfig = (nodeConfig: NodeConfigDep) => {
+  return {
     host: nodeConfig.POSTGRES_HOST,
     username: nodeConfig.POSTGRES_USER,
     password: Redacted.make(nodeConfig.POSTGRES_PASSWORD),
@@ -16,17 +16,4 @@ export const createPgLayerEffect = Effect.gen(function* () {
     connectTimeout: 2_000,
     trace: "all"
   };
-  return PgClient.layer(pgConfig);
-}).pipe(Effect.orDie);
-
-const SqlClientLive: Layer.Layer<
-  SqlClient.SqlClient,
-  SqlError.SqlError | ConfigError,
-  NodeConfig
-> = Layer.unwrapEffect(createPgLayerEffect);
-
-export const Database = {
-  layer: SqlClientLive,
-};
-
-export type Database = SqlClient.SqlClient;
+}

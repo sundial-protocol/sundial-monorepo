@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, Layer, Schedule, pipe } from "effect";
+import { Effect, Layer, Redacted, Schedule, pipe } from "effect";
 import {
   WorkerInput,
   WorkerOutput,
@@ -13,12 +13,24 @@ import { fromHex, toHex } from "@lucid-evolution/lucid";
 import * as ETH from "@ethereumjs/mpt";
 import * as ETH_UTILS from "@ethereumjs/util";
 import { PostgresCheckpointDB } from "./db.js";
-import { NodeConfig, User } from "@/config.js";
-import { Database } from "@/services/database.js";
+import { NodeConfig, NodeConfigDep, User } from "@/config.js";
+import { Database, mkPgConfig } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
+import { PgClient } from "@effect/sql-pg";
+import * as Reactivity from "@effect/experimental/Reactivity"
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
+
+const getWorkerSqlClient = () => Effect.gen(function* () {
+  yield* Effect.logInfo("Creating client instance for commit-block-header worker")
+  const nodeConfig = yield* NodeConfig;
+  const client = yield* PgClient.make(mkPgConfig(nodeConfig))
+  const totalClients = yield* client
+    `SELECT count(*) FROM pg_stat_activity WHERE state = 'active' GROUP BY usename;`
+    yield* Effect.logInfo(`Total active sql clients: ${totalClients.map((x) => x.count)}`)
+  return client;
+})
 
 const wrapper = (
   _input: WorkerInput,
@@ -77,7 +89,7 @@ const wrapper = (
       // Ensuring persisted root is stored in trie's private property. Looking
       // at `mpt`'s source code, initializing an MPT does NOT seem to
       // automatically pull a previously stored root from the database.
-      // yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
+      yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
 
       const mempoolTxHashes: Uint8Array[] = [];
       let sizeOfBlocksTxs = 0;
@@ -255,9 +267,11 @@ const inputData = workerData as WorkerInput;
 
 const program = pipe(
   wrapper(inputData),
-  Effect.provide(Database.layer),
+  Effect.provide(Layer.effect(SqlClient.SqlClient, getWorkerSqlClient())),
   Effect.provide(User.layer),
   Effect.provide(NodeConfig.layer),
+  Effect.scoped,
+  Effect.provide(Reactivity.layer),
 );
 
 Effect.runPromise(

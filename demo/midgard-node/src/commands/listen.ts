@@ -6,14 +6,13 @@ import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
 import {
   CML,
-  LucidEvolution,
   fromHex,
   getAddressDetails,
 } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Duration, Effect, Either, Metric, Option, pipe, Schedule } from "effect";
+import { Duration, Effect, Either, Layer, Metric, Option, pipe, Schedule } from "effect";
 import express from "express";
 import {
   BlocksDB,
@@ -25,7 +24,10 @@ import {
   MempoolLedgerDB,
 } from "../database/index.js";
 import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
-import { Database } from "@/services/database.js";
+import { Database, mkPgConfig } from "@/services/database.js";
+import { PgClient } from "@effect/sql-pg";
+import { SqlClient } from "@effect/sql";
+import * as Reactivity from "@effect/experimental/Reactivity"
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -324,11 +326,13 @@ export const listenFork: () => Effect.Effect<
         }
       });
 
+  const sqlClient = yield* SqlClient.SqlClient;
+
   type RunEndpointEffect = <A, E>(
     endpoint: Effect.Effect<
       EndpointResponse<A>,
       E,
-      AlwaysSucceedsContract | Database | User
+      AlwaysSucceedsContract | SqlClient.SqlClient | User
     >,
     response: any,
   ) => Promise<void>;
@@ -336,10 +340,10 @@ export const listenFork: () => Effect.Effect<
     try {
       const res: EndpointResponse<any> = await Effect.runPromise(
         endpoint.pipe(
-          Effect.provide(Database.layer),
-      Effect.provide(User.layer),
-      Effect.provide(AlwaysSucceedsContract.layer),
-      Effect.provide(NodeConfig.layer),
+          Effect.provide(Layer.succeed(SqlClient.SqlClient, sqlClient)),
+          Effect.provide(User.layer),
+          Effect.provide(AlwaysSucceedsContract.layer),
+          Effect.provide(NodeConfig.layer),
     ),
   );
     if (res._tag === "Success") await response.status(200).json(res.body);
@@ -477,6 +481,9 @@ export const runNode = Effect.gen(function* () {
       `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
     },
   );
+
+  const sqlClient = PgClient.make(mkPgConfig(nodeConfig))
+
   const originalStop = prometheusExporter.stopServer;
   prometheusExporter.stopServer = async function () {
     Effect.runSync(Effect.logInfo("Prometheus exporter is stopping!"));
@@ -492,14 +499,20 @@ export const runNode = Effect.gen(function* () {
   }));
 
   yield* Effect.logInfo("📚 Opening connection to db...");
-  yield* InitDB.initializeDb();
+  yield* InitDB.initializeDb().pipe(
+    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
+    Effect.scoped,
+    Effect.provide(Reactivity.layer),
+  );
 
   const appThread = pipe(
     listenFork(),
-    Effect.provide(Database.layer),
+    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
+    Effect.scoped,
+    Effect.provide(Reactivity.layer),
   );
 
   const blockCommitmentThread = blockCommitmentFork(
@@ -508,16 +521,20 @@ export const runNode = Effect.gen(function* () {
 
   const mergeThread = pipe(
     mergeFork(nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
-    Effect.provide(Database.layer),
+    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
+    Effect.scoped,
+    Effect.provide(Reactivity.layer),
   );
 
   const monitorMempoolThread = pipe(
     mempoolFork(),
-    Effect.provide(Database.layer),
+    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
     Effect.provide(NodeConfig.layer),
+    Effect.scoped,
+    Effect.provide(Reactivity.layer),
   );
 
   const program = Effect.all(
