@@ -71,7 +71,7 @@ export const listenFork: () => Effect.Effect<
         )
           return {
             _tag: "Failure",
-            status: 400,
+            status: 404,
             msg: `Invalid transaction hash: ${txHash}`,
           };
         const txHashBytes = fromHex(txHash);
