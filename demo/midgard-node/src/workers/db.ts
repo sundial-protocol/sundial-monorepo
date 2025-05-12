@@ -33,7 +33,8 @@ export class PostgresCheckpointDB
         batch: async (ops) => this.batch(convertOps(ops))
       } as DB<string, Uint8Array>
     });
-    this.cache = new LRUCache({ max: options.cacheSize ?? 0 });
+     // TODO: tune this value
+    this.cache = new LRUCache({ max: options.cacheSize ?? 100 });
     this._client = client;
     // this._clientLayer = clientLayer;
 
@@ -44,7 +45,6 @@ export class PostgresCheckpointDB
   openEffect = (copyFromReference?: true) => {
     return Effect.gen(function* (this: PostgresCheckpointDB) {
       const sql = yield* SqlClient.SqlClient;
-      yield* sql`SET client_min_messages = 'error`;
       yield* UtilsDB.mkKeyValueCreateQuery(this._tableName);
       if (this._referenceTableName && copyFromReference) {
         const refTableName = this._referenceTableName;
