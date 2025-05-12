@@ -28,9 +28,8 @@ const wrapper = (
     const { user: lucid } = yield* User;
     const client = yield* SqlClient.SqlClient;
 
-    const mempoolDB = new PostgresCheckpointDB(client, "mempool", "mempool_clone");
-    const ledgerDB = new PostgresCheckpointDB(client, "latest_ledger", "latest_ledger_clone");
-
+    const mempoolDB = new PostgresCheckpointDB(client, "mempool_clone", "mempool");
+    const ledgerDB = new PostgresCheckpointDB(client, "latest_ledger_clone", "latest_ledger");
     yield* Effect.all(
       [
         // Open the empty clone table for collecting mempool transactions and

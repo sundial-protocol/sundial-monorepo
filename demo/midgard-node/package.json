@@ -29,8 +29,8 @@
     "@aiken-lang/merkle-patricia-forestry": "^1.2.0",
     "@al-ft/midgard-sdk": "file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz",
     "@effect/opentelemetry": "^0.44.6",
-    "@effect/platform": "^0.81.1",
-    "@effect/platform-node": "^0.81.1",
+    "@effect/platform": "^0.80.0",
+    "@effect/platform-node": "^0.80.0",
     "@effect/sql": "^0.34.1",
     "@effect/sql-pg": "^0.35.1",
     "@ethereumjs/mpt": "7.0.0-alpha.1",
@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.1.0",
+    "@effect/vitest": "^0.22.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.5",
     "prettier": "^3.5.2",

@@ -1,7 +1,7 @@
 import { SqlClient } from "@effect/sql";
-import { BatchDBOp, bytesToHex, DB, hexToBytes } from "@ethereumjs/util";
-import { Effect, Layer } from "effect";
-import { CheckpointDB, hexToKeybytes } from "@ethereumjs/mpt";
+import { BatchDBOp, bytesToHex, DB } from "@ethereumjs/util";
+import { Effect, Layer, Ref } from "effect";
+import { CheckpointDB } from "@ethereumjs/mpt";
 import { LRUCache } from "lru-cache"
 import { UtilsDB } from "@/database/index.js";
 
@@ -11,15 +11,13 @@ export class PostgresCheckpointDB
   {
 
   cache: LRUCache<string, Uint8Array>
-  _transactionDepth = 0
-  _roots: Uint8Array[] = []
-  // _clientLayer: Layer.Layer<SqlClient.SqlClient, never, never>
+  _transactionDepthRef: Ref.Ref<number>
+  _rootsRef: Ref.Ref<Uint8Array[]>
   _client: SqlClient.SqlClient;
   _tableName: string;
   _referenceTableName: string | undefined;
 
   constructor(
-    // clientLayer: Layer.Layer<SqlClient.SqlClient>,
     client: SqlClient.SqlClient,
     tableName: string,
     referenceTableName?: string,
@@ -33,29 +31,29 @@ export class PostgresCheckpointDB
         batch: async (ops) => this.batch(convertOps(ops))
       } as DB<string, Uint8Array>
     });
-     // TODO: tune this value
+     // TODO: tune max cache size value
     this.cache = new LRUCache({ max: options.cacheSize ?? 100 });
     this._client = client;
-    // this._clientLayer = clientLayer;
-
     this._tableName = tableName;
     this._referenceTableName = referenceTableName;
+    this._transactionDepthRef = Ref.unsafeMake(0);
+    this._rootsRef = Ref.unsafeMake<Uint8Array[]>([]);
   }
 
   openEffect = (copyFromReference?: true) => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
+    const { _tableName, _referenceTableName, clear } = this
+    return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
-      yield* UtilsDB.mkKeyValueCreateQuery(this._tableName);
-      if (this._referenceTableName && copyFromReference) {
-        const refTableName = this._referenceTableName;
+      yield* UtilsDB.mkKeyValueCreateQuery(_tableName);
+      if (_referenceTableName && copyFromReference) {
         sql.withTransaction(
-          Effect.gen(function* (this: PostgresCheckpointDB) {
-            yield* UtilsDB.clearTable(this._tableName);
-            yield* sql`INSERT INTO ${sql(this._tableName)} SELECT * FROM ${sql(refTableName)}`
+          Effect.gen(function* () {
+            yield* UtilsDB.clearTable(_tableName);
+            yield* sql`INSERT INTO ${sql(_tableName)} SELECT * FROM ${sql(_referenceTableName)}`
           })
         )
       } else {
-        yield* this.clear();
+        yield* clear();
       }
     })
   }
@@ -63,25 +61,24 @@ export class PostgresCheckpointDB
   async open() {
     return await this.openEffect().pipe(
       Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client)),
-      // Effect.scoped,
       Effect.runPromise,
     )
   }
 
 
   getEffect = (key: Uint8Array) => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
+    const {cache, checkpoints, _tableName} = this
+    return Effect.gen(function* () {
       const keyHex = bytesToHex(key)
-      if (this.cache.has(keyHex)) return this.cache.get(keyHex)
+      if (cache.has(keyHex)) return cache.get(keyHex)
 
-      for (let i = this.checkpoints.length - 1; i >= 0; i--) {
-        const value = this.checkpoints[i].keyValueMap.get(keyHex)
+      for (let i = checkpoints.length - 1; i >= 0; i--) {
+        const value = checkpoints[i].keyValueMap.get(keyHex)
         if (value !== undefined) return value
       }
       const sql = yield* SqlClient.SqlClient;
-      // yield* sql.reserve;
       const rows = yield* sql<{ value: Uint8Array }>`
-        SELECT value FROM ${sql(this._tableName)}
+        SELECT value FROM ${sql(_tableName)}
         WHERE key = ${Buffer.from(key)}`
       return rows[0]?.value
     })
@@ -90,16 +87,16 @@ export class PostgresCheckpointDB
   async get(key: Uint8Array): Promise<Uint8Array | undefined> {
     return await this.getEffect(key).pipe(
       Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client)),
-      // Effect.scoped,
       Effect.runPromise,
     )
   }
 
   getAllEffect = () => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
+    const {_tableName} = this
+    return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       const rows = yield* sql<{ key: Uint8Array, value: Uint8Array }>`
-        SELECT * FROM ${sql(this._tableName)}`
+        SELECT * FROM ${sql(_tableName)}`
         return rows.map((row) => ({
                 key: Buffer.from(row.key),
                 value: Buffer.from(row.value),
@@ -108,11 +105,12 @@ export class PostgresCheckpointDB
   }
 
   getAllFromReferenceEffect = () => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
-      if (!this._referenceTableName) {throw new Error("No reference tables set")}
+    const {_referenceTableName} = this
+    return Effect.gen(function* () {
+      if (!_referenceTableName) {throw new Error("No reference tables set")}
       const sql = yield* SqlClient.SqlClient;
       const rows = yield* sql<{ key: Uint8Array, value: Uint8Array }>
-      `SELECT * FROM ${sql(this._referenceTableName)}`;
+      `SELECT * FROM ${sql(_referenceTableName)}`;
       return rows.map((row) => ({
         key: Buffer.from(row.key),
         value: Buffer.from(row.value),
@@ -121,18 +119,18 @@ export class PostgresCheckpointDB
   }
 
   putEffect = (key: Uint8Array, value: Uint8Array) => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
+    const {cache, checkpoints, _tableName} = this
+    return Effect.gen(function* () {
       const keyHex = bytesToHex(key);
-      this.cache.set(keyHex, value);
+      cache.set(keyHex, value);
 
-      if (this.checkpoints.length > 0) {
-        this.checkpoints[this.checkpoints.length - 1].keyValueMap.set(keyHex, value)
+      if (checkpoints.length > 0) {
+        checkpoints[checkpoints.length - 1].keyValueMap.set(keyHex, value)
       } else {
         const sql = yield* SqlClient.SqlClient;
-        // yield* sql.reserve;
         const rowsToInsert = { key: key, value: value };
         yield* sql`
-          INSERT INTO ${sql(this._tableName)} ${sql.insert(rowsToInsert)}
+          INSERT INTO ${sql(_tableName)} ${sql.insert(rowsToInsert)}
           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
           `
       }
@@ -147,15 +145,15 @@ export class PostgresCheckpointDB
   }
 
   delEffect = (key: Uint8Array) => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
+    const {cache, checkpoints, _tableName} = this
+    return Effect.gen(function* () {
       const keyHex = bytesToHex(key)
-      this.cache.set(keyHex, undefined)
-      if (this.checkpoints.length > 0) {
-        this.checkpoints[this.checkpoints.length - 1].keyValueMap.set(keyHex, undefined)
+      cache.set(keyHex, undefined)
+      if (checkpoints.length > 0) {
+        checkpoints[checkpoints.length - 1].keyValueMap.set(keyHex, undefined)
       } else {
         const sql = yield* SqlClient.SqlClient
-        // yield* sql.reserve
-        yield* sql`DELETE FROM ${sql(this._tableName)} WHERE key = ${key}`
+        yield* sql`DELETE FROM ${sql(_tableName)} WHERE key = ${key}`
       }
     })
   }
@@ -168,27 +166,30 @@ export class PostgresCheckpointDB
   }
 
   clear = () => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
-      UtilsDB.clearTable(this._tableName)
+    const {_tableName} = this
+    return Effect.gen(function* () {
+      UtilsDB.clearTable(_tableName)
     })
   }
 
   clearReference = () => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
-      if (!this._referenceTableName) {throw new Error("No reference tables set")}
-      UtilsDB.clearTable(this._tableName)
+    const {_tableName, _referenceTableName} = this
+    return Effect.gen(function* () {
+      if (!_referenceTableName) {throw new Error("No reference tables set")}
+      UtilsDB.clearTable(_tableName)
     })
   }
 
   transferToReference = () => {
-    return Effect.gen(function* (this: PostgresCheckpointDB) {
-      if (!this._referenceTableName) {throw new Error("No reference tables set")}
+    const {_tableName, _referenceTableName, clearReference} = this
+    return Effect.gen(function* () {
+      if (!_referenceTableName) {throw new Error("No reference tables set")}
       const sql = yield* SqlClient.SqlClient;
-      const tableName = this._tableName;
-      const refTableName = this._referenceTableName;
+      const tableName = _tableName;
+      const refTableName = _referenceTableName;
       yield* sql.withTransaction(
-        Effect.gen(function* (this: PostgresCheckpointDB) {
-          yield* this.clearReference();
+        Effect.gen(function* () {
+          yield* clearReference();
           yield* sql`INSERT INTO ${sql(refTableName)} SELECT * FROM ${tableName}`
         })
       )
@@ -196,21 +197,21 @@ export class PostgresCheckpointDB
   }
 
   async batch(opStack: BatchDBOp[]): Promise<void> {
-    const program = Effect.gen(function* (this: PostgresCheckpointDB) {
+    const {putEffect, delEffect} = this
+    return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       yield* sql.withTransaction(
-        Effect.gen(function* (this: PostgresCheckpointDB) {
+        Effect.gen(function* () {
           for (const op of opStack) {
             if (op.type === "put") {
-              yield* this.putEffect(op.key, op.value)
+              yield* putEffect(op.key, op.value)
             } else {
-              yield* this.delEffect(op.key)
+              yield* delEffect(op.key)
             }
           }
         })
       )
-    })
-  return program.pipe(
+    }).pipe(
     Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client)),
     Effect.scoped,
     Effect.runPromise
@@ -219,20 +220,21 @@ export class PostgresCheckpointDB
 
   checkpoint(root: Uint8Array): void {
     super.checkpoint(root)
-    this._roots.push(root)
-
+    const {_transactionDepthRef, _rootsRef} = this
     Effect.runFork(
-      Effect.gen(function* (this: PostgresCheckpointDB) {
+      Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
+        const depth = yield* Ref.get(_transactionDepthRef)
         // First checkpoint = start transaction
-        if (this._transactionDepth === 0) {
+        if (depth === 0) {
           yield* sql`BEGIN`
         }
         // Nested checkpoint = create savepoint
         else {
           yield* sql`SAVEPOINT root_${bytesToHex(root)}`
         }
-        this._transactionDepth++
+        yield* Ref.update(_transactionDepthRef, (n) => n + 1)
+        yield* Ref.update(_rootsRef, (roots) => [...roots, root])
       }).pipe(
         Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client)),
       )
@@ -240,53 +242,46 @@ export class PostgresCheckpointDB
   }
 
   async commit(): Promise<void> {
-    if (this._roots.length === 0) return
-    const root = this._roots.pop()!
-    super.commit()
-
-    await Effect.runPromise(
-      Effect.gen(function* (this: PostgresCheckpointDB) {
-        const sql = yield* SqlClient.SqlClient
-        this._transactionDepth--
-
-        // Final commit = persist to database
-        if (this._transactionDepth === 0) {
-          yield* sql`COMMIT`
-        }
-        // Nested commit = release savepoint
-        else {
-          yield* sql`RELEASE SAVEPOINT root_${bytesToHex(root)}`
-        }
-      }).pipe(
+    const {_transactionDepthRef, _rootsRef} = this
+    const superCommit = super.commit
+    await Effect.runPromise(Effect.gen(function* () {
+      const roots = yield* Ref.get(_rootsRef)
+      if (roots.length === 0) return Effect.void
+      const root = yield* rootsPop(_rootsRef);
+      superCommit()
+      const sql = yield* SqlClient.SqlClient
+      yield* Ref.update(_transactionDepthRef, (n) => n - 1)
+      const depth = yield* Ref.get(_transactionDepthRef)
+      if (depth === 0) yield* sql`COMMIT`
+      else yield* sql`RELEASE SAVEPOINT root_${bytesToHex(root)}`
+      return Effect.void
+    }).pipe(
         Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client)),
       )
-    )
-  }
+    )}
 
   async revert(): Promise<Uint8Array> {
-    if (this._roots.length === 0) {
-      throw new Error("No checkpoints to revert")
-    }
-    const root = this._roots.pop()!
-    super.revert()
-
-    await Effect.runPromise(
-      Effect.gen(function* (this: PostgresCheckpointDB) {
-        const sql = yield* SqlClient.SqlClient
-        this._transactionDepth--
+    const {_rootsRef, _transactionDepthRef} = this
+    const superRevert = super.revert
+    return await Effect.runPromise(
+      Effect.gen(function* () {
+        const roots = yield* Ref.get(_rootsRef)
+        if (roots.length === 0) {
+          throw new Error("No checkpoints to revert")
+        }
+        const root = yield* rootsPop(_rootsRef);
+        superRevert();
+        const sql = yield* SqlClient.SqlClient;
+        const depth = yield* Ref.updateAndGet(_transactionDepthRef, (n) => n - 1)
 
         // Full rollback if root checkpoint
-        if (this._transactionDepth === 0) {
-          yield* sql`ROLLBACK`
-        }
-        else {
-          yield* sql`ROLLBACK TO SAVEPOINT root_${bytesToHex(root)}`
-        }
+        if (depth === 0) yield* sql`ROLLBACK`
+        else  yield* sql`ROLLBACK TO SAVEPOINT root_${bytesToHex(root)}`
+        return root;
       }).pipe(
         Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client)),
       )
     )
-    return root
   }
 
   async conclude() {this.transferToReference()}
@@ -324,3 +319,9 @@ const convertOps = (
         }
   })
 }
+
+const rootsPop = (rootsRef: Ref.Ref<Uint8Array<ArrayBufferLike>[]>) => Ref.modify(rootsRef, (roots) => {
+    const newRoots = roots.slice(0, -1);
+    const last = roots[roots.length - 1];
+    return [last, newRoots];
+});

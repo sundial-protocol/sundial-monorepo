@@ -14,6 +14,7 @@ export const createPgLayerEffect = Effect.gen(function* () {
     maxConnections: 20,
     idleTimeout: 30_000,
     connectTimeout: 2_000,
+    trace: "all"
   };
   return PgClient.layer(pgConfig);
 }).pipe(Effect.orDie);
