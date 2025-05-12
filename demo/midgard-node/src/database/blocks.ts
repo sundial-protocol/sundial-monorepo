@@ -7,7 +7,7 @@ export const tableName = "blocks";
 
 export const createQuery = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  `
+  yield* sql`
   CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
     header_hash BYTEA NOT NULL,
     tx_hash BYTEA NOT NULL UNIQUE
@@ -39,7 +39,7 @@ export const insert = (
     );
   }).pipe(
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: inserting error: ${JSON.stringify(e)}`),
+      Effect.logError(`${tableName} db: inserting error: ${e}`),
     ),
     Effect.withLogSpan(`insert ${tableName}`),
     mapSqlError,

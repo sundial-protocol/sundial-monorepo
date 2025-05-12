@@ -16,26 +16,9 @@ import { PostgresCheckpointDB } from "./db.js";
 import { NodeConfig, NodeConfigDep, User } from "@/config.js";
 import { Database, mkPgConfig } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
-import { PgClient } from "@effect/sql-pg";
-import * as Reactivity from "@effect/experimental/Reactivity";
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
-
-const getWorkerSqlClient = () =>
-  Effect.gen(function* () {
-    yield* Effect.logInfo(
-      "Creating client instance for commit-block-header worker",
-    );
-    const nodeConfig = yield* NodeConfig;
-    const client = yield* PgClient.make(mkPgConfig(nodeConfig));
-    const totalClients =
-      yield* client`SELECT count(*) FROM pg_stat_activity WHERE state = 'active' GROUP BY usename;`;
-    yield* Effect.logInfo(
-      `Total active sql clients: ${totalClients.map((x) => x.count)}`,
-    );
-    return client;
-  });
 
 const wrapper = (
   _input: WorkerInput,
@@ -299,11 +282,9 @@ const inputData = workerData as WorkerInput;
 
 const program = pipe(
   wrapper(inputData),
-  Effect.provide(Layer.effect(SqlClient.SqlClient, getWorkerSqlClient())),
+  Effect.provide(Database.layer),
   Effect.provide(User.layer),
   Effect.provide(NodeConfig.layer),
-  Effect.scoped,
-  Effect.provide(Reactivity.layer),
 );
 
 Effect.runPromise(

@@ -29,7 +29,7 @@ import {
   MempoolLedgerDB,
 } from "../database/index.js";
 import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
-import { Database, mkPgConfig } from "@/services/database.js";
+import { Database, mkPgConfig, SqlClientLive } from "@/services/database.js";
 import { PgClient } from "@effect/sql-pg";
 import { SqlClient } from "@effect/sql";
 import * as Reactivity from "@effect/experimental/Reactivity";
@@ -359,7 +359,7 @@ export const listenFork: () => Effect.Effect<
       try {
         const res: EndpointResponse<any> = await Effect.runPromise(
           endpoint.pipe(
-            Effect.provide(Layer.succeed(SqlClient.SqlClient, sqlClient)),
+            Effect.provide(Database.layer),
             Effect.provide(User.layer),
             Effect.provide(AlwaysSucceedsContract.layer),
             Effect.provide(NodeConfig.layer),
@@ -500,8 +500,6 @@ export const runNode = Effect.gen(function* () {
     },
   );
 
-  const sqlClient = PgClient.make(mkPgConfig(nodeConfig));
-
   const originalStop = prometheusExporter.stopServer;
   prometheusExporter.stopServer = async function () {
     Effect.runSync(Effect.logInfo("Prometheus exporter is stopping!"));
@@ -517,20 +515,14 @@ export const runNode = Effect.gen(function* () {
   }));
 
   yield* Effect.logInfo("📚 Opening connection to db...");
-  yield* InitDB.initializeDb().pipe(
-    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
-    Effect.scoped,
-    Effect.provide(Reactivity.layer),
-  );
+  yield* InitDB.initializeDb().pipe(Effect.provide(SqlClientLive));
 
   const appThread = pipe(
     listenFork(),
-    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
+    Effect.provide(SqlClientLive),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
-    Effect.scoped,
-    Effect.provide(Reactivity.layer),
   );
 
   const blockCommitmentThread = blockCommitmentFork(
@@ -539,17 +531,15 @@ export const runNode = Effect.gen(function* () {
 
   const mergeThread = pipe(
     mergeFork(nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
-    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
+    Effect.provide(SqlClientLive),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
-    Effect.scoped,
-    Effect.provide(Reactivity.layer),
   );
 
   const monitorMempoolThread = pipe(
     mempoolFork(),
-    Effect.provide(Layer.effect(SqlClient.SqlClient, sqlClient)),
+    Effect.provide(SqlClientLive),
     Effect.provide(NodeConfig.layer),
     Effect.scoped,
     Effect.provide(Reactivity.layer),
