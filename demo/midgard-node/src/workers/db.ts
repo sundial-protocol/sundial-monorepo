@@ -171,7 +171,7 @@ export class PostgresCheckpointDB
   clear = () => {
     const { _tableName } = this;
     return Effect.gen(function* () {
-      UtilsDB.clearTable(_tableName);
+      yield* UtilsDB.clearTable(_tableName);
     });
   };
 
@@ -181,7 +181,7 @@ export class PostgresCheckpointDB
       if (!_referenceTableName) {
         throw new Error("No reference tables set");
       }
-      UtilsDB.clearTable(_tableName);
+      yield* UtilsDB.clearTable(_tableName);
     });
   };
 
@@ -197,7 +197,7 @@ export class PostgresCheckpointDB
       yield* sql.withTransaction(
         Effect.gen(function* () {
           yield* clearReference();
-          yield* sql`INSERT INTO ${sql(refTableName)} SELECT * FROM ${tableName}`;
+          yield* sql`INSERT INTO ${sql(refTableName)} SELECT * FROM ${sql(tableName)}`;
         }),
       );
     });
@@ -291,7 +291,8 @@ export class PostgresCheckpointDB
   }
 
   async conclude() {
-    this.transferToReference();
+    await Effect.runPromise(this.transferToReference().
+      pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))));
   }
 
   shallowCopy(): PostgresCheckpointDB {

@@ -255,10 +255,12 @@ const wrapper = (
       yield* Effect.logInfo(
         "🔹 Clearing LatestLedgerDB, inserting updated UTxO set LatestLedgerDB and closing the connection...",
       );
-      yield* Effect.tryPromise({
-        try: ledgerDB.conclude,
-        catch: (e) => new Error(`${e}`),
-      });
+      // yield* ledgerDB.conclude()
+      // yield* Effect.tryPromise({
+      //   try: ledgerDB.conclude(),
+      //   catch: (e) => new Error(`${e}`),
+      // });
+      yield* ledgerDB.transferToReference();
 
       return output;
     } else {
