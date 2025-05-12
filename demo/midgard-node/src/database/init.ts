@@ -11,17 +11,17 @@ import { Database } from "@/services/database.js";
 
 export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
   Effect.gen(function* () {
-   const sql = yield* SqlClient.SqlClient;
+    const sql = yield* SqlClient.SqlClient;
     // await sql`SET default_transaction_read_only TO 'off'`;
     yield* sql`SET client_min_messages = 'error'`;
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
-     yield* BlocksDB.createQuery;
-     yield* (mkKeyValueCreateQuery(MempoolDB.tableName));
-     yield* (mkKeyValueCreateQuery(MempoolLedgerDB.tableName));
-     yield* (mkKeyValueCreateQuery(ImmutableDB.tableName));
-     yield* (mkKeyValueCreateQuery(ConfirmedLedgerDB.tableName));
-     yield* (mkKeyValueCreateQuery(LatestLedgerDB.tableName));
+    yield* BlocksDB.createQuery;
+    yield* mkKeyValueCreateQuery(MempoolDB.tableName);
+    yield* mkKeyValueCreateQuery(MempoolLedgerDB.tableName);
+    yield* mkKeyValueCreateQuery(ImmutableDB.tableName);
+    yield* mkKeyValueCreateQuery(ConfirmedLedgerDB.tableName);
+    yield* mkKeyValueCreateQuery(LatestLedgerDB.tableName);
 
     Effect.logInfo("Connected to the PostgreSQL database");
   });

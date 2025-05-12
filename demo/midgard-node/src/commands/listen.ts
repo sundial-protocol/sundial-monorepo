@@ -4,15 +4,20 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import {
-  CML,
-  fromHex,
-  getAddressDetails,
-} from "@lucid-evolution/lucid";
+import { CML, fromHex, getAddressDetails } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Duration, Effect, Either, Layer, Metric, Option, pipe, Schedule } from "effect";
+import {
+  Duration,
+  Effect,
+  Either,
+  Layer,
+  Metric,
+  Option,
+  pipe,
+  Schedule,
+} from "effect";
 import express from "express";
 import {
   BlocksDB,
@@ -27,7 +32,7 @@ import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
 import { Database, mkPgConfig } from "@/services/database.js";
 import { PgClient } from "@effect/sql-pg";
 import { SqlClient } from "@effect/sql";
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Reactivity from "@effect/experimental/Reactivity";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -78,7 +83,8 @@ export const listenFork: () => Effect.Effect<
           return { _tag: "Success", body: { tx: retMempool.value } };
         }
 
-        const retImmutable = yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
+        const retImmutable =
+          yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
         if (Option.isSome(retImmutable)) {
           yield* Effect.logInfo(
             `GET /tx - Transaction found in immutable: ${txHash}`,
@@ -106,7 +112,11 @@ export const listenFork: () => Effect.Effect<
       Effect.gen(function* () {
         if (typeof addr !== "string") {
           yield* Effect.logInfo(`GET /utxos - Invalid address type: ${addr}`);
-          return { _tag: "Failure", status: 400, msg: `Invalid address: ${addr}` };
+          return {
+            _tag: "Failure",
+            status: 400,
+            msg: `Invalid address: ${addr}`,
+          };
         }
         try {
           const addrDetails = getAddressDetails(addr);
@@ -135,7 +145,11 @@ export const listenFork: () => Effect.Effect<
           yield* Effect.logInfo(
             `GET /utxos - Invalid address format: ${addr}, error: ${e}`,
           );
-          return { _tag: "Failure", status: 400, msg: `Invalid address: ${addr}` };
+          return {
+            _tag: "Failure",
+            status: 400,
+            msg: `Invalid address: ${addr}`,
+          };
         }
       });
 
@@ -219,7 +233,11 @@ export const listenFork: () => Effect.Effect<
           yield* Effect.logInfo(
             `GET /commit - Block commitment failed: ${result.left}`,
           );
-          return { _tag: "Failure", status: 500, msg: `Block commitment failed.` };
+          return {
+            _tag: "Failure",
+            status: 500,
+            msg: `Block commitment failed.`,
+          };
         }
       });
 
@@ -304,7 +322,8 @@ export const listenFork: () => Effect.Effect<
           Effect.gen(function* () {
             const txCBOR = fromHex(txString);
             const tx = lucid.fromTx(txString);
-            const { spent, produced } = yield* findSpentAndProducedUTxOs(txCBOR);
+            const { spent, produced } =
+              yield* findSpentAndProducedUTxOs(txCBOR);
             yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
             yield* MempoolLedgerDB.clearUTxOs(spent);
             yield* MempoolLedgerDB.insert(produced);
@@ -326,35 +345,35 @@ export const listenFork: () => Effect.Effect<
         }
       });
 
-  const sqlClient = yield* SqlClient.SqlClient;
+    const sqlClient = yield* SqlClient.SqlClient;
 
-  type RunEndpointEffect = <A, E>(
-    endpoint: Effect.Effect<
-      EndpointResponse<A>,
-      E,
-      AlwaysSucceedsContract | SqlClient.SqlClient | User
-    >,
-    response: any,
-  ) => Promise<void>;
-  const runEndpointEffect: RunEndpointEffect = async (endpoint, response) => {
-    try {
-      const res: EndpointResponse<any> = await Effect.runPromise(
-        endpoint.pipe(
-          Effect.provide(Layer.succeed(SqlClient.SqlClient, sqlClient)),
-          Effect.provide(User.layer),
-          Effect.provide(AlwaysSucceedsContract.layer),
-          Effect.provide(NodeConfig.layer),
-    ),
-  );
-    if (res._tag === "Success") await response.status(200).json(res.body);
-      else await response.status(res.status).json({ message: res.msg });
-    } catch (error) {
-      await Effect.runPromise(
-        Effect.logError("Endpoint effect failed:", error),
-      );
-      await response.status(500).json({ message: "Something went wrong" });
-    }
-  };
+    type RunEndpointEffect = <A, E>(
+      endpoint: Effect.Effect<
+        EndpointResponse<A>,
+        E,
+        AlwaysSucceedsContract | SqlClient.SqlClient | User
+      >,
+      response: any,
+    ) => Promise<void>;
+    const runEndpointEffect: RunEndpointEffect = async (endpoint, response) => {
+      try {
+        const res: EndpointResponse<any> = await Effect.runPromise(
+          endpoint.pipe(
+            Effect.provide(Layer.succeed(SqlClient.SqlClient, sqlClient)),
+            Effect.provide(User.layer),
+            Effect.provide(AlwaysSucceedsContract.layer),
+            Effect.provide(NodeConfig.layer),
+          ),
+        );
+        if (res._tag === "Success") await response.status(200).json(res.body);
+        else await response.status(res.status).json({ message: res.msg });
+      } catch (error) {
+        await Effect.runPromise(
+          Effect.logError("Endpoint effect failed:", error),
+        );
+        await response.status(500).json({ message: "Something went wrong" });
+      }
+    };
 
     app.get("/tx", async (req, res) => {
       await runEndpointEffect(getTxEndpoint(req.query.tx_hash), res);
@@ -387,7 +406,6 @@ export const listenFork: () => Effect.Effect<
       ),
     );
   });
-
 
 const makeBlockCommitmentAction = () =>
   Effect.gen(function* () {
@@ -482,7 +500,7 @@ export const runNode = Effect.gen(function* () {
     },
   );
 
-  const sqlClient = PgClient.make(mkPgConfig(nodeConfig))
+  const sqlClient = PgClient.make(mkPgConfig(nodeConfig));
 
   const originalStop = prometheusExporter.stopServer;
   prometheusExporter.stopServer = async function () {
@@ -538,11 +556,7 @@ export const runNode = Effect.gen(function* () {
   );
 
   const program = Effect.all(
-    [ appThread,
-      blockCommitmentThread,
-      mergeThread,
-      monitorMempoolThread,
-    ],
+    [appThread, blockCommitmentThread, mergeThread, monitorMempoolThread],
     {
       concurrency: "unbounded",
     },

@@ -11,7 +11,7 @@ export const createQuery = Effect.gen(function* () {
   CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
     header_hash BYTEA NOT NULL,
     tx_hash BYTEA NOT NULL UNIQUE
-  );`
+  );`;
 });
 
 export const insert = (
@@ -47,8 +47,8 @@ export const insert = (
   );
 
 export const retrieveTxHashesByBlockHash = (
-    blockHash: Uint8Array,
-  ): Effect.Effect<Uint8Array[], Error, Database> =>
+  blockHash: Uint8Array,
+): Effect.Effect<Uint8Array[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve tx_hashes for block ${blockHash}`,
@@ -75,23 +75,23 @@ export const retrieveTxHashesByBlockHash = (
     mapSqlError,
   );
 
-  export const retrieveBlockHashByTxHash = (
-    txHash: Uint8Array,
-  ): Effect.Effect<Option.Option<Uint8Array>, Error, SqlClient.SqlClient> =>
+export const retrieveBlockHashByTxHash = (
+  txHash: Uint8Array,
+): Effect.Effect<Option.Option<Uint8Array>, Error, SqlClient.SqlClient> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
-     `${tableName} db: attempt retrieve block_hash for tx_hash ${txHash}`,
-   );
-   const sql = yield* SqlClient.SqlClient;
+      `${tableName} db: attempt retrieve block_hash for tx_hash ${txHash}`,
+    );
+    const sql = yield* SqlClient.SqlClient;
 
-   const rows = yield* sql<{
-     header_hash: Uint8Array;
-   }>`SELECT header_hash FROM ${sql(tableName)} WHERE tx_hash = ${Buffer.from(txHash)} LIMIT 1`;
+    const rows = yield* sql<{
+      header_hash: Uint8Array;
+    }>`SELECT header_hash FROM ${sql(tableName)} WHERE tx_hash = ${Buffer.from(txHash)} LIMIT 1`;
 
-   const result =
-     rows.length > 0
-       ? Option.some(rows[0].header_hash)
-       : Option.none<Uint8Array>();
+    const result =
+      rows.length > 0
+        ? Option.some(rows[0].header_hash)
+        : Option.none<Uint8Array>();
 
     yield* Effect.logDebug(
       `${tableName} db: retrieved block_hash for tx ${txHash}: ${Option.match(result, { onNone: () => "None", onSome: () => "Some(...)})" })}`,
@@ -144,10 +144,13 @@ export const retrieve = (): Effect.Effect<
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
-    const rows =
-      yield* sql<BlockRow>`SELECT * FROM ${sql(tableName)}`;
+    const rows = yield* sql<BlockRow>`SELECT * FROM ${sql(tableName)}`;
     const result: [Uint8Array, Uint8Array][] = rows.map(
-      (row: BlockRow) => [Uint8Array.from(row.header_hash), Uint8Array.from(row.tx_hash)] as const,
+      (row: BlockRow) =>
+        [
+          Uint8Array.from(row.header_hash),
+          Uint8Array.from(row.tx_hash),
+        ] as const,
     );
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
@@ -161,5 +164,5 @@ export const retrieve = (): Effect.Effect<
     mapSqlError,
   );
 
-  export const clear = (): Effect.Effect<void, Error, SqlClient.SqlClient> =>
-    clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));
+export const clear = (): Effect.Effect<void, Error, SqlClient.SqlClient> =>
+  clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));

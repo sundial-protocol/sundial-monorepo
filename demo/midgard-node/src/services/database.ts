@@ -14,6 +14,6 @@ export const mkPgConfig = (nodeConfig: NodeConfigDep) => {
     maxConnections: 20,
     idleTimeout: 30_000,
     connectTimeout: 2_000,
-    trace: "all"
+    trace: "all",
   };
-}
+};

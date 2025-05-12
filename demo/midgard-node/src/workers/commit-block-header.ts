@@ -17,31 +17,48 @@ import { NodeConfig, NodeConfigDep, User } from "@/config.js";
 import { Database, mkPgConfig } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
 import { PgClient } from "@effect/sql-pg";
-import * as Reactivity from "@effect/experimental/Reactivity"
+import * as Reactivity from "@effect/experimental/Reactivity";
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 
-const getWorkerSqlClient = () => Effect.gen(function* () {
-  yield* Effect.logInfo("Creating client instance for commit-block-header worker")
-  const nodeConfig = yield* NodeConfig;
-  const client = yield* PgClient.make(mkPgConfig(nodeConfig))
-  const totalClients = yield* client
-    `SELECT count(*) FROM pg_stat_activity WHERE state = 'active' GROUP BY usename;`
-    yield* Effect.logInfo(`Total active sql clients: ${totalClients.map((x) => x.count)}`)
-  return client;
-})
+const getWorkerSqlClient = () =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo(
+      "Creating client instance for commit-block-header worker",
+    );
+    const nodeConfig = yield* NodeConfig;
+    const client = yield* PgClient.make(mkPgConfig(nodeConfig));
+    const totalClients =
+      yield* client`SELECT count(*) FROM pg_stat_activity WHERE state = 'active' GROUP BY usename;`;
+    yield* Effect.logInfo(
+      `Total active sql clients: ${totalClients.map((x) => x.count)}`,
+    );
+    return client;
+  });
 
 const wrapper = (
   _input: WorkerInput,
-): Effect.Effect<WorkerOutput, Error, NodeConfig | User | SqlClient.SqlClient> =>
+): Effect.Effect<
+  WorkerOutput,
+  Error,
+  NodeConfig | User | SqlClient.SqlClient
+> =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
     const client = yield* SqlClient.SqlClient;
 
-    const mempoolDB = new PostgresCheckpointDB(client, "mempool_clone", "mempool");
-    const ledgerDB = new PostgresCheckpointDB(client, "latest_ledger_clone", "latest_ledger");
+    const mempoolDB = new PostgresCheckpointDB(
+      client,
+      "mempool_clone",
+      "mempool",
+    );
+    const ledgerDB = new PostgresCheckpointDB(
+      client,
+      "latest_ledger_clone",
+      "latest_ledger",
+    );
     yield* Effect.all(
       [
         // Open the empty clone table for collecting mempool transactions and
@@ -55,7 +72,9 @@ const wrapper = (
     );
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
-    const mempoolTxs = yield* mempoolDB.getAllFromReferenceEffect().pipe(Effect.withSpan("retrieve mempool transaction"));
+    const mempoolTxs = yield* mempoolDB
+      .getAllFromReferenceEffect()
+      .pipe(Effect.withSpan("retrieve mempool transaction"));
     const mempoolTxsCount = mempoolTxs.length;
 
     if (mempoolTxsCount > 0) {
@@ -210,26 +229,39 @@ const wrapper = (
 
       const batchIndices = Array.from(
         { length: Math.ceil(mempoolTxsCount / batchSize) },
-        (_, i) => i * batchSize
-      )
-      yield* Effect.forEach(batchIndices, (startIndex) => {
-        const endIndex = startIndex + batchSize
-        const batchTxs = mempoolTxs.slice(startIndex, endIndex)
-        const batchHashes = mempoolTxHashes.slice(startIndex, endIndex)
+        (_, i) => i * batchSize,
+      );
+      yield* Effect.forEach(
+        batchIndices,
+        (startIndex) => {
+          const endIndex = startIndex + batchSize;
+          const batchTxs = mempoolTxs.slice(startIndex, endIndex);
+          const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
 
-        return pipe(
-          Effect.all([
-            ImmutableDB.insertTxs(batchTxs).pipe(Effect.withSpan(`immutable-db-insert-${startIndex}`)),
-            BlocksDB.insert(fromHex(newHeaderHash), batchHashes).pipe(Effect.withSpan(`blocks-db-insert-${startIndex}`)),
-          ], { concurrency: 2 }),
-          Effect.withSpan(`batch-insert-${startIndex}-${endIndex}`)
-        )
-      }, { concurrency: 2 })
+          return pipe(
+            Effect.all(
+              [
+                ImmutableDB.insertTxs(batchTxs).pipe(
+                  Effect.withSpan(`immutable-db-insert-${startIndex}`),
+                ),
+                BlocksDB.insert(fromHex(newHeaderHash), batchHashes).pipe(
+                  Effect.withSpan(`blocks-db-insert-${startIndex}`),
+                ),
+              ],
+              { concurrency: 2 },
+            ),
+            Effect.withSpan(`batch-insert-${startIndex}-${endIndex}`),
+          );
+        },
+        { concurrency: 2 },
+      );
 
       yield* Effect.logInfo(
         "🔹 Clearing included transactions from MempoolDB...",
       );
-      yield* MempoolDB.clearTxs(mempoolTxHashes).pipe(Effect.withSpan("clear mempool"))
+      yield* MempoolDB.clearTxs(mempoolTxHashes).pipe(
+        Effect.withSpan("clear mempool"),
+      );
 
       const output: WorkerOutput = {
         txSize,
