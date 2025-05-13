@@ -15,7 +15,7 @@ A transaction order is created by an L1 transaction that performs the following:
         \begin{equation*}
         \T{TxOrderDatum} \coloneq \left\{
             \begin{array}{ll}
-                \T{tx} : & \T{MidgardTx}, \\
+                \T{event} : & \T{TxOrderEvent}, \\
                 \T{inclusion\_time} : & \T{PosixTime}, \\
                 \T{witness} : & \T{ScriptHash}, \\
                 \T{refund\_address}: & \T{Address}, \\
