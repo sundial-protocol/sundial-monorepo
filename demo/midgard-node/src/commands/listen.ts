@@ -18,7 +18,6 @@ import {
   pipe,
   Schedule,
 } from "effect";
-import express from "express";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -29,10 +28,13 @@ import {
   MempoolLedgerDB,
 } from "../database/index.js";
 import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
-import { Database, mkPgConfig, SqlClientLive } from "@/services/database.js";
-import { PgClient } from "@effect/sql-pg";
-import { SqlClient } from "@effect/sql";
+import { SqlClientLive } from "@/services/database.js";
 import * as Reactivity from "@effect/experimental/Reactivity";
+import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
+import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
+import { createServer } from "node:http";
+import { NodeHttpServer } from "@effect/platform-node";
+import { HttpBodyError } from "@effect/platform/HttpBody";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -46,366 +48,251 @@ const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   bigint: true,
 });
 
-export const listenFork: () => Effect.Effect<
-  void,
-  Error,
-  AlwaysSucceedsContract | Database | User | NodeConfig
-> = () =>
+const handle500 = (location: string, error: Error | HttpBodyError) =>
   Effect.gen(function* () {
-    const nodeConfig = yield* NodeConfig;
-    const port = nodeConfig.PORT;
-    const app = express();
-
-    type EndpointResponse<R> =
-      | { _tag: "Success"; body: R }
-      | { _tag: "Failure"; status: number; msg: string };
-
-    const getTxEndpoint = (
-      txHash: unknown,
-    ): Effect.Effect<EndpointResponse<{ tx: Uint8Array }>, Error, Database> =>
-      Effect.gen(function* () {
-        if (
-          typeof txHash !== "string" ||
-          !isHexString(txHash) ||
-          txHash.length !== 32
-        )
-          return {
-            _tag: "Failure",
-            status: 404,
-            msg: `Invalid transaction hash: ${txHash}`,
-          };
-        const txHashBytes = fromHex(txHash);
-        const retMempool = yield* MempoolDB.retrieveTxCborByHash(txHashBytes);
-        if (Option.isSome(retMempool)) {
-          yield* Effect.logInfo(
-            `GET /tx - Transaction found in mempool: ${txHash}`,
-          );
-          return { _tag: "Success", body: { tx: retMempool.value } };
-        }
-
-        const retImmutable =
-          yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
-        if (Option.isSome(retImmutable)) {
-          yield* Effect.logInfo(
-            `GET /tx - Transaction found in immutable: ${txHash}`,
-          );
-          return { _tag: "Success", body: { tx: retImmutable.value } };
-        }
-
-        yield* Effect.logInfo(`GET /tx - No transaction found: ${txHash}`);
-        return {
-          _tag: "Failure",
-          status: 404,
-          msg: `Transaction not found: ${txHash}`,
-        };
-      });
-
-    const getUtxosEndpoint = (
-      addr: unknown,
-    ): Effect.Effect<
-      EndpointResponse<{
-        utxos: { key: Uint8Array; value: Uint8Array }[];
-      }>,
-      Error,
-      Database
-    > =>
-      Effect.gen(function* () {
-        if (typeof addr !== "string") {
-          yield* Effect.logInfo(`GET /utxos - Invalid address type: ${addr}`);
-          return {
-            _tag: "Failure",
-            status: 400,
-            msg: `Invalid address: ${addr}`,
-          };
-        }
-        try {
-          const addrDetails = getAddressDetails(addr);
-          if (addrDetails.paymentCredential) {
-            const allUTxOs = yield* MempoolLedgerDB.retrieve();
-            const filtered = allUTxOs.filter(({ value }) => {
-              const cmlOutput = CML.TransactionOutput.from_cbor_bytes(value);
-              const address = cmlOutput.address().to_bech32();
-              address === addrDetails.address.bech32;
-            });
-            yield* Effect.logInfo(
-              `GET /utxos - Found ${filtered.length} UTXOs for address: ${addr}`,
-            );
-            return { _tag: "Success", body: { utxos: filtered } };
-          } else {
-            yield* Effect.logInfo(
-              `GET /utxos - Invalid address (no payment credential): ${addr}`,
-            );
-            return {
-              _tag: "Failure",
-              status: 400,
-              msg: `Invalid address: ${addr}`,
-            };
-          }
-        } catch (e) {
-          yield* Effect.logInfo(
-            `GET /utxos - Invalid address format: ${addr}, error: ${e}`,
-          );
-          return {
-            _tag: "Failure",
-            status: 400,
-            msg: `Invalid address: ${addr}`,
-          };
-        }
-      });
-
-    const getBlockEndpoint = (
-      hdrHash: unknown,
-    ): Effect.Effect<
-      EndpointResponse<Uint8Array<ArrayBufferLike>[]>,
-      Error,
-      Database
-    > =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(
-          `GET /block - Request received for header_hash: ${hdrHash}`,
-        );
-        if (
-          typeof hdrHash !== "string" ||
-          !isHexString(hdrHash) ||
-          hdrHash.length !== 32
-        ) {
-          yield* Effect.logInfo(
-            `GET /block - Invalid block header hash: ${hdrHash}`,
-          );
-          return {
-            _tag: "Failure",
-            status: 400,
-            msg: `Invalid block header hash: ${hdrHash}`,
-          };
-        }
-        const hashes = yield* BlocksDB.retrieveTxHashesByBlockHash(
-          fromHex(hdrHash),
-        );
-        yield* Effect.logInfo(
-          `GET /block - Found ${hashes.length} transactions for block: ${hdrHash}`,
-        );
-        return { _tag: "Success", body: hashes };
-      });
-
-    const getInitEndpoint = (): Effect.Effect<
-      EndpointResponse<{ message: string }>,
-      Error,
-      Database | User | AlwaysSucceedsContract
-    > =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(`✨ Initialization request received`);
-        const result = yield* Effect.either(StateQueueTx.stateQueueInit);
-        if (Either.isRight(result)) {
-          yield* Effect.logInfo(
-            `GET /init - Initialization successful: ${result.right}`,
-          );
-          return {
-            _tag: "Success",
-            body: { message: `Initiation successful: ${result.right}` },
-          };
-        } else {
-          yield* Effect.logInfo(
-            `GET /init - Initialization failed: ${result.left}`,
-          );
-          return { _tag: "Failure", status: 500, msg: `Initiation failed.` };
-        }
-      });
-
-    const getCommitEndpoint = (): Effect.Effect<
-      EndpointResponse<{ message: string }>,
-      Error,
-      Database
-    > =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(
-          `GET /commit - Manual block commitment order received`,
-        );
-        const result = yield* Effect.either(makeBlockCommitmentAction());
-        if (Either.isRight(result)) {
-          yield* Effect.logInfo(
-            `GET /commit - Block commitment successful: ${result.right}`,
-          );
-          return {
-            _tag: "Success",
-            body: { message: `Block commitment successful: ${result.right}` },
-          };
-        } else {
-          yield* Effect.logInfo(
-            `GET /commit - Block commitment failed: ${result.left}`,
-          );
-          return {
-            _tag: "Failure",
-            status: 500,
-            msg: `Block commitment failed.`,
-          };
-        }
-      });
-
-    const getMergeEndpoint = (): Effect.Effect<
-      EndpointResponse<{ message: string }>,
-      Error,
-      Database | User | AlwaysSucceedsContract
-    > =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(`GET /merge - Manual merge order received`);
-        const result = yield* Effect.either(makeMergeAction());
-        if (Either.isRight(result)) {
-          yield* Effect.logInfo(
-            `GET /merge - Merging confirmed state successful: ${result.right}`,
-          );
-          return {
-            _tag: "Success",
-            body: {
-              message: `Merging confirmed state successful: ${result.right}`,
-            },
-          };
-        } else {
-          yield* Effect.logInfo(
-            `GET /merge - Merging confirmed state failed: ${result.left}`,
-          );
-          return {
-            _tag: "Failure",
-            status: 500,
-            msg: `Merging confirmed state failed.`,
-          };
-        }
-      });
-
-    const getResetEndpoint = (): Effect.Effect<
-      EndpointResponse<{ message: string }>,
-      Error,
-      Database | User | AlwaysSucceedsContract
-    > =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(`🚧 Reset request received`);
-        const result = yield* Effect.either(StateQueueTx.resetStateQueue);
-        if (Either.isLeft(result)) {
-          return {
-            _tag: "Failure",
-            status: 400,
-            msg: `Failed to collect one or more UTxOs. Please try again. Error: ${result.left}`,
-          };
-        } else {
-          yield* Effect.all(
-            [
-              MempoolDB.clear(),
-              MempoolLedgerDB.clear(),
-              BlocksDB.clear(),
-              ImmutableDB.clear(),
-              LatestLedgerDB.clear(),
-              ConfirmedLedgerDB.clear(),
-            ],
-            { discard: true },
-          );
-          return {
-            _tag: "Success",
-            body: { message: `Collected all UTxOs successfully!` },
-          };
-        }
-      });
-
-    const postSubmitEndpoint = (
-      txString: unknown,
-    ): Effect.Effect<
-      EndpointResponse<{ message: string }>,
-      Error,
-      Database | User
-    > =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(`◻️ Submit request received for transaction`);
-        if (typeof txString !== "string" || !isHexString(txString)) {
-          yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
-          return { _tag: "Failure", status: 400, msg: `Invalid CBOR provided` };
-        }
-        const { user: lucid } = yield* User;
-        const result = yield* Effect.either(
-          Effect.gen(function* () {
-            const txCBOR = fromHex(txString);
-            const tx = lucid.fromTx(txString);
-            const { spent, produced } =
-              yield* findSpentAndProducedUTxOs(txCBOR);
-            yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
-            yield* MempoolLedgerDB.clearUTxOs(spent);
-            yield* MempoolLedgerDB.insert(produced);
-            Effect.runSync(Metric.increment(txCounter));
-          }),
-        );
-        if (Either.isRight(result)) {
-          return {
-            _tag: "Success",
-            body: { message: `Successfully submitted the transaction` },
-          };
-        } else {
-          yield* Effect.logInfo(`▫️ L2 transaction failed: ${result.left}`);
-          return {
-            _tag: "Failure",
-            status: 400,
-            msg: `Something went wrong: ${result.left}`,
-          };
-        }
-      });
-
-    const sqlClient = yield* SqlClient.SqlClient;
-
-    type RunEndpointEffect = <A, E>(
-      endpoint: Effect.Effect<
-        EndpointResponse<A>,
-        E,
-        AlwaysSucceedsContract | SqlClient.SqlClient | User
-      >,
-      response: any,
-    ) => Promise<void>;
-    const runEndpointEffect: RunEndpointEffect = async (endpoint, response) => {
-      try {
-        const res: EndpointResponse<any> = await Effect.runPromise(
-          endpoint.pipe(
-            Effect.provide(Database.layer),
-            Effect.provide(User.layer),
-            Effect.provide(AlwaysSucceedsContract.layer),
-            Effect.provide(NodeConfig.layer),
-          ),
-        );
-        if (res._tag === "Success") await response.status(200).json(res.body);
-        else await response.status(res.status).json({ message: res.msg });
-      } catch (error) {
-        await Effect.runPromise(
-          Effect.logError("Endpoint effect failed:", error),
-        );
-        await response.status(500).json({ message: "Something went wrong" });
-      }
-    };
-
-    app.get("/tx", async (req, res) => {
-      await runEndpointEffect(getTxEndpoint(req.query.tx_hash), res);
-    });
-    app.get("/utxos", async (req, res) => {
-      await runEndpointEffect(getUtxosEndpoint(req.query.addr), res);
-    });
-    app.get("/block", async (req, res) => {
-      await runEndpointEffect(getBlockEndpoint(req.query.header_hash), res);
-    });
-    app.get("/init", async (_req, res) => {
-      await runEndpointEffect(getInitEndpoint(), res);
-    });
-    app.get("/commit", async (_req, res) => {
-      await runEndpointEffect(getCommitEndpoint(), res);
-    });
-    app.get("/merge", async (_req, res) => {
-      await runEndpointEffect(getMergeEndpoint(), res);
-    });
-    app.get("/reset", async (_req, res) => {
-      res.type("text/plain");
-      await runEndpointEffect(getResetEndpoint(), res);
-    });
-    app.post("/submit", async (req, res) => {
-      await runEndpointEffect(postSubmitEndpoint(req.query.tx_cbor), res);
-    });
-    app.listen(port, () =>
-      Effect.runSync(
-        Effect.logInfo(`Server running at http://localhost:${port}`),
-      ),
+    yield* Effect.logInfo(
+      `Something went wrong at ${location} handler: ${error}`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: `Something went wrong` },
+      { status: 500 },
     );
   });
+
+const getTxHandler = Effect.gen(function* () {
+  const params = yield* ParsedSearchParams;
+  const txHashParam = params["tx_hash"];
+  if (
+    typeof txHashParam !== "string" ||
+    !isHexString(txHashParam) ||
+    txHashParam.length !== 32
+  ) {
+    yield* Effect.logInfo(`Invalid transaction hash: ${txHashParam}`);
+    return yield* HttpServerResponse.json(
+      { error: `Invalid transaction hash: ${txHashParam}` },
+      { status: 404 },
+    );
+  }
+  const txHashBytes = fromHex(txHashParam);
+  const retMempool = yield* MempoolDB.retrieveTxCborByHash(txHashBytes);
+  if (Option.isSome(retMempool)) {
+    yield* Effect.logInfo(
+      `GET /tx - Transaction found in mempool: ${txHashParam}`,
+    );
+    return yield* HttpServerResponse.json({ tx: retMempool.value });
+  }
+  const retImmutable = yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
+  if (Option.isSome(retImmutable)) {
+    yield* Effect.logInfo(
+      `GET /tx - Transaction found in immutable: ${txHashParam}`,
+    );
+    return yield* HttpServerResponse.json({ tx: retImmutable.value });
+  }
+  yield* Effect.logInfo(`Transaction not found: ${txHashParam}`);
+  return yield* HttpServerResponse.json(
+    { error: `Transaction not found: ${txHashParam}` },
+    { status: 404 },
+  );
+}).pipe(Effect.catchAll((e) => handle500("getTx", e)));
+
+const getUtxosHandler = Effect.gen(function* () {
+  const params = yield* ParsedSearchParams;
+  const addr = params["addr"];
+
+  if (typeof addr !== "string") {
+    yield* Effect.logInfo(`GET /utxos - Invalid address type: ${addr}`);
+    return yield* HttpServerResponse.json(
+      { error: `Invalid address type: ${addr}` },
+      { status: 400 },
+    );
+  }
+  try {
+    const addrDetails = getAddressDetails(addr);
+    if (!addrDetails.paymentCredential) {
+      yield* Effect.logInfo(`Invalid address format: ${addr}`);
+      return yield* HttpServerResponse.json(
+        { error: `Invalid address format: ${addr}` },
+        { status: 400 },
+      );
+    }
+    const allUTxOs = yield* MempoolLedgerDB.retrieve();
+    const filtered = allUTxOs.filter(({ value }) => {
+      const cmlOutput = CML.TransactionOutput.from_cbor_bytes(value);
+      return cmlOutput.address().to_bech32() === addrDetails.address.bech32;
+    });
+    yield* Effect.logInfo(`Found ${filtered.length} UTXOs for ${addr}`);
+    return yield* HttpServerResponse.json({ utxos: filtered });
+  } catch (error) {
+    yield* Effect.logInfo(`Invalid address: ${addr}`);
+    return yield* HttpServerResponse.json(
+      { error: `Invalid address: ${addr}` },
+      { status: 400 },
+    );
+  }
+}).pipe(Effect.catchAll((e) => handle500("getUtxos", e)));
+
+const getBlockHandler = Effect.gen(function* () {
+  const params = yield* ParsedSearchParams;
+  const hdrHash = params["header_hash"];
+  yield* Effect.logInfo(
+    `GET /block - Request received for header_hash: ${hdrHash}`,
+  );
+
+  if (
+    typeof hdrHash !== "string" ||
+    !isHexString(hdrHash) ||
+    hdrHash.length !== 32
+  ) {
+    yield* Effect.logInfo(`GET /block - Invalid block hash: ${hdrHash}`);
+    return yield* HttpServerResponse.json(
+      { error: `Invalid block hash: ${hdrHash}` },
+      { status: 400 },
+    );
+  }
+  const hashes = yield* BlocksDB.retrieveTxHashesByBlockHash(fromHex(hdrHash));
+  yield* Effect.logInfo(
+    `GET /block - Found ${hashes.length} txs for block: ${hdrHash}`,
+  );
+  return yield* HttpServerResponse.json({ hashes });
+}).pipe(Effect.catchAll((e) => handle500("getBlock", e)));
+
+const getInitHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✨ Initialization request received`);
+  const result = yield* Effect.either(StateQueueTx.stateQueueInit);
+  if (Either.isRight(result)) {
+    yield* Effect.logInfo(
+      `GET /init - Initialization successful: ${result.right}`,
+    );
+    return yield* HttpServerResponse.json({
+      message: `Initiation successful: ${result}`,
+    });
+  } else {
+    yield* Effect.logInfo(`GET /init - Initialization failed: ${result.left}`);
+    return yield* HttpServerResponse.json(
+      { error: "Initialization failed" },
+      { status: 500 },
+    );
+  }
+}).pipe(Effect.catchAll((e) => handle500("getInit", e)));
+
+const getCommitEndpoint = Effect.gen(function* () {
+  yield* Effect.logInfo(`GET /commit - Manual block commitment order received`);
+  const result = yield* Effect.either(makeBlockCommitmentAction());
+  if (Either.isRight(result)) {
+    yield* Effect.logInfo(
+      `GET /commit - Block commitment successful: ${result.right}`,
+    );
+    return yield* HttpServerResponse.json({
+      message: `Block commitment successful: ${result.right}`,
+    });
+  } else {
+    yield* Effect.logInfo(
+      `GET /commit - Block commitment failed: ${result.left}`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: "Block commitment failed." },
+      { status: 500 },
+    );
+  }
+}).pipe(Effect.catchAll((e) => handle500("getCommit", e)));
+
+const getMergeHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`GET /merge - Manual merge order received`);
+  const result = yield* Effect.either(makeMergeAction());
+  if (Either.isRight(result)) {
+    yield* Effect.logInfo(
+      `GET /merge - Merging confirmed state successful: ${result.right}`,
+    );
+    return yield* HttpServerResponse.json({
+      message: `Merging confirmed state successful: ${result.right}`,
+    });
+  } else {
+    yield* Effect.logInfo(
+      `GET /merge - Merging confirmed state failed: ${result.left}`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: "Merging confirmed state failed." },
+      { status: 500 },
+    );
+  }
+}).pipe(Effect.catchAll((e) => handle500("getMerge", e)));
+
+const getResetHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`🚧 Reset request received`);
+  const result = yield* Effect.either(StateQueueTx.resetStateQueue);
+  if (Either.isLeft(result)) {
+    return yield* HttpServerResponse.json(
+      {
+        error: `Failed to collect one or more UTxOs. Please try again. Error: ${result.left}`,
+      },
+      { status: 400 },
+    );
+  } else {
+    yield* Effect.all(
+      [
+        MempoolDB.clear(),
+        MempoolLedgerDB.clear(),
+        BlocksDB.clear(),
+        ImmutableDB.clear(),
+        LatestLedgerDB.clear(),
+        ConfirmedLedgerDB.clear(),
+      ],
+      { discard: true },
+    );
+    return yield* HttpServerResponse.json({
+      message: `Collected all UTxOs successfully!`,
+    });
+  }
+}).pipe(Effect.catchAll((e) => handle500("getReset", e)));
+
+const postSubmitHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`◻️ Submit request received for transaction`);
+  const params = yield* ParsedSearchParams;
+  const txStringParam = params["tx_cbor"];
+  if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
+    yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
+    return yield* HttpServerResponse.json(
+      { error: `Invalid CBOR provided` },
+      { status: 400 },
+    );
+  } else {
+    const txString = txStringParam;
+    const { user: lucid } = yield* User;
+    const result = yield* Effect.either(
+      Effect.gen(function* () {
+        const txCBOR = fromHex(txString);
+        const tx = lucid.fromTx(txString);
+        const { spent, produced } = yield* findSpentAndProducedUTxOs(txCBOR);
+        yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
+        yield* MempoolLedgerDB.clearUTxOs(spent);
+        yield* MempoolLedgerDB.insert(produced);
+        Effect.runSync(Metric.increment(txCounter));
+      }),
+    );
+    if (Either.isRight(result)) {
+      return yield* HttpServerResponse.json({
+        message: `Successfully submitted the transaction`,
+      });
+    } else {
+      yield* Effect.logInfo(`▫️ L2 transaction failed: ${result.left}`);
+      return yield* HttpServerResponse.json(
+        { error: `Something went wrong: ${result.left}` },
+        { status: 400 },
+      );
+    }
+  }
+}).pipe(Effect.catchAll((e) => handle500("postSubmit", e)));
+
+const router = HttpRouter.empty.pipe(
+  HttpRouter.get("/tx", getTxHandler),
+  HttpRouter.get("/utxos", getUtxosHandler),
+  HttpRouter.get("/block", getBlockHandler),
+  HttpRouter.get("/init", getInitHandler),
+  HttpRouter.get("/commit", getCommitEndpoint),
+  HttpRouter.get("/merge", getMergeHandler),
+  HttpRouter.get("/reset", getResetHandler),
+  HttpRouter.post("/submit", postSubmitHandler),
+);
 
 const makeBlockCommitmentAction = () =>
   Effect.gen(function* () {
@@ -517,8 +404,13 @@ export const runNode = Effect.gen(function* () {
   yield* Effect.logInfo("📚 Opening connection to db...");
   yield* InitDB.initializeDb().pipe(Effect.provide(SqlClientLive));
 
+  const ListenLayer = Layer.provide(
+    HttpServer.serve(router),
+    NodeHttpServer.layer(createServer, { port: 3000 }),
+  );
+
   const appThread = pipe(
-    listenFork(),
+    Layer.launch(ListenLayer),
     Effect.provide(SqlClientLive),
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceedsContract.layer),

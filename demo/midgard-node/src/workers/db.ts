@@ -291,8 +291,11 @@ export class PostgresCheckpointDB
   }
 
   async conclude() {
-    await Effect.runPromise(this.transferToReference().
-      pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))));
+    await Effect.runPromise(
+      this.transferToReference().pipe(
+        Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client)),
+      ),
+    );
   }
 
   shallowCopy(): PostgresCheckpointDB {
