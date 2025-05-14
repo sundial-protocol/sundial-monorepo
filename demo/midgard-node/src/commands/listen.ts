@@ -411,10 +411,6 @@ export const runNode = Effect.gen(function* () {
 
   const appThread = pipe(
     Layer.launch(ListenLayer),
-    Effect.provide(SqlClientLive),
-    Effect.provide(User.layer),
-    Effect.provide(AlwaysSucceedsContract.layer),
-    Effect.provide(NodeConfig.layer),
   );
 
   const blockCommitmentThread = blockCommitmentFork(
@@ -423,18 +419,10 @@ export const runNode = Effect.gen(function* () {
 
   const mergeThread = pipe(
     mergeFork(nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
-    Effect.provide(SqlClientLive),
-    Effect.provide(User.layer),
-    Effect.provide(AlwaysSucceedsContract.layer),
-    Effect.provide(NodeConfig.layer),
   );
 
   const monitorMempoolThread = pipe(
     mempoolFork(),
-    Effect.provide(SqlClientLive),
-    Effect.provide(NodeConfig.layer),
-    Effect.scoped,
-    Effect.provide(Reactivity.layer),
   );
 
   const program = Effect.all(
@@ -442,6 +430,11 @@ export const runNode = Effect.gen(function* () {
     {
       concurrency: "unbounded",
     },
+  ).pipe(
+    Effect.provide(SqlClientLive),
+    Effect.provide(AlwaysSucceedsContract.layer),
+    Effect.provide(User.layer),
+    Effect.provide(NodeConfig.layer),
   );
 
   pipe(
