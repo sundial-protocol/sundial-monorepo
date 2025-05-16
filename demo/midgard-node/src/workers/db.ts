@@ -44,6 +44,7 @@ export class PostgresCheckpointDB
     const { _tableName, _referenceTableName, clear } = this;
     return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
+      yield* sql`SET client_min_messages = 'error'`;
       yield* UtilsDB.mkKeyValueCreateQuery(_tableName);
       if (_referenceTableName && copyFromReference) {
         sql.withTransaction(
