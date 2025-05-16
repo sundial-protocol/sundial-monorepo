@@ -48,16 +48,6 @@ export const makeUserFn = (nodeConfig: NodeConfigDep) =>
       }
     });
     user.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
-    yield* pipe(
-      Effect.promise(() => user.wallet().address()),
-      Effect.flatMap((address) => Effect.log(`Wallet : ${address}`)),
-    );
-    yield* pipe(
-      Effect.promise(() => user.wallet().getUtxos()),
-      Effect.flatMap((utxos) =>
-        Effect.log(`Total Wallet UTxOs: ${utxos.length}`),
-      ),
-    );
     return {
       user,
     };
@@ -100,8 +90,6 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("POSTGRES_DB").pipe(Config.withDefault("midgard")),
     Config.string("POSTGRES_USER").pipe(Config.withDefault("postgres")),
   ]);
-
-  yield* Effect.logInfo("📚 Done");
 
   const provider = config[0].toLowerCase();
   if (!isValidProvider(provider)) {
