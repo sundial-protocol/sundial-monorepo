@@ -5,8 +5,15 @@ use cardano/assets.{PolicyId}
 use cardano/certificate.{RegisterCredential, UnregisterCredential}
 use cardano/transaction.{Publish, Redeemer, ScriptPurpose}
 
-pub type PublishRedeemer =
-  PolicyId
+pub type PublishRedeemer {
+  MintOrBurn {
+    target_policy: PolicyId,
+  }
+  RegisterToProveNotRegistered
+  UnregisterToProveNotRegistered
+  UnregisterToProveRegistered
+  RegisterToProveRegistered
+}
 
 /// Witness script's prefix from its single CBOR encoded applied bytearray.
 /// TODO: This should probably be moved to `env` with a better generation
