@@ -246,7 +246,7 @@ const getResetHandler = Effect.gen(function* () {
 }).pipe(Effect.catchAll((e) => handle500("getReset", e)));
 
 const postSubmitHandler = Effect.gen(function* () {
-  yield* Effect.logInfo(`◻️ Submit request received for transaction`);
+  // yield* Effect.logInfo(`◻️ Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
