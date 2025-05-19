@@ -74,7 +74,7 @@ export const clearTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attermt to clear table`);
+    yield* Effect.logDebug(`${tableName} db: attempt to clear table`);
     const sql = yield* SqlClient.SqlClient;
 
     yield* sql`TRUNCATE TABLE ${sql(tableName)} CASCADE`;
@@ -94,7 +94,7 @@ export const insertKeyValue = (
   value: Uint8Array,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attermt to insert keyValue`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValue`);
     const sql = yield* SqlClient.SqlClient;
     const valueBuffer: Buffer = Buffer.from(value);
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
@@ -114,7 +114,7 @@ export const insertKeyValues = (
   values: { key: Uint8Array; value: Uint8Array }[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attermt to insert keyValues`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValues`);
     const sql = yield* SqlClient.SqlClient;
     const pairs = values.map((kv) => ({
       key: Buffer.from(kv.key),
@@ -142,7 +142,7 @@ export const retrieveKeyValues = (
   SqlClient.SqlClient
 > =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attermt to retrieve keyValues`);
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql`SELECT * FROM ${sql(tableName)}`;
     return rows.map((row: unknown) => {
