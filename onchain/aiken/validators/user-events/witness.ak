@@ -4,8 +4,9 @@ use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
 use cardano/transaction.{Transaction}
 use midgard/common/parameter_validation
 use midgard/user_events/witness.{
-  PublishRedeemer, MintOrBurn, RegisterToProveRegistered, RegisterToProveNotRegistered,
-  UnregisterToProveRegistered, UnregisterToProveNotRegistered,
+  MintOrBurn, PublishRedeemer, RegisterToProveNotRegistered,
+  RegisterToProveRegistered, UnregisterToProveNotRegistered,
+  UnregisterToProveRegistered,
 }
 
 validator main(nonce: Hash<Blake2b_256, ByteArray>) {
@@ -19,8 +20,7 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
       ) -> Bool {
         when publish_redeemer is {
           MintOrBurn { target_policy } -> {
-            let mint_qty =
-              tx.mint |> assets.quantity_of(target_policy, nonce)
+            let mint_qty = tx.mint |> assets.quantity_of(target_policy, nonce)
 
             when cert is {
               RegisterCredential { .. } -> mint_qty == 1
@@ -28,7 +28,31 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
               _ -> False
             }
           }
-          RegisterToProveNotRegistered -> todo
+          RegisterToProveNotRegistered { registration_redeemer_index } -> {
+            expect [registration_pair,
+              unregistration_pair, ..] =
+              tx.redeemers |> list.drop(registration_redeemer_index)
+
+            expect Pair(Publish {
+              certificate: RegisterCredential {
+                credential: Script(reg_script_hash),
+                ..
+              },
+              ..
+            },
+            reg_redeemer_data) = registration_pair
+            expect RegisterToProveNotRegistered = reg_redeemer_data
+
+            expect Pair(Publish {
+              certificate: UnregisterCredential {
+                credential: Script(unreg_script_hash),
+                ..
+              },
+              ..
+            },
+            unreg_redeemer_data) = unregistration_pair.1st
+            expect UnregisterToProveNotRegistered = reg_redeemer_data
+          }
           UnregisterToProveNotRegistered -> todo
           UnregisterToProveRegistered -> todo
           RegisterToProveRegistered -> todo

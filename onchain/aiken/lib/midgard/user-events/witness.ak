@@ -6,10 +6,8 @@ use cardano/certificate.{RegisterCredential, UnregisterCredential}
 use cardano/transaction.{Publish, Redeemer, ScriptPurpose}
 
 pub type PublishRedeemer {
-  MintOrBurn {
-    target_policy: PolicyId,
-  }
-  RegisterToProveNotRegistered
+  MintOrBurn { target_policy: PolicyId }
+  RegisterToProveNotRegistered { registration_redeemer_index: Int }
   UnregisterToProveNotRegistered
   UnregisterToProveRegistered
   RegisterToProveRegistered
