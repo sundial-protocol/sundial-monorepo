@@ -333,7 +333,7 @@ const convertOps = (
   });
 };
 
-const rootsPop = (rootsRef: Ref.Ref<Uint8Array<ArrayBufferLike>[]>) =>
+const rootsPop = (rootsRef: Ref.Ref<Uint8Array[]>) =>
   Ref.modify(rootsRef, (roots) => {
     const newRoots = roots.slice(0, -1);
     const last = roots[roots.length - 1];

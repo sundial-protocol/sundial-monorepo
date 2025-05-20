@@ -135,8 +135,8 @@ export const retrieveKeyValues = (
   tableName: string,
 ): Effect.Effect<
   {
-    key: Uint8Array<ArrayBufferLike>;
-    value: Uint8Array<ArrayBufferLike>;
+    key: Uint8Array;
+    value: Uint8Array;
   }[],
   Error,
   SqlClient.SqlClient
