@@ -400,7 +400,7 @@ export const runNode = Effect.gen(function* () {
 
   const ListenLayer = Layer.provide(
     HttpServer.serve(router),
-    NodeHttpServer.layer(createServer, { port: 3000 }),
+    NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
   );
 
   const appThread = pipe(Layer.launch(ListenLayer));
