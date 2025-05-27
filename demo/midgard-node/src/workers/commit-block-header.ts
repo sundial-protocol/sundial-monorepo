@@ -15,6 +15,7 @@ import * as ETH_UTILS from "@ethereumjs/util";
 import { PostgresCheckpointDB } from "./db.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
+import { SqlClient } from "@effect/sql";
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
