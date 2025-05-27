@@ -139,7 +139,7 @@ export const retrieveKeyValues = (
     value: Uint8Array;
   }[],
   Error,
-  SqlClient.SqlClient
+  Database
 > =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);

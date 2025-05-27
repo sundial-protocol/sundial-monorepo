@@ -25,7 +25,7 @@ const wrapper = (
 ): Effect.Effect<
   WorkerOutput,
   Error,
-  NodeConfig | User | SqlClient.SqlClient
+  NodeConfig | User | Database
 > =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;

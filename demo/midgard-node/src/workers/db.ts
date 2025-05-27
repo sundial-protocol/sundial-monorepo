@@ -4,6 +4,7 @@ import { Effect, Layer, Ref } from "effect";
 import { CheckpointDB } from "@ethereumjs/mpt";
 import { LRUCache } from "lru-cache";
 import { UtilsDB } from "@/database/index.js";
+import { Database } from "@/services/database.js";
 
 export class PostgresCheckpointDB
   extends CheckpointDB
@@ -12,12 +13,12 @@ export class PostgresCheckpointDB
   cache: LRUCache<string, Uint8Array>;
   _transactionDepthRef: Ref.Ref<number>;
   _rootsRef: Ref.Ref<Uint8Array[]>;
-  _client: SqlClient.SqlClient;
+  _client: Database;
   _tableName: string;
   _referenceTableName: string | undefined;
 
   constructor(
-    client: SqlClient.SqlClient,
+    client: Database,
     tableName: string,
     referenceTableName?: string,
     options: { cacheSize?: number } = {},

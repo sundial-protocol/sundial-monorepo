@@ -77,7 +77,7 @@ export const retrieveTxHashesByBlockHash = (
 
 export const retrieveBlockHashByTxHash = (
   txHash: Uint8Array,
-): Effect.Effect<Uint8Array, Error, SqlClient.SqlClient> =>
+): Effect.Effect<Uint8Array, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve block_hash for tx_hash ${txHash}`,
@@ -110,7 +110,7 @@ export const retrieveBlockHashByTxHash = (
 
 export const clearBlock = (
   blockHash: Uint8Array,
-): Effect.Effect<void, Error, SqlClient.SqlClient> =>
+): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt clear block ${blockHash}`);
     const sql = yield* SqlClient.SqlClient;
@@ -140,7 +140,7 @@ interface BlockRow {
 export const retrieve = (): Effect.Effect<
   [Uint8Array, Uint8Array][],
   Error,
-  SqlClient.SqlClient
+  Database
 > =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
@@ -165,5 +165,5 @@ export const retrieve = (): Effect.Effect<
     mapSqlError,
   );
 
-export const clear = (): Effect.Effect<void, Error, SqlClient.SqlClient> =>
+export const clear = (): Effect.Effect<void, Error, Database> =>
   clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));
