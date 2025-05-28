@@ -244,9 +244,14 @@ validator mint(hub_oracle: ScriptHash) {
           )
 
         expect parsed_header_datum: state_queue.Datum = latest_block_datum_data
+
+        // 2. The provided block must be the latest in queue.
         expect parsed_header_datum.link == unordered.Empty
+
         expect ledger_state.Header { utxos_root, .. } = parsed_header_datum.data
 
+        // 3. The `l2_value` stated in `WithdrawalInfo` must be the same as the
+        //    value from the `l2_output` coming from the redeemer.
         expect
           assets.match(
             l2_output.value,
@@ -256,6 +261,8 @@ validator mint(hub_oracle: ScriptHash) {
 
         let l2_output_data: Data = l2_output
 
+        // 4. The latest block's ledger must contain the UTxO identified by
+        //    `l2_outref` from `WithdrawalInfo`.
         expect
           utils.plutarch_phas(
             mpf_root: utxos_root,
@@ -270,8 +277,8 @@ validator mint(hub_oracle: ScriptHash) {
             output_withdrawal_order_value,
           )
 
-        // 2. The output value of the UTxO at the withdrawal address must contain
-        //    only ADA and the authentication NFT.
+        // 5. The output value of the UTxO at the withdrawal address must
+        //    contain only ADA and the authentication NFT.
         output_withdrawal_order_nft_triplet == (own_policy, l1_id, 1)
       }
       BurnWithdrawalNFT {
