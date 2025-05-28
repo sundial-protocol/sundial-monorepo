@@ -5,11 +5,14 @@
 \section{Withdrawal order (L1)}
 \label{h:withdrawal-order}
 
-\notebox{Currently, this withdrawal order design can only handle withdrawing pubkey-based utxos.
-However, we can modify L2 transactions to produce ``withdrawable utxos'' that cannot be spent on L2 but can be withdrawn permissionlessly on L1.
-This will allow L1 withdrawal orders to withdraw these L2 utxos without even requiring any signatures.}
+A user initiates a withdrawal from Midgard by first producing an authentic token at the \emph{outbox} contract on L2.
+This ensures two things:
+\begin{enumerate}
+    \item The utxo becomes unspendable on L2, until its corresponding withdrawal event removes it from ledger.
+    \item The number of tokens included for withdrawal does not exceed the \code{max\_tokens\_allowed} protocol parameter.
+\end{enumerate}
 
-A user initiates a withdrawal from Midgard by submitting an L1 transaction that performs the following:
+To actually bring the funds to L1, users must then submit an L1 transaction that performs the following:
 \begin{enumerate}
     \item Spend an input \code{l1\_nonce}, which uniquely identifies this withdrawal order.
     \item Register a staking script credential to witness the withdrawal order.
@@ -29,6 +32,8 @@ A user initiates a withdrawal from Midgard by submitting an L1 transaction that 
     \item Send min-ADA to the Midgard withdrawal order address, along with the withdrawal order token and the above datum.
 \end{enumerate}
 
+\notebox{By adjusting incentives, users can be relieved from producing the withdrawl event utxo on L1 themselves, and rely on operators to take care of this second step.}
+
 At the time of the L1 withdrawal order, its \code{inclusion\_time} is set to the sum of the L1 transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter.
 According to Midgard's ledger rules:
 \begin{description}
@@ -37,7 +42,7 @@ According to Midgard's ledger rules:
 
 The withdrawal order's outcome is determined as follows:
 \begin{itemize}
-    \item If the withdrawal event is included in a settlement queue node, then utxos from the Midgard reserve and confirmed deposits can be used to pay for the creation of an L1 utxo according to the withdrawal event.
+    \item If the withdrawal event is included in a settlement queue node, its utxo can be transferred to the escrow contract so that it can be funded from the Midgard reserve.
     \item If the withdrawal order's inclusion time is within the confirmed header's event interval but not within the event interval of any settlement queue node, then the withdrawal order utxo can be refunded to its user according to the \code{refund\_address} and \code{refund\_datum} fields.
 \end{itemize}
 
@@ -62,6 +67,12 @@ It oversees correctness of datums, and registration/unregistration of events' co
         \item Withdrawal order utxo must be produced at \code{withdrawal\_addr}.
         \item The withdrawal order's \code{inclusion\_time} must be equal to transaction's time-validity upper bound plus \code{event\_wait\_duration} Midgard protocol parameter.
         \item The hash of the witness script must be correctly stored in the withdrawal datum.
+        \item Let \code{utxos\_root} be the root of the latest ledger at the latest node of the state queue, and \code{l2\_outref} be the output reference of the utxo subject to withdrawal.
+        \item Let \code{l2\_output} be the utxo itself at \code{outbox} contract on L2, provided via the redeemer.
+        \item \code{utxos\_root} must contain an item with key \code{l2\_outref} and value \code{l2\_output}.
+        \item Let \code{l2\_value} be the recorded value on L2 stored in \code{WithdrawalInfo}.
+        \item \code{l2\_value} and \code{value} from \code{l2\_output} must be equal.
+        \item Address from \code{l2\_output} must be the same as outbox contract's on L2.
       \end{enumerate}
     \item[Burn Withdrawal NFT.] Oversee start of the funding for a withdrawal order by requiring its NFTs to be burnt, and having the utxo reproduced at the \code{escrow} contract.
     Conditions:
