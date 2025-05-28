@@ -5,6 +5,7 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
+use env
 use midgard/common/utils.{plutarch_phas}
 use midgard/escrow
 use midgard/hub_oracle as hub
@@ -16,7 +17,6 @@ use midgard/user_events/withdrawal.{
   AuthenticateWithdrawal, BurnWithdrawalNFT, Datum, MintRedeemer, Refund,
   SpendRedeemer, TransferToEscrow,
 }
-use env
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
