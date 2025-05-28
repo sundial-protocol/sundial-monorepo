@@ -1,4 +1,6 @@
 use aiken/merkle_patricia_forestry as mpf
+use cardano/assets.{AssetName}
+use cardano/transaction.{Output}
 use midgard/ledger_state
 use midgard/user_events
 

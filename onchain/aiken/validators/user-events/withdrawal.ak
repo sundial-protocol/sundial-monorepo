@@ -1,6 +1,6 @@
 use aiken/crypto.{ScriptHash}
-use aiken_design_patterns/singular_utxo_indexer
 use aiken_design_patterns/linked_list/unordered
+use aiken_design_patterns/singular_utxo_indexer
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
@@ -10,10 +10,11 @@ use midgard/escrow
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
+use midgard/state_queue
 use midgard/user_events
 use midgard/user_events/withdrawal.{
-  Datum, Refund, SpendRedeemer, TransferToEscrow, MintRedeemer,
-  AuthenticateWithdrawal, BurnWithdrawalNFT,
+  AuthenticateWithdrawal, BurnWithdrawalNFT, Datum, MintRedeemer, Refund,
+  SpendRedeemer, TransferToEscrow,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -179,99 +180,114 @@ validator spend(hub_oracle: ScriptHash) {
 }
 
 validator mint(hub_oracle: ScriptHash) {
-  mint(
-    redeemer: MintRedeemer,
-    own_policy: PolicyId,
-    tx: Transaction,
-  ) {
-  when redeemer is {
-    AuthenticateWithdrawal {
-      nonce_input_index,
-      event_output_index,
-      hub_ref_input_index,
-      witness_registration_redeemer_index,
-      latest_block_ref_input_index,
-      l2_output,
-      membership_proof,
-    } -> {
-      let Transaction {
-        inputs,
-        outputs,
-        reference_inputs,
-        validity_range,
-        mint,
-        redeemers,
-        ..
-      } = tx
-
-      let hub.Datum { state_queue: state_queue_policy, withdrawal_addr, .. } =
-        hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
-
-      expect Input {
-        output: Output {
-          datum: InlineDatum(latest_block_datum_data),
-          ..
-        },
-        ..
-      } = utils.get_authentic_input_with_policy_at(
-        reference_inputs,
-        state_queue_policy,
+  mint(redeemer: MintRedeemer, own_policy: PolicyId, tx: Transaction) {
+    when redeemer is {
+      AuthenticateWithdrawal {
+        nonce_input_index,
+        event_output_index,
+        hub_ref_input_index,
+        witness_registration_redeemer_index,
         latest_block_ref_input_index,
-      )
-
-      // 1. Perform numerous validations and grant access to:
-      //    - Serialized and hashed nonce based on the output reference of a
-      //      specified input UTxO
-      //    - The output value of the UTxO at the withdrawal address for the
-      //      minting (not burning) endpoint
-      //    - Withdrawal info
-      let
-        l1_id,
-        output_withdrawal_order_value,
-        withdrawal_info_data,
-      <-
-        user_events.authenticate_event(
-          event_address,
-          nonce_input_index,
-          event_output_index,
-          hub_ref_input_index,
-          witness_registration_redeemer_index,
-          own_policy,
+        l2_output,
+        membership_proof,
+      } -> {
+        let Transaction {
           inputs,
           outputs,
+          reference_inputs,
           validity_range,
           mint,
           redeemers,
+          ..
+        } = tx
+
+        // Grab the hub oracle datum.
+        let hub.Datum { state_queue: state_queue_policy, withdrawal_addr, .. } =
+          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+
+        // 1. Perform numerous validations and grant access to:
+        //    - Serialized and hashed nonce based on the output reference of a
+        //      specified input UTxO
+        //    - The output value of the UTxO at the withdrawal address for the
+        //      minting (not burning) endpoint
+        //    - Withdrawal info
+        let
+          l1_id,
+          output_withdrawal_order_value,
+          withdrawal_info_data,
+        <-
+          user_events.authenticate_event(
+            withdrawal_addr,
+            nonce_input_index,
+            event_output_index,
+            witness_registration_redeemer_index,
+            own_policy,
+            inputs,
+            outputs,
+            validity_range,
+            mint,
+            redeemers,
+          )
+
+        expect ledger_state.WithdrawalInfo { l2_outref, l2_value, .. } =
+          withdrawal_info_data
+
+        // Grab the state queue datum.
+        expect Input {
+          output: Output { datum: InlineDatum(latest_block_datum_data), .. },
+          ..
+        } =
+          utils.get_authentic_input_with_policy_at(
+            reference_inputs,
+            state_queue_policy,
+            latest_block_ref_input_index,
+          )
+
+        expect parsed_header_datum: state_queue.Datum = latest_block_datum_data
+        expect parsed_header_datum.link == unordered.Empty
+        expect ledger_state.Header { utxos_root, .. } = parsed_header_datum.data
+
+        expect
+          assets.match(
+            l2_output.value,
+            l2_value,
+            fn(utxo_lovelace, info_lovelace) { utxo_lovelace == info_lovelace },
+          )
+
+        let l2_output_data: Data = l2_output
+
+        expect
+          utils.plutarch_phas(
+            mpf_root: utxos_root,
+            key: l2_outref,
+            value: l2_output_data,
+            membership_proof: membership_proof,
+            redeemers: redeemers,
+          )
+
+        let output_withdrawal_order_nft_triplet =
+          utils.get_single_asset_from_value_apart_from_ada(
+            output_withdrawal_order_value,
+          )
+
+        // 2. The output value of the UTxO at the withdrawal address must contain
+        //    only ADA and the authentication NFT.
+        output_withdrawal_order_nft_triplet == (own_policy, l1_id, 1)
+      }
+      BurnWithdrawalNFT {
+        nonce_asset_name,
+        witness_unregistration_redeemer_index,
+      } -> {
+        let Transaction { mint, redeemers, .. } = tx
+        user_events.validate_event_nft_burn(
+          nonce_asset_name,
+          witness_unregistration_redeemer_index,
+          own_policy,
+          mint,
+          redeemers,
         )
-
-      expect ledger_state.WithdrawalInfo {
-        l2_outref,
-        l2_value,
-        ..
-      } = withdrawal_info_data
-
-      expect parsed_header_datum: state_queue.Datum = latest_block_datum_data
-      expect parsed_header_datum.link == unordered.Empty
-      expect ledger_state.Header { utxos_root, .. } = latest_block_datum_data.data
-
-      let l2_output_data: Data = l2_output
-
-      expect utils.plutarch_phas(
-        mpf_root: ByteArray,
-        key: l2_outref,
-        value: l2_output_data,
-        membership_proof: membership_proof,
-        redeemers: redeemers,
-      )
-
-    let output_withdrawal_order_nft_triplet =
-      utils.get_single_asset_from_value_apart_from_ada(
-        output_withdrawal_order_value,
-      )
-
-    // 2. The output value of the UTxO at the withdrawal address must contain
-    //    only ADA and the authentication NFT.
-    output_withdrawal_order_nft_triplet == (own_policy, l1_id, 1)
+      }
+    }
   }
 
   else(_) {

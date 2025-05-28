@@ -8,7 +8,7 @@ use cardano/address.{Address}
 use cardano/assets.{AssetName, PolicyId, Value}
 use cardano/transaction.{
   Datum as CardanoDatum, InlineDatum, Input, Output, OutputReference, Redeemer,
-  ScriptPurpose, Transaction,
+  ScriptPurpose, Transaction, ValidityRange,
 }
 use env
 use midgard/common/parameter_validation
@@ -168,7 +168,6 @@ pub fn validate_mint(
         event_address,
         nonce_input_index,
         event_output_index,
-        hub_ref_input_index,
         witness_registration_redeemer_index,
         own_policy,
         inputs,
@@ -256,7 +255,8 @@ pub fn authenticate_event(
     ..
   }: Datum<Data> = output_event_datum_data
 
-  let Pair(event_id, event_info) = ledger_state.unsafe_event_to_key_value_pair(event)
+  let Pair(event_id, event_info) =
+    ledger_state.unsafe_event_to_key_value_pair(event)
 
   let nonce_input_out_ref_data: Data = nonce_input_out_ref
 
@@ -284,8 +284,6 @@ pub fn validate_event_nft_burn(
   mint: Value,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
 ) -> Bool {
-  let Transaction { mint, redeemers, .. } = tx
-
   let expected_witness_script_hash =
     parameter_validation.apply_prehashed_param(
       version: 3,
