@@ -139,8 +139,8 @@ pub fn validate_mint(
   redeemer: MintRedeemer,
   own_policy: PolicyId,
   tx: Transaction,
-  event_value_validator: fn(AssetName, Value) -> Bool,
-) {
+  event_validator: fn(AssetName, Value, Data) -> Bool,
+) -> Bool {
   when redeemer is {
     AuthenticateEvent {
       nonce_input_index,
@@ -158,108 +158,154 @@ pub fn validate_mint(
         ..
       } = tx
 
-      // Grab validity range's upper bound.
-      expect Finite(valid_to) = validity_range.upper_bound.bound_type
-
-      // Grab output reference of the specified nonce input.
-      expect Some(Input { output_reference: nonce_input_out_ref, .. }) =
-        inputs |> list.at(nonce_input_index)
-
-      // In order to apply the parameterized witness script, we hash the
-      // serialized nonce output reference to get the 32 bytes long nonce.
-      let nonce = out_ref_to_nonce(nonce_input_out_ref)
-
-      // 1. This event NFT must be minted with a quantity of 1.
-      expect assets.quantity_of(mint, own_policy, nonce) == 1
-
-      // Script hash of the witness script, required to be registered in this
-      // transaction.
-      let expected_witness_script_hash =
-        parameter_validation.apply_prehashed_param(
-          version: 3,
-          prefix: witness_script_prefix,
-          param: nonce,
-        )
-
-      // 2. Validate this script hash is being registered.
-      // 3. Validate the policy ID passed in its redeemer is correct.
-      expect
-        validate_witness_redeemer(
-          expected_witness_script_hash: expected_witness_script_hash,
-          witness_redeemer_index: witness_registration_redeemer_index,
-          for_registration: True,
-          event_policy_id: own_policy,
-          redeemers: redeemers,
-        )
-
-      // Event's produced UTxO, with an inline datum and no reference script
-      // attached.
-      expect Some(Output {
-        address: output_event_address,
-        value: output_event_value,
-        datum: InlineDatum(output_event_datum_data),
-        reference_script: None,
-      }) = outputs |> list.at(event_output_index)
-
-      // Extracting common data shared between all event datums.
-      expect Datum {
-        event,
-        inclusion_time: output_event_inclusion_time,
-        witness: output_event_witness,
-        ..
-      }: Datum<Data> = output_event_datum_data
-
-      let event_id = ledger_state.unsafe_event_to_id_data(event)
-
-      let nonce_input_out_ref_data: Data = nonce_input_out_ref
-
-      // 4. Event's ID must be the same as the specified spent input.
-      expect event_id == nonce_input_out_ref_data
-
       // Grab hub oracle datum.
       let hub_datum =
         hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
       let event_address = event_address_getter(hub_datum)
 
-      and {
-        // 5. Event UTxO must be produced at the provided script's address from
-        //    hub oracle.
-        output_event_address == event_address,
-        // 6. Specified inclusion time of the event must be some time in the
-        //    future.
-        output_event_inclusion_time == valid_to + env.event_wait_duration,
-        // 7. Recorded witness must be correct.
-        output_event_witness == expected_witness_script_hash,
-        // 8. The provided validation function must pass.
-        event_value_validator(nonce, output_event_value),
-      }
+      authenticate_event(
+        event_address,
+        nonce_input_index,
+        event_output_index,
+        hub_ref_input_index,
+        witness_registration_redeemer_index,
+        own_policy,
+        inputs,
+        outputs,
+        validity_range,
+        mint,
+        redeemers,
+        event_validator,
+      )
     }
     BurnEventNFT { nonce_asset_name, witness_unregistration_redeemer_index } -> {
       let Transaction { mint, redeemers, .. } = tx
-
-      let expected_witness_script_hash =
-        parameter_validation.apply_prehashed_param(
-          version: 3,
-          prefix: witness_script_prefix,
-          param: nonce_asset_name,
-        )
-
-      and {
-        // 1. The specified NFT must be burnt.
-        assets.quantity_of(mint, own_policy, nonce_asset_name) == -1,
-        // 2. Witness staking script corresponding to the NFT must be getting
-        //    unregistered.
-        // 3. `PublishRedeemer` for unregistration must be equal to
-        //    `own_policy`
-        validate_witness_redeemer(
-          expected_witness_script_hash: expected_witness_script_hash,
-          witness_redeemer_index: witness_unregistration_redeemer_index,
-          for_registration: False,
-          event_policy_id: own_policy,
-          redeemers: redeemers,
-        ),
-      }
+      validate_event_nft_burn(
+        nonce_asset_name,
+        witness_unregistration_redeemer_index,
+        own_policy,
+        mint,
+        redeemers,
+      )
     }
+  }
+}
+
+pub fn authenticate_event(
+  event_address: Address,
+  nonce_input_index: Int,
+  event_output_index: Int,
+  witness_registration_redeemer_index: Int,
+  own_policy: PolicyId,
+  inputs: List<Input>,
+  outputs: List<Output>,
+  validity_range: ValidityRange,
+  mint: Value,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+  event_validator: fn(AssetName, Value, Data) -> Bool,
+) -> Bool {
+  // Grab validity range's upper bound.
+  expect Finite(valid_to) = validity_range.upper_bound.bound_type
+
+  // Grab output reference of the specified nonce input.
+  expect Some(Input { output_reference: nonce_input_out_ref, .. }) =
+    inputs |> list.at(nonce_input_index)
+
+  // In order to apply the parameterized witness script, we hash the
+  // serialized nonce output reference to get the 32 bytes long nonce.
+  let nonce = out_ref_to_nonce(nonce_input_out_ref)
+
+  // 1. This event NFT must be minted with a quantity of 1.
+  expect assets.quantity_of(mint, own_policy, nonce) == 1
+
+  // Script hash of the witness script, required to be registered in this
+  // transaction.
+  let expected_witness_script_hash =
+    parameter_validation.apply_prehashed_param(
+      version: 3,
+      prefix: witness_script_prefix,
+      param: nonce,
+    )
+
+  // 2. Validate this script hash is being registered.
+  // 3. Validate the policy ID passed in its redeemer is correct.
+  expect
+    validate_witness_redeemer(
+      expected_witness_script_hash: expected_witness_script_hash,
+      witness_redeemer_index: witness_registration_redeemer_index,
+      for_registration: True,
+      event_policy_id: own_policy,
+      redeemers: redeemers,
+    )
+
+  // Event's produced UTxO, with an inline datum and no reference script
+  // attached.
+  expect Some(Output {
+    address: output_event_address,
+    value: output_event_value,
+    datum: InlineDatum(output_event_datum_data),
+    reference_script: None,
+  }) = outputs |> list.at(event_output_index)
+
+  // Extracting common data shared between all event datums.
+  expect Datum {
+    event,
+    inclusion_time: output_event_inclusion_time,
+    witness: output_event_witness,
+    ..
+  }: Datum<Data> = output_event_datum_data
+
+  let Pair(event_id, event_info) = ledger_state.unsafe_event_to_key_value_pair(event)
+
+  let nonce_input_out_ref_data: Data = nonce_input_out_ref
+
+  // 4. Event's ID must be the same as the specified spent input.
+  expect event_id == nonce_input_out_ref_data
+
+  and {
+    // 5. Event UTxO must be produced at the provided script's address from
+    //    hub oracle.
+    output_event_address == event_address,
+    // 6. Specified inclusion time of the event must be some time in the
+    //    future.
+    output_event_inclusion_time == valid_to + env.event_wait_duration,
+    // 7. Recorded witness must be correct.
+    output_event_witness == expected_witness_script_hash,
+    // 8. The provided validation function must pass.
+    event_validator(nonce, output_event_value, event_info),
+  }
+}
+
+pub fn validate_event_nft_burn(
+  nonce_asset_name: AssetName,
+  witness_unregistration_redeemer_index: Int,
+  own_policy: PolicyId,
+  mint: Value,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+) -> Bool {
+  let Transaction { mint, redeemers, .. } = tx
+
+  let expected_witness_script_hash =
+    parameter_validation.apply_prehashed_param(
+      version: 3,
+      prefix: witness_script_prefix,
+      param: nonce_asset_name,
+    )
+
+  and {
+    // 1. The specified NFT must be burnt.
+    assets.quantity_of(mint, own_policy, nonce_asset_name) == -1,
+    // 2. Witness staking script corresponding to the NFT must be getting
+    //    unregistered.
+    // 3. `PublishRedeemer` for unregistration must be equal to
+    //    `own_policy`
+    validate_witness_redeemer(
+      expected_witness_script_hash: expected_witness_script_hash,
+      witness_redeemer_index: witness_unregistration_redeemer_index,
+      for_registration: False,
+      event_policy_id: own_policy,
+      redeemers: redeemers,
+    ),
   }
 }
