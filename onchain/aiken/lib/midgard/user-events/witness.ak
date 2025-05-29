@@ -59,8 +59,8 @@ pub fn validate_witness_redeemer(
   and {
     // 1. Registered script must match the expected witness.
     present_witness_script_hash == expected_witness_script_hash,
-    // 2. Deposit / withdrawal / tx order policy ID, and L2 ID must be correctly
-    //    set.
+    // 2. Deposit / withdrawal / tx order policy ID, and the event identifier
+    //    must be set correctly.
     witness_redeemer_pair.2nd == expected_witness_redeemer,
   }
 }
