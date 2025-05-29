@@ -1,11 +1,14 @@
+use aiken/builtin
 use aiken/crypto.{ScriptHash}
 use aiken_design_patterns/linked_list/unordered
 use aiken_design_patterns/singular_utxo_indexer
+use cardano/address.{Address}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use env
+use midgard/common/types.{ValuePairs}
 use midgard/common/utils.{plutarch_phas}
 use midgard/escrow
 use midgard/hub_oracle as hub
@@ -189,7 +192,7 @@ validator mint(hub_oracle: ScriptHash) {
         hub_ref_input_index,
         witness_registration_redeemer_index,
         latest_block_ref_input_index,
-        l2_output,
+        l2_output_data,
         membership_proof,
       } -> {
         let Transaction {
@@ -202,8 +205,18 @@ validator mint(hub_oracle: ScriptHash) {
           ..
         } = tx
 
+        // Unsafely destructuring `l2_output_data`, assuming it is structured as
+        // an `Output`. Since further down we are validating the presence of
+        // this UTxO in the latest ledger, we don't need to worry about the
+        // correctness of its structure here.
+        expect [l2_output_address_data,
+          l2_output_value_data, ..] = builtin.unconstr_fields(l2_output_data)
+
+        // Coerce the first data under `l2_output_data` into an `Address`.
+        expect l2_output_address: Address = l2_output_address_data
+
         // 1. Subject UTxO must be sitting at the outbox contract on L2.
-        expect l2_output.address == env.l2_outbox_address
+        expect l2_output_address == env.l2_outbox_address
 
         // Grab the hub oracle datum.
         let hub.Datum { state_queue: state_queue_policy, withdrawal_addr, .. } =
@@ -247,20 +260,18 @@ validator mint(hub_oracle: ScriptHash) {
             latest_block_ref_input_index,
           )
 
+        // Coerce the second data under `l2_output_data` into a `ValuePairs`.
+        // `Value` is not allowed as its an opaque type.
+        expect l2_output_value: ValuePairs = l2_output_value_data
+
         // 3. The `l2_value` stated in `WithdrawalInfo` must be the same as the
-        //    value from the `l2_output` coming from the redeemer.
-        expect
-          assets.match(
-            l2_output.value,
-            l2_value,
-            fn(utxo_lovelace, info_lovelace) { utxo_lovelace == info_lovelace },
-          )
+        //    value from the `l2_output_data` coming from the redeemer.
+        expect l2_output_value == l2_value
 
         expect parsed_header_datum: state_queue.Datum = latest_block_datum_data
         // 4. The provided block must be the latest in queue.
         expect parsed_header_datum.link == unordered.Empty
         expect ledger_state.Header { utxos_root, .. } = parsed_header_datum.data
-        let l2_output_data: Data = l2_output
 
         // 5. The latest block's ledger must contain the UTxO identified by
         //    `l2_outref` from `WithdrawalInfo`.
