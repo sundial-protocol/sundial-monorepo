@@ -8,9 +8,7 @@ use cardano/transaction.{Publish, Redeemer, ScriptPurpose}
 pub type PublishRedeemer {
   MintOrBurn { target_policy: PolicyId }
   RegisterToProveNotRegistered { registration_redeemer_index: Int }
-  UnregisterToProveNotRegistered
-  UnregisterToProveRegistered
-  RegisterToProveRegistered
+  UnregisterToProveNotRegistered { registration_redeemer_index: Int }
 }
 
 /// Witness script's prefix from its single CBOR encoded applied bytearray.

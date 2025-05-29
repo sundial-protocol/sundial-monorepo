@@ -29,33 +29,68 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
             }
           }
           RegisterToProveNotRegistered { registration_redeemer_index } -> {
+            // 1. The registration redeemer must be immediately followed by the
+            //    unregistration counterpart.
             expect [registration_pair,
               unregistration_pair, ..] =
               tx.redeemers |> list.drop(registration_redeemer_index)
 
             expect Pair(Publish {
-              certificate: RegisterCredential {
-                credential: Script(reg_script_hash),
-                ..
-              },
+              certificate: RegisterCredential { credential: reg_cred, .. } as reg_cert,
               ..
             },
             reg_redeemer_data) = registration_pair
-            expect RegisterToProveNotRegistered = reg_redeemer_data
+
+            // 2. Ensure correctness of the provided redeemer index.
+            expect reg_cert == cert
+            expect RegisterToProveNotRegistered { .. } = reg_redeemer_data
 
             expect Pair(Publish {
               certificate: UnregisterCredential {
-                credential: Script(unreg_script_hash),
+                credential: unreg_cred,
                 ..
               },
               ..
             },
             unreg_redeemer_data) = unregistration_pair.1st
-            expect UnregisterToProveNotRegistered = reg_redeemer_data
+
+            // 3. The unregistration redeemer must invoke the same script.
+            expect reg_cred == unreg_cred
+
+            // 4. The index carried in the unregistration redeemer must match
+            //    the index from the registration redeemer.
+            expect UnregisterToProveNotRegistered {
+              registration_redeemer_index: index_from_unregistration,
+            } = reg_redeemer_data
+            index_from_unregistration == registration_redeemer_index
           }
-          UnregisterToProveNotRegistered -> todo
-          UnregisterToProveRegistered -> todo
-          RegisterToProveRegistered -> todo
+          UnregisterToProveNotRegistered { registration_redeemer_index } -> {
+            // Retrieve the current credential.
+            expect UnregisterCredential { credential: unreg_cred, .. } = cert
+
+            // 1. The provided index must point to a registration endpoint.
+            expect [registration_pair, ..] =
+              tx.redeemers |> list.drop(registration_redeemer_index)
+            expect Pair(Publish {
+              certificate: RegisterCredential {
+                credential: reg_cred,
+                ..
+              },
+              ..
+            },
+            reg_redeemer_data) = registration_pair
+
+            // 2. Credential from the registration endpoint must match the
+            //    current credential.
+            expect reg_cred == unreg_cred
+
+            // 3. Index from the registration endpoint must be equal to the
+            //    index from the current endpoint.
+            expect RegisterToProveNotRegistered {
+              registration_redeemer_index: index_from_registration,
+            } = reg_redeemer_data
+            registration_redeemer_index == index_from_registration
+          }
         }
       },
       param: nonce,
