@@ -159,9 +159,11 @@ validator mint(hub_oracle: ScriptHash) {
     //      specified input UTxO
     //    - The output value of the UTxO at the withdrawal address for the
     //      minting (not burning) endpoint
+    //    - Order info (unused)
     let
       l1_id,
       output_tx_order_value,
+      _,
     <-
       user_events.validate_mint(
         hub_oracle,
