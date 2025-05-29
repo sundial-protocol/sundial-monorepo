@@ -49,7 +49,7 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
               certificate: UnregisterCredential { credential: unreg_cred, .. },
               ..
             },
-            unreg_redeemer_data) = unregistration_pair.1st
+            unreg_redeemer_data) = unregistration_pair
 
             // 3. The unregistration redeemer must invoke the same script.
             expect reg_cred == unreg_cred
@@ -58,7 +58,7 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
             //    the index from the registration redeemer.
             expect UnregisterToProveNotRegistered {
               registration_redeemer_index: index_from_unregistration,
-            } = reg_redeemer_data
+            } = unreg_redeemer_data
             index_from_unregistration == registration_redeemer_index
           }
           UnregisterToProveNotRegistered { registration_redeemer_index } -> {
