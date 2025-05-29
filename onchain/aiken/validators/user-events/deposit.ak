@@ -169,6 +169,7 @@ validator mint(hub_oracle: ScriptHash) {
     let
       l2_id,
       output_deposit_value,
+      _,
     <-
       user_events.validate_mint(
         hub_oracle,

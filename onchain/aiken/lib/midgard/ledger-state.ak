@@ -115,31 +115,11 @@ pub type DepositEvent {
 pub type WithdrawalId =
   OutputReference
 
-pub type WithdrawalBody {
+pub type WithdrawalInfo {
   l2_outref: OutputReference,
-  l2_owner: VerificationKeyHash,
   l2_value: ValuePairs,
   l1_address: Address,
   l1_datum: CardanoDatum,
-}
-
-pub type WithdrawalSignature =
-  Pair<VerificationKey, Signature>
-
-pub type WithdrawalValidity {
-  WithdrawalIsValid
-  NonExistentWithdrawalUtxo
-  SpentWithdrawalUtxo { l2_tx_hash: H32<MidgardTxCompact> }
-  IncorrectWithdrawalOwner
-  IncorrectWithdrawalValue
-  IncorrectWithdrawalSignature
-  TooManyTokensInWithdrawal
-}
-
-pub type WithdrawalInfo {
-  body: WithdrawalBody,
-  signature: WithdrawalSignature,
-  validity: WithdrawalValidity,
 }
 
 pub type WithdrawalEvent {
