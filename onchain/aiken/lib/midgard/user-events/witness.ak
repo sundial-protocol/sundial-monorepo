@@ -29,7 +29,7 @@ pub fn validate_witness_redeemer(
     redeemers |> list.at(witness_redeemer_index)
 
   // Grab the included `Publish` script hash (no validation on `certificate`
-  // index, TODO?).
+  // index, i.e. `at` field under `Publish`, TODO?).
   let present_witness_script_hash =
     if for_registration {
       expect Publish {
@@ -51,14 +51,16 @@ pub fn validate_witness_redeemer(
       witness_unregistration_script_hash
     }
 
-  // Since `PublishRedeemer` is an alias for `PolicyId`, acting as a dependency
-  // proxy between deposit/withdrawal policy and witness scripts.
-  let expected_witness_redeemer: Data = event_policy_id
+  // The only endpoint allowed for this validation is the `MintOrBurn` redeemer,
+  // provided with a correct policy ID.
+  let expected_witness_redeemer: Data =
+    MintOrBurn { target_policy: event_policy_id }
 
   and {
     // 1. Registered script must match the expected witness.
     present_witness_script_hash == expected_witness_script_hash,
-    // 2. Deposit/withdrawal policy ID, and L2 ID must be correctly set.
+    // 2. Deposit / withdrawal / tx order policy ID, and L2 ID must be correctly
+    //    set.
     witness_redeemer_pair.2nd == expected_witness_redeemer,
   }
 }

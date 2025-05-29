@@ -1,12 +1,12 @@
+use aiken/collection/list
 use aiken/crypto.{Blake2b_256, Hash}
 use cardano/assets
 use cardano/certificate.{Certificate, RegisterCredential, UnregisterCredential}
-use cardano/transaction.{Transaction}
+use cardano/transaction.{Publish, Transaction}
 use midgard/common/parameter_validation
 use midgard/user_events/witness.{
   MintOrBurn, PublishRedeemer, RegisterToProveNotRegistered,
-  RegisterToProveRegistered, UnregisterToProveNotRegistered,
-  UnregisterToProveRegistered,
+  UnregisterToProveNotRegistered,
 }
 
 validator main(nonce: Hash<Blake2b_256, ByteArray>) {
@@ -46,10 +46,7 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
             expect RegisterToProveNotRegistered { .. } = reg_redeemer_data
 
             expect Pair(Publish {
-              certificate: UnregisterCredential {
-                credential: unreg_cred,
-                ..
-              },
+              certificate: UnregisterCredential { credential: unreg_cred, .. },
               ..
             },
             unreg_redeemer_data) = unregistration_pair.1st
@@ -72,10 +69,7 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
             expect [registration_pair, ..] =
               tx.redeemers |> list.drop(registration_redeemer_index)
             expect Pair(Publish {
-              certificate: RegisterCredential {
-                credential: reg_cred,
-                ..
-              },
+              certificate: RegisterCredential { credential: reg_cred, .. },
               ..
             },
             reg_redeemer_data) = registration_pair
