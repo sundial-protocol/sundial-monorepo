@@ -62,10 +62,10 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
             index_from_unregistration == registration_redeemer_index
           }
           UnregisterToProveNotRegistered { registration_redeemer_index } -> {
-            // Retrieve the current credential.
+            // 1. Current certificate must be an `UnregisterCredential`.
             expect UnregisterCredential { credential: unreg_cred, .. } = cert
 
-            // 1. The provided index must point to a registration endpoint.
+            // 2. The provided index must point to a registration endpoint.
             expect [registration_pair, ..] =
               tx.redeemers |> list.drop(registration_redeemer_index)
             expect Pair(Publish {
@@ -74,11 +74,11 @@ validator main(nonce: Hash<Blake2b_256, ByteArray>) {
             },
             reg_redeemer_data) = registration_pair
 
-            // 2. Credential from the registration endpoint must match the
+            // 3. Credential from the registration endpoint must match the
             //    current credential.
             expect reg_cred == unreg_cred
 
-            // 3. Index from the registration endpoint must be equal to the
+            // 4. Index from the registration endpoint must be equal to the
             //    index from the current endpoint.
             expect RegisterToProveNotRegistered {
               registration_redeemer_index: index_from_registration,
