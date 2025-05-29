@@ -91,7 +91,7 @@ validator spend(hub_oracle: ScriptHash) {
             //    the deposit NFT.
             //    TODO: Reserve contract might end up requiring an NFT.
             //    TODO: Fees must be deduced whenever we have a clear plan for
-            //          them (for `TransferToReserve` endpoint).
+            //          them.
             expect
               output_value == (
                 own_value |> assets.add(deposit_policy_id, burn_asset_name, -1)

@@ -109,21 +109,4 @@ It's responsible for validating conclusion of transaction orders, or refunding s
     \end{enumerate}
 \end{description}
 
-\subsection{Staking script}
-\label{h:transaction-order-staking-script}
-
-The \code{witness} script is parameterized by an ID that is obtained from the output reference of a specified utxo on L1, which is serialized and then hashed with Blake2b256.
-The registration state of this script is the mechanism that allows related fraud proofs to function.
-Conditions:
-
-\begin{enumerate}
-  \item Let \code{l1\_id} be the Blake2b256 hash of transaction order event's \code{TxOrderId} (L1 nonce output-reference).
-  \item Let \code{tx\_order\_minting\_policy} be the policy ID of the transaction order NFT, accessed via the redeemer.
-  \item Registration/unregsitration of this witness script is respectively tied to the \code{tx\_order\_minting\_policy}'s mint/burn logic. 
-    \begin{itemize}
-      \item Registeration is allowed if a transaction order NFT with asset name of \code{l1\_id} is minted.
-      \item Unregistration is allowed if a transaction order NFT with asset name of \code{l1\_id} is burnt.
-    \end{itemize}
-\end{enumerate}
-
 \end{document}
