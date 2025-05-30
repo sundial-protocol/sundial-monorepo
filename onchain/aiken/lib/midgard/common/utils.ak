@@ -8,16 +8,12 @@ use aiken/crypto.{
 use aiken/interval.{Finite, Interval, NegativeInfinity, PositiveInfinity}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/merkelized_validator
-use aiken_design_patterns/validity_range_normalization as vrn
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
-use cardano/transaction.{
-  Input, Output, OutputReference, Redeemer, ScriptPurpose, ValidityRange,
-}
+use cardano/transaction.{Input,
+  Output, OutputReference, Redeemer, ScriptPurpose}
 use env
-use midgard/common/constants.{
-  max_validity_range_for_current_time, posix_time_none,
-}
+use midgard/common/constants.{posix_time_none}
 use midgard/common/types.{H28, H32, PosixTime, ValuePairs}
 
 /// Check whether the interval starts on or after the point.
@@ -106,16 +102,8 @@ pub fn is_output_to_sc(output: Output, scHash: ByteArray) -> Bool {
   }
 }
 
-pub fn get_current_time(validity_range: ValidityRange) -> PosixTime {
-  when vrn.normalize_time_range(validity_range) is {
-    vrn.ClosedRange { lower, upper } -> {
-      expect upper - lower <= max_validity_range_for_current_time
-      upper
-    }
-    _ -> fail @"Unexpected validity range provided."
-  }
-}
-
+/// A more readable function for validating a pub key hash has provided
+/// signature in a transaction.
 pub fn has_signed(
   signer: VerificationKeyHash,
   extra_signatories: List<VerificationKeyHash>,
@@ -123,6 +111,8 @@ pub fn has_signed(
   extra_signatories |> list.has(signer)
 }
 
+/// Expects a single token to be present in the given `Value`, and returns it as
+/// a triplet.
 pub fn get_single_asset_from_value(v: Value) -> (PolicyId, AssetName, Int) {
   expect [Pair(sym, tn_qty_pairs)] =
     v
@@ -132,6 +122,8 @@ pub fn get_single_asset_from_value(v: Value) -> (PolicyId, AssetName, Int) {
   (sym, tn, qty)
 }
 
+/// Expects exactly 2 tokens in the given `Value`, one of which must be ADA, and
+/// returns the other as a triplet.
 pub fn get_single_asset_from_value_apart_from_ada(
   v: Value,
 ) -> (PolicyId, AssetName, Int) {
@@ -265,6 +257,9 @@ pub fn authentic_value_has_tokens(
   assets.match(without_nft, tokens, fn(_, tokens_ada) { tokens_ada == 0 })
 }
 
+/// Traverses two lists in parallel, accumulating a value using the provided
+/// `with` function. The lists are traversed from right, and the smaller list
+/// determines the number of elements traversed.
 pub fn zip_foldr(
   self: List<a>,
   bs: List<b>,
@@ -284,6 +279,7 @@ pub fn zip_foldr(
   }
 }
 
+/// Similar to [`zip_foldr`](#zip_foldr), but traverses the lists from left.
 pub fn zip_foldl(
   self: List<a>,
   bs: List<b>,
@@ -337,6 +333,7 @@ pub fn compare_authentic_value_with_target(
   quantity_predicate(value_token_pair.2nd, target_token_pair.2nd)
 }
 
+/// Fetch the redeemer data of a specific script purpose at an expected index.
 pub fn get_redeemer_at(
   redeemers: Pairs<ScriptPurpose, Redeemer>,
   expected_purpose: ScriptPurpose,
@@ -347,6 +344,7 @@ pub fn get_redeemer_at(
   redeemer_pair.2nd
 }
 
+/// Merkelized validator abstraction for `phas` function from Plutarch.
 pub fn plutarch_phas(
   mpf_root: ByteArray,
   key: Data,
@@ -378,6 +376,7 @@ pub fn plutarch_phas(
   )
 }
 
+/// Merkelized validator abstraction for `pexcludes` function from Plutarch.
 pub fn plutarch_pexcludes(
   mpf_root: ByteArray,
   key: Data,

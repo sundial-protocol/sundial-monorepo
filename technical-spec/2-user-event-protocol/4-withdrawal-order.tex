@@ -32,7 +32,7 @@ To actually bring the funds to L1, users must then submit an L1 transaction that
     \item Send min-ADA to the Midgard withdrawal order address, along with the withdrawal order token and the above datum.
 \end{enumerate}
 
-\notebox{By adjusting incentives, users can be relieved from producing the withdrawl event utxo on L1 themselves, and rely on operators to take care of this second step.}
+\notebox{By adjusting incentives, users can be relieved from producing the withdrawal event utxo on L1 themselves, and rely on operators to take care of this second step.}
 
 At the time of the L1 withdrawal order, its \code{inclusion\_time} is set to the sum of the L1 transaction's validity interval upper bound and the \code{event\_wait\_duration} Midgard protocol parameter.
 According to Midgard's ledger rules:
@@ -80,7 +80,7 @@ It oversees correctness of datums, and registration/unregistration of events' co
         \item Let \code{l1\_id} be the corresponding ID of the target withdrawal order, provided via the redeemer.
         \item An NFT with own policy ID and asset name of \code{l1\_id} must be burnt.
         \item The witness staking script, instantiated with \code{l1\_id} must be unregistered in the transaction.
-        \item The redeemer used for unregistrering the witness script must be correct.
+        \item The redeemer used for unregistering the witness script must be correct.
           Namely, it must be equal to the \code{withdrawal} policy ID.
       \end{enumerate}
 \end{description}
