@@ -1,6 +1,5 @@
 use aiken/merkle_patricia_forestry as mpf
 use cardano/assets.{AssetName}
-use cardano/transaction.{Output}
 use midgard/ledger_state
 use midgard/user_events
 
@@ -29,7 +28,7 @@ pub type MintRedeemer {
     hub_ref_input_index: Int,
     witness_registration_redeemer_index: Int,
     latest_block_ref_input_index: Int,
-    l2_output: Output,
+    l2_output_data: Data,
     membership_proof: mpf.Proof,
   }
   BurnWithdrawalNFT {

@@ -127,6 +127,16 @@ pub type WithdrawalEvent {
   info: WithdrawalInfo,
 }
 
+// ### Transaction order event
+
+pub type TxOrderId =
+  OutputReference
+
+pub type TxOrderEvent {
+  id: TxOrderId,
+  tx: MidgardTxCompact,
+}
+
 // ## Transaction
 
 /// Midgard transaction.
