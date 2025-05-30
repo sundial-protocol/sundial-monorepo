@@ -1,10 +1,8 @@
 use aiken/crypto.{VerificationKey}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
-use cardano/assets.{PolicyId}
-use cardano/transaction.{InlineDatum, Input, Output}
+use cardano/assets.{AssetName}
 use midgard/common/types.{PosixTime}
-use midgard/common/utils
 use midgard/registered_operators.{OperatorStatus}
 
 pub type Datum =
@@ -13,6 +11,7 @@ pub type Datum =
 pub type NodeData {
   deposits_root: ByteArray,
   withdrawals_root: ByteArray,
+  tx_orders_root: ByteArray,
   start_time: PosixTime,
   end_time: PosixTime,
   resolution_claim: Option<ResolutionClaim>,
@@ -42,6 +41,7 @@ pub type SpendRedeemer {
     operator: VerificationKey,
     operator_status: OperatorStatus,
     unresolved_event_ref_input_index: Int,
+    unresolved_event_asset_name: AssetName,
     event_type: EventType,
     membership_proof: mpf.Proof,
   }
@@ -50,6 +50,7 @@ pub type SpendRedeemer {
 pub type EventType {
   Deposit
   Withdrawal
+  TxOrder
 }
 
 pub type MintRedeemer {
@@ -67,24 +68,4 @@ pub type MintRedeemer {
     removed_node_input_index: Int,
     anchor_node_input_index: Int,
   }
-}
-
-pub fn get_datum(
-  reference_inputs: List<Input>,
-  settlement_queue_policy_id: PolicyId,
-  settlement_ref_input_index: Int,
-) -> Datum {
-  expect Input {
-    output: Output { datum: InlineDatum(settlement_node_datum_data), .. },
-    ..
-  } =
-    reference_inputs
-      |> utils.get_authentic_input_with_policy_at(
-          settlement_queue_policy_id,
-          settlement_ref_input_index,
-        )
-
-  expect parsed_settlement_node_datum: Datum = settlement_node_datum_data
-
-  parsed_settlement_node_datum
 }
