@@ -6,7 +6,7 @@ import {
   UTxO,
   fromHex,
 } from "@lucid-evolution/lucid";
-import { Effect, Schedule } from "effect";
+import { Data, Effect, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
@@ -21,26 +21,52 @@ import { Database } from "@/services/database.js";
 export const handleSignSubmit = (
   lucid: LucidEvolution,
   signBuilder: TxSignBuilder,
-): Effect.Effect<string, Error> =>
+  onSubmitFailure: (error: SubmitError) => Effect.Effect<void>,
+  onConfirmFailure: (
+    error: ConfirmError,
+    txHash: string,
+  ) => Effect.Effect<void>,
+): Effect.Effect<string | void, Error, never> =>
   Effect.gen(function* () {
-    const signed = yield* signBuilder.sign.withWallet().completeProgram();
+    const signed = yield* signBuilder.sign
+      .withWallet()
+      .completeProgram()
+      .pipe(Effect.mapError((err) => new SignError({ err })));
     yield* Effect.logInfo("✉️  Submitting transaction...");
-    const txHash = yield* signed
-      .submitProgram()
-      .pipe(
-        Effect.retry(
-          Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
-        ),
-      );
+    const txHash = yield* signed.submitProgram().pipe(
+      Effect.retry(
+        Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
+      ),
+      Effect.mapError((err) => new SubmitError({ err })),
+    );
     yield* Effect.logInfo(`🚀 Transaction submitted: ${txHash}`);
     yield* Effect.logInfo(`⏳ Confirming Transaction...`);
-    yield* Effect.tryPromise(() => lucid.awaitTx(txHash, 10_000));
+    yield* Effect.tryPromise({
+      try: () => lucid.awaitTx(txHash, 10_000),
+      catch: (err: any) => new ConfirmError({ err, txHash }),
+    });
     yield* Effect.logInfo(`🎉 Transaction confirmed: ${txHash}`);
     yield* Effect.logInfo("⌛ Pausing for 10 seconds...");
     yield* Effect.sleep("10 seconds");
     yield* Effect.logInfo("✅ Pause ended.");
     return txHash;
-  });
+  }).pipe(
+    Effect.catchAll((err: HandleSignSubmitError) =>
+      Effect.gen(function* () {
+        switch (err._tag) {
+          case "SubmitError":
+            onSubmitFailure(err);
+            break;
+          case "ConfirmError":
+            onConfirmFailure(err, err.txHash);
+            break;
+          case "SignError":
+            yield* Effect.logError(`Signing tx error: ${err.err}`);
+            return yield* Effect.fail(err);
+        }
+      }),
+    ),
+  );
 
 /**
  * Handle the signing and submission of a transaction without waiting for the transaction to be confirmed.
@@ -50,19 +76,50 @@ export const handleSignSubmit = (
  */
 export const handleSignSubmitWithoutConfirmation = (
   signBuilder: TxSignBuilder,
-): Effect.Effect<string, Error> =>
+  onSubmitFailure: (error: SubmitError) => Effect.Effect<void>,
+): Effect.Effect<string | void, Error> =>
   Effect.gen(function* () {
-    const signed = yield* signBuilder.sign.withWallet().completeProgram();
-    const txHash = yield* signed
-      .submitProgram()
-      .pipe(
-        Effect.retry(
-          Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
-        ),
-      );
+    const signed = yield* signBuilder.sign
+      .withWallet()
+      .completeProgram()
+      .pipe(Effect.mapError((err) => new SignError({ err })));
+    const txHash = yield* signed.submitProgram().pipe(
+      Effect.retry(
+        Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
+      ),
+      Effect.mapError((err) => new SubmitError({ err })),
+    );
     yield* Effect.logDebug(`🚀 Transaction submitted: ${txHash}`);
     return txHash;
-  });
+  }).pipe(
+    Effect.catchAll((err: SignError | SubmitError) =>
+      Effect.gen(function* () {
+        switch (err._tag) {
+          case "SubmitError":
+            onSubmitFailure(err);
+            break;
+          case "SignError":
+            yield* Effect.logError(`Signing tx error: ${err.err}`);
+            return yield* Effect.fail(err);
+        }
+      }),
+    ),
+  );
+
+export type HandleSignSubmitError = SignError | SubmitError | ConfirmError;
+
+export class SignError extends Data.TaggedError("SignError")<{
+  readonly err: unknown;
+}> {}
+
+export class SubmitError extends Data.TaggedError("SubmitError")<{
+  readonly err: unknown;
+}> {}
+
+export class ConfirmError extends Data.TaggedError("ConfirmError")<{
+  readonly err: unknown;
+  readonly txHash: string;
+}> {}
 
 /**
  * Fetch transactions of the first block by querying BlocksDB and ImmutableDB.
