@@ -22,10 +22,7 @@ export const handleSignSubmit = (
   lucid: LucidEvolution,
   signBuilder: TxSignBuilder,
   onSubmitFailure: (error: SubmitError) => Effect.Effect<void>,
-  onConfirmFailure: (
-    error: ConfirmError,
-    txHash: string,
-  ) => Effect.Effect<void>,
+  onConfirmFailure: (error: ConfirmError) => Effect.Effect<void>,
 ): Effect.Effect<string | void, Error> =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign
@@ -56,7 +53,7 @@ export const handleSignSubmit = (
         case "SubmitError":
           return onSubmitFailure(err);
         case "ConfirmError":
-          return onConfirmFailure(err, err.txHash);
+          return onConfirmFailure(err);
         case "SignError":
           return pipe(
             Effect.logError(`Signing tx error: ${err.err}`),
