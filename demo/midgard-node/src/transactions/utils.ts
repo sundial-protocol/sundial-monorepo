@@ -93,18 +93,12 @@ export const handleSignSubmitWithoutConfirmation = (
     return txHash;
   }).pipe(
     Effect.catchAll((err: SignError | SubmitError) =>
-      Effect.gen(function* () {
-        switch (err._tag) {
-          case "SubmitError":
-            yield* onSubmitFailure(err);
-            break;
-          case "SignError":
-            yield* pipe(
-              Effect.logError(`Signing tx error: ${err.err}`),
-              Effect.flatMap(() => Effect.fail(err)),
-            );
-        }
-      }),
+      err._tag === "SubmitError"
+        ? onSubmitFailure(err)
+        : pipe(
+            Effect.logError(`Signing tx error: ${err.err}`),
+            Effect.flatMap(() => Effect.fail(err)),
+          ),
     ),
   );
 
