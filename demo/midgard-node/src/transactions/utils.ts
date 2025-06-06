@@ -6,7 +6,7 @@ import {
   UTxO,
   fromHex,
 } from "@lucid-evolution/lucid";
-import { Data, Effect, Schedule } from "effect";
+import { Data, Effect, pipe, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
@@ -26,7 +26,7 @@ export const handleSignSubmit = (
     error: ConfirmError,
     txHash: string,
   ) => Effect.Effect<void>,
-): Effect.Effect<string | void, Error, never> =>
+): Effect.Effect<string | void, Error> =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign
       .withWallet()
@@ -55,10 +55,10 @@ export const handleSignSubmit = (
       Effect.gen(function* () {
         switch (err._tag) {
           case "SubmitError":
-            onSubmitFailure(err);
+            yield* onSubmitFailure(err);
             break;
           case "ConfirmError":
-            onConfirmFailure(err, err.txHash);
+            yield* onConfirmFailure(err, err.txHash);
             break;
           case "SignError":
             yield* Effect.logError(`Signing tx error: ${err.err}`);
@@ -96,11 +96,13 @@ export const handleSignSubmitWithoutConfirmation = (
       Effect.gen(function* () {
         switch (err._tag) {
           case "SubmitError":
-            onSubmitFailure(err);
+            yield* onSubmitFailure(err);
             break;
           case "SignError":
-            yield* Effect.logError(`Signing tx error: ${err.err}`);
-            return yield* Effect.fail(err);
+            yield* pipe(
+              Effect.logError(`Signing tx error: ${err.err}`),
+              Effect.flatMap(() => Effect.fail(err)),
+            );
         }
       }),
     ),
