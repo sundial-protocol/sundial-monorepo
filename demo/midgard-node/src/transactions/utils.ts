@@ -51,21 +51,19 @@ export const handleSignSubmit = (
     yield* Effect.logInfo("✅ Pause ended.");
     return txHash;
   }).pipe(
-    Effect.catchAll((err: HandleSignSubmitError) =>
-      Effect.gen(function* () {
-        switch (err._tag) {
-          case "SubmitError":
-            yield* onSubmitFailure(err);
-            break;
-          case "ConfirmError":
-            yield* onConfirmFailure(err, err.txHash);
-            break;
-          case "SignError":
-            yield* Effect.logError(`Signing tx error: ${err.err}`);
-            return yield* Effect.fail(err);
-        }
-      }),
-    ),
+    Effect.catchAll((err: HandleSignSubmitError) => {
+      switch (err._tag) {
+        case "SubmitError":
+          return onSubmitFailure(err);
+        case "ConfirmError":
+          return onConfirmFailure(err, err.txHash);
+        case "SignError":
+          return pipe(
+            Effect.logError(`Signing tx error: ${err.err}`),
+            Effect.flatMap(() => Effect.fail(err)),
+          );
+      }
+    }),
   );
 
 /**
@@ -105,15 +103,15 @@ export const handleSignSubmitWithoutConfirmation = (
 export type HandleSignSubmitError = SignError | SubmitError | ConfirmError;
 
 export class SignError extends Data.TaggedError("SignError")<{
-  readonly err: unknown;
+  readonly err: Error;
 }> {}
 
 export class SubmitError extends Data.TaggedError("SubmitError")<{
-  readonly err: unknown;
+  readonly err: Error;
 }> {}
 
 export class ConfirmError extends Data.TaggedError("ConfirmError")<{
-  readonly err: unknown;
+  readonly err: Error;
   readonly txHash: string;
 }> {}
 
