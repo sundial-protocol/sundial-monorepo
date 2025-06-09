@@ -38,7 +38,7 @@ const collectAndBurnStateQueueNodesProgram = (
     const onSubmitFailure = (err: SubmitError) =>
       Effect.gen(function* () {
         yield* Effect.logError(`Sumbit tx error: ${err}`);
-        return Effect.fail(err);
+        Effect.fail(err);
       });
     const onConfirmFailure = (err: ConfirmError) =>
       Effect.logError(`Confirm tx error: ${err}`);
