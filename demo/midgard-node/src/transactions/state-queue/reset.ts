@@ -36,9 +36,9 @@ const collectAndBurnStateQueueNodesProgram = (
       .attach.Script(stateQueueMintingScript);
     const completed = yield* tx.completeProgram();
     const onSubmitFailure = (err: SubmitError) =>
-      yield* Effect.gen(function* () {
+      Effect.gen(function* () {
         yield* Effect.logError(`Sumbit tx error: ${err}`);
-        return yield* Effect.fail(err);
+        return Effect.fail(err);
       });
     const onConfirmFailure = (err: ConfirmError) =>
       Effect.logError(`Confirm tx error: ${err}`);

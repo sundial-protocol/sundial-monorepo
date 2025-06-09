@@ -15,9 +15,9 @@ export const stateQueueInit = Effect.gen(function* () {
   };
   const txBuilder = yield* SDK.Endpoints.initTxProgram(lucid, initParams);
   const onSubmitFailure = (err: SubmitError) =>
-    yield* Effect.gen(function* () {
+    Effect.gen(function* () {
       yield* Effect.logError(`Sumbit tx error: ${err}`);
-      return yield* Effect.fail(err);
+      return Effect.fail(err);
     });
   const onConfirmFailure = (err: ConfirmError) =>
     Effect.logError(`Confirm tx error: ${err}`);

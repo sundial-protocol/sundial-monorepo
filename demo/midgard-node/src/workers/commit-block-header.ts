@@ -201,9 +201,9 @@ const wrapper = (
       // Using sign and submit helper with confirmation so that databases are
       // only updated after a successful on-chain registration of the block.
       const onSubmitFailure = (err: SubmitError) =>
-        yield* Effect.gen(function* () {
+        Effect.gen(function* () {
           yield* Effect.logError(`Sumbit tx error: ${err}`);
-          return yield* Effect.fail(err);
+          return Effect.fail(err);
         });
       const onConfirmFailure = (err: ConfirmError) =>
         Effect.logError(`Confirm tx error: ${err}`);
