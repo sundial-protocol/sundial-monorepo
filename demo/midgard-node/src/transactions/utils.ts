@@ -21,8 +21,8 @@ import { Database } from "@/services/database.js";
 export const handleSignSubmit = (
   lucid: LucidEvolution,
   signBuilder: TxSignBuilder,
-  onSubmitFailure: (error: SubmitError) => Effect.Effect<void>,
-  onConfirmFailure: (error: ConfirmError) => Effect.Effect<void>,
+  onSubmitFailure: (error: SubmitError) => Effect.Effect<void, Error>,
+  onConfirmFailure: (error: ConfirmError) => Effect.Effect<void, Error>,
 ): Effect.Effect<string | void, Error> =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign
@@ -71,7 +71,7 @@ export const handleSignSubmit = (
  */
 export const handleSignSubmitWithoutConfirmation = (
   signBuilder: TxSignBuilder,
-  onSubmitFailure: (error: SubmitError) => Effect.Effect<void>,
+  onSubmitFailure: (error: SubmitError) => Effect.Effect<void, Error>,
 ): Effect.Effect<string | void, Error> =>
   Effect.gen(function* () {
     const signed = yield* signBuilder.sign
