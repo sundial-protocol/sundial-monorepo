@@ -12,18 +12,14 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../src/database/index.js";
-import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { fromHex } from "@lucid-evolution/lucid";
 import dotenv from "dotenv";
-import { initializeDb } from "@/database/init.js";
+import { initializeDb } from "../src/database/init.js";
 import path from "path";
 import { Worker } from "worker_threads";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import { makeMpts, PostgresCheckpointDB } from "@/workers/db.js";
-import { SqlClient } from "@effect/sql";
-import * as ETH from "@ethereumjs/mpt";
-import * as ETH_UTILS from "@ethereumjs/util";
+import { makeMpts, processMpts } from "../src/workers/db.js";
 dotenv.config({ path: ".env" });
 
 const NUM_OF_BLOCKS = 5;
@@ -34,14 +30,14 @@ const TxRoots = [
   "a86b120fa8fb642584b9e4b780ea15fab00affc599b22830925e723a3c4fcee3",
   "3e1e1827c99c228e986d4f4bd8adf26291874ce16c6b80eeecd84c158a1dc2ce",
   "a4932ac746e5c098160ca4fddd34a428b5f9c9daf59b9e855f4c52a211e812db",
-]
+];
 const UtxoRoots = [
   "06bc3f80780264d6b824ab4e60021aaadaf89333ac37fb388ddba7d56fb8384f",
   "296aedcf0d98fb9907139b2f53198d6bd265e98051b7892b374c85258d45ce96",
   "a77a669b61a8f40c28c93272632de3831f8837ff2170d3956923eb8952604d6b",
   "a3fa49d4ec584d5e764ef61c9ea7eb41f3e6d3a472bfa3fd3e93b92e0e73d726",
   "073b9b40d33068452794b851126c4132888b0c2f7a17cac9241aa01c97a3f4a4",
-]
+];
 
 const runMptWorker = (
   workerInput: number,
@@ -104,14 +100,13 @@ describe("Commit Block Header Worker", () => {
           yield* MempoolDB.insert(tx.key, tx.value);
         }
         const startTime = performance.now();
-        const {utxoRoot, txRoot} = yield* makeMpts(blocksTxs[blockNumber]);
+        const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+        const {utxoRoot, txRoot} = yield* processMpts(ledgerTrie, mempoolTrie, blocksTxs[blockNumber])
         totalTimeMs += performance.now() - startTime;
         yield* MempoolDB.clear();
         expect(utxoRoot).toEqual(UtxoRoots[blockNumber]);
         expect(txRoot).toEqual(TxRoots[blockNumber]);
-
       }
-      // const totalTime = (performance.now() - startTime) / 1000;
       const totalTimeSec = totalTimeMs / 1000;
       const avgTimeSec = totalTimeSec / (NUM_OF_BLOCKS * 2);
       console.log(`It took ${totalTimeSec.toFixed(2)}s to create`);
@@ -119,13 +114,13 @@ describe("Commit Block Header Worker", () => {
         `${NUM_OF_BLOCKS} ledger and mempool tries with ${blocksTxs[0].length} one-to-one txs each.`,
       );
       console.log(`Average time per trie: ${avgTimeSec.toFixed(2)}s`);
-    }).pipe(
+
+  }).pipe(
       Effect.provide(Database.layer),
-      Effect.provide(AlwaysSucceedsContract.layer),
       Effect.provide(User.layer),
       Effect.provide(NodeConfig.layer),
-    ),
-  );
+    )
+),
 
   it.effect(
     `should create ${NUM_OF_BLOCKS} blocks sequentially`,
@@ -164,7 +159,6 @@ describe("Commit Block Header Worker", () => {
               txSize: workerOutput.txSize,
               sizeOfBlocksTxs: workerOutput.sizeOfBlocksTxs,
             });
-            expect()
 
             // Store block data for analysis
             blocksData.push({
@@ -175,7 +169,6 @@ describe("Commit Block Header Worker", () => {
               executionTime: workerEndTime - workerStartTime,
             });
 
-            // expect(workerOutput.mempoolTxsCount).toBeGreaterThan(0);
           } catch (error) {
             console.error(
               `❌ Worker failed for block ${blockNumber + 1}:`,
@@ -204,14 +197,12 @@ describe("Commit Block Header Worker", () => {
         );
       }).pipe(
         Effect.provide(Database.layer),
-        Effect.provide(AlwaysSucceedsContract.layer),
         Effect.provide(User.layer),
         Effect.provide(NodeConfig.layer),
       ),
     { timeout: 6000_000 },
   );
 });
-// );
 
 const flushDb = Effect.gen(function* () {
   yield* Effect.all(
@@ -227,8 +218,8 @@ const flushDb = Effect.gen(function* () {
   );
 });
 
-const loadTxs = Effect.gen(function* () {
-  const blocksTxs = [];
+const loadTxs: Effect.Effect<{ key: Uint8Array; value: Uint8Array}[][], never, never> = Effect.gen(function* () {
+  const blocksTxs: { key: Uint8Array; value: Uint8Array}[][] = [];
   for (let blockNumber = 0; blockNumber < NUM_OF_BLOCKS; blockNumber++) {
     const txsPath = path.resolve(__dirname, `txs/txs_${blockNumber}.json`);
     const txs: { cborHex: string; txId: string }[] = JSON.parse(

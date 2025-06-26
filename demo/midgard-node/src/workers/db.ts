@@ -9,13 +9,11 @@ import { findSpentAndProducedUTxOs } from "@/utils.js";
 import * as ETH from "@ethereumjs/mpt";
 import * as ETH_UTILS from "@ethereumjs/util";
 import { toHex } from "@lucid-evolution/lucid";
-import { writeFile } from "fs/promises";
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 
-// Make mempool trie, and fill it with ledger trie with processed mempool txs
-export const makeMpts = (mempoolTxs: { key: Uint8Array; value: Uint8Array }[]) =>
+export const makeMpts = () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     Effect.logDebug("🔹 Creating ledger and mempool tries ...");
@@ -53,7 +51,19 @@ export const makeMpts = (mempoolTxs: { key: Uint8Array; value: Uint8Array }[]) =
     }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
     // Ensuring persisted root is stored in trie's private property
     yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
+    return {
+      ledgerTrie: ledgerTrie,
+      mempoolTrie: mempoolTrie,
+    };
+  });
 
+// Make mempool trie, and fill it with ledger trie with processed mempool txs
+export const processMpts = (
+  ledgerTrie: ETH.MerklePatriciaTrie,
+  mempoolTrie: ETH.MerklePatriciaTrie,
+  mempoolTxs: { key: Uint8Array; value: Uint8Array }[],
+) =>
+  Effect.gen(function* () {
     const mempoolTxHashes: Uint8Array[] = [];
     let sizeOfBlocksTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
@@ -95,7 +105,6 @@ export const makeMpts = (mempoolTxs: { key: Uint8Array; value: Uint8Array }[]) =
     yield* Effect.logInfo(`🔹 New transaction root found: ${txRoot}`);
 
     return {
-      ledgerTrie: ledgerTrie,
       utxoRoot: utxoRoot,
       txRoot: txRoot,
       mempoolTxHashes: mempoolTxHashes,
@@ -258,44 +267,44 @@ export class PostgresCheckpointDB
       Effect.runPromise,
     );
   }
+  // This methods  didn't get well with`sql.withTransaction`
+  // async checkpoint(root: Uint8Array): Promise<void> {
+  //   super.checkpoint(root);
+  //   const savepointName = `mpt_savepoint_${this.checkpoints.length}`;
+  //   await Effect.runPromise(
+  //     Effect.gen(function* () {
+  //       const sql = yield* SqlClient.SqlClient;
+  //       yield* sql`SAVEPOINT ${sql(savepointName)}`;
+  //     }).pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))),
+  //   );
+  // }
 
-  async checkpoint(root: Uint8Array): Promise<void> {
-    super.checkpoint(root);
-    const savepointName = `mpt_savepoint_${this.checkpoints.length}`;
-    await Effect.runPromise(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        yield* sql`SAVEPOINT ${sql(savepointName)}`;
-      }).pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))),
-    );
-  }
+  // async commit(): Promise<void> {
+  //   if (this.checkpoints.length === 0) {
+  //     return;
+  //   }
+  //   const savepointName = `mpt_savepoint_${this.checkpoints.length}`;
+  //   await Effect.runPromise(
+  //     Effect.gen(function* () {
+  //       const sql = yield* SqlClient.SqlClient;
+  //       yield* sql`RELEASE SAVEPOINT ${sql(savepointName)}`;
+  //     }).pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))),
+  //   );
+  //   await super.commit();
+  // }
 
-  async commit(): Promise<void> {
-    if (this.checkpoints.length === 0) {
-      return;
-    }
-    const savepointName = `mpt_savepoint_${this.checkpoints.length}`;
-    await Effect.runPromise(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        yield* sql`RELEASE SAVEPOINT ${sql(savepointName)}`;
-      }).pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))),
-    );
-    await super.commit();
-  }
-
-  async revert(): Promise<Uint8Array> {
-    if (this.checkpoints.length === 0) return super.revert();
-    const savepointName = `mpt_savepoint_${this.checkpoints.length}`;
-    await Effect.runPromise(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        yield* sql`ROLLBACK TO SAVEPOINT ${sql(savepointName)}`;
-      }).pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))),
-    );
-    const newRoot = await super.revert();
-    return newRoot;
-  }
+  // async revert(): Promise<Uint8Array> {
+  //   if (this.checkpoints.length === 0) return super.revert();
+  //   const savepointName = `mpt_savepoint_${this.checkpoints.length}`;
+  //   await Effect.runPromise(
+  //     Effect.gen(function* () {
+  //       const sql = yield* SqlClient.SqlClient;
+  //       yield* sql`ROLLBACK TO SAVEPOINT ${sql(savepointName)}`;
+  //     }).pipe(Effect.provide(Layer.succeed(SqlClient.SqlClient, this._client))),
+  //   );
+  //   const newRoot = await super.revert();
+  //   return newRoot;
+  // }
 }
 
 const convertOps = (

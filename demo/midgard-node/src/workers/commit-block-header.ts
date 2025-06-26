@@ -10,7 +10,7 @@ import {
   SubmitError,
 } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
-import { makeMpts } from "./db.js";
+import { makeMpts, processMpts } from "./db.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
@@ -40,11 +40,15 @@ const wrapper = (
     yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
     const sql = yield* SqlClient.SqlClient;
 
+    const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+    const ledgerRootBeforeMempoolTxs = yield* Effect.sync(() =>
+      ledgerTrie.root(),
+    );
+
     return yield* sql.withTransaction(
       Effect.gen(function* () {
         const { utxoRoot, txRoot, mempoolTxHashes, sizeOfBlocksTxs } =
-          yield* makeMpts(mempoolTxs);
-
+          yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
         const { policyId, spendScript, spendScriptAddress, mintScript } =
           yield* makeAlwaysSucceedsServiceFn(nodeConfig);
         const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
@@ -76,8 +80,8 @@ const wrapper = (
           );
 
         const newHeaderHash = yield* SDK.Utils.hashHeader(newHeader);
-
         yield* Effect.logInfo(`🔹 New header hash is: ${newHeaderHash}`);
+
         // Build commitment block
         const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
           anchorUTxO: latestBlock,
@@ -156,7 +160,6 @@ const wrapper = (
         yield* Effect.logInfo(
           "🔹 Clearing included transactions from MempoolDB...",
         );
-
         yield* MempoolDB.clearTxs(mempoolTxHashes).pipe(
           Effect.withSpan("clear mempool"),
         );
@@ -167,7 +170,18 @@ const wrapper = (
           sizeOfBlocksTxs,
         };
         return output;
-      }),
+      }).pipe(
+        Effect.catchAll((e) =>
+          Effect.gen(function* () {
+            yield* Effect.logError(e);
+            yield* Effect.logInfo("🔹 Reverting changers...");
+            yield* Effect.sync(() =>
+              ledgerTrie.root(ledgerRootBeforeMempoolTxs),
+            );
+            return yield* Effect.fail(e);
+          }),
+        ),
+      ),
     );
   });
 
