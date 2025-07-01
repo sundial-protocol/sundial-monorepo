@@ -12,14 +12,17 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../src/database/index.js";
-import { fromHex } from "@lucid-evolution/lucid";
+import { fromHex, toHex } from "@lucid-evolution/lucid";
 import dotenv from "dotenv";
 import { initializeDb } from "../src/database/init.js";
 import path from "path";
 import { Worker } from "worker_threads";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import { makeMpts, processMpts } from "../src/workers/db.js";
+import { makeMpts, PostgresCheckpointDB, processMpts, withTrieTransaction } from "../src/workers/db.js";
+import { SqlClient } from "@effect/sql";
+import * as ETH from "@ethereumjs/mpt";
+import * as ETH_UTILS from "@ethereumjs/util";
 dotenv.config({ path: ".env" });
 
 const NUM_OF_BLOCKS = 5;
@@ -84,6 +87,79 @@ const runMptWorker = (
       worker.terminate();
     });
   });
+
+describe("CheckpointDB", () => {
+  it.effect("Checkpoints, commits and reverts", (_) =>
+    Effect.gen(function* () {
+      yield* initializeDb();
+      yield* flushDb;
+      const sql = yield* SqlClient.SqlClient;
+      const ledgerCheckpointDB = new PostgresCheckpointDB(sql, "latest_ledger");
+      yield* ledgerCheckpointDB.openEffect();
+      const ledgerTrie = yield* Effect.tryPromise({
+        try: () =>
+          ETH.createMPT({
+            db: ledgerCheckpointDB.db,
+            useRootPersistence: true,
+            valueEncoding: ETH_UTILS.ValueEncoding.Bytes,
+          }),
+        catch: (e) => new Error(`${e}`),
+      });
+      const root1 = yield* Effect.sync(() => ledgerTrie.root());
+      yield* Effect.sync(() => ledgerTrie.checkpoint());
+      expect(toHex(root1)).toEqual(toHex(ledgerTrie.EMPTY_TRIE_ROOT));
+      // Direct update
+      yield* Effect.tryPromise(() => ledgerTrie.put(Buffer.from("aa", "hex"), Buffer.from("bb", "hex")));
+      const root2 = yield* Effect.sync(() => ledgerTrie.root());
+      yield* Effect.tryPromise(() => ledgerTrie.commit());
+      expect(toHex(root2)).toEqual("2569f13bc09fa69b2e624d31238ad9dc3b7be864d593d6eea9aaa1f8565e645e");
+      yield* Effect.sync(() => ledgerTrie.checkpoint());
+      yield* Effect.tryPromise(() => ledgerTrie.put(Buffer.from("cc", "hex"), Buffer.from("dd", "hex")));
+      const root3 = yield* Effect.sync(() => ledgerTrie.root());
+      expect(toHex(root3)).toEqual("1dcb2196504dbd63c5b9f7578517267ebdc6267c4a53f45768cee1d1a60eff59")
+      yield* Effect.tryPromise(() => ledgerTrie.revert());
+      const root4 = yield* Effect.sync(() => ledgerTrie.root());
+      expect(toHex(root4)).toEqual(toHex(root2))
+
+      // Transaction update
+      yield* Effect.gen(function* () {
+        yield* Effect.sync(() => ledgerTrie.checkpoint());
+        yield* sql.withTransaction(Effect.gen(function* () {
+          yield* MempoolDB.insert(Buffer.from("ee", "hex"), Buffer.from("ff", "hex"));
+          yield* Effect.tryPromise(() => ledgerTrie.put(Buffer.from("ee", "hex"), Buffer.from("ff", "hex")));
+          const root5 = yield* Effect.sync(() => ledgerTrie.root());
+          expect(toHex(root5)).toEqual("c2f0030bf8657330fde77f508dea41b4fedf03467add56e6b212548cacf19114")
+          yield* Effect.fail(new Error("test"))
+        }))
+      }).pipe(Effect.catchAll((e) => Effect.gen(function* () {
+        yield* Effect.tryPromise(() => ledgerTrie.revert());
+        Effect.succeed(Effect.void)
+      })))
+      const mempoolDB = yield* MempoolDB.retrieve();
+      const root5 = yield* Effect.sync(() => ledgerTrie.root());
+      expect(toHex(root5)).toEqual(toHex(root2));
+      expect(mempoolDB).toEqual([]);
+
+    // Tranasction combinator update
+    yield* withTrieTransaction(ledgerTrie, Effect.gen(function* () {
+      yield* MempoolDB.insert(Buffer.from("ee", "hex"), Buffer.from("ff", "hex"));
+      yield* Effect.tryPromise(() => ledgerTrie.put(Buffer.from("ee", "hex"), Buffer.from("ff", "hex")));
+      const root5 = yield* Effect.sync(() => ledgerTrie.root());
+      expect(toHex(root5)).toEqual("c2f0030bf8657330fde77f508dea41b4fedf03467add56e6b212548cacf19114")
+      yield* Effect.fail(new Error("test"))
+    })).pipe(Effect.catchAll((e) => Effect.succeed(Effect.void)));
+    const mempoolDBCombinator = yield* MempoolDB.retrieve();
+    const root5Combinator = yield* Effect.sync(() => ledgerTrie.root());
+    expect(toHex(root5Combinator)).toEqual(toHex(root2));
+    expect(mempoolDBCombinator).toEqual([]);
+
+    }).pipe(
+      Effect.provide(Database.layer),
+      Effect.provide(User.layer),
+      Effect.provide(NodeConfig.layer),
+    )
+  )
+})
 
 describe("Commit Block Header Worker", () => {
   it.effect(`should measure performance of MPTs`, (_) =>
@@ -231,3 +307,7 @@ const loadTxs: Effect.Effect<{ key: Uint8Array; value: Uint8Array}[][], never, n
   }
   return blocksTxs;
 });
+
+const showKVs = (arg: { key: Uint8Array; value: Uint8Array}[]): { key: string; value: string}[] => {
+  return arg.map(a => ({key: toHex(a.key), value: toHex(a.value)}))
+}
