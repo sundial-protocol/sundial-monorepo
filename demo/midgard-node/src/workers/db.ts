@@ -112,17 +112,24 @@ export const processMpts = (
     };
   });
 
-export const withTrieTransaction = (trie: ETH.MerklePatriciaTrie, eff: Effect.Effect<any, any, any>) =>
+export const withTrieTransaction = (
+  trie: ETH.MerklePatriciaTrie,
+  eff: Effect.Effect<any, any, any>,
+) =>
   Effect.gen(function* () {
     yield* Effect.sync(() => trie.checkpoint());
     const sql = yield* SqlClient.SqlClient;
     const res = yield* sql.withTransaction(eff);
     yield* Effect.sync(() => trie.commit());
     return res;
-  }).pipe(Effect.catchAll((e) => Effect.gen(function* () {
-    yield* Effect.tryPromise(() => trie.revert());
-    yield* Effect.fail(e);
-})))
+  }).pipe(
+    Effect.catchAll((e) =>
+      Effect.gen(function* () {
+        yield* Effect.tryPromise(() => trie.revert());
+        yield* Effect.fail(e);
+      }),
+    ),
+  );
 
 export class PostgresCheckpointDB
   extends CheckpointDB
