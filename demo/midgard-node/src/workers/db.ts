@@ -65,7 +65,6 @@ export const processMpts = (
 ) =>
   Effect.gen(function* () {
     const mempoolTxHashes: Uint8Array[] = [];
-    const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfBlocksTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
     yield* Effect.forEach(mempoolTxs, ({ key: txHash, value: txCbor }) =>
@@ -184,9 +183,7 @@ export class PostgresCheckpointDB
         SELECT value FROM ${sql(_tableName)}
         WHERE key = ${Buffer.from(key)}`;
       const value = rows[0]?.value;
-      if (value) {
-        cache.set(keyHex, value);
-      }
+      if (value) yield* Effect.sync(() => cache.set(keyHex, value));
       return value;
     });
   };
@@ -215,8 +212,6 @@ export class PostgresCheckpointDB
     const { cache, checkpoints, _tableName } = this;
     return Effect.gen(function* () {
       const keyHex = bytesToHex(key);
-      cache.set(keyHex, value);
-
       if (checkpoints.length > 0) {
         checkpoints[checkpoints.length - 1].keyValueMap.set(keyHex, value);
       } else {
@@ -227,6 +222,7 @@ export class PostgresCheckpointDB
           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
           `;
       }
+      yield* Effect.sync(() => cache.set(keyHex, value));
     });
   };
 
@@ -241,13 +237,13 @@ export class PostgresCheckpointDB
     const { cache, checkpoints, _tableName } = this;
     return Effect.gen(function* () {
       const keyHex = bytesToHex(key);
-      cache.set(keyHex, undefined);
       if (checkpoints.length > 0) {
         checkpoints[checkpoints.length - 1].keyValueMap.set(keyHex, undefined);
       } else {
         const sql = yield* SqlClient.SqlClient;
         yield* sql`DELETE FROM ${sql(_tableName)} WHERE key = ${key}`;
       }
+      yield* Effect.sync(() => cache.set(keyHex, undefined));
     });
   };
 

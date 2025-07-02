@@ -38,7 +38,6 @@ const wrapper = (
     }
     const endTime = Date.now();
     yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
-    const sql = yield* SqlClient.SqlClient;
 
     const { ledgerTrie, mempoolTrie } = yield* makeMpts();
 
