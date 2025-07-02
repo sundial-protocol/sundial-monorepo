@@ -65,6 +65,7 @@ export const processMpts = (
 ) =>
   Effect.gen(function* () {
     const mempoolTxHashes: Uint8Array[] = [];
+    const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfBlocksTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
     yield* Effect.forEach(mempoolTxs, ({ key: txHash, value: txCbor }) =>
@@ -89,14 +90,14 @@ export const processMpts = (
             value: output,
           }),
         );
-        const batchDBOps: ETH_UTILS.BatchDBOp[] = [...delOps, ...putOps];
-
-        yield* Effect.tryPromise({
-          try: () => ledgerTrie.batch(batchDBOps),
-          catch: (e) => new Error(`${e}`),
-        });
+        yield* Effect.sync(() => batchDBOps.push(...[...delOps, ...putOps]));
       }),
     );
+
+    yield* Effect.tryPromise({
+      try: () => ledgerTrie.batch(batchDBOps),
+      catch: (e) => new Error(`${e}`),
+    });
 
     const utxoRoot = toHex(ledgerTrie.root());
     const txRoot = toHex(mempoolTrie.root());
@@ -240,6 +241,33 @@ export class PostgresCheckpointDB
     );
   }
 
+  putMultipleEffect = (ops: ETH_UTILS.PutBatch<Uint8Array, Uint8Array>[]) => {
+    const { cache, checkpoints, _tableName } = this;
+    return Effect.gen(function* () {
+      if (ops.length === 0) return;
+      if (checkpoints.length > 0) {
+        const keyValueMap = checkpoints[checkpoints.length - 1].keyValueMap;
+        for (const { key, value } of ops) {
+          const keyHex = bytesToHex(key);
+          keyValueMap.set(keyHex, value);
+        }
+      } else {
+        const sql = yield* SqlClient.SqlClient;
+        const rowsToInsert = ops.map(({ key, value }) => ({ key, value }));
+        yield* sql`
+        INSERT INTO ${sql(_tableName)} ${sql.insert(rowsToInsert)}
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+      `;
+      }
+      yield* Effect.sync(() => {
+        for (const { key, value } of ops) {
+          const keyHex = bytesToHex(key);
+          cache.set(keyHex, value);
+        }
+      });
+    });
+  };
+
   delEffect = (key: Uint8Array) => {
     const { cache, checkpoints, _tableName } = this;
     return Effect.gen(function* () {
@@ -261,6 +289,32 @@ export class PostgresCheckpointDB
     );
   }
 
+  delMultipleEffect = (ops: ETH_UTILS.DelBatch<Uint8Array>[]) => {
+    const { cache, checkpoints, _tableName } = this;
+    return Effect.gen(function* () {
+      if (ops.length === 0) return;
+      if (checkpoints.length > 0) {
+        const keyValueMap = checkpoints[checkpoints.length - 1].keyValueMap;
+        for (const { key } of ops) {
+          const keyHex = bytesToHex(key);
+          keyValueMap.set(keyHex, undefined);
+        }
+      } else {
+        const sql = yield* SqlClient.SqlClient;
+        const keys = ops.map((op) => op.key);
+        yield* sql`
+        DELETE FROM ${sql(_tableName)} WHERE key IN (${sql.in(keys)})
+      `;
+      }
+      yield* Effect.sync(() => {
+        for (const { key } of ops) {
+          const keyHex = bytesToHex(key);
+          cache.set(keyHex, undefined);
+        }
+      });
+    });
+  };
+
   clear = () => {
     const { _tableName } = this;
     return Effect.gen(function* () {
@@ -269,16 +323,17 @@ export class PostgresCheckpointDB
   };
 
   async batch(opStack: BatchDBOp[]): Promise<void> {
-    const { putEffect, delEffect } = this;
+    const { putMultipleEffect, delMultipleEffect } = this;
+    const splittedOps = splitBatchOps(opStack);
     return Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       yield* sql.withTransaction(
         Effect.gen(function* () {
-          for (const op of opStack) {
-            if (op.type === "put") {
-              yield* putEffect(op.key, op.value);
+          for (const ops of splittedOps) {
+            if (isPutBatch(ops)) {
+              yield* putMultipleEffect(ops);
             } else {
-              yield* delEffect(op.key);
+              yield* delMultipleEffect(ops);
             }
           }
         }),
@@ -351,3 +406,55 @@ const convertOps = (
         };
   });
 };
+
+function splitBatchOps(
+  ops: BatchDBOp<Uint8Array, Uint8Array>[],
+): (
+  | ETH_UTILS.PutBatch<Uint8Array, Uint8Array>[]
+  | ETH_UTILS.DelBatch<Uint8Array>[]
+)[] {
+  const result: (
+    | ETH_UTILS.PutBatch<Uint8Array, Uint8Array>[]
+    | ETH_UTILS.DelBatch<Uint8Array>[]
+  )[] = [];
+  let currentPutGroup: ETH_UTILS.PutBatch<Uint8Array, Uint8Array>[] = [];
+  let currentDelGroup: ETH_UTILS.DelBatch<Uint8Array>[] = [];
+  let currentType: "put" | "del" | null = null;
+
+  for (const op of ops) {
+    if (op.type !== currentType) {
+      if (currentType === "put" && currentPutGroup.length > 0) {
+        result.push(currentPutGroup);
+        currentPutGroup = [];
+      } else if (currentType === "del" && currentDelGroup.length > 0) {
+        result.push(currentDelGroup);
+        currentDelGroup = [];
+      }
+
+      currentType = op.type;
+      if (op.type === "put") {
+        currentPutGroup.push(op as ETH_UTILS.PutBatch<Uint8Array, Uint8Array>);
+      } else {
+        currentDelGroup.push(op as ETH_UTILS.DelBatch<Uint8Array>);
+      }
+    } else {
+      if (op.type === "put") {
+        currentPutGroup.push(op as ETH_UTILS.PutBatch<Uint8Array, Uint8Array>);
+      } else {
+        currentDelGroup.push(op as ETH_UTILS.DelBatch<Uint8Array>);
+      }
+    }
+  }
+  if (currentType === "put" && currentPutGroup.length > 0) {
+    result.push(currentPutGroup);
+  } else if (currentType === "del" && currentDelGroup.length > 0) {
+    result.push(currentDelGroup);
+  }
+  return result;
+}
+
+function isPutBatch(
+  ops: BatchDBOp<Uint8Array, Uint8Array>[],
+): ops is ETH_UTILS.PutBatch<Uint8Array, Uint8Array>[] {
+  return ops[0].type === "put";
+}

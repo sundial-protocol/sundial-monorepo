@@ -200,127 +200,157 @@ describe("CheckpointDB", () => {
 });
 
 describe("Commit Block Header Worker", () => {
-  it.effect(`should measure performance of MPTs`, (_) =>
+  it.effect(`should measure performance of MPTs single 5000txs`, (_) =>
     Effect.gen(function* () {
       yield* initializeDb();
       yield* flushDb;
 
       const blocksTxs = yield* loadTxs;
       let totalTimeMs = 0;
+
       console.log("Building trees...");
-      for (let blockNumber = 0; blockNumber < NUM_OF_BLOCKS; blockNumber++) {
-        const transactions = blocksTxs[blockNumber];
-        for (const [_, tx] of transactions.entries()) {
-          yield* MempoolDB.insert(tx.key, tx.value);
-        }
-        const startTime = performance.now();
-        const { ledgerTrie, mempoolTrie } = yield* makeMpts();
-        const { utxoRoot, txRoot } = yield* processMpts(
-          ledgerTrie,
-          mempoolTrie,
-          blocksTxs[blockNumber],
-        );
-        totalTimeMs += performance.now() - startTime;
-        yield* MempoolDB.clear();
-        expect(utxoRoot).toEqual(UtxoRoots[blockNumber]);
-        expect(txRoot).toEqual(TxRoots[blockNumber]);
-      }
+      const transactions = blocksTxs.flat();
+      const startTime = performance.now();
+      const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+      const { utxoRoot, txRoot } = yield* processMpts(
+        ledgerTrie,
+        mempoolTrie,
+        transactions,
+      );
+      totalTimeMs += performance.now() - startTime;
+      yield* MempoolDB.clear();
       const totalTimeSec = totalTimeMs / 1000;
-      const avgTimeSec = totalTimeSec / (NUM_OF_BLOCKS * 2);
       console.log(`It took ${totalTimeSec.toFixed(2)}s to create`);
       console.log(
-        `${NUM_OF_BLOCKS} ledger and mempool tries with ${blocksTxs[0].length} one-to-one txs each.`,
+        `ledger and mempool trie with ${transactions.length} one-to-one txs each.`,
       );
-      console.log(`Average time per trie: ${avgTimeSec.toFixed(2)}s`);
+      expect(utxoRoot).toEqual(
+        "2fbd2397169c17c9621387ba47fb2a2858f580e28d2750feb5eec8b371b4f9ea",
+      );
+      expect(txRoot).toEqual(
+        "992bf3cbb70bf1841575b24e8ce5d419c3bb770cac45f944cc653717734e8da7",
+      );
     }).pipe(
       Effect.provide(Database.layer),
       Effect.provide(User.layer),
       Effect.provide(NodeConfig.layer),
     ),
-  ),
-    it.effect(
-      `should create ${NUM_OF_BLOCKS} blocks sequentially`,
-      (_) =>
-        Effect.gen(function* () {
-          yield* flushDb;
-          const blocksTxs = yield* loadTxs;
-          const blocksData: any[] = [];
-          let totalTransactions = 0;
-          const startTime = performance.now();
+  );
+  //   it.effect(`should measure performance of MPTs 1000 txs 5x`, (_) =>
+  //     Effect.gen(function* () {
+  //       yield* initializeDb();
+  //       yield* flushDb;
 
-          // Iteratively put txs in mempool and run worker until all blocks are done
-          for (
-            let blockNumber = 0;
-            blockNumber < NUM_OF_BLOCKS;
-            blockNumber++
-          ) {
-            console.log(`\n📦 Processing block ${blockNumber + 1}...`);
-            const blockStartTime = performance.now();
-            const transactions = blocksTxs[blockNumber];
-            totalTransactions += transactions.length;
+  //       const blocksTxs = yield* loadTxs;
+  //       let totalTimeMs = 0;
+  //       console.log("Building trees...");
+  //       for (let blockNumber = 0; blockNumber < NUM_OF_BLOCKS; blockNumber++) {
+  //         const transactions = blocksTxs[blockNumber];
+  //         for (const [_, tx] of transactions.entries()) {
+  //           yield* MempoolDB.insert(tx.key, tx.value);
+  //         }
+  //         const startTime = performance.now();
+  //         const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+  //         const {utxoRoot, txRoot} = yield* processMpts(ledgerTrie, mempoolTrie, blocksTxs[blockNumber])
+  //         totalTimeMs += performance.now() - startTime;
+  //         yield* MempoolDB.clear();
+  //         expect(utxoRoot).toEqual(UtxoRoots[blockNumber]);
+  //         expect(txRoot).toEqual(TxRoots[blockNumber]);
+  //       }
+  //       const totalTimeSec = totalTimeMs / 1000;
+  //       const avgTimeSec = totalTimeSec / (NUM_OF_BLOCKS * 2);
+  //       console.log(`It took ${totalTimeSec.toFixed(2)}s to create`);
+  //       console.log(
+  //         `${NUM_OF_BLOCKS} ledger and mempool tries with ${blocksTxs[0].length} one-to-one txs each.`,
+  //       );
+  //       console.log(`Average time per trie: ${avgTimeSec.toFixed(2)}s`);
 
-            // Sequentially insert transactions into mempool
-            for (const [_, tx] of transactions.entries()) {
-              yield* MempoolDB.insert(tx.key, tx.value);
-            }
+  //   }).pipe(
+  //       Effect.provide(Database.layer),
+  //       Effect.provide(User.layer),
+  //       Effect.provide(NodeConfig.layer),
+  //     )
+  // )
 
-            // Execute worker to commit the block
-            console.log(`🔨 Executing worker for block ${blockNumber + 1}...`);
-            const workerStartTime = performance.now();
+  // it.effect(
+  //   `should create ${NUM_OF_BLOCKS} blocks sequentially`,
+  //   (_) =>
+  //     Effect.gen(function* () {
+  //       yield* flushDb;
+  //       const blocksTxs = yield* loadTxs;
+  //       const blocksData: any[] = [];
+  //       let totalTransactions = 0;
+  //       const startTime = performance.now();
 
-            try {
-              const workerOutput = yield* runMptWorker(blockNumber);
-              const workerEndTime = performance.now();
-              console.log(
-                `⏱️ Worker execution time for block ${blockNumber + 1}: ${workerEndTime - workerStartTime}ms`,
-              );
-              console.log(`📊 Block ${blockNumber + 1} output:`, {
-                mempoolTxsCount: workerOutput.mempoolTxsCount,
-                txSize: workerOutput.txSize,
-                sizeOfBlocksTxs: workerOutput.sizeOfBlocksTxs,
-              });
+  //       // Iteratively put txs in mempool and run worker until all blocks are done
+  //       for (let blockNumber = 0; blockNumber < NUM_OF_BLOCKS; blockNumber++) {
+  //         console.log(`\n📦 Processing block ${blockNumber + 1}...`);
+  //         const blockStartTime = performance.now();
+  //         const transactions = blocksTxs[blockNumber];
+  //         totalTransactions += transactions.length;
 
-              // Store block data for analysis
-              blocksData.push({
-                blockNumber: blockNumber + 1,
-                mempoolTxsCount: workerOutput.mempoolTxsCount,
-                txSize: workerOutput.txSize,
-                sizeOfBlocksTxs: workerOutput.sizeOfBlocksTxs,
-                executionTime: workerEndTime - workerStartTime,
-              });
-            } catch (error) {
-              console.error(
-                `❌ Worker failed for block ${blockNumber + 1}:`,
-                error,
-              );
-              throw error;
-            }
+  //         // Sequentially insert transactions into mempool
+  //         for (const [_, tx] of transactions.entries()) {
+  //           yield* MempoolDB.insert(tx.key, tx.value);
+  //         }
 
-            const blockEndTime = performance.now();
-            console.log(
-              `⏱️ Total time for block ${blockNumber + 1}: ${((blockEndTime - blockStartTime) / 1000).toFixed(2)}s`,
-            );
-          }
+  //         // Execute worker to commit the block
+  //         console.log(`🔨 Executing worker for block ${blockNumber + 1}...`);
+  //         const workerStartTime = performance.now();
 
-          const totalEndTime = performance.now();
-          const totalTime = totalEndTime - startTime;
+  //         try {
+  //           const workerOutput = yield* runMptWorker(blockNumber);
+  //           const workerEndTime = performance.now();
+  //           console.log(
+  //             `⏱️ Worker execution time for block ${blockNumber + 1}: ${workerEndTime - workerStartTime}ms`,
+  //           );
+  //           console.log(`📊 Block ${blockNumber + 1} output:`, {
+  //             mempoolTxsCount: workerOutput.mempoolTxsCount,
+  //             txSize: workerOutput.txSize,
+  //             sizeOfBlocksTxs: workerOutput.sizeOfBlocksTxs,
+  //           });
 
-          console.log("\n📈 Performance Summary:");
-          console.log(
-            `⏱️ Total test execution time: ${(totalTime / 1000).toFixed(2)}s`,
-          );
-          console.log(`📦 Total blocks created: ${blocksData.length}`);
-          console.log(` Total transactions processed: ${totalTransactions}`);
-          console.log(
-            `⚡ Average time per block: ${(totalTime / blocksData.length / 1000).toFixed(2)}s`,
-          );
-        }).pipe(
-          Effect.provide(Database.layer),
-          Effect.provide(User.layer),
-          Effect.provide(NodeConfig.layer),
-        ),
-      { timeout: 6000_000 },
-    );
+  //           // Store block data for analysis
+  //           blocksData.push({
+  //             blockNumber: blockNumber + 1,
+  //             mempoolTxsCount: workerOutput.mempoolTxsCount,
+  //             txSize: workerOutput.txSize,
+  //             sizeOfBlocksTxs: workerOutput.sizeOfBlocksTxs,
+  //             executionTime: workerEndTime - workerStartTime,
+  //           });
+  //         } catch (error) {
+  //           console.error(
+  //             `❌ Worker failed for block ${blockNumber + 1}:`,
+  //             error,
+  //           );
+  //           throw error;
+  //         }
+
+  //         const blockEndTime = performance.now();
+  //         console.log(
+  //           `⏱️ Total time for block ${blockNumber + 1}: ${((blockEndTime - blockStartTime) / 1000).toFixed(2)}s`,
+  //         );
+  //       }
+
+  //       const totalEndTime = performance.now();
+  //       const totalTime = totalEndTime - startTime;
+
+  //       console.log("\n📈 Performance Summary:");
+  //       console.log(
+  //         `⏱️ Total test execution time: ${(totalTime / 1000).toFixed(2)}s`,
+  //       );
+  //       console.log(`📦 Total blocks created: ${blocksData.length}`);
+  //       console.log(` Total transactions processed: ${totalTransactions}`);
+  //       console.log(
+  //         `⚡ Average time per block: ${(totalTime / blocksData.length / 1000).toFixed(2)}s`,
+  //       );
+  //     }).pipe(
+  //       Effect.provide(Database.layer),
+  //       Effect.provide(User.layer),
+  //       Effect.provide(NodeConfig.layer),
+  //     ),
+  //   { timeout: 6000_000 },
+  // );
 });
 
 const flushDb = Effect.gen(function* () {
