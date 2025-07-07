@@ -5,6 +5,7 @@ import {
   StateQueueUTxO,
   getConfirmedStateFromStateQueueUTxO,
   utxosToStateQueueUTxOs,
+  findLinkStateQueueUTxO,
 } from "../../utils/state-queue.js";
 import { StateQueue } from "../../tx-builder/index.js";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
@@ -26,38 +27,11 @@ export const fetchConfirmedStateAndItsLinkProgram = (
     if (filteredForConfirmedState.length === 1) {
       const { utxo: confirmedStateUTxO, link: confirmedStatesLink } =
         filteredForConfirmedState[0];
-      if (confirmedStatesLink !== "Empty") {
-        const firstLink = confirmedStatesLink.Key;
-        const filteredForLink = yield* Effect.allSuccesses(
-          allUTxOs.map((u: StateQueueUTxO) => {
-            const nodeDatum = u.datum;
-            if (
-              nodeDatum.key !== "Empty" &&
-              nodeDatum.key.Key.key === firstLink.key
-            ) {
-              return Effect.succeed(u);
-            } else {
-              return Effect.fail(
-                new Error(
-                  "Link is either a root, or its key doesn't match with what the root is pointing to"
-                )
-              );
-            }
-          })
-        );
-        if (filteredForLink.length === 1) {
-          return {
-            confirmed: confirmedStateUTxO.utxo,
-            link: filteredForLink[0].utxo,
-          };
-        } else {
-          return yield* Effect.fail(
-            new Error("Confirmed state's link not found")
-          );
-        }
-      } else {
-        return { confirmed: confirmedStateUTxO.utxo };
-      }
+      const linkUTxO = yield* findLinkStateQueueUTxO(confirmedStatesLink, allUTxOs);
+      return {
+        confirmed: confirmedStateUTxO.utxo,
+        link: linkUTxO.utxo,
+      };
     } else {
       return yield* Effect.fail(new Error("Confirmed state not found"));
     }

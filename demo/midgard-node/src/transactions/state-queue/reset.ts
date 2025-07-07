@@ -4,7 +4,6 @@ import {
   Data,
   LucidEvolution,
   Script,
-  UTxO,
   toUnit,
 } from "@lucid-evolution/lucid";
 import { AlwaysSucceeds } from "@/services/index.js";
@@ -17,12 +16,12 @@ const collectAndBurnStateQueueNodesProgram = (
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   stateQueueSpendingScript: Script,
   stateQueueMintingScript: Script,
-  utxosAndAssetNames: StateQueueUTxO[],
+  stateQueueUTxOs: SDK.Utils.StateQueueUTxO[],
 ): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const tx = lucid.newTx();
     const assetsToBurn: Assets = {};
-    utxosAndAssetNames.map(({ utxo, assetName }) => {
+    stateQueueUTxOs.map(({ utxo, assetName }) => {
       const unit = toUnit(fetchConfig.stateQueuePolicyId, assetName);
       if (assetsToBurn[unit] !== undefined) {
         assetsToBurn[unit] -= 1n;
@@ -59,7 +58,7 @@ export const resetStateQueue = Effect.gen(function* () {
   };
 
   const allStateQueueUTxOs =
-    yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(lucid, fetchConfig.stateQueuePolicyId);
+    yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(lucid, fetchConfig);
 
   // Collect and burn 10 UTxOs and asset names at a time:
   const batchSize = 40;

@@ -122,7 +122,7 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
     };
   });
 
-const findLinkStateQueueUTxO = (
+export const findLinkStateQueueUTxO = (
   link: NodeKey,
   utxos: StateQueueUTxO[],
 ): Effect.Effect<StateQueueUTxO, Error> => {
