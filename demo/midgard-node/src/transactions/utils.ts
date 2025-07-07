@@ -11,6 +11,10 @@ import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
 
+const RETRY_ATTEMPTS = 2;
+
+const INIT_RETRY_AFTER_MILLIS = 5_000;
+
 /**
  * Handle the signing and submission of a transaction.
  *
@@ -32,7 +36,10 @@ export const handleSignSubmit = (
     yield* Effect.logInfo("✉️  Submitting transaction...");
     const txHash = yield* signed.submitProgram().pipe(
       Effect.retry(
-        Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
+        Schedule.compose(
+          Schedule.exponential(INIT_RETRY_AFTER_MILLIS),
+          Schedule.recurs(RETRY_ATTEMPTS),
+        ),
       ),
       Effect.mapError((err) => new SubmitError({ err })),
     );
@@ -80,7 +87,10 @@ export const handleSignSubmitWithoutConfirmation = (
       .pipe(Effect.mapError((err) => new SignError({ err })));
     const txHash = yield* signed.submitProgram().pipe(
       Effect.retry(
-        Schedule.compose(Schedule.exponential(5_000), Schedule.recurs(5)),
+        Schedule.compose(
+          Schedule.exponential(INIT_RETRY_AFTER_MILLIS),
+          Schedule.recurs(RETRY_ATTEMPTS),
+        ),
       ),
       Effect.mapError((err) => new SubmitError({ err })),
     );
