@@ -32,11 +32,10 @@ When the escape hatch is triggered, it is set to the time when the emergency per
 \subsection{Minting policy}%
 \label{h:escape-hatch-minting-policy}%
 
-The \code{escape\_hatch} minting policy initializes and deinitializes the escape hatch state. It is statically parametrized on the \code{hub\_oracle} minting policy.
+The \code{escape\_hatch} minting policy initializes the escape hatch state. It is statically parametrized on the \code{hub\_oracle} minting policy.
 Redeemers:
 \begin{description}
   \item[Init.] The transaction must mint the Midgard hub oracle token.
-  \item[Deinit.] The transaction must burn the Midgard hub oracle token.
 \end{description}
 
 \subsection{Spending validator}%

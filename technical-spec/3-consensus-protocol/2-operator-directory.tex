@@ -71,12 +71,6 @@ Redeemers:
             \item The transaction must mint the Midgard hub oracle NFT.
             \item The transaction must Init the \code{registered\_operators} queue.
         \end{enumerate}
-    \item[Deinit.] Deinitialize the \code{registered\_operators} queue via the Midgard hub oracle.
-      Conditions:
-        \begin{enumerate}
-            \item The transaction must burn the Midgard hub oracle NFT.
-            \item The transaction must Deinit the \code{registered\_operators} queue.
-        \end{enumerate}
     \item[Register Operator.] Prepend a node into the \code{registered\_operators} queue with the operator's ADA bond at the operator's key, noting the registration time.
       Grouped conditions:
         \begin{itemize}
@@ -170,12 +164,6 @@ Redeemers:
         \begin{enumerate}
             \item The transaction must mint the Midgard hub oracle NFT.
             \item The transaction must Init the \code{active\_operators} set.
-        \end{enumerate}
-    \item[Deinit.] Deinitialize the \code{active\_operators} set via the Midgard hub oracle.
-      Conditions:
-        \begin{enumerate}
-            \item The transaction must burn the Midgard hub oracle NFT.
-            \item The transaction must Deinit the \code{active\_operators} set.
         \end{enumerate}
     \item[Activate Operator.] Transfer an operator node from the \code{registered\_operators} queue to the \code{active\_operators} set.
       Conditions:
@@ -295,12 +283,6 @@ Redeemers:
         \begin{enumerate}
             \item The transaction must mint the Midgard hub oracle NFT.
             \item The transaction must Init the \code{retired\_operators} set.
-        \end{enumerate}
-    \item[Deinit.] Deinitialize the \code{retired\_operators} set via the Midgard hub oracle.
-      Conditions:
-        \begin{enumerate}
-            \item The transaction must burn the Midgard hub oracle NFT.
-            \item The transaction must Deinit the \code{retired\_operators} set.
         \end{enumerate}
     \item[Retire Operator.] Transfer an operator node, unchanged, from the \code{active\_operators} set to the \code{retired\_operators} set.
       Conditions:
