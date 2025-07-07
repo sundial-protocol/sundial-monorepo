@@ -73,4 +73,6 @@ export const resetStateQueue = Effect.gen(function* () {
       batch,
     );
   }
+  global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH = Date.now();
+  global.BLOCKS_IN_QUEUE = 0;
 });

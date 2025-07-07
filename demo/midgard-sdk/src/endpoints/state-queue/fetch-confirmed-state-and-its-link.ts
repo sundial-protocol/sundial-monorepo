@@ -1,71 +1,62 @@
 import { Effect } from "effect";
-import { LucidEvolution, UTxO, fromText, toUnit } from "@lucid-evolution/lucid";
+import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { makeReturn } from "../../core.js";
-import { getConfirmedStateFromUTxO } from "../../utils/state-queue.js";
-import { getNodeDatumFromUTxO } from "../../utils/linked-list.js";
-import { LedgerState, LinkedList, StateQueue } from "../../tx-builder/index.js";
+import {
+  StateQueueUTxO,
+  getConfirmedStateFromStateQueueUTxO,
+  utxosToStateQueueUTxOs,
+} from "../../utils/state-queue.js";
+import { StateQueue } from "../../tx-builder/index.js";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
+
 export const fetchConfirmedStateAndItsLinkProgram = (
   lucid: LucidEvolution,
-  config: StateQueue.FetchConfig,
+  config: StateQueue.FetchConfig
 ): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, Error> =>
   Effect.gen(function* () {
-    const allUTxOs = yield* Effect.catchAll(
-      utxosAtByNFTPolicyId(
-        lucid,
-        config.stateQueueAddress,
-        config.stateQueuePolicyId,
-        // toUnit(config.stateQueuePolicyId, fromText("Node"))
-      ),
-      (error) =>
-        Effect.fail(new Error(`Failed to fetch UTxOs: ${error.message}`)),
+    const initUTxOs = yield* utxosAtByNFTPolicyId(
+      lucid,
+      config.stateQueueAddress,
+      config.stateQueuePolicyId
     );
-    let confirmedStateResult:
-      | { data: LedgerState.ConfirmedState; link: LinkedList.NodeKey }
-      | undefined;
+    const allUTxOs = yield* utxosToStateQueueUTxOs(initUTxOs);
     const filteredForConfirmedState = yield* Effect.allSuccesses(
-      allUTxOs.map((u: UTxO) => {
-        const confirmedStateEffect = getConfirmedStateFromUTxO(u);
-        return Effect.map(confirmedStateEffect, (confirmedState) => {
-          confirmedStateResult = confirmedState;
-          return u;
-        });
-      }),
+      allUTxOs.map(getConfirmedStateFromStateQueueUTxO)
     );
-    // console.log("allUTxOs :>> ", allUTxOs);
-    if (filteredForConfirmedState.length === 1 && confirmedStateResult) {
-      const confirmedStateUTxO = filteredForConfirmedState[0];
-      if (confirmedStateResult.link !== "Empty") {
-        const firstLink = confirmedStateResult.link.Key;
-        // console.log("firstLink :>> ", firstLink);
+    if (filteredForConfirmedState.length === 1) {
+      const { utxo: confirmedStateUTxO, link: confirmedStatesLink } =
+        filteredForConfirmedState[0];
+      if (confirmedStatesLink !== "Empty") {
+        const firstLink = confirmedStatesLink.Key;
         const filteredForLink = yield* Effect.allSuccesses(
-          allUTxOs.map((u: UTxO) => {
-            const nodeDatumEffect = getNodeDatumFromUTxO(u);
-            return Effect.andThen(nodeDatumEffect, (nodeDatum) => {
-              if (
-                nodeDatum.key !== "Empty" &&
-                nodeDatum.key.Key.key === firstLink.key
-              ) {
-                return Effect.succeed(u);
-              } else {
-                return Effect.fail(
-                  new Error(
-                    "Link is either a root, or its key doesn't match with what the root is pointing to",
-                  ),
-                );
-              }
-            });
-          }),
+          allUTxOs.map((u: StateQueueUTxO) => {
+            const nodeDatum = u.datum;
+            if (
+              nodeDatum.key !== "Empty" &&
+              nodeDatum.key.Key.key === firstLink.key
+            ) {
+              return Effect.succeed(u);
+            } else {
+              return Effect.fail(
+                new Error(
+                  "Link is either a root, or its key doesn't match with what the root is pointing to"
+                )
+              );
+            }
+          })
         );
         if (filteredForLink.length === 1) {
-          return { confirmed: confirmedStateUTxO, link: filteredForLink[0] };
+          return {
+            confirmed: confirmedStateUTxO.utxo,
+            link: filteredForLink[0].utxo,
+          };
         } else {
           return yield* Effect.fail(
-            new Error("Confirmed state's link not found"),
+            new Error("Confirmed state's link not found")
           );
         }
       } else {
-        return { confirmed: confirmedStateUTxO };
+        return { confirmed: confirmedStateUTxO.utxo };
       }
     } else {
       return yield* Effect.fail(new Error("Confirmed state not found"));
@@ -82,6 +73,6 @@ export const fetchConfirmedStateAndItsLinkProgram = (
  */
 export const fetchConfirmedStateAndItsLink = (
   lucid: LucidEvolution,
-  config: StateQueue.FetchConfig,
+  config: StateQueue.FetchConfig
 ) =>
   makeReturn(fetchConfirmedStateAndItsLinkProgram(lucid, config)).unsafeRun();

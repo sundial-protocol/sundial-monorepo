@@ -1,8 +1,6 @@
 import { Address, PolicyId, Script, Data, UTxO } from "@lucid-evolution/lucid";
 import {
-  MerkleRoot,
   OutputReferenceSchema,
-  POSIXTime,
   POSIXTimeSchema,
 } from "../common.js";
 import { NodeDatumSchema } from "../linked-list.js";
