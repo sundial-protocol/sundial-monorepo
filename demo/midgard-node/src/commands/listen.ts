@@ -247,6 +247,34 @@ const getResetHandler = Effect.gen(function* () {
   ),
 );
 
+const getLogStateQueueHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`\u270d Fetching state queue to draw...`);
+  const { user: lucid } = yield* User;
+
+  const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
+
+  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+    stateQueuePolicyId: alwaysSucceeds.policyId,
+    stateQueueAddress: alwaysSucceeds.spendScriptAddress,
+  };
+
+  const sortedUTxOs = yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(
+    lucid,
+    fetchConfig,
+  );
+  let drawn = "";
+  sortedUTxOs.map((u) => {
+    const emoji =
+      u.datum.key === "Empty" ? "👑" : u.datum.next === "Empty" ? "⚓" : "⛓";
+    drawn = `${drawn}
+${u.utxo.txHash}#${u.utxo.outputIndex}
+${emoji}${u.datum.key !== "Empty" ? "(" + u.assetName + ")" : ""}`;
+  });
+  return yield* HttpServerResponse.json({
+    message: `State queue drawn in server logs!`,
+  });
+});
+
 const postSubmitHandler = Effect.gen(function* () {
   // yield* Effect.logInfo(`◻️ Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
@@ -298,6 +326,7 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/commit", getCommitEndpoint),
   HttpRouter.get("/merge", getMergeHandler),
   HttpRouter.get("/reset", getResetHandler),
+  HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
   HttpRouter.post("/submit", postSubmitHandler),
 );
 
