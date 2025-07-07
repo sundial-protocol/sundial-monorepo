@@ -17,7 +17,7 @@ const collectAndBurnStateQueueNodesProgram = (
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   stateQueueSpendingScript: Script,
   stateQueueMintingScript: Script,
-  utxosAndAssetNames: { utxo: UTxO; assetName: string }[],
+  utxosAndAssetNames: StateQueueUTxO[],
 ): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const tx = lucid.newTx();
@@ -58,13 +58,13 @@ export const resetStateQueue = Effect.gen(function* () {
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
 
-  const allUTxOsAndAssetNames =
-    yield* SDK.Endpoints.fetchAllStateQueueUTxOsProgram(lucid, fetchConfig);
+  const allStateQueueUTxOs =
+    yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(lucid, fetchConfig.stateQueuePolicyId);
 
   // Collect and burn 10 UTxOs and asset names at a time:
   const batchSize = 40;
-  for (let i = 0; i < allUTxOsAndAssetNames.length; i += batchSize) {
-    const batch = allUTxOsAndAssetNames.slice(i, i + batchSize);
+  for (let i = 0; i < allStateQueueUTxOs.length; i += batchSize) {
+    const batch = allStateQueueUTxOs.slice(i, i + batchSize);
     yield* collectAndBurnStateQueueNodesProgram(
       lucid,
       fetchConfig,

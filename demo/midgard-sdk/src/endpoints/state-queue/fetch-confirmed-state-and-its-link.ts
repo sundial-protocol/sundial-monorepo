@@ -19,7 +19,7 @@ export const fetchConfirmedStateAndItsLinkProgram = (
       config.stateQueueAddress,
       config.stateQueuePolicyId
     );
-    const allUTxOs = yield* utxosToStateQueueUTxOs(initUTxOs);
+    const allUTxOs = yield* utxosToStateQueueUTxOs(initUTxOs, config.stateQueuePolicyId);
     const filteredForConfirmedState = yield* Effect.allSuccesses(
       allUTxOs.map(getConfirmedStateFromStateQueueUTxO)
     );

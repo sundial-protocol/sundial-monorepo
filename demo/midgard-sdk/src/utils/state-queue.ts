@@ -11,23 +11,37 @@ import { StateQueue } from "../tx-builder/index.js";
 import { getNodeDatumFromUTxO } from "./linked-list.js";
 import { MerkleRoot, POSIXTime } from "../tx-builder/common.js";
 import { Datum } from "@/tx-builder/state-queue/types.js";
+import {getSingleAssetApartFromAda} from "./common.js";
 
 export type StateQueueUTxO = {
   utxo: UTxO;
   datum: StateQueue.Datum;
+  assetName: string;
 };
 
+/**
+ * Validates correctness of datum, and having a single NFT.
+ */
 export const utxoToStateQueueUTxO = (
   utxo: UTxO,
+  nftPolicy: string,
 ): Effect.Effect<StateQueueUTxO, Error> => Effect.gen(function* () {
   const datum = yield* getNodeDatumFromUTxO(utxo);
-  return { utxo, datum };
+  const [sym, assetName, _qty] = yield* getSingleAssetApartFromAda(utxo.assets);
+  if (sym !== nftPolicy) {
+    yield* Effect.fail(new Error("UTxO's NFT policy ID is not the same as the state queue's"));
+  }
+  return { utxo, datum, assetName };
 });
 
+/**
+ * Silently drops invalid UTxOs.
+ */
 export const utxosToStateQueueUTxOs = (
   utxos: UTxO[],
+  nftPolicy: string,
 ): Effect.Effect<StateQueueUTxO[], Error> => {
-  const effects = utxos.map(utxoToStateQueueUTxO);
+  const effects = utxos.map((u) => utxoToStateQueueUTxO(u, nftPolicy));
   return Effect.allSuccesses(effects);
 };
 
@@ -72,6 +86,7 @@ export const getConfirmedStateFromStateQueueUTxO = (
  */
 export const updateLatestBlocksDatumAndGetTheNewHeader = (
   lucid: LucidEvolution,
+  stateQueuePolicyId: string,
   latestBlock: UTxO,
   newUTxOsRoot: MerkleRoot,
   transactionsRoot: MerkleRoot,
@@ -85,7 +100,7 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
 
     const pubKeyHash = paymentCredentialOf(walletAddress).hash;
 
-    const stateQueueUTxO = yield* utxoToStateQueueUTxO(latestBlock);
+    const stateQueueUTxO = yield* utxoToStateQueueUTxO(latestBlock, stateQueuePolicyId);
     const { data: confirmedState } = yield* getConfirmedStateFromStateQueueUTxO(stateQueueUTxO);
     return {
       nodeDatum: {
@@ -107,7 +122,7 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
     };
   });
 
-export const findLinkStateQueueUTxO = (
+const findLinkStateQueueUTxO = (
   link: NodeKey,
   utxos: StateQueueUTxO[],
 ): Effect.Effect<StateQueueUTxO, Error> => {
@@ -124,6 +139,16 @@ export const findLinkStateQueueUTxO = (
   }
 };
 
+/**
+ * Returns a sorted array of `StateQueueUTxO`s where the confirmed state's UTxO
+ * is the head element, and the following elements are linked from their
+ * previous elements.
+ *
+ * TODO: Make it more efficient. Currently that same list of all state queue
+ *       UTxOs is traversed to find the next link UTxO multiple times. It might
+ *       be better to drop link UTxOs when found so that subsequent lookups
+ *       become cheaper.
+ */
 export const sortStateQueueUTxOs = (
   stateQueueUTxOs: StateQueueUTxO[],
 ): Effect.Effect<StateQueueUTxO[], Error> => Effect.gen(function* () {
