@@ -44,10 +44,6 @@ const commitBlockTxSizeGauge = Metric.gauge("commit_block_tx_size", {
 
 export const buildAndSubmitCommitmentBlock = () =>
   Effect.gen(function* () {
-    // Toggle global flag to prevent wasted work in case of a merge tx occurring
-    // in a conflicting manner.
-    global.BLOCK_SUBMISSION_IN_PROGRESS = true;
-
     const worker = Effect.async<WorkerOutput, Error, never>((resume) => {
       Effect.runSync(Effect.logInfo(`👷 Starting worker...`));
       const worker = new Worker(
@@ -91,7 +87,4 @@ export const buildAndSubmitCommitmentBlock = () =>
 
       yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
     }
-
-    // Toggling the flag back to `false` so that merges can continue.
-    global.BLOCK_SUBMISSION_IN_PROGRESS = false;
   });
