@@ -11,7 +11,7 @@ This chapter specifies the L1 transactions that interact with Midgard's consensu
 Whereas the onchain smart contract are specified in a modular way, where each validator is only concerned with its own validity conditions, the transactions specified in this chapter often interact with several of the onchain validators and must satisfy all of their conditions.
 Thus, the offchain code can be seen as the integration layer for the onchain code.
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/Z-example-diagram.pdf}}
 \end{center}
@@ -36,7 +36,7 @@ As illustrated in the example diagram (\cref{fig:tx-example}), interpret our tra
 \section{Initialization}%
 \label{h:midgard-l1-tx-initialization}%
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/0-init-midgard.pdf}}
 \end{center}
@@ -44,8 +44,8 @@ As illustrated in the example diagram (\cref{fig:tx-example}), interpret our tra
 \label{fig:tx-init-midgard}
 \end{figure}
 
-A Midgard instance is initialized with a single transaction that all the onchain data structures required for Midgard's smart-contract-based consensus protocol.
-This transaction:
+Initialize a Midgard instance with a single transaction that sets up all the onchain data structures required for Midgard's smart-contract-based consensus protocol.
+This transaction (\cref{fig:tx-init-midgard}):
 \begin{enumerate}
   \item Spends a nonce utxo to uniquely parametrize%
     \footnote{A Midgard instance's hub oracle minting policy is parametrized on the nonce utxo spent in the initialization transaction, and all minting policies of the Midgard instance are parametrized on the hub oracle minting policy.}
@@ -57,12 +57,14 @@ This transaction:
   \item Produces the scheduler, escape hatch, fraud proof catalogue, and hub oracle singleton utxos.
 \end{enumerate}
 
-The hub oracle minting policy's Init redeemer enforces the initialization transaction's correctness (see \cref{h:hub-oracle-minting-policy}).
+Correctness is enforced by the hub oracle minting policy's Init redeemer (\cref{h:hub-oracle-minting-policy}).
 
 \section{Operator management}%
 \label{h:midgard-l1-tx-operator-management}%
 
-\begin{figure}[htb]
+Midgard has several transactions that manage operators by interacting with the data structures of the operator directory.
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/1-register-operator.pdf}}
 \end{center}
@@ -70,9 +72,15 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-register-operator}
 \end{figure}
 
-[TODO]
+Register a new operator via a transaction that (\cref{fig:tx-register-operator}):
+\begin{enumerate}
+  \item Prepends a new operator node to the registered operators list. 
+  \item Places a sufficient ADA bond into the new operator's node.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is enforced by the registered operators minting policy's Register Operator redeemer (\cref{h:registered-operators-minting-policy}).
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/2-deregister-operator.pdf}}
 \end{center}
@@ -80,9 +88,15 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-deregister-operator}
 \end{figure}
 
-[TODO]
+De-register an operator via a transaction that (\cref{fig:tx-deregister-operator}):
+\begin{enumerate}
+  \item Removes the operator's node from the registered operator's list.
+  \item Refunds the ADA bond to the operator.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is enforced by the registered operators minting policy's Deregister Operator redeemer (\cref{h:registered-operators-minting-policy}).
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/3-remove-duplicate-registrant.pdf}}
 \end{center}
@@ -90,9 +104,16 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-remove-duplicate-registrant}
 \end{figure}
 
-[TODO]
+If the same operator key is simultaneously present in a registered operators node and in another node of the registered, active, or retired operators lists, then it can be removed via a transaction that (\cref{fig:tx-remove-duplicate-registrant}):
+\begin{enumerate}
+  \item Removes the duplicate node from the registered operators list
+  \item Slashes the duplicate node's operator ADA bond, allocating part of it (\code{slashing\_penalty} param) to the transaction's fee and allowing the transaction submitter to claim the rest as the fraud prover reward.
+  \item References the same operator key being used in another list node (registered/active/retired) to justify removing and slashing that operator's duplicate node.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is enforced by the registered operators minting policy's Remove Duplicate Slash Bond redeemer (\cref{h:registered-operators-minting-policy}).
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/4-activate-operator.pdf}}
 \end{center}
@@ -100,9 +121,20 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-activate-operator}
 \end{figure}
 
-[TODO]
+Activate an operator via a transaction that (\cref{fig:tx-activate-operator}):
+\begin{enumerate}
+  \item Removes the operator's node from the registered operators list.
+  \item Inserts a node for the operator in the active operators list.
+  \item Transfers the operator's ADA bond from the removed registered operator node to the inserted active operators node.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Activate Operator of the registered operators minting policy (\cref{h:registered-operators-minting-policy}).
+  \item Activate Operator of the active operators minting policy (\cref{h:active-operators-minting-policy}).
+\end{itemize}
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/5-retire-operator.pdf}}
 \end{center}
@@ -110,9 +142,20 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-retire-operator}
 \end{figure}
 
-[TODO]
+Retire an operator via a transaction that (\cref{fig:tx-retire-operator}):
+\begin{enumerate}
+  \item Removes the operator's node from the active operators list.
+  \item Inserts a node for the operator in the retired operators list.
+  \item Transfers the operator's ADA bond from the removed active operator node to the inserted retired operator node.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Retire Operator of the active operators minting policy (\cref{h:active-operators-minting-policy}).
+  \item Retire Operator of the retired operators minting policy (\cref{h:retired-operators-minting-policy}).
+\end{itemize}
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/6-recover-bond.pdf}}
 \end{center}
@@ -120,22 +163,34 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-recover-bond}
 \end{figure}
 
-[TODO]
+After all of a retired operator's block headers (in the state queue) and resolution claims (in the settlement queue) have matured, the operator can recover his ADA bond via a transaction that (\cref{fig:tx-recover-bond}):
+\begin{enumerate}
+  \item Removes the operator's node from the retired operators list.
+  \item Refunds the operator's ADA bond to the operator.
+\end{enumerate}
+
+Correctness is enforced by the retired operators minting policy's Recover Operator Bond redeemer (\cref{h:retired-operators-minting-policy}).
 
 \section{Scheduler}%
 \label{h:midgard-l1-tx-scheduler}%
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/7-advance-scheduler.pdf}}
 \end{center}
 \caption[Advance scheduler]{Advance the scheduler to the next operator.}
-\label{fig:tx-advance-operator}
+\label{fig:tx-advance-scheduler}
 \end{figure}
 
-[TODO]
+Advance the scheduler via transaction that (\cref{fig:tx-advance-scheduler}):
+\begin{enumerate}
+  \item Updates the scheduler's datum to start the next shift and assign it to a new operator.
+  \item References an active operator node that proves that the newly assigned operator follows the previously assigned operator in key-descending order of the active operators list.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is enforced by the scheduler spending validator's Advance redeemer (\cref{h:scheduler-spending-validator}).
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/8-rewind-scheduler.pdf}}
 \end{center}
@@ -143,12 +198,18 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-rewind-scheduler}
 \end{figure}
 
-[TODO]
+Rewind the scheduler via a transaction that (\cref{fig:tx-rewind-scheduler}):
+\begin{enumerate}
+  \item Updates the scheduler's datum to the start the next shift and assign it to a new operator.
+  \item References the active operators' root and last nodes to prove that the previously assigned operator was at the end and the newly assigned operator is at the beginning of the key-descending order of the active operators list.
+\end{enumerate}
+
+Correctness is enforced by the scheduler spending validator's Rewind redeemer (\cref{h:scheduler-spending-validator}).
 
 \section{State queue}%
 \label{h:midgard-l1-tx-state-queue}%
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/9-commit-block-header.pdf}}
 \end{center}
@@ -156,9 +217,20 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-commit-block-header}
 \end{figure}
 
-[TODO]
+Commit a new block header to the state queue via a transaction that (\cref{fig:tx-commit-block-header}):
+\begin{enumerate}
+  \item Appends a new node containing the block header to the state queue.
+  \item Updates the operator's bond-unlock time to the future time when the new block header will mature.
+  \item References the scheduler to verify that the operator has the right to commit a block during the current shift.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Commit Block Header of the state queue minting policy (\cref{h:state-queue-minting-policy}).
+  \item Update Bond Hold New State of the active operators spending validator (\cref{h:active-operators-spending-validator}).
+\end{itemize}
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/A-remove-fraudulent-block-header.pdf}}
 \end{center}
@@ -166,9 +238,21 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-remove-fraudulent-block-header}
 \end{figure}
 
-[TODO]
+Remove a fraudulent block header from the state queue via a transaction that (\cref{fig:tx-remove-fraudulent-block-header}):
+\begin{enumerate}
+  \item References a fraud proof to justify removing the block header and slashing its operator.
+  \item Removes the fraudulent block header's node from the state queue.
+  \item Removes the dishonest operator's node from the active operators or retired operators list (depending on where the operator's node resides).
+  \item Slashes the dishonest operator's ADA bond, sending part of it (\code{fraud\_prover\_reward} param) to the fraud prover and paying the rest (\code{slashing\_penalty}) as transaction fees.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Remove Fraudulent Block Header of the state queue minting policy (\cref{h:state-queue-minting-policy}).
+  \item Remove Operator Bad State of the active/retired operators minting policy (\cref{h:active-operators-minting-policy}, \cref{h:retired-operators-minting-policy}).
+\end{itemize}
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/B-merge-to-confirmed-state.pdf}}
 \end{center}
@@ -176,45 +260,23 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-merge-to-confirmed-state}
 \end{figure}
 
-[TODO]
+Merge a matured block header to the confirmed state via a transaction that (\cref{fig:tx-merge-to-confirmed-state}):
+\begin{enumerate}
+  \item Removes the block header's node from the state queue.
+  \item Updates the state queue's root node datum (i.e. Midgard's confirmed state) to the reflect the information contained in the block header.
+  \item If the block header contains any L1 user events (deposits, transaction orders, or withdrawal orders) append a new node containing the same user events to the settlement queue.
+\end{enumerate}
 
-\section{User events}%
-\label{h:midgard-l1-tx-user-events}%
-
-\begin{figure}[htb]
-\begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/C-deposit.pdf}}
-\end{center}
-\caption[Create deposit]{Create an L1 deposit for Midgard.}
-\label{fig:tx-deposit}
-\end{figure}
-
-[TODO]
-
-\begin{figure}[htb]
-\begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/D-tx-order.pdf}}
-\end{center}
-\caption[Create tx order]{Create a transaction order for Midgard.}
-\label{fig:tx-transaction-order}
-\end{figure}
-
-[TODO]
-
-\begin{figure}[htb]
-\begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/E-withdrawal-order.pdf}}
-\end{center}
-\caption[Create withdrawal order]{Create a withdrawal order for Midgard.}
-\label{fig:tx-withdrawal-order}
-\end{figure}
-
-[TODO]
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Merge to Confirmed State of the state queue minting policy (\cref(h:state-queue-minting-policy)).
+  \item Append Settlement Node of the settlement queue minting policy (\cref{h:settlement-queue-minting-policy}).
+\end{itemize}
 
 \section{Settlement queue}%
 \label{h:midgard-l1-tx-settlement-queue}%
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/F-attach-resolution-claim.pdf}}
 \end{center}
@@ -224,7 +286,7 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 
 [TODO]
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/G-disprove-resolution-claim.pdf}}
 \end{center}
@@ -234,7 +296,7 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 
 [TODO]
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/H-resolve-settlement-node.pdf}}
 \end{center}
@@ -244,10 +306,89 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 
 [TODO]
 
+\section{User events}%
+\label{h:midgard-l1-tx-user-events}%
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/C-deposit.pdf}}
+\end{center}
+\caption[Create deposit]{Create an L1 deposit for Midgard.}
+\label{fig:tx-deposit}
+\end{figure}
+
+Create a new deposit for Midgard via a transaction that (\cref{fig:tx-deposit}):
+\begin{enumerate}
+  \item Spends a nonce input to uniquely parametrize the deposit.
+  \item Produces a deposit utxo containing the user's deposited funds and instructions.
+  \item Registers a staking credential to witness the existence of the deposit.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Authenticate Deposit of the deposit minting policy (\cref{h:deposit-minting-policy}).
+  \item Register Staking Credential of the witness staking script (\cref{h:witness-staking-script}).
+\end{itemize}
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/D-tx-order.pdf}}
+\end{center}
+\caption[Create tx order]{Create a transaction order for Midgard.}
+\label{fig:tx-transaction-order}
+\end{figure}
+
+Create a new transaction order for Midgard via a transaction that (\cref{fig:tx-transaction-order}):
+\begin{enumerate}
+  \item Spends a nonce input to uniquely parametrize the transaction order.
+  \item Produces a transaction order utxo containing the user's L2 transaction.
+  \item Registers a staking credential to witness the existence of the transaction order.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Authenticate Transaction Order of the transaction order minting policy (\cref{h:transaction-order-minting-policy}).
+  \item Register Staking Credential of the witness staking script (\cref{h:witness-staking-script}).
+\end{itemize}
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/E-withdrawal-order.pdf}}
+\end{center}
+\caption[Create withdrawal order]{Create a withdrawal order for Midgard.}
+\label{fig:tx-withdrawal-order}
+\end{figure}
+
+Create a new withdrawal order for Midgard via a transaction that (\cref{fig:tx-transaction-order}):
+\begin{enumerate}
+  \item Spends a nonce input to uniquely parametrize the withdrawal order.
+  \item Produces a withdrawal order utxo indicating the L2 utxo to be withdrawn.
+  \item Registers a staking credential to witness the existence of the withdrawal order.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Authenticate Withdrawal Order of the withdrawal order minting policy (\cref{h:transaction-order-minting-policy}).
+  \item Register Staking Credential of the witness staking script (\cref{h:witness-staking-script}).
+\end{itemize}
+
+[Conclude tx order] % TODO
+
+\section{Reserve management}%
+\label{h:midgard-l1-tx-reserve-management}%
+
+[Absorb deposit] % TODO
+
+[Init payout] % TODO
+
+[Accum payout] % TODO
+
+[Conclude payout] % TODO
+
 \section{Fraud proofs}%
 \label{h:midgard-l1-tx-fraud-proofs}%
 
-\begin{figure}[htb]
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/I-fraud-proof-init.pdf}}
 \end{center}
@@ -255,9 +396,16 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-fraud-proof-init}
 \end{figure}
 
-[TODO]
+Initialize the verification of a fraud proof via a transaction that (\cref{fig:tx-fraud-proof-init}):
+\begin{enumerate}
+  \item References an allegedly fraudulent node in the state queue.
+  \item References the fraud proof catalogue to select the fraud proof verification procedure that will demonstrate the allegation.
+  \item Mints a computation thread token and sends it to the first step spending validator of the selected fraud proof verification procedure.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is enforced by the Init redeemer of the fraud proof computation thread minting policy (\cref{h:fraud-proof-computation-threads-minting-policy}).
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/J-fraud-proof-cancel.pdf}}
 \end{center}
@@ -265,9 +413,16 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-fraud-proof-cancel}
 \end{figure}
 
-[TODO]
+Cancel the verification of a fraud proof via a transaction that (\cref{fig:tx-fraud-proof-cancel}):
+\begin{enumerate}
+  \item Spends a single fraud proof computation thread utxo.
+  \item Burns the computation thread token
+  \item Refunds the ADA from the computation thread utxo to the fraud prover.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is enforced by the Cancel redeemer of the fraud proof minting policy (\cref{h:fraud-proof-computation-threads-minting-policy}).
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/K-fraud-proof-step.pdf}}
 \end{center}
@@ -275,9 +430,21 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-fraud-proof-step}
 \end{figure}
 
-[TODO]
+Perform a single verification step of a fraud proof via a transaction that (\cref{fig:tx-fraud-proof-step}):
+\begin{enumerate}
+  \item Spends a single fraud proof computation thread utxo, performing the verification step defined in the utxo's spending validator.
+  \item Reproduces the fraud proof computation thread utxo as a continuing output sent to the next step's spending validator address.
+  \item If required by the verification step, references the allegedly fraudulent state queue node.
+  \item If required by the verification step, withdraws ADA from a designated account that triggers Midgard's Merkle proof helper script.
+\end{enumerate}
 
-\begin{figure}[htb]
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Continue of the fraud proof's spending validator (\cref{h:fraud-proof-computation-threads-spending-validators}).
+  \item (If needed) Merkle Inclusion/Exclusion Proof of the helper script staking validator (see the Aiken Merkle Patricia Forestry repository on Github).
+\end{itemize}
+
+\begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/L-fraud-proof-conclude.pdf}}
 \end{center}
@@ -285,6 +452,20 @@ The hub oracle minting policy's Init redeemer enforces the initialization transa
 \label{fig:tx-fraud-proof-conclude}
 \end{figure}
 
-[TODO]
+
+Perform the final verification step of a fraud proof via a transaction that (\cref{fig:tx-fraud-proof-step}):
+\begin{enumerate}
+  \item Spends a single fraud proof computation thread utxo, performing the verification step defined in the utxo's spending validator.
+  \item Burns the computation thread token and mints the corresponding fraud proof token.
+  \item If required by the verification step, references the allegedly fraudulent state queue node.
+  \item If required by the verification step, withdraws ADA from a designated account that triggers Midgard's Merkle proof helper script.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Mint of the fraud proof minting policy (\cref{h:fraud-proof-tokens-minting-policy}).
+  \item Conclude of the fraud proof's spending validator (\cref{h:fraud-proof-computation-threads-spending-validators}).
+  \item (If needed) Merkle Inclusion/Exclusion Proof of the helper script staking validator (see the Aiken Merkle Patricia Forestry repository on Github).
+\end{itemize}
 
 \end{document}
