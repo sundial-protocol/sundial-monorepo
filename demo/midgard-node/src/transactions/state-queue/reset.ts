@@ -19,6 +19,7 @@ const collectAndBurnStateQueueNodesProgram = (
   stateQueueUTxOs: SDK.TxBuilder.StateQueue.StateQueueUTxO[],
 ): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
+    global.RESET_IN_PROGRESS = true;
     const tx = lucid.newTx();
     const assetsToBurn: Assets = {};
     stateQueueUTxOs.map(({ utxo, assetName }) => {
@@ -41,12 +42,14 @@ const collectAndBurnStateQueueNodesProgram = (
       });
     const onConfirmFailure = (err: ConfirmError) =>
       Effect.logError(`Confirm tx error: ${err}`);
-    return yield* handleSignSubmit(
+    const txHash = yield* handleSignSubmit(
       lucid,
       completed,
       onSubmitFailure,
       onConfirmFailure,
     );
+    global.RESET_IN_PROGRESS = false;
+    return txHash;
   });
 
 export const resetStateQueue = Effect.gen(function* () {

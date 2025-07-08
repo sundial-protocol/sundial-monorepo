@@ -19,7 +19,7 @@ export const insert = (
   txHashes: Uint8Array[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(`${tableName} db: attempt to insert blocks`);
+    // yield* Effect.logInfo(`${tableName} db: attempt to insert blocks`);
     const sql = yield* SqlClient.SqlClient;
 
     if (!txHashes.length) {
@@ -34,9 +34,9 @@ export const insert = (
 
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(rowsToInsert)}`;
 
-    yield* Effect.logInfo(
-      `${tableName} db: ${rowsToInsert.length} block rows inserted.`,
-    );
+    // yield* Effect.logInfo(
+    //   `${tableName} db: ${rowsToInsert.length} block rows inserted.`,
+    // );
   }).pipe(
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: inserting error: ${e}`),

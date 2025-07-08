@@ -5,7 +5,7 @@ import { hashHexWithBlake2b224 } from "./common.js";
 import { StateQueueUTxO } from "@/tx-builder/state-queue/types.js";
 
 export const getHeaderFromStateQueueUTxO = (
-  utxo: StateQueueUTxO
+  utxo: StateQueueUTxO,
 ): Effect.Effect<Header, Error> =>
   Effect.gen(function* () {
     const nodeDatum = utxo.datum;

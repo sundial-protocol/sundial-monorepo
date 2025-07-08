@@ -3,7 +3,10 @@ import { StateQueue } from "@/tx-builder/index.js";
 import { Effect } from "effect";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
-import { sortStateQueueUTxOs, utxosToStateQueueUTxOs } from "@/utils/state-queue.js";
+import {
+  sortStateQueueUTxOs,
+  utxosToStateQueueUTxOs,
+} from "@/utils/state-queue.js";
 import { StateQueueUTxO } from "@/tx-builder/state-queue/types.js";
 
 export const fetchSortedStateQueueUTxOsProgram = (
@@ -16,7 +19,10 @@ export const fetchSortedStateQueueUTxOsProgram = (
       config.stateQueueAddress,
       config.stateQueuePolicyId,
     );
-    const unsorted = yield* utxosToStateQueueUTxOs(allUTxOs, config.stateQueuePolicyId);
+    const unsorted = yield* utxosToStateQueueUTxOs(
+      allUTxOs,
+      config.stateQueuePolicyId,
+    );
     return yield* sortStateQueueUTxOs(unsorted);
   });
 

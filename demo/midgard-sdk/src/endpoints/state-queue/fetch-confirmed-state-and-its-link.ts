@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
+import { LucidEvolution } from "@lucid-evolution/lucid";
 import { makeReturn } from "../../core.js";
 import {
   getConfirmedStateFromStateQueueUTxO,
@@ -8,28 +8,35 @@ import {
 } from "../../utils/state-queue.js";
 import { StateQueue } from "../../tx-builder/index.js";
 import { utxosAtByNFTPolicyId } from "@/utils/common.js";
+import { StateQueueUTxO } from "@/tx-builder/state-queue/types.js";
 
 export const fetchConfirmedStateAndItsLinkProgram = (
   lucid: LucidEvolution,
-  config: StateQueue.FetchConfig
-): Effect.Effect<{ confirmed: UTxO; link?: UTxO }, Error> =>
+  config: StateQueue.FetchConfig,
+): Effect.Effect<{ confirmed: StateQueueUTxO; link?: StateQueueUTxO }, Error> =>
   Effect.gen(function* () {
     const initUTxOs = yield* utxosAtByNFTPolicyId(
       lucid,
       config.stateQueueAddress,
-      config.stateQueuePolicyId
+      config.stateQueuePolicyId,
     );
-    const allUTxOs = yield* utxosToStateQueueUTxOs(initUTxOs, config.stateQueuePolicyId);
+    const allUTxOs = yield* utxosToStateQueueUTxOs(
+      initUTxOs,
+      config.stateQueuePolicyId,
+    );
     const filteredForConfirmedState = yield* Effect.allSuccesses(
-      allUTxOs.map(getConfirmedStateFromStateQueueUTxO)
+      allUTxOs.map(getConfirmedStateFromStateQueueUTxO),
     );
     if (filteredForConfirmedState.length === 1) {
       const { utxo: confirmedStateUTxO, link: confirmedStatesLink } =
         filteredForConfirmedState[0];
-      const linkUTxO = yield* findLinkStateQueueUTxO(confirmedStatesLink, allUTxOs);
+      const linkUTxO = yield* findLinkStateQueueUTxO(
+        confirmedStatesLink,
+        allUTxOs,
+      );
       return {
-        confirmed: confirmedStateUTxO.utxo,
-        link: linkUTxO.utxo,
+        confirmed: confirmedStateUTxO,
+        link: linkUTxO,
       };
     } else {
       return yield* Effect.fail(new Error("Confirmed state not found"));
@@ -46,6 +53,6 @@ export const fetchConfirmedStateAndItsLinkProgram = (
  */
 export const fetchConfirmedStateAndItsLink = (
   lucid: LucidEvolution,
-  config: StateQueue.FetchConfig
+  config: StateQueue.FetchConfig,
 ) =>
   makeReturn(fetchConfirmedStateAndItsLinkProgram(lucid, config)).unsafeRun();

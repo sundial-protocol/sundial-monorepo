@@ -21,7 +21,10 @@ export const fetchLatestCommittedBlockProgram = (
     yield* Effect.logInfo("allBlocks", allBlocks.length);
     const filtered = yield* Effect.allSuccesses(
       allBlocks.map((u: UTxO) => {
-        const stateQueueUTxOEffect = utxoToStateQueueUTxO(u, config.stateQueuePolicyId);
+        const stateQueueUTxOEffect = utxoToStateQueueUTxO(
+          u,
+          config.stateQueuePolicyId,
+        );
         return Effect.andThen(stateQueueUTxOEffect, (squ: StateQueueUTxO) =>
           squ.datum.next === "Empty"
             ? Effect.succeed(squ)

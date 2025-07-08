@@ -1,8 +1,5 @@
 import { Address, PolicyId, Script, Data, UTxO } from "@lucid-evolution/lucid";
-import {
-  OutputReferenceSchema,
-  POSIXTimeSchema,
-} from "../common.js";
+import { OutputReferenceSchema, POSIXTimeSchema } from "../common.js";
 import { NodeDatumSchema } from "../linked-list.js";
 import { Header } from "../ledger-state.js";
 

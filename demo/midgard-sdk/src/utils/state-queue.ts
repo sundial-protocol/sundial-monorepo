@@ -21,16 +21,16 @@ type StateQueueUTxO = StateQueue.StateQueueUTxO;
  */
 export const utxoToStateQueueUTxO = (
   utxo: UTxO,
-  nftPolicy: string
+  nftPolicy: string,
 ): Effect.Effect<StateQueueUTxO, Error> =>
   Effect.gen(function* () {
     const datum = yield* getNodeDatumFromUTxO(utxo);
     const [sym, assetName, _qty] = yield* getSingleAssetApartFromAda(
-      utxo.assets
+      utxo.assets,
     );
     if (sym !== nftPolicy) {
       yield* Effect.fail(
-        new Error("UTxO's NFT policy ID is not the same as the state queue's")
+        new Error("UTxO's NFT policy ID is not the same as the state queue's"),
       );
     }
     return { utxo, datum, assetName };
@@ -41,7 +41,7 @@ export const utxoToStateQueueUTxO = (
  */
 export const utxosToStateQueueUTxOs = (
   utxos: UTxO[],
-  nftPolicy: string
+  nftPolicy: string,
 ): Effect.Effect<StateQueueUTxO[], Error> => {
   const effects = utxos.map((u) => utxoToStateQueueUTxO(u, nftPolicy));
   return Effect.allSuccesses(effects);
@@ -53,7 +53,7 @@ export const utxosToStateQueueUTxOs = (
  * `ConfirmedState`.
  */
 export const getConfirmedStateFromStateQueueUTxO = (
-  utxo: StateQueueUTxO
+  utxo: StateQueueUTxO,
 ): Effect.Effect<
   { utxo: StateQueueUTxO; data: ConfirmedState; link: NodeKey },
   Error
@@ -91,7 +91,7 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
   latestBlock: StateQueueUTxO,
   newUTxOsRoot: MerkleRoot,
   transactionsRoot: MerkleRoot,
-  endTime: POSIXTime
+  endTime: POSIXTime,
 ): Effect.Effect<{ nodeDatum: Datum; header: Header }, Error> =>
   Effect.gen(function* () {
     const walletAddress = yield* Effect.tryPromise({
@@ -146,14 +146,14 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
 
 export const findLinkStateQueueUTxO = (
   link: NodeKey,
-  utxos: StateQueueUTxO[]
+  utxos: StateQueueUTxO[],
 ): Effect.Effect<StateQueueUTxO, Error> => {
   if (link === "Empty") {
     return Effect.fail(new Error('Given link is "Empty"'));
   } else {
     const foundLink = utxos.find(
       (u: StateQueueUTxO) =>
-        u.datum.key !== "Empty" && u.datum.key.Key.key === link.Key.key
+        u.datum.key !== "Empty" && u.datum.key.Key.key === link.Key.key,
     );
     if (foundLink) {
       return Effect.succeed(foundLink);
@@ -174,11 +174,11 @@ export const findLinkStateQueueUTxO = (
  *       become cheaper.
  */
 export const sortStateQueueUTxOs = (
-  stateQueueUTxOs: StateQueueUTxO[]
+  stateQueueUTxOs: StateQueueUTxO[],
 ): Effect.Effect<StateQueueUTxO[], Error> =>
   Effect.gen(function* () {
     const filteredForConfirmedState = yield* Effect.allSuccesses(
-      stateQueueUTxOs.map(getConfirmedStateFromStateQueueUTxO)
+      stateQueueUTxOs.map(getConfirmedStateFromStateQueueUTxO),
     );
     if (filteredForConfirmedState.length === 1) {
       const { utxo: confirmedStateUTxO, link: linkToOldestBlock } =
@@ -193,7 +193,7 @@ export const sortStateQueueUTxOs = (
       return sorted;
     } else {
       yield* Effect.fail(
-        new Error("Confirmed state not found among state queue UTxOs.")
+        new Error("Confirmed state not found among state queue UTxOs."),
       );
       return [];
     }

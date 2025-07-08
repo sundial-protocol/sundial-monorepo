@@ -248,7 +248,8 @@ const getResetHandler = Effect.gen(function* () {
 );
 
 const getLogStateQueueHandler = Effect.gen(function* () {
-  // yield* Effect.logInfo(`✍  State queue draw request received...`);
+  yield* Effect.logInfo(`✍  Drawing state queue UTxOs...`);
+
   const { user: lucid } = yield* User;
 
   const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -258,14 +259,14 @@ const getLogStateQueueHandler = Effect.gen(function* () {
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
 
-  yield* Effect.logInfo(`✍  Fetching state queue UTxOs...`);
   const sortedUTxOs = yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(
     lucid,
     fetchConfig,
   );
-  // yield* Effect.logInfo(`✍  ${sortedUTxOs.length} UTxO(s) found.`);
+
   let drawn = `
 ---------------------------- STATE QUEUE ----------------------------`;
+
   sortedUTxOs.map((u) => {
     const isHead = u.datum.key === "Empty";
     const isEnd = u.datum.next === "Empty";
@@ -273,10 +274,13 @@ const getLogStateQueueHandler = Effect.gen(function* () {
     drawn = `${drawn}
 ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex} ${!isHead ? "(" + u.assetName + ")" : ""}`;
   });
+
   drawn += `
 ---------------------------------------------------------------------
 `;
+
   yield* Effect.logInfo(drawn);
+
   return yield* HttpServerResponse.json({
     message: `State queue drawn in server logs!`,
   });

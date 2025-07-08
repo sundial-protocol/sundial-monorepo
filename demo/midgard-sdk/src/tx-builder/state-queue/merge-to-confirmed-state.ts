@@ -35,7 +35,8 @@ export const mergeTxBuilder = (
   Effect.gen(function* () {
     const { data: currentConfirmedState } =
       yield* getConfirmedStateFromStateQueueUTxO(confirmedUTxO);
-    const blockHeader: Header = yield* getHeaderFromStateQueueUTxO(firstBlockUTxO);
+    const blockHeader: Header =
+      yield* getHeaderFromStateQueueUTxO(firstBlockUTxO);
     const headerHash = yield* hashHeader(blockHeader);
     const newConfirmedState = {
       ...currentConfirmedState,
