@@ -248,7 +248,7 @@ const getResetHandler = Effect.gen(function* () {
 );
 
 const getLogStateQueueHandler = Effect.gen(function* () {
-  yield* Effect.logInfo(`\u270d Fetching state queue to draw...`);
+  // yield* Effect.logInfo(`✍  State queue draw request received...`);
   const { user: lucid } = yield* User;
 
   const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -258,18 +258,25 @@ const getLogStateQueueHandler = Effect.gen(function* () {
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
 
+  yield* Effect.logInfo(`✍  Fetching state queue UTxOs...`);
   const sortedUTxOs = yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(
     lucid,
     fetchConfig,
   );
-  let drawn = "";
+  // yield* Effect.logInfo(`✍  ${sortedUTxOs.length} UTxO(s) found.`);
+  let drawn = `
+---------------------------- STATE QUEUE ----------------------------`;
   sortedUTxOs.map((u) => {
-    const emoji =
-      u.datum.key === "Empty" ? "👑" : u.datum.next === "Empty" ? "⚓" : "⛓";
+    const isHead = u.datum.key === "Empty";
+    const isEnd = u.datum.next === "Empty";
+    const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
     drawn = `${drawn}
-${u.utxo.txHash}#${u.utxo.outputIndex}
-${emoji}${u.datum.key !== "Empty" ? "(" + u.assetName + ")" : ""}`;
+${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex} ${!isHead ? "(" + u.assetName + ")" : ""}`;
   });
+  drawn += `
+---------------------------------------------------------------------
+`;
+  yield* Effect.logInfo(drawn);
   return yield* HttpServerResponse.json({
     message: `State queue drawn in server logs!`,
   });

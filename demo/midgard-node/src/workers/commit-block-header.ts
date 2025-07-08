@@ -69,7 +69,6 @@ const wrapper = (
         const { nodeDatum: updatedNodeDatum, header: newHeader } =
           yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
             lucid,
-            policyId,
             latestBlock,
             utxoRoot,
             txRoot,

@@ -16,7 +16,7 @@ const collectAndBurnStateQueueNodesProgram = (
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   stateQueueSpendingScript: Script,
   stateQueueMintingScript: Script,
-  stateQueueUTxOs: SDK.Utils.StateQueueUTxO[],
+  stateQueueUTxOs: SDK.TxBuilder.StateQueue.StateQueueUTxO[],
 ): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     const tx = lucid.newTx();

@@ -1,17 +1,17 @@
 import { Effect } from "effect";
 import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import {
-  StateQueueUTxO,
   utxosAtByNFTPolicyId,
   utxoToStateQueueUTxO,
 } from "../../utils/index.js";
 import { makeReturn } from "../../core.js";
 import { StateQueue } from "../../tx-builder/index.js";
+import { StateQueueUTxO } from "@/tx-builder/state-queue/types.js";
 
 export const fetchLatestCommittedBlockProgram = (
   lucid: LucidEvolution,
   config: StateQueue.FetchConfig,
-): Effect.Effect<UTxO, Error> =>
+): Effect.Effect<StateQueueUTxO, Error> =>
   Effect.gen(function* () {
     const allBlocks = yield* utxosAtByNFTPolicyId(
       lucid,
@@ -24,7 +24,7 @@ export const fetchLatestCommittedBlockProgram = (
         const stateQueueUTxOEffect = utxoToStateQueueUTxO(u, config.stateQueuePolicyId);
         return Effect.andThen(stateQueueUTxOEffect, (squ: StateQueueUTxO) =>
           squ.datum.next === "Empty"
-            ? Effect.succeed(u)
+            ? Effect.succeed(squ)
             : Effect.fail(new Error("Not a tail node")),
         );
       }),

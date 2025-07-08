@@ -32,13 +32,19 @@ export const Redeemer = RedeemerSchema as unknown as Redeemer;
 export type Datum = Data.Static<typeof NodeDatumSchema>;
 export const Datum = NodeDatumSchema as unknown as Datum;
 
+export type StateQueueUTxO = {
+  utxo: UTxO;
+  datum: Datum;
+  assetName: string;
+};
+
 export type FetchConfig = {
   stateQueueAddress: Address;
   stateQueuePolicyId: PolicyId;
 };
 
 export type CommitBlockParams = {
-  anchorUTxO: UTxO;
+  anchorUTxO: StateQueueUTxO;
   updatedAnchorDatum: Datum;
   newHeader: Header;
   stateQueueSpendingScript: Script;
@@ -47,8 +53,8 @@ export type CommitBlockParams = {
 };
 
 export type MergeParams = {
-  confirmedUTxO: UTxO;
-  firstBlockUTxO: UTxO;
+  confirmedUTxO: StateQueueUTxO;
+  firstBlockUTxO: StateQueueUTxO;
   stateQueueSpendingScript: Script;
   stateQueueMintingScript: Script;
 };

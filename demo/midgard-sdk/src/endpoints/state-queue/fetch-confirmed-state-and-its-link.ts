@@ -2,7 +2,6 @@ import { Effect } from "effect";
 import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
 import { makeReturn } from "../../core.js";
 import {
-  StateQueueUTxO,
   getConfirmedStateFromStateQueueUTxO,
   utxosToStateQueueUTxOs,
   findLinkStateQueueUTxO,
