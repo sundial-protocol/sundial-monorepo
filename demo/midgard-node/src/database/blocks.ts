@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { clearTable, mapSqlError } from "./utils.js";
 import { SqlClient } from "@effect/sql";
 import { Database } from "@/services/database.js";
+import { toHex } from "@lucid-evolution/lucid";
 
 export const tableName = "blocks";
 
@@ -119,7 +120,7 @@ export const clearBlock = (
       yield* sql`DELETE FROM ${sql(tableName)} WHERE header_hash = ${Buffer.from(blockHash)}`;
 
     yield* Effect.logInfo(
-      `${tableName} db: cleared ${result.length} rows for block ${blockHash}`,
+      `${tableName} db: cleared ${result.length} rows for block ${toHex(blockHash)}`,
     );
     return Effect.void;
   }).pipe(
@@ -138,7 +139,7 @@ interface BlockRow {
 }
 
 export const retrieve = (): Effect.Effect<
-  [Uint8Array, Uint8Array][],
+  (readonly [Uint8Array, Uint8Array])[],
   Error,
   Database
 > =>
@@ -146,7 +147,7 @@ export const retrieve = (): Effect.Effect<
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<BlockRow>`SELECT * FROM ${sql(tableName)}`;
-    const result: [Uint8Array, Uint8Array][] = rows.map(
+    const result: (readonly [Uint8Array, Uint8Array])[] = rows.map(
       (row: BlockRow) =>
         [
           Uint8Array.from(row.header_hash),

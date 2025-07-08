@@ -4,7 +4,7 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { CML, fromHex, getAddressDetails } from "@lucid-evolution/lucid";
+import { CML, fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -249,42 +249,68 @@ const getResetHandler = Effect.gen(function* () {
 
 const getLogStateQueueHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Drawing state queue UTxOs...`);
-
   const { user: lucid } = yield* User;
-
   const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
-
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
-
   const sortedUTxOs = yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(
     lucid,
     fetchConfig,
   );
-
   let drawn = `
 ---------------------------- STATE QUEUE ----------------------------`;
-
-  sortedUTxOs.map((u) => {
+  yield* Effect.allSuccesses(sortedUTxOs.map((u) => Effect.gen(function* () {
+    let headerHashStr = "";
     const isHead = u.datum.key === "Empty";
+    if (!isHead) {
+      const header = yield* SDK.Utils.getHeaderFromStateQueueUTxO(u);
+      const headerHash = yield* SDK.Utils.hashHeader(header);
+      headerHashStr = ` (${headerHash})`;
+    }
     const isEnd = u.datum.next === "Empty";
     const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
     drawn = `${drawn}
-${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex} ${!isHead ? "(" + u.assetName + ")" : ""}`;
-  });
-
+${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${headerHashStr}`;
+  })));
   drawn += `
 ---------------------------------------------------------------------
 `;
-
   yield* Effect.logInfo(drawn);
-
   return yield* HttpServerResponse.json({
     message: `State queue drawn in server logs!`,
   });
 });
+
+const getLogBlocksDB = Effect.gen(function* () {
+  const allPairs = yield* BlocksDB.retrieve();
+  const keyValues: Record<string, number> = allPairs.reduce(
+    (acc: Record<string, number>, [b, _t]) => {
+      const bHex = toHex(b);
+      if (!acc[bHex]) {
+        acc[bHex] = 1;
+      } else {
+        acc[bHex] += 1;
+      }
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  let drawn = `
+------------------------------ BLOCKS DB ----------------------------`;
+  for (const bHex in keyValues) {
+    drawn = `${drawn}
+${bHex} ---> ${keyValues[bHex]} tx(s)
+`;
+  }
+  drawn += `
+---------------------------------------------------------------------
+`;
+  return yield* HttpServerResponse.json({
+    message: `BlocksDB drawn in server logs!`,
+  });
+}).pipe(Effect.catchAll((e) => handle500("getLogBlocksDB", e)));
 
 const postSubmitHandler = Effect.gen(function* () {
   // yield* Effect.logInfo(`◻️ Submit request received for transaction`);
@@ -338,6 +364,7 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/merge", getMergeHandler),
   HttpRouter.get("/reset", getResetHandler),
   HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
+  HttpRouter.get("/logBlocksDB", getLogBlocksDB),
   HttpRouter.post("/submit", postSubmitHandler),
 );
 
