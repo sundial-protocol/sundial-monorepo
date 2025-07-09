@@ -4,7 +4,7 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { CML, fromHex, getAddressDetails } from "@lucid-evolution/lucid";
+import { CML, fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -33,6 +33,7 @@ import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
+import { SqlClient } from "@effect/sql";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -246,6 +247,84 @@ const getResetHandler = Effect.gen(function* () {
   ),
 );
 
+const getLogStateQueueHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Drawing state queue UTxOs...`);
+  const { user: lucid } = yield* User;
+  const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
+  const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+    stateQueuePolicyId: alwaysSucceeds.policyId,
+    stateQueueAddress: alwaysSucceeds.spendScriptAddress,
+  };
+  const sortedUTxOs = yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(
+    lucid,
+    fetchConfig,
+  );
+  let drawn = `
+---------------------------- STATE QUEUE ----------------------------`;
+  yield* Effect.allSuccesses(sortedUTxOs.map((u) => Effect.gen(function* () {
+    let info = "";
+    const isHead = u.datum.key === "Empty";
+    const isEnd = u.datum.next === "Empty";
+    const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
+    if (!isHead) {
+      const icon = isEnd ? "  " : emoji;
+      info = isHead ? "" : `
+${icon} ╰─ asset name: ${u.assetName}`;
+    }
+    drawn = `${drawn}
+${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
+  })));
+  drawn += `
+---------------------------------------------------------------------
+`;
+  yield* Effect.logInfo(drawn);
+  return yield* HttpServerResponse.json({
+    message: `State queue drawn in server logs!`,
+  });
+});
+
+const getLogBlocksDBHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Querying BlocksDB...`);
+  const allPairs = yield* BlocksDB.retrieve();
+  const keyValues: Record<string, number> = allPairs.reduce(
+    (acc: Record<string, number>, [b, _t]) => {
+      const bHex = toHex(b);
+      if (!acc[bHex]) {
+        acc[bHex] = 1;
+      } else {
+        acc[bHex] += 1;
+      }
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  let drawn = `
+------------------------------ BLOCKS DB ----------------------------`;
+  for (const bHex in keyValues) {
+    drawn = `${drawn}
+${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
+  }
+  drawn += `
+---------------------------------------------------------------------
+`;
+  yield* Effect.logInfo(drawn);
+  return yield* HttpServerResponse.json({
+    message: `BlocksDB drawn in server logs!`,
+  });
+}).pipe(Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)));
+
+const getLogSemaphoresHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Logging semaphores...`);
+  yield* Effect.logInfo(`
+  BLOCKS_IN_QUEUE ⋅⋅⋅⋅ ${global.BLOCKS_IN_QUEUE}
+  LATEST_SYNC ⋅⋅⋅⋅⋅⋅⋅⋅ ${(new Date(global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH)).toLocaleString()}
+  RESET_IN_PROGRESS ⋅⋅ ${global.RESET_IN_PROGRESS}
+`);
+  return yield* HttpServerResponse.json({
+    message: `Semaphores logged!`,
+  });
+});
+
 const postSubmitHandler = Effect.gen(function* () {
   // yield* Effect.logInfo(`◻️ Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
@@ -260,12 +339,17 @@ const postSubmitHandler = Effect.gen(function* () {
     const txString = txStringParam;
     const { user: lucid } = yield* User;
     return yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
       const txCBOR = fromHex(txString);
       const tx = lucid.fromTx(txString);
       const { spent, produced } = yield* findSpentAndProducedUTxOs(txCBOR);
-      yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
-      yield* MempoolLedgerDB.clearUTxOs(spent);
-      yield* MempoolLedgerDB.insert(produced);
+      yield* sql.withTransaction(
+        Effect.gen(function* () {
+          yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
+          yield* MempoolLedgerDB.clearUTxOs(spent);
+          yield* MempoolLedgerDB.insert(produced);
+        }),
+      );
       Effect.runSync(Metric.increment(txCounter));
       return yield* HttpServerResponse.json({
         message: `Successfully submitted the transaction`,
@@ -292,6 +376,9 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/commit", getCommitEndpoint),
   HttpRouter.get("/merge", getMergeHandler),
   HttpRouter.get("/reset", getResetHandler),
+  HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
+  HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
+  HttpRouter.get("/logSemaphores", getLogSemaphoresHandler),
   HttpRouter.post("/submit", postSubmitHandler),
 );
 
@@ -299,7 +386,8 @@ const blockCommitmentAction = Effect.gen(function* () {
   yield* Effect.logInfo("🔹 New block commitment process started.");
   yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
     Effect.withSpan("buildAndSubmitCommitmentBlock"),
-)});
+  );
+});
 
 const mergeAction = Effect.gen(function* () {
   const { user: lucid } = yield* User;
@@ -314,13 +402,14 @@ const mergeAction = Effect.gen(function* () {
     fetchConfig,
     spendScript,
     mintScript,
-)});
+  );
+});
 
 const mempoolAction = Effect.gen(function* () {
-    const txList = yield* MempoolDB.retrieve();
-    const numTx = BigInt(txList.length);
-    yield* mempoolTxGauge(Effect.succeed(numTx));
-  });
+  const txList = yield* MempoolDB.retrieve();
+  const numTx = BigInt(txList.length);
+  yield* mempoolTxGauge(Effect.succeed(numTx));
+});
 
 const blockCommitmentFork = (pollingInterval: number) =>
   pipe(
