@@ -34,6 +34,8 @@ const mergeBlockCounter = Metric.counter("merge_block_count", {
 // 30 minutes.
 const MAX_LIFE_OF_LOCAL_SYNC: number = 1_800_000;
 
+const MIN_QUEUE_LENGTH_FOR_MERGING: number = 8;
+
 const getStateQueueLength = (
   lucid: LucidEvolution,
   stateQueueAddress: Address,
@@ -51,7 +53,7 @@ const getStateQueueLength = (
         catch: (e) => new Error(`${e}`),
       });
 
-      global.BLOCKS_IN_QUEUE = stateQueueUtxos.length;
+      global.BLOCKS_IN_QUEUE = stateQueueUtxos.length - 1;
 
       global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH = Date.now();
 
@@ -84,7 +86,7 @@ export const buildAndSubmitMergeTx = (
     );
     // Avoid a merge tx if the queue is too short (performing a merge with such
     // conditions has a chance of wasting the work done for root computaions).
-    if (currentStateQueueLength < 4 || global.RESET_IN_PROGRESS) {
+    if (currentStateQueueLength < MIN_QUEUE_LENGTH_FOR_MERGING || global.RESET_IN_PROGRESS) {
       // yield* Effect.logInfo(
       //   "🔸 There are too few blocks in queue.
       // );

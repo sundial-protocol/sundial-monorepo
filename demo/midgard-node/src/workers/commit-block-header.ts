@@ -40,6 +40,8 @@ const wrapper = (
 
     const { ledgerTrie, mempoolTrie } = yield* makeMpts();
 
+    lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
+
     return yield* withTrieTransaction(
       ledgerTrie,
       Effect.gen(function* () {
