@@ -84,7 +84,7 @@ export const buildAndSubmitMergeTx = (
     );
     // Avoid a merge tx if the queue is too short (performing a merge with such
     // conditions has a chance of wasting the work done for root computaions).
-    if (currentStateQueueLength < 4) {
+    if (currentStateQueueLength < 4 || global.RESET_IN_PROGRESS) {
       // yield* Effect.logInfo(
       //   "🔸 There are too few blocks in queue.
       // );
@@ -103,7 +103,7 @@ export const buildAndSubmitMergeTx = (
       );
     if (firstBlockUTxO) {
       yield* Effect.logInfo(
-        `🔸 First block found: ${firstBlockUTxO.txHash}#${firstBlockUTxO.outputIndex}`,
+        `🔸 First block found: ${firstBlockUTxO.utxo.txHash}#${firstBlockUTxO.utxo.outputIndex}`,
       );
       // Fetch transactions from the first block
       yield* Effect.logInfo("🔸 Looking up its transactions from BlocksDB...");

@@ -13,7 +13,6 @@ import { fromHex } from "@lucid-evolution/lucid";
 import { makeMpts, processMpts, withTrieTransaction } from "./db.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
-import { SqlClient } from "@effect/sql";
 
 const emptyOutput: WorkerOutput = {
   txSize: 0,
