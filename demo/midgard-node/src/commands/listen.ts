@@ -262,17 +262,20 @@ const getLogStateQueueHandler = Effect.gen(function* () {
   let drawn = `
 ---------------------------- STATE QUEUE ----------------------------`;
   yield* Effect.allSuccesses(sortedUTxOs.map((u) => Effect.gen(function* () {
-    let headerHashStr = "";
+    let info = "";
     const isHead = u.datum.key === "Empty";
+    const isEnd = u.datum.next === "Empty";
+    const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
     if (!isHead) {
       const header = yield* SDK.Utils.getHeaderFromStateQueueUTxO(u);
       const headerHash = yield* SDK.Utils.hashHeader(header);
-      headerHashStr = ` (${headerHash})`;
+      const icon = isEnd ? "   " : emoji;
+      info = isHead ? "" : `
+${icon}   ├─ header:     ${headerHash}
+${icon}   ╰─ asset name: ${u.assetName}`;
     }
-    const isEnd = u.datum.next === "Empty";
-    const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
     drawn = `${drawn}
-${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${headerHashStr}`;
+${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
   })));
   drawn += `
 ---------------------------------------------------------------------
@@ -283,7 +286,8 @@ ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${headerHashStr}`;
   });
 });
 
-const getLogBlocksDB = Effect.gen(function* () {
+const getLogBlocksDBHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Querying BlocksDB...`);
   const allPairs = yield* BlocksDB.retrieve();
   const keyValues: Record<string, number> = allPairs.reduce(
     (acc: Record<string, number>, [b, _t]) => {
@@ -301,7 +305,7 @@ const getLogBlocksDB = Effect.gen(function* () {
 ------------------------------ BLOCKS DB ----------------------------`;
   for (const bHex in keyValues) {
     drawn = `${drawn}
-${bHex} ---> ${keyValues[bHex]} tx(s)
+${bHex} -──▶ ${keyValues[bHex]} tx(s)
 `;
   }
   drawn += `
@@ -310,7 +314,19 @@ ${bHex} ---> ${keyValues[bHex]} tx(s)
   return yield* HttpServerResponse.json({
     message: `BlocksDB drawn in server logs!`,
   });
-}).pipe(Effect.catchAll((e) => handle500("getLogBlocksDB", e)));
+}).pipe(Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)));
+
+const getLogSemaphoresHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Logging semaphores...`);
+  yield* Effect.logInfo(`
+  BLOCKS_IN_QUEUE ⋅⋅⋅⋅ ${global.BLOCKS_IN_QUEUE}
+  LATEST_SYNC ⋅⋅⋅⋅⋅⋅⋅⋅ ${(new Date(global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH)).toLocaleString()}
+  RESET_IN_PROGRESS ⋅⋅ ${global.RESET_IN_PROGRESS}
+`);
+  return yield* HttpServerResponse.json({
+    message: `Semaphores logged!`,
+  });
+});
 
 const postSubmitHandler = Effect.gen(function* () {
   // yield* Effect.logInfo(`◻️ Submit request received for transaction`);
@@ -364,7 +380,8 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/merge", getMergeHandler),
   HttpRouter.get("/reset", getResetHandler),
   HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
-  HttpRouter.get("/logBlocksDB", getLogBlocksDB),
+  HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
+  HttpRouter.get("/logSemaphores", getLogSemaphoresHandler),
   HttpRouter.post("/submit", postSubmitHandler),
 );
 

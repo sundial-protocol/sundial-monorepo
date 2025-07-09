@@ -101,11 +101,11 @@ export const retrieveBlockHashByTxHash = (
     return result;
   }).pipe(
     Effect.withLogSpan(`retrieveBlockHashByTxHash ${tableName}`),
-    // Effect.tapErrorTag("SqlError", (e) =>
-    //   Effect.logError(
-    //     `${tableName} db: retrieving block_hash error: ${JSON.stringify(e)}`,
-    //   ),
-    // ),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: retrieving block_hash error: ${JSON.stringify(e)}`,
+      ),
+    ),
     mapSqlError,
   );
 
@@ -118,6 +118,8 @@ export const clearBlock = (
 
     const result =
       yield* sql`DELETE FROM ${sql(tableName)} WHERE header_hash = ${Buffer.from(blockHash)}`;
+
+    result
 
     yield* Effect.logInfo(
       `${tableName} db: cleared ${result.length} rows for block ${toHex(blockHash)}`,
