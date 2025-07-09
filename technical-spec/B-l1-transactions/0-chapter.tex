@@ -55,6 +55,7 @@ This transaction (\cref{fig:tx-init-midgard}):
   \item Produces the root nodes of the initially empty registered, active, and retired operator lists.
   \item Produces the root nodes of the initially empty state and settlement queues.
   \item Produces the scheduler, escape hatch, fraud proof catalogue, and hub oracle singleton utxos.
+  \item Attaches the signatures necessary to spend the nonce utxo.
 \end{enumerate}
 
 Correctness is enforced by the hub oracle minting policy's Init redeemer (\cref{h:hub-oracle-minting-policy}).
@@ -76,6 +77,7 @@ Register a new operator via a transaction that (\cref{fig:tx-register-operator})
 \begin{enumerate}
   \item Prepends a new operator node to the registered operators list. 
   \item Places a sufficient ADA bond into the new operator's node.
+  \item Attaches the operator's signature to the transaction.
 \end{enumerate}
 
 Correctness is enforced by the registered operators minting policy's Register Operator redeemer (\cref{h:registered-operators-minting-policy}).
@@ -92,6 +94,7 @@ De-register an operator via a transaction that (\cref{fig:tx-deregister-operator
 \begin{enumerate}
   \item Removes the operator's node from the registered operator's list.
   \item Refunds the ADA bond to the operator.
+  \item Attaches the operator's signature to the transaction.
 \end{enumerate}
 
 Correctness is enforced by the registered operators minting policy's Deregister Operator redeemer (\cref{h:registered-operators-minting-policy}).
@@ -147,6 +150,7 @@ Retire an operator via a transaction that (\cref{fig:tx-retire-operator}):
   \item Removes the operator's node from the active operators list.
   \item Inserts a node for the operator in the retired operators list.
   \item Transfers the operator's ADA bond from the removed active operator node to the inserted retired operator node.
+  \item Attaches the operator's signature to the transaction.
 \end{enumerate}
 
 Correctness is jointly enforced by these script redeemers:
@@ -167,6 +171,7 @@ After all of a retired operator's block headers (in the state queue) and resolut
 \begin{enumerate}
   \item Removes the operator's node from the retired operators list.
   \item Refunds the operator's ADA bond to the operator.
+  \item Attaches the operator's signature to the transaction.
 \end{enumerate}
 
 Correctness is enforced by the retired operators minting policy's Recover Operator Bond redeemer (\cref{h:retired-operators-minting-policy}).
@@ -221,6 +226,7 @@ Commit a new block header to the state queue via a transaction that (\cref{fig:t
 \begin{enumerate}
   \item Appends a new node containing the block header to the state queue.
   \item Updates the operator's bond-unlock time to the future time when the new block header will mature.
+  \item Attaches the operator's signature to the transaction.
   \item References the scheduler to verify that the operator has the right to commit a block during the current shift.
 \end{enumerate}
 
@@ -269,7 +275,7 @@ Merge a matured block header to the confirmed state via a transaction that (\cre
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
-  \item Merge to Confirmed State of the state queue minting policy (\cref(h:state-queue-minting-policy)).
+  \item Merge to Confirmed State of the state queue minting policy (\cref{h:state-queue-minting-policy}).
   \item Append Settlement Node of the settlement queue minting policy (\cref{h:settlement-queue-minting-policy}).
 \end{itemize}
 
@@ -278,40 +284,70 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/F-attach-resolution-claim.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/C-attach-resolution-claim.pdf}}
 \end{center}
 \caption[Attach resolution claim]{Attach an optimistic resolution claim to a settlement node.}
 \label{fig:tx-attach-resolution-claim}
 \end{figure}
 
-[TODO]
+Attach a claim that all user events in a settlement node have been resolved, via a transaction that (\cref{fig:tx-attach-resolution-claim}):
+\begin{enumerate}
+  \item Spends a settlement node without a resolution claim and updates its datum to attach a resolution claim. The claim must indicate the operator attaching the claim and the future time when the claim will mature (must be set according to \code{maturity\_duration} param).
+  \item Spends the operator's node (must be active) and updates its datum's bond unlock time to the resolution claim's maturity time.
+  \item Attaches the operator's signature to the transaction.
+  \item References the scheduler to demonstrate that the current shift is assigned to the operator attaching the resolution claim.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Attach Resolution Claim of the settlement queue spending validator (\cref{h:settlement-queue-spending-validator}).
+  \item Update Bond Hold New Settlement of the active operators spending validator (\cref{h:active-operators-spending-validator}).
+\end{itemize}
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/G-disprove-resolution-claim.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/D-disprove-resolution-claim.pdf}}
 \end{center}
 \caption[Disprove resolution claim]{Disprove an optimistic resolution claim of a settlement node.}
 \label{fig:tx-disprove-resolution-claim}
 \end{figure}
 
-[TODO]
+Disprove a settlement node's resolution claim via a transaction that (\cref{fig:tx-disprove-resolution-claim}):
+\begin{enumerate}
+  \item Spends a settlement node with a resolution claim and updates it to remove the resolution claim.
+  \item Removes the resolution claim's operator node from the active operators or retired operators list (depending on where the operator's node resides).
+  \item Slashes the dishonest operator's ADA bond, sending part of it (\code{fraud\_prover\_reward} param) to the transaction's submitter and paying the rest (\code{slashing\_penalty}) as transaction fees.
+  \item References an L1 user event as a counter-example to the resolution claim---the event is included in the settlement node but has not yet been resolved.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Disprove Resolution Claim of the settlement queue spending validator (\cref{h:settlement-queue-spending-validator}).
+  \item Remove Operator Bad Settlement of the active operators or retired operators minting policy (\cref{h:active-operators-minting-policy}, \cref{h:retired-operators-minting-policy}).
+\end{itemize}
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/H-resolve-settlement-node.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/E-resolve-settlement-node.pdf}}
 \end{center}
 \caption[Resolve settlement node]{Resolve a settlement node after its resolution claim matures.}
 \label{fig:tx-resolve-settlement-node}
 \end{figure}
 
-[TODO]
+Resolve a settlement node via a transaction that (\cref{fig:tx-resolve-settlement-node}):
+\begin{enumerate}
+  \item Removes a settlement queue node that contains a resolution claim with a maturity time preceding the transaction's time-validity lower bound.
+  \item Attaches the signature of the resolution claim's operator.
+\end{enumerate}
+
+Correctness is enforced by the Resolve Settlement Node script redeemer of the settlement queue's minting policy (\cref{h:settlement-queue-minting-policy}).
 
 \section{User events}%
 \label{h:midgard-l1-tx-user-events}%
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/C-deposit.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/F-deposit.pdf}}
 \end{center}
 \caption[Create deposit]{Create an L1 deposit for Midgard.}
 \label{fig:tx-deposit}
@@ -332,7 +368,7 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/D-tx-order.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/G-tx-order.pdf}}
 \end{center}
 \caption[Create tx order]{Create a transaction order for Midgard.}
 \label{fig:tx-transaction-order}
@@ -353,7 +389,7 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/E-withdrawal-order.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/H-withdrawal-order.pdf}}
 \end{center}
 \caption[Create withdrawal order]{Create a withdrawal order for Midgard.}
 \label{fig:tx-withdrawal-order}
@@ -372,25 +408,124 @@ Correctness is jointly enforced by these script redeemers:
   \item Register Staking Credential of the witness staking script (\cref{h:witness-staking-script}).
 \end{itemize}
 
-[Conclude tx order] % TODO
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/I-conclude-tx-order.pdf}}
+\end{center}
+\caption[Conclude tx order]{Conclude a transaction order after it has been confirmed.}
+\label{fig:tx-conclude-tx-order}
+\end{figure}
+
+Conclude a confirmed transaction order via a transaction that (\cref{fig:tx-conclude-tx-order}):
+\begin{enumerate}
+  \item Spends a transaction order and burns its NFT.
+  \item De-registers the staking credential witnessing the transaction order.
+  \item References a settlement node that includes the transaction order to prove that it has been confirmed.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Conclude of the transaction order spending validator (\cref{h:transaction-order-spending-validator}).
+  \item Burn Transaction Order NFT of the transaction order minting policy (\cref{h:transaction-order-minting-policy}).
+  \item Mint or Burn of the witness staking script (\cref{h:witness-staking-script}).
+\end{itemize}
 
 \section{Reserve management}%
 \label{h:midgard-l1-tx-reserve-management}%
 
-[Absorb deposit] % TODO
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/J-absorb-deposit.pdf}}
+\end{center}
+\caption[Absorb deposit]{Absorb a deposit into the Midgard reserves after it has been confirmed.}
+\label{fig:tx-absorb-deposit}
+\end{figure}
 
-[Init payout] % TODO
+Absorb a confirmed deposit into Midgard reserves via a transaction that (\cref{fig:tx-absorb-deposit}):
+\begin{enumerate}
+  \item Spends a deposit and burns its deposit NFT.
+  \item De-registers the staking credential witnessing the deposit.
+  \item References a settlement node that includes the deposit to prove that it has been confirmed.
+\end{enumerate}
 
-[Accum payout] % TODO
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Transfer to Reserve of the deposit spending validator (\cref{h:deposit-spending-validator}).
+  \item Burn Deposit NFt of the deposit minting policy (\cref{h:deposit-minting-policy}).
+  \item Mint or Burn of the witness staking script (\cref{h:witness-staking-script}).
+\end{itemize}
 
-[Conclude payout] % TODO
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/K-init-payout-accumulator.pdf}}
+\end{center}
+\caption[Initialize payout accumulator]{Transform a confirmed withdrawal order into a payout accumulator.}
+\label{fig:tx-initialize-payout-accumulator}
+\end{figure}
+
+Transform a confirmed withdrawal into a payout accumulator via a transaction that (\cref{fig:tx-initialize-payout-accumulator}):
+\begin{enumerate}
+  \item Spends the withdrawal order and burns its NFT.
+  \item Produces a payout accumulator with \code{l2\_value}, \code{l1\_address}, and \code{l1\_datum} datum fields matching those of the withdrawal order.
+  \item De-registers the staking credential witnessing the withdrawal order.
+  \item References a settlement node that includes the withdrawal to prove that it has been confirmed.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Initialize Payout Accumulator of the withdrawal order spending validator (\cref{h:withdrawal-order-spending-validator}).
+  \item Burn Withdrawal NFT of the withdrawal order minting policy (\cref{h:withdrawal-order-minting-policy}).
+  \item Burn or Mint of the witness staking script (\cref{h:witness-staking-script}).
+\end{itemize}
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/L-collect-reserve-funds.pdf}}
+\end{center}
+\caption[Collect reserve funds]{Collect funds from Midgard reserves into a payout accumulator.}
+\label{fig:tx-collect-reserve-funds}
+\end{figure}
+
+Collect funds from Midgard reserves into a payout accumulator via a transaction that (\cref{fig:tx-collect-reserve-funds}):
+\begin{enumerate}
+  \item Spends a payout accumulator.
+  \item Spends a reserve utxo.
+  \item Produces a payout accumulator output that combines the funds from the payout accumulator input with as many funds from the reserve utxo input as possible, up to the limit defined in the payout accumulator's \code{l2\_value} datum field.
+  \item Produces a reserve utxo if needed to hold the remainder of the funds.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Collect Reserve Funds of the payout accumulator spending validator (\cref{h:payout-accumulator-spending-validator})
+  \item The sole redeemer of the reserve spending validator (\cref{h:reserve-spending-validator}).
+\end{itemize}
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/M-complete-payout.pdf}}
+\end{center}
+\caption[Conclude payout]{Conclude a payout from Midgard.}
+\label{fig:tx-conclude-payout}
+\end{figure}
+
+Conclude a payout from Midgard via a transaction that (\cref{fig:tx-conclude-payout}):
+\begin{enumerate}
+  \item Spends a payout accumulator with funds matching or exceeding the amount defined in its \code{l2\_value} datum field.
+  \item Produces an output at the address and datum defined by the payout accumulator's \code{l1\_address} and \code{l1\_datum} datum fields.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Complete Payout of the payout accumulator spending validator (\cref{h:payout-accumulator-spending-validator}).
+  \item Burn of the payout accumulator minting policy (\cref{h:payout-accumulator-minting-policy}).
+\end{itemize}
 
 \section{Fraud proofs}%
 \label{h:midgard-l1-tx-fraud-proofs}%
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/I-fraud-proof-init.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/N-fraud-proof-init.pdf}}
 \end{center}
 \caption[Fraud proof init]{Initialize the verification of a fraud proof.}
 \label{fig:tx-fraud-proof-init}
@@ -407,7 +542,7 @@ Correctness is enforced by the Init redeemer of the fraud proof computation thre
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/J-fraud-proof-cancel.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/O-fraud-proof-cancel.pdf}}
 \end{center}
 \caption[Fraud proof cancel]{Cancel the verification of a fraud proof.}
 \label{fig:tx-fraud-proof-cancel}
@@ -424,7 +559,7 @@ Correctness is enforced by the Cancel redeemer of the fraud proof minting policy
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/K-fraud-proof-step.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/P-fraud-proof-step.pdf}}
 \end{center}
 \caption[Fraud proof step]{Perform a verification step of a fraud proof.}
 \label{fig:tx-fraud-proof-step}
@@ -446,7 +581,7 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/L-fraud-proof-conclude.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/Q-fraud-proof-conclude.pdf}}
 \end{center}
 \caption[Fraud proof conclude]{Conclude the verification of a fraud proof by performing its final step.}
 \label{fig:tx-fraud-proof-conclude}
