@@ -266,10 +266,11 @@ const getLogStateQueueHandler = Effect.gen(function* () {
     const isHead = u.datum.key === "Empty";
     const isEnd = u.datum.next === "Empty";
     const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
-    if (!isHead) {
+    if (u.datum.key !== "Empty") {
+    // if (isHead) {
       const icon = isEnd ? "  " : emoji;
-      info = isHead ? "" : `
-${icon} ╰─ asset name: ${u.assetName}`;
+      info = `
+${icon} ╰─ header: ${u.datum.key.Key.key}`;
     }
     drawn = `${drawn}
 ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
@@ -390,6 +391,7 @@ const blockCommitmentAction = Effect.gen(function* () {
 });
 
 const mergeAction = Effect.gen(function* () {
+  const nodeConfig = yield* NodeConfig;
   const { user: lucid } = yield* User;
   const { spendScriptAddress, policyId, spendScript, mintScript } =
     yield* AlwaysSucceeds.AlwaysSucceedsContract;
@@ -397,6 +399,7 @@ const mergeAction = Effect.gen(function* () {
     stateQueueAddress: spendScriptAddress,
     stateQueuePolicyId: policyId,
   };
+  lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX);
   yield* StateQueueTx.buildAndSubmitMergeTx(
     lucid,
     fetchConfig,
@@ -411,7 +414,7 @@ const mempoolAction = Effect.gen(function* () {
   yield* mempoolTxGauge(Effect.succeed(numTx));
 });
 
-const blockCommitmentFork = (pollingInterval: number) =>
+const blockCommitmentFork = (rerunDelay: number) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔵 Block commitment fork started.");
@@ -420,7 +423,7 @@ const blockCommitmentFork = (pollingInterval: number) =>
         Effect.catchAllCause(Effect.logWarning),
       );
       const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(pollingInterval),
+        Duration.millis(rerunDelay),
       );
       yield* Effect.repeat(action, schedule);
     }),
@@ -430,12 +433,12 @@ const blockCommitmentFork = (pollingInterval: number) =>
 // possible issues:
 // 1. tx-generator: large batch size & high concurrency
 // 2. after initing node, can't commit the block
-const mergeFork = (pollingInterval: number) =>
+const mergeFork = (rerunDelay: number) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🟠 Merge fork started.");
       const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(pollingInterval),
+        Duration.millis(rerunDelay),
       );
       const action = mergeAction.pipe(
         Effect.withSpan("merge-confirmed-state-fork"),
@@ -459,7 +462,6 @@ const mempoolFork = () =>
   );
 
 export const runNode = Effect.gen(function* () {
-  const { user } = yield* User;
   const nodeConfig = yield* NodeConfig;
 
   const prometheusExporter = new PrometheusExporter(
@@ -495,11 +497,11 @@ export const runNode = Effect.gen(function* () {
   const appThread = pipe(Layer.launch(ListenLayer));
 
   const blockCommitmentThread = blockCommitmentFork(
-    nodeConfig.POLLING_INTERVAL,
+    nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENT,
   );
 
   const mergeThread = pipe(
-    mergeFork(nodeConfig.CONFIRMED_STATE_POLLING_INTERVAL),
+    mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS),
   );
 
   const monitorMempoolThread = pipe(mempoolFork());

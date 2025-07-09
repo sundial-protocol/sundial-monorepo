@@ -7,7 +7,7 @@ import {
   toUnit,
 } from "@lucid-evolution/lucid";
 import { AlwaysSucceeds } from "@/services/index.js";
-import { User } from "@/config.js";
+import { NodeConfig, User } from "@/config.js";
 import { Effect } from "effect";
 import { ConfirmError, handleSignSubmit, SubmitError } from "../utils.js";
 
@@ -53,6 +53,7 @@ const collectAndBurnStateQueueNodesProgram = (
   });
 
 export const resetStateQueue = Effect.gen(function* () {
+  const nodeConfig = yield* NodeConfig;
   const { user: lucid } = yield* User;
   const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
@@ -62,6 +63,8 @@ export const resetStateQueue = Effect.gen(function* () {
 
   const allStateQueueUTxOs =
     yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(lucid, fetchConfig);
+
+  lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
 
   // Collect and burn 10 UTxOs and asset names at a time:
   const batchSize = 40;
