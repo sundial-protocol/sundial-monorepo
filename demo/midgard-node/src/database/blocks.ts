@@ -115,15 +115,10 @@ export const clearBlock = (
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt clear block ${blockHash}`);
     const sql = yield* SqlClient.SqlClient;
-
-    const result =
-      yield* sql`DELETE FROM ${sql(tableName)} WHERE header_hash = ${Buffer.from(blockHash)}`;
-
-    result
-
-    yield* Effect.logInfo(
-      `${tableName} db: cleared ${result.length} rows for block ${toHex(blockHash)}`,
-    );
+    yield* sql`DELETE FROM ${sql(tableName)} WHERE header_hash = ${Buffer.from(blockHash)}`;
+    // yield* Effect.logInfo(
+    //   `${tableName} db: cleared ${result.entries()} rows for block ${toHex(blockHash)}`,
+    // );
     return Effect.void;
   }).pipe(
     Effect.withLogSpan(`clearBlock ${tableName}`),

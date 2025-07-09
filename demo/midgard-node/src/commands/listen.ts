@@ -302,8 +302,7 @@ const getLogBlocksDBHandler = Effect.gen(function* () {
 ------------------------------ BLOCKS DB ----------------------------`;
   for (const bHex in keyValues) {
     drawn = `${drawn}
-${bHex} -──▶ ${keyValues[bHex]} tx(s)
-`;
+${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
   }
   drawn += `
 ---------------------------------------------------------------------
