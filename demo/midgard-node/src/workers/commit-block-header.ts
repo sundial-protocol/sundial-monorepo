@@ -24,9 +24,6 @@ const wrapper = (
   _input: WorkerInput,
 ): Effect.Effect<WorkerOutput, Error, NodeConfig | User | Database> =>
   Effect.gen(function* () {
-    if (global.RESET_IN_PROGRESS) {
-      return emptyOutput;
-    }
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
 

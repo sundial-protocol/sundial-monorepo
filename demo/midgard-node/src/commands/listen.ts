@@ -267,12 +267,9 @@ const getLogStateQueueHandler = Effect.gen(function* () {
     const isEnd = u.datum.next === "Empty";
     const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
     if (!isHead) {
-      const header = yield* SDK.Utils.getHeaderFromStateQueueUTxO(u);
-      const headerHash = yield* SDK.Utils.hashHeader(header);
-      const icon = isEnd ? "   " : emoji;
+      const icon = isEnd ? "  " : emoji;
       info = isHead ? "" : `
-${icon}   ├─ header:     ${headerHash}
-${icon}   ╰─ asset name: ${u.assetName}`;
+${icon} ╰─ asset name: ${u.assetName}`;
     }
     drawn = `${drawn}
 ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
@@ -311,6 +308,7 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)
   drawn += `
 ---------------------------------------------------------------------
 `;
+  yield* Effect.logInfo(drawn);
   return yield* HttpServerResponse.json({
     message: `BlocksDB drawn in server logs!`,
   });
