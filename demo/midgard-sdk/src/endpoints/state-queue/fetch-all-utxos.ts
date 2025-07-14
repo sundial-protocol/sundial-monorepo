@@ -26,6 +26,22 @@ export const fetchSortedStateQueueUTxOsProgram = (
     return yield* sortStateQueueUTxOs(unsorted);
   });
 
+export const fetchUnsortedStateQueueUTxOsProgram = (
+  lucid: LucidEvolution,
+  config: StateQueue.FetchConfig,
+): Effect.Effect<StateQueueUTxO[], Error> =>
+  Effect.gen(function* () {
+    const allUTxOs = yield* utxosAtByNFTPolicyId(
+      lucid,
+      config.stateQueueAddress,
+      config.stateQueuePolicyId,
+    );
+    return yield* utxosToStateQueueUTxOs(
+      allUTxOs,
+      config.stateQueuePolicyId,
+    );
+  });
+
 /**
  * Attempts fetching the whole state queue linked list.
  *
@@ -37,3 +53,8 @@ export const fetchSortedStateQueueUTxOs = (
   lucid: LucidEvolution,
   config: StateQueue.FetchConfig,
 ) => makeReturn(fetchSortedStateQueueUTxOsProgram(lucid, config)).unsafeRun();
+
+export const fetchUnsortedStateQueueUTxOs = (
+  lucid: LucidEvolution,
+  config: StateQueue.FetchConfig,
+) => makeReturn(fetchUnsortedStateQueueUTxOsProgram(lucid, config)).unsafeRun();
