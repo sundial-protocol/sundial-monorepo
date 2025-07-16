@@ -5,7 +5,7 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use midgard/common/utils.{plutarch_phas}
-use midgard/escrow
+use midgard/payout_accumulator
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
