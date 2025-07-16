@@ -5,7 +5,7 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use midgard/common/utils.{plutarch_phas}
-use midgard/payout_accumulator
+use midgard/escrow
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
@@ -185,14 +185,19 @@ validator mint(hub_oracle: ScriptHash) {
     own_policy: PolicyId,
     tx: Transaction,
   ) {
-    // 1. Perform numerous validations and grant access to:
+    // 1. Perform numerous validations (refer to `lib/midgard/user-events.ak`)
+    //    and grant access to:
     //    - Serialized and hashed nonce based on the output reference of a
-    //      specified input UTxO
-    //    - The output value of the UTxO at the withdrawal address for the
-    //      minting (not burning) endpoint
+    //      specified input UTxO.
+    //    - The output `Value` of the UTxO at the withdrawal address for the
+    //      minting (not burning) endpoint.
+    //    - The `WithdrawalInfo` as `Data`, which we are ignoring here (TODO:
+    //      try remodeling the types to avoid inclusion of `WithdrawalValidity`
+    //      on L1 datum).
     let
       l1_id,
       output_withdrawal_order_value,
+      withdrawal_info_data,
     <-
       user_events.validate_mint(
         hub_oracle,
@@ -212,7 +217,18 @@ validator mint(hub_oracle: ScriptHash) {
 
     // 2. The output value of the UTxO at the withdrawal address must contain
     //    only ADA and the authentication NFT.
-    output_withdrawal_order_nft_triplet == (own_policy, l1_id, 1)
+    expect output_withdrawal_order_nft_triplet == (own_policy, l1_id, 1)
+
+    // 3. The withdrawal event must be marked as valid. This is needed to make
+    //    distinguishing between resolutions and refunds easier when spending
+    //    the produced UTxO (as this value can be different when coming back
+    //    from L2, TODO).
+    expect ledger_state.WithdrawalInfo {
+      validity: ledger_state.WithdrawalIsValid,
+      ..
+    }: ledger_state.WithdrawalInfo = withdrawal_info_data
+
+    True
   }
 
   else(_) {

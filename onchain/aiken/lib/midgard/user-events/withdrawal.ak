@@ -10,6 +10,12 @@ pub type SpendPurpose {
   Refund { refund_approach: user_events.RefundApproach }
 }
 
+pub type RefundApproach {
+  InvalidOrder { membership_proof: mpf.Proof }
+  SkippedEvent { non_membership_proof: mpf.Proof }
+  EventInSettlementGap { settlement_link_ref_input_index: Int }
+}
+
 pub type SpendRedeemer {
   input_index: Int,
   output_index: Int,
