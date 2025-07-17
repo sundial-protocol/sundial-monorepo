@@ -163,7 +163,7 @@ validator mint(hub_oracle: ScriptHash) {
     let
       l1_id,
       output_tx_order_value,
-      _,
+      midgard_tx_data,
     <-
       user_events.validate_mint(
         hub_oracle,
@@ -181,7 +181,18 @@ validator mint(hub_oracle: ScriptHash) {
 
     // 2. The output value of the UTxO at the withdrawal address must contain
     //    only ADA and the authentication NFT.
-    output_tx_order_nft_triplet == (own_policy, l1_id, 1)
+    expect output_tx_order_nft_triplet == (own_policy, l1_id, 1)
+
+    // 3. Tx order must be marked as valid. This is needed for spending the
+    //    UTxO, which requires validating the presence of its key-value in the
+    //    transactions tree (valid cases, which will presumably be the majority
+    //    of cases).
+    expect ledger_state.MidgardTxCompact {
+      validity: ledger_state.TxIsValid,
+      ..
+    } = midgard_tx_data
+
+    True
   }
 
   else(_) {

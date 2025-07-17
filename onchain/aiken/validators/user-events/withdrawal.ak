@@ -221,12 +221,11 @@ validator mint(hub_oracle: ScriptHash) {
 
     // 3. The withdrawal event must be marked as valid. This is needed to make
     //    distinguishing between resolutions and refunds easier when spending
-    //    the produced UTxO (as this value can be different when coming back
-    //    from L2, TODO).
+    //    the produced UTxO (as this value will be different for invalid cases).
     expect ledger_state.WithdrawalInfo {
       validity: ledger_state.WithdrawalIsValid,
       ..
-    }: ledger_state.WithdrawalInfo = withdrawal_info_data
+    } = withdrawal_info_data
 
     True
   }

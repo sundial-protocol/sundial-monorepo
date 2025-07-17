@@ -170,7 +170,11 @@ pub type MidgardTxCompact {
 // TODO
 pub type MidgardTxValidity {
   TxIsValid
-  TxIsNotValid
+  NonExistentInputUtxo
+  InvalidSignature
+  FailedScript
+  FeeTooLow
+  UnbalancedTx
 }
 
 // ### Transaction body

@@ -32,6 +32,7 @@ pub type Datum<event_type> {
 }
 
 pub type RefundApproach {
+  InvalidEvent { membership_proof: mpf.Proof }
   SkippedEvent { non_membership_proof: mpf.Proof }
   EventInSettlementGap { settlement_link_ref_input_index: Int }
 }
@@ -90,25 +91,25 @@ pub fn validate_refund(
     }
 
   when refund_approach is {
+    InvalidEvent { membership_proof } -> todo
     SkippedEvent { non_membership_proof } -> and {
-        // 4. The deposit event must be absent from the deposit tree.
+        // 4. The event must be absent from the deposit tree.
         plutarch_pexcludes(
           events_root,
           event_id,
           non_membership_proof,
           redeemers,
         ),
-        // 5. Inclusion time of the deposit subject to this refund
-        //    logic must fall within the time range of the specified
-        //    settlement node.
+        // 5. Inclusion time of the event subject to this refund logic must fall
+        //    within the time range of the specified settlement node.
         //    TODO: Should any of the comparisons be exclusive?
         inclusion_time <= settlement_end_time,
         inclusion_time >= settlement_start_time,
       }
     EventInSettlementGap { settlement_link_ref_input_index } -> {
-      // 4. Grab the immediate next settlement node, and ensure
-      //    correct linkage (authenticity of the reference UTxO is
-      //    checked with `settlement_queue.get_datum`).
+      // 4. Grab the immediate next settlement node, and ensure correct linkage
+      //    (authenticity of the reference UTxO is checked with
+      //    `settlement_queue.get_datum`).
       let parsed_settlement_link_datum =
         settlement_queue.get_datum(
           reference_inputs,
