@@ -1,6 +1,7 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect, Option } from "effect";
+import { CML, UTxO } from "@lucid-evolution/lucid";
 
 export const mkKeyValueCreateQuery = (
   tableName: string,
@@ -180,4 +181,55 @@ export const mapSqlError = <A, E, R>(
         } else return Effect.fail(e as Exclude<E, SqlError.SqlError>);
       },
     ),
+  );
+
+export const insertKeyValueUTxOWithAddress = (
+  tableName: string,
+  outReferenceArray: Uint8Array,
+  txOutputArray: Uint8Array,
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValueUTxO`);
+    const sql = yield* SqlClient.SqlClient;
+
+    const txOutput = CML.TransactionOutput.from_cbor_bytes(txOutputArray)
+    const address = txOutput.address().to_raw_bytes()
+
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
+      key: Buffer.from(outReferenceArray),
+      txOutputArray: Buffer.from(txOutputArray),
+      address: Buffer.from(address),
+    })} ON CONFLICT (key) DO UPDATE SET txOutputArray = ${Buffer.from(txOutputArray)}, address = ${Buffer.from(address)}`;
+  }).pipe(
+    Effect.withLogSpan(`insert keyValueUTxO ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(`${tableName} db: insert keyValueUTxO: ${JSON.stringify(e)}`),
+    ),
+    mapSqlError,
+  );
+
+export const insertKeyValuesUTxO = (
+  tableName: string,
+  values: { outReferenceArray: Uint8Array,
+            txOutputArray: Uint8Array,
+            address: Uint8Array,
+          }[],
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValuesUTxO`);
+    const sql = yield* SqlClient.SqlClient;
+    const triples = values.map((kv) => ({
+      key: Buffer.from(kv.outReferenceArray),
+      txOutputArray: Buffer.from(kv.txOutputArray),
+      address: Buffer.from(kv.address),
+    }));
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(triples)}`;
+  }).pipe(
+    Effect.withLogSpan(`insert keyValuesUTxO ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: insert keyValuesUTxO: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
   );
