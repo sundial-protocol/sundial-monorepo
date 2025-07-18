@@ -34,9 +34,10 @@ export const makeMpts = () =>
 
     // Ledger MPT from the other side should use a checkpoint database —
     // its MPT building operations are paired with database ones
-    const levelDb = new Level<string, Uint8Array>(nodeConfig.MPT_DB_PATH, {
-      valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
-    });
+    const levelDb = new Level<string, Uint8Array>(
+      nodeConfig.MPT_DB_PATH,
+      LEVELDB_ENCODING_OPTS,
+    );
     const ledgerTrie = yield* Effect.tryPromise({
       try: () =>
         ETH.createMPT({
