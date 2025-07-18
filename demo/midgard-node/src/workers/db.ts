@@ -33,7 +33,7 @@ export const makeMpts = () =>
 
     // Ledger MPT from the other side should use a checkpoint database —
     // its MPT building operations are paired with database ones
-    const levelDb = new Level(nodeConfig.MPT_DB_PATH, {
+    const levelDb = new Level<string, Uint8Array>(nodeConfig.MPT_DB_PATH, {
       valueEncoding: "binary"
     });
     const ledgerTrie = yield* Effect.tryPromise({
@@ -135,9 +135,9 @@ export const withTrieTransaction = (
 const LEVELDB_ENCODING_OPTS = { keyEncoding: "view", valueEncoding: "binary" };
 
 export class LevelDB {
-  _leveldb: MemoryLevel<string, string>;
+  _leveldb: MemoryLevel<string, Uint8Array>;
 
-  constructor(leveldb: MemoryLevel<string, string>) {
+  constructor(leveldb: MemoryLevel<string, Uint8Array>) {
     this._leveldb = leveldb ?? new MemoryLevel(LEVELDB_ENCODING_OPTS);
   }
 
