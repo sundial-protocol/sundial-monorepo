@@ -233,3 +233,76 @@ export const insertKeyValuesUTxO = (
     ),
     mapSqlError,
   );
+
+export const retrieveKeyValuesUTxO = (
+  tableName: string,
+): Effect.Effect<
+  {
+    key: Uint8Array;
+    txOutputArray: Uint8Array;
+    address: Uint8Array;
+  }[],
+  Error,
+  Database
+> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql`SELECT * FROM ${sql(tableName)}`;
+    return rows.map((row: unknown) => {
+      const { key, txOutputArray, address } = row as {
+        key: Buffer;
+        txOutputArray: Uint8Array;
+        address: Uint8Array;
+      };
+      return {
+        key: new Uint8Array(key.buffer, key.byteOffset, key.byteLength),
+        txOutputArray: new Uint8Array(txOutputArray.buffer, txOutputArray.byteOffset, txOutputArray.byteLength),
+        address: new Uint8Array(address.buffer, address.byteOffset, address.byteLength),
+      };
+    });
+  }).pipe(
+    Effect.withLogSpan(`insert keyValues ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
+export const retrieveKeyValuesUTxOWithAddress = (
+  tableName: string,
+  address: Uint8Array,
+): Effect.Effect<
+  {
+    key: Uint8Array;
+    txOutputArray: Uint8Array;
+  }[],
+  Error,
+  Database
+> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql`SELECT * FROM ${sql(tableName)} WHERE address = ${Buffer.from(address)}`;
+    return rows.map((row: unknown) => {
+      const { key, txOutputArray, address } = row as {
+        key: Buffer;
+        txOutputArray: Uint8Array;
+        address: Uint8Array;
+      };
+      return {
+        key: new Uint8Array(key.buffer, key.byteOffset, key.byteLength),
+        txOutputArray: new Uint8Array(txOutputArray.buffer, txOutputArray.byteOffset, txOutputArray.byteLength),
+      };
+    });
+  }).pipe(
+    Effect.withLogSpan(`insert keyValues ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
