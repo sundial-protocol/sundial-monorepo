@@ -347,7 +347,6 @@ const postSubmitHandler = Effect.gen(function* () {
       yield* sql.withTransaction(
         Effect.gen(function* () {
           yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
-          yield* MempoolLedgerDB.clearUTxOs(spent);
           yield* MempoolLedgerDB.insert(produced);
         }),
       );
