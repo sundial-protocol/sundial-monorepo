@@ -1,10 +1,9 @@
 import { Effect } from "effect";
 import {
   clearTable,
-  insertKeyValues,
   insertKeyValuesUTxO,
   retrieveKeyValuesUTxO,
-  retrieveKeyValues,
+  retrieveKeyValuesUTxOWithAddress,
   delMultiple,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
@@ -19,6 +18,13 @@ export const retrieve = (): Effect.Effect<
   Error,
   Database
 > => retrieveKeyValuesUTxO(tableName);
+
+export const retrieveByAddress = (address: String): Effect.Effect<
+  { key: Uint8Array; txOutputBytes: Uint8Array; }[],
+  Error,
+  Database
+> => retrieveKeyValuesUTxOWithAddress(tableName, address);
+
 
 export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);
 

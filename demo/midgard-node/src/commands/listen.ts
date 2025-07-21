@@ -114,13 +114,9 @@ const getUtxosHandler = Effect.gen(function* () {
         { status: 400 },
       );
     }
-    const allUTxOs = yield* MempoolLedgerDB.retrieve();
-    const filtered = allUTxOs.filter(({ value }) => {
-      const cmlOutput = CML.TransactionOutput.from_cbor_bytes(value);
-      return cmlOutput.address().to_bech32() === addrDetails.address.bech32;
-    });
-    yield* Effect.logInfo(`Found ${filtered.length} UTXOs for ${addr}`);
-    return yield* HttpServerResponse.json({ utxos: filtered });
+    const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(addrDetails.address.bech32)
+    yield* Effect.logInfo(`Found ${utxosWithAddress.length} UTXOs for ${addr}`);
+    return yield* HttpServerResponse.json({ utxos: utxosWithAddress });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
     return yield* HttpServerResponse.json(
