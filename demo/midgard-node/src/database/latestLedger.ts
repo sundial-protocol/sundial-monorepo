@@ -1,16 +1,16 @@
 import {
   clearTable,
-  insertKeyValues,
-  retrieveKeyValues,
+  insertKeyValuesUTxO,
+  retrieveKeyValuesUTxO,
   delMultiple,
 } from "./utils.js";
 
 export const tableName = "latest_ledger";
 
-export const insert = (utxosCBOR: { key: Uint8Array; value: Uint8Array }[]) =>
-  insertKeyValues(tableName, utxosCBOR);
+export const insert = (utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[]) =>
+  insertKeyValuesUTxO(tableName, utxosCBOR);
 
-export const retrieve = () => retrieveKeyValues(tableName);
+export const retrieve = () => retrieveKeyValuesUTxO(tableName);
 
 export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);
 

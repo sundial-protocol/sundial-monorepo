@@ -183,30 +183,43 @@ export const mapSqlError = <A, E, R>(
     ),
   );
 
-const txOutputArrayToAddress = (
-  txOutputArray: Uint8Array
+export const mkKeyTxAddressCreateQuery = (
+  tableName: string,
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+      key BYTEA NOT NULL,
+      txOutputBytes BYTEA NOT NULL,
+      address BYTEA NOT NULL,
+      PRIMARY KEY (key)
+    );`;
+  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
+
+const txOutputBytesToAddress = (
+  txOutputBytes: Uint8Array
 ): String => {
-  const txOutput = CML.TransactionOutput.from_cbor_bytes(txOutputArray)
+  const txOutput = CML.TransactionOutput.from_cbor_bytes(txOutputBytes)
   const address = txOutput.address().to_bech32()
   return address
 }
 
-export const insertKeyValueUTxOWithAddress = (
+export const insertKeyValueUTxO = (
   tableName: string,
-  outReferenceArray: Uint8Array,
-  txOutputArray: Uint8Array,
+  outReferenceBytes: Uint8Array,
+  txOutputBytes: Uint8Array,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert keyValueUTxO`);
     const sql = yield* SqlClient.SqlClient;
 
-    const address = txOutputArrayToAddress(txOutputArray)
+    const address = txOutputBytesToAddress(txOutputBytes)
 
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
-      key: Buffer.from(outReferenceArray),
-      txOutputArray: Buffer.from(txOutputArray),
+      key: Buffer.from(outReferenceBytes),
+      txOutputBytes: Buffer.from(txOutputBytes),
       address: Buffer.from(address),
-    })} ON CONFLICT (key) DO UPDATE SET txOutputArray = ${Buffer.from(txOutputArray)}, address = ${Buffer.from(address)}`;
+    })} ON CONFLICT (key) DO UPDATE SET txOutputBytes = ${Buffer.from(txOutputBytes)}, address = ${Buffer.from(address)}`;
   }).pipe(
     Effect.withLogSpan(`insert keyValueUTxO ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -215,10 +228,10 @@ export const insertKeyValueUTxOWithAddress = (
     mapSqlError,
   );
 
-export const insertKeyValuesUTxOWithAddress = (
+export const insertKeyValuesUTxO = (
   tableName: string,
-  values: { outReferenceArray: Uint8Array,
-            txOutputArray: Uint8Array,
+  values: { outReferenceBytes: Uint8Array,
+            txOutputBytes: Uint8Array,
           }[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
@@ -227,9 +240,9 @@ export const insertKeyValuesUTxOWithAddress = (
 
     const triples = values.map((kv) => (
       {
-      key: Buffer.from(kv.outReferenceArray),
-      txOutputArray: Buffer.from(kv.txOutputArray),
-      address: Buffer.from(txOutputArrayToAddress(kv.txOutputArray)
+      key: Buffer.from(kv.outReferenceBytes),
+      txOutputBytes: Buffer.from(kv.txOutputBytes),
+      address: Buffer.from(txOutputBytesToAddress(kv.txOutputBytes)
 ),
     }));
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(triples)}`;
@@ -248,7 +261,7 @@ export const retrieveKeyValuesUTxO = (
 ): Effect.Effect<
   {
     key: Uint8Array;
-    txOutputArray: Uint8Array;
+    txOutputBytes: Uint8Array;
     address: String;
   }[],
   Error,
@@ -259,14 +272,14 @@ export const retrieveKeyValuesUTxO = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql`SELECT * FROM ${sql(tableName)}`;
     return rows.map((row: unknown) => {
-      const { key, txOutputArray, address } = row as {
+      const { key, txOutputBytes, address } = row as {
         key: Buffer;
-        txOutputArray: Buffer;
+        txOutputBytes: Buffer;
         address: Buffer;
       };
       return {
         key: new Uint8Array(key.buffer, key.byteOffset, key.byteLength),
-        txOutputArray: new Uint8Array(txOutputArray.buffer, txOutputArray.byteOffset, txOutputArray.byteLength),
+        txOutputBytes: new Uint8Array(txOutputBytes.buffer, txOutputBytes.byteOffset, txOutputBytes.byteLength),
         address: new String(address),
       };
     });
@@ -286,7 +299,7 @@ export const retrieveKeyValuesUTxOWithAddress = (
 ): Effect.Effect<
   {
     key: Uint8Array;
-    txOutputArray: Uint8Array;
+    txOutputBytes: Uint8Array;
   }[],
   Error,
   Database
@@ -296,14 +309,14 @@ export const retrieveKeyValuesUTxOWithAddress = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql`SELECT * FROM ${sql(tableName)} WHERE address = ${Buffer.from(address)}`;
     return rows.map((row: unknown) => {
-      const { key, txOutputArray, address } = row as {
+      const { key, txOutputBytes, address } = row as {
         key: Buffer;
-        txOutputArray: Buffer;
+        txOutputBytes: Buffer;
         address: Buffer;
       };
       return {
         key: new Uint8Array(key.buffer, key.byteOffset, key.byteLength),
-        txOutputArray: new Uint8Array(txOutputArray.buffer, txOutputArray.byteOffset, txOutputArray.byteLength),
+        txOutputBytes: new Uint8Array(txOutputBytes.buffer, txOutputBytes.byteOffset, txOutputBytes.byteLength),
       };
     });
   }).pipe(
