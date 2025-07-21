@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import {
   clearTable,
-  insertKeyValuesUTxO,
-  retrieveKeyValuesUTxO,
-  retrieveKeyValuesUTxOWithAddress,
+  insertLedgerUTxOs,
+  retrieveLedgerUTxOs,
+  retrieveLedgerUTxOsWithAddress,
   delMultiple,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
@@ -11,19 +11,19 @@ import { Database } from "@/services/database.js";
 export const tableName = "mempool_ledger";
 
 export const insert = (utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[]) =>
-  insertKeyValuesUTxO(tableName, utxosCBOR);
+  insertLedgerUTxOs(tableName, utxosCBOR);
 
 export const retrieve = (): Effect.Effect<
-  { key: Uint8Array; txOutputBytes: Uint8Array; address: String }[],
+  { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; address: String }[],
   Error,
   Database
-> => retrieveKeyValuesUTxO(tableName);
+> => retrieveLedgerUTxOs(tableName);
 
 export const retrieveByAddress = (address: String): Effect.Effect<
-  { key: Uint8Array; txOutputBytes: Uint8Array; }[],
+  { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; }[],
   Error,
   Database
-> => retrieveKeyValuesUTxOWithAddress(tableName, address);
+> => retrieveLedgerUTxOsWithAddress(tableName, address);
 
 
 export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);

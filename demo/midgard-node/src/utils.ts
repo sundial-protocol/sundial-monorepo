@@ -152,7 +152,7 @@ export const findAllSpentAndProducedUTxOs = (
 ): Effect.Effect<
   {
     spent: Uint8Array[];
-    produced: { key: Uint8Array; value: Uint8Array }[];
+    produced: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[];
   },
   Error
 > =>

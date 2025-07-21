@@ -5,7 +5,7 @@ import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
 import * as MempoolDB from "./mempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { mkKeyValueCreateQuery, mkKeyTxAddressCreateQuery } from "./utils.js";
+import { mkKeyValueCreateQuery, mkLedgerCreateQuery } from "./utils.js";
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 
@@ -18,10 +18,10 @@ export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
 
     yield* BlocksDB.createQuery;
     yield* mkKeyValueCreateQuery(MempoolDB.tableName);
-    yield* mkKeyTxAddressCreateQuery(MempoolLedgerDB.tableName);
+    yield* mkLedgerCreateQuery(MempoolLedgerDB.tableName);
     yield* mkKeyValueCreateQuery(ImmutableDB.tableName);
-    yield* mkKeyTxAddressCreateQuery(ConfirmedLedgerDB.tableName);
-    yield* mkKeyTxAddressCreateQuery(LatestLedgerDB.tableName);
+    yield* mkLedgerCreateQuery(ConfirmedLedgerDB.tableName);
+    yield* mkLedgerCreateQuery(LatestLedgerDB.tableName);
 
     Effect.logInfo("Connected to the PostgreSQL database");
   });

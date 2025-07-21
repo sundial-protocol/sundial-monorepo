@@ -1,8 +1,8 @@
 import { Effect } from "effect";
 import {
   clearTable,
-  insertKeyValuesUTxO,
-  retrieveKeyValuesUTxO,
+  insertLedgerUTxOs,
+  retrieveLedgerUTxOs,
   delMultiple,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
@@ -10,10 +10,10 @@ import { Database } from "@/services/database.js";
 export const tableName = "confirmed_ledger";
 
 export const insert = (utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[]) =>
-  insertKeyValuesUTxO(tableName, utxosCBOR);
+  insertLedgerUTxOs(tableName, utxosCBOR);
 
 export const retrieve = (): Effect.Effect<void, Error, Database> =>
-  retrieveKeyValuesUTxO(tableName);
+  retrieveLedgerUTxOs(tableName);
 
 export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);
 
