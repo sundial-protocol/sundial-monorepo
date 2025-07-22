@@ -282,9 +282,10 @@ export const retrieveLedgerUTxOsWithAddress = (
   tableName: string,
   address: String,
 ): Effect.Effect<
-  {
+  readonly {
     outReferenceBytes: Uint8Array,
     txOutputBytes: Uint8Array,
+    address: String
   }[],
   Error,
   Database
@@ -292,18 +293,12 @@ export const retrieveLedgerUTxOsWithAddress = (
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve LedgerUTxOs`);
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql`SELECT * FROM ${sql(tableName)} WHERE address = ${Buffer.from(address)}`;
-    return rows.map((row: unknown) => {
-      const { outref, output, address } = row as {
-        outref: Buffer;
-        output: Buffer;
+
+    return yield* sql<{
+        outReferenceBytes: Uint8Array;
+        txOutputBytes: Uint8Array;
         address: String;
-      };
-      return {
-        outReferenceBytes: new Uint8Array(outref.buffer, outref.byteOffset, outref.byteLength),
-        txOutputBytes: new Uint8Array(output.buffer, output.byteOffset, output.byteLength),
-      };
-    });
+      }>`SELECT outref, output, address FROM ${sql(tableName)} WHERE address = ${Buffer.from(address)}`
   }).pipe(
     Effect.withLogSpan(`insert LedgerUTxOs ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>

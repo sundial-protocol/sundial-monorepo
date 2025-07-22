@@ -20,7 +20,7 @@ export const retrieve = (): Effect.Effect<
 > => retrieveLedgerUTxOs(tableName);
 
 export const retrieveByAddress = (address: String): Effect.Effect<
-  { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; }[],
+  readonly { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; address: String; }[],
   Error,
   Database
 > => retrieveLedgerUTxOsWithAddress(tableName, address);
