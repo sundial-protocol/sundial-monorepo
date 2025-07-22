@@ -137,7 +137,7 @@ export const insertKeyValues = (
 export const retrieveKeyValues = (
   tableName: string,
 ): Effect.Effect<
-  {
+  readonly {
     key: Uint8Array;
     value: Uint8Array;
   }[],
@@ -147,17 +147,10 @@ export const retrieveKeyValues = (
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql`SELECT * FROM ${sql(tableName)}`;
-    return rows.map((row: unknown) => {
-      const { key, value } = row as {
-        key: Buffer;
-        value: Buffer;
-      };
-      return {
-        key: new Uint8Array(key.buffer, key.byteOffset, key.byteLength),
-        value: new Uint8Array(value.buffer, value.byteOffset, value.byteLength),
-      };
-    });
+    return yield* sql<{
+        key: Uint8Array
+        value: Uint8Array
+      }>`SELECT key, value FROM ${sql(tableName)}`
   }).pipe(
     Effect.withLogSpan(`insert keyValues ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -259,7 +252,7 @@ export const insertLedgerUTxOs = (
 export const retrieveLedgerUTxOs = (
   tableName: string,
 ): Effect.Effect<
-  {
+  readonly {
     outReferenceBytes: Uint8Array,
     txOutputBytes: Uint8Array,
     address: String;
@@ -270,19 +263,11 @@ export const retrieveLedgerUTxOs = (
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve LedgerUTxOs`);
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql`SELECT * FROM ${sql(tableName)}`;
-    return rows.map((row: unknown) => {
-      const { outref, output, address } = row as {
-        outref: Buffer;
-        output: Buffer;
+    return yield* sql<{
+        outReferenceBytes: Uint8Array;
+        txOutputBytes: Uint8Array;
         address: String;
-      };
-      return {
-        outReferenceBytes: new Uint8Array(outref.buffer, outref.byteOffset, outref.byteLength),
-        txOutputBytes: new Uint8Array(output.buffer, output.byteOffset, output.byteLength),
-        address: new String(address),
-      };
-    });
+      }>`SELECT outref, output, address FROM ${sql(tableName)}`
   }).pipe(
     Effect.withLogSpan(`insert LedgerUTxOs ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>

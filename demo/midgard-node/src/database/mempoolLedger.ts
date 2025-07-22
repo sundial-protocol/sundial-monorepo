@@ -14,7 +14,7 @@ export const insert = (utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes
   insertLedgerUTxOs(tableName, utxosCBOR);
 
 export const retrieve = (): Effect.Effect<
-  { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; address: String }[],
+  readonly { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; address: String }[],
   Error,
   Database
 > => retrieveLedgerUTxOs(tableName);
