@@ -191,7 +191,7 @@ export const mkLedgerCreateQuery = (
 
 const txOutputBytesToAddress = (
   txOutputBytes: Uint8Array
-): String => {
+): string => {
   const txOutput = CML.TransactionOutput.from_cbor_bytes(txOutputBytes)
   const address = txOutput.address().to_bech32()
   return address
@@ -255,7 +255,7 @@ export const retrieveLedgerUTxOs = (
   readonly {
     outReferenceBytes: Uint8Array,
     txOutputBytes: Uint8Array,
-    address: String;
+    address: string;
   }[],
   Error,
   Database
@@ -266,7 +266,7 @@ export const retrieveLedgerUTxOs = (
     return yield* sql<{
         outReferenceBytes: Uint8Array;
         txOutputBytes: Uint8Array;
-        address: String;
+        address: string;
       }>`SELECT outref, output, address FROM ${sql(tableName)}`
   }).pipe(
     Effect.withLogSpan(`insert LedgerUTxOs ${tableName}`),
@@ -280,12 +280,12 @@ export const retrieveLedgerUTxOs = (
 
 export const retrieveLedgerUTxOsWithAddress = (
   tableName: string,
-  address: String,
+  address: string,
 ): Effect.Effect<
   readonly {
     outReferenceBytes: Uint8Array,
     txOutputBytes: Uint8Array,
-    address: String
+    address: string
   }[],
   Error,
   Database
@@ -297,7 +297,7 @@ export const retrieveLedgerUTxOsWithAddress = (
     return yield* sql<{
         outReferenceBytes: Uint8Array;
         txOutputBytes: Uint8Array;
-        address: String;
+        address: string;
       }>`SELECT outref, output, address FROM ${sql(tableName)} WHERE address = ${Buffer.from(address)}`
   }).pipe(
     Effect.withLogSpan(`insert LedgerUTxOs ${tableName}`),
