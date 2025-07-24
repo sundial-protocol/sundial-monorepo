@@ -413,7 +413,7 @@ const mergeAction = Effect.gen(function* () {
 });
 
 const mempoolAction = Effect.gen(function* () {
-  const numTx = yield* MempoolDB.retrieveNumberOfEntries();
+  const numTx = yield* MempoolDB.retrieveTxCount();
   yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
 

@@ -5,8 +5,8 @@ import {
   retrieveValue,
   retrieveValues,
   retrieveKeyValues,
+  retrieveNumberOfEntries,
 } from "./utils.js";
-import * as Utils from "./utils.js";
 
 export const tableName = "mempool";
 
@@ -21,8 +21,8 @@ export const retrieveTxCborsByHashes = (txHashes: Uint8Array[]) =>
 
 export const retrieve = () => retrieveKeyValues(tableName);
 
-export const retrieveNumberOfEntries = () =>
-  Utils.retrieveNumberOfEntries(tableName);
+export const retrieveTxCount = () =>
+  retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (txHashes: Uint8Array[]) =>
   delMultiple(tableName, txHashes);
