@@ -34,6 +34,9 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
 import { SqlClient } from "@effect/sql";
+import { Level } from "level";
+import { LevelDB, makeMpts } from "@/workers/db.js";
+import { fromNullable } from "effect/Option";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -114,9 +117,19 @@ const getUtxosHandler = Effect.gen(function* () {
         { status: 400 },
       );
     }
+
     const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(addrDetails.address.bech32)
-    yield* Effect.logInfo(`Found ${utxosWithAddress.length} UTXOs for ${addr}`);
-    return yield* HttpServerResponse.json({ utxos: utxosWithAddress });
+    const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+    const maybeUTxOsWithAddress : Option.Option<Uint8Array>[] = yield* utxosWithAddress.map((utxo) => Effect.gen(function* () {
+      const raw = yield* Effect.tryPromise(
+          () => ledgerTrie.get(utxo.outReferenceBytes)
+        )
+      return fromNullable(raw)
+    }))
+    const utxosWithAddressNotConsumed = maybeUTxOsWithAddress.filter(Option.isSome).map((item) => (item.value))
+
+    yield* Effect.logInfo(`Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`);
+    return yield* HttpServerResponse.json({ utxos: utxosWithAddressNotConsumed });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
     return yield* HttpServerResponse.json(
