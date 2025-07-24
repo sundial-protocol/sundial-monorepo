@@ -120,10 +120,12 @@ const getUtxosHandler = Effect.gen(function* () {
 
     const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(addrDetails.address.bech32)
     const { ledgerTrie, mempoolTrie } = yield* makeMpts();
-    const utxosWithAddressOrNulls = yield* Effect.allSuccesses(utxosWithAddress.map((utxo) => Effect.tryPromise(
+    const utxosWithAddressOrNulls = yield* Effect.allSuccesses(
+      utxosWithAddress.map((utxo) => Effect.tryPromise(
           () => ledgerTrie.get(utxo.outReferenceBytes)
-        )
-    ))
+      )),
+      { concurrency: "unbounded" }
+    )
     const utxosWithAddressNotConsumed : Uint8Array[] = utxosWithAddressOrNulls.filter((e): e is Exclude<typeof e, null> => e !== null)
 
     yield* Effect.logInfo(`Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`);
