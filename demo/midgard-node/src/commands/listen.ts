@@ -120,13 +120,11 @@ const getUtxosHandler = Effect.gen(function* () {
 
     const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(addrDetails.address.bech32)
     const { ledgerTrie, mempoolTrie } = yield* makeMpts();
-    const maybeUTxOsWithAddress : Option.Option<Uint8Array>[] = yield* utxosWithAddress.map((utxo) => Effect.gen(function* () {
-      const raw = yield* Effect.tryPromise(
+    const utxosWithAddressOrNulls = yield* Effect.allSuccesses(utxosWithAddress.map((utxo) => Effect.tryPromise(
           () => ledgerTrie.get(utxo.outReferenceBytes)
         )
-      return fromNullable(raw)
-    }))
-    const utxosWithAddressNotConsumed = maybeUTxOsWithAddress.filter(Option.isSome).map((item) => (item.value))
+    ))
+    const utxosWithAddressNotConsumed : Uint8Array[] = utxosWithAddressOrNulls.filter((e): e is Exclude<typeof e, null> => e !== null)
 
     yield* Effect.logInfo(`Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`);
     return yield* HttpServerResponse.json({ utxos: utxosWithAddressNotConsumed });
