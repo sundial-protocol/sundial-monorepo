@@ -413,9 +413,8 @@ const mergeAction = Effect.gen(function* () {
 });
 
 const mempoolAction = Effect.gen(function* () {
-  const txList = yield* MempoolDB.retrieve();
-  const numTx = BigInt(txList.length);
-  yield* mempoolTxGauge(Effect.succeed(numTx));
+  const numTx = yield* MempoolDB.retrieveNumberOfEntries();
+  yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
 
 const blockCommitmentFork = (rerunDelay: number) =>
