@@ -362,6 +362,11 @@ const postSubmitHandler = Effect.gen(function* () {
     return yield* Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       const txCBOR = fromHex(txString);
+      const deserializedTx = CML.Transaction.from_cbor_bytes(txCBOR);
+      const txBody = deserializedTx.body();
+      const txHash = CML.hash_transaction(txBody);
+      const txHashHex = txHash.to_hex();
+      const txHashBytes = txHash.to_raw_bytes();
       const tx = lucid.fromTx(txString);
       const { produced } = yield* findSpentAndProducedUTxOs(txCBOR);
       yield* sql.withTransaction(

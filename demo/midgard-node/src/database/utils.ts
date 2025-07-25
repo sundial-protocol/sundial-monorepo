@@ -95,6 +95,8 @@ export const insertKeyValue = (
   tableName: string,
   key: Uint8Array,
   value: Uint8Array,
+  keyLabel?: string,
+  valueLabel?: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert keyValue`);
@@ -103,7 +105,7 @@ export const insertKeyValue = (
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
       key: Buffer.from(key),
       value: valueBuffer,
-    })} ON CONFLICT (key) DO UPDATE SET value = ${valueBuffer}`;
+    })} ON CONFLICT (${keyLabel ?? "key"}) DO UPDATE SET ${valueLabel ?? "value"} = ${valueBuffer}`;
   }).pipe(
     Effect.withLogSpan(`insert keyValue ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
