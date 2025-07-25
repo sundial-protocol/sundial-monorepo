@@ -118,18 +118,27 @@ const getUtxosHandler = Effect.gen(function* () {
       );
     }
 
-    const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(addrDetails.address.bech32)
+    const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(
+      addrDetails.address.bech32,
+    );
     const { ledgerTrie, mempoolTrie } = yield* makeMpts();
     const utxosWithAddressOrNulls = yield* Effect.allSuccesses(
-      utxosWithAddress.map((utxo) => Effect.tryPromise(
-          () => ledgerTrie.get(utxo.outReferenceBytes)
-      )),
-      { concurrency: "unbounded" }
-    )
-    const utxosWithAddressNotConsumed : Uint8Array[] = utxosWithAddressOrNulls.filter((e): e is Exclude<typeof e, null> => e !== null)
+      utxosWithAddress.map((utxo) =>
+        Effect.tryPromise(() => ledgerTrie.get(utxo.outReferenceBytes)),
+      ),
+      { concurrency: "unbounded" },
+    );
+    const utxosWithAddressNotConsumed: Uint8Array[] =
+      utxosWithAddressOrNulls.filter(
+        (e): e is Exclude<typeof e, null> => e !== null,
+      );
 
-    yield* Effect.logInfo(`Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`);
-    return yield* HttpServerResponse.json({ utxos: utxosWithAddressNotConsumed });
+    yield* Effect.logInfo(
+      `Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`,
+    );
+    return yield* HttpServerResponse.json({
+      utxos: utxosWithAddressNotConsumed,
+    });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
     return yield* HttpServerResponse.json(
@@ -356,7 +365,7 @@ const postSubmitHandler = Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
       const txCBOR = fromHex(txString);
       const tx = lucid.fromTx(txString);
-      const { spent, produced } = yield* findSpentAndProducedUTxOs(txCBOR);
+      const { produced } = yield* findSpentAndProducedUTxOs(txCBOR);
       yield* sql.withTransaction(
         Effect.gen(function* () {
           yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);

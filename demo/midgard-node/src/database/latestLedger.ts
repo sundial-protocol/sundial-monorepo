@@ -7,8 +7,9 @@ import {
 
 export const tableName = "latest_ledger";
 
-export const insert = (utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[]) =>
-  insertLedgerUTxOs(tableName, utxosCBOR);
+export const insert = (
+  utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[],
+) => insertLedgerUTxOs(tableName, utxosCBOR);
 
 export const retrieve = () => retrieveLedgerUTxOs(tableName);
 

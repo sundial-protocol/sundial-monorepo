@@ -119,7 +119,10 @@ export function utxoToCBOR(utxo: UTxO): {
 export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
   Effect.gen(function* () {
     const spent: Uint8Array[] = [];
-    const produced: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[] = [];
+    const produced: {
+      outReferenceBytes: Uint8Array;
+      txOutputBytes: Uint8Array;
+    }[] = [];
     const tx = CML.Transaction.from_cbor_bytes(txCBOR);
     const txBody = tx.body();
     const inputs = txBody.inputs();

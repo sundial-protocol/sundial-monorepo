@@ -10,21 +10,31 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";
 
-export const insert = (utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[]) =>
-  insertLedgerUTxOs(tableName, utxosCBOR);
+export const insert = (
+  utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[],
+) => insertLedgerUTxOs(tableName, utxosCBOR);
 
 export const retrieve = (): Effect.Effect<
-  readonly { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; address: string }[],
+  readonly {
+    outReferenceBytes: Uint8Array;
+    txOutputBytes: Uint8Array;
+    address: string;
+  }[],
   Error,
   Database
 > => retrieveLedgerUTxOs(tableName);
 
-export const retrieveByAddress = (address: string): Effect.Effect<
-  readonly { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array; address: string; }[],
+export const retrieveByAddress = (
+  address: string,
+): Effect.Effect<
+  readonly {
+    outReferenceBytes: Uint8Array;
+    txOutputBytes: Uint8Array;
+    address: string;
+  }[],
   Error,
   Database
 > => retrieveLedgerUTxOsWithAddress(tableName, address);
-
 
 export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);
 

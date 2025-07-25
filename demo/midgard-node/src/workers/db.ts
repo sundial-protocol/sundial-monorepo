@@ -34,7 +34,7 @@ export const makeMpts = () =>
     // Ledger MPT from the other side should use a checkpoint database —
     // its MPT building operations are paired with database ones
     const levelDb = new Level(nodeConfig.MPT_DB_PATH, {
-      valueEncoding: "binary"
+      valueEncoding: "binary",
     });
     const ledgerTrie = yield* Effect.tryPromise({
       try: () =>
@@ -84,7 +84,10 @@ export const processMpts = (
           key: outRef,
         }));
         const putOps: ETH_UTILS.BatchDBOp[] = produced.map(
-          ({ outReferenceBytes: outputReference, txOutputBytes: txOutputBytes }) => ({
+          ({
+            outReferenceBytes: outputReference,
+            txOutputBytes: txOutputBytes,
+          }) => ({
             type: "put",
             key: outputReference,
             value: txOutputBytes,

@@ -9,8 +9,9 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "confirmed_ledger";
 
-export const insert = (utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[]) =>
-  insertLedgerUTxOs(tableName, utxosCBOR);
+export const insert = (
+  utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[],
+) => insertLedgerUTxOs(tableName, utxosCBOR);
 
 export const retrieve = (): Effect.Effect<void, Error, Database> =>
   retrieveLedgerUTxOs(tableName);
