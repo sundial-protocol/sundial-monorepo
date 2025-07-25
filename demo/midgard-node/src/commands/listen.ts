@@ -34,9 +34,7 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
 import { SqlClient } from "@effect/sql";
-import { Level } from "level";
-import { LevelDB, makeMpts } from "@/workers/db.js";
-import { fromNullable } from "effect/Option";
+import { makeMpts } from "@/workers/db.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -121,7 +119,7 @@ const getUtxosHandler = Effect.gen(function* () {
     const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(
       addrDetails.address.bech32,
     );
-    const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+    const { ledgerTrie } = yield* makeMpts();
     const utxosWithAddressOrNulls = yield* Effect.allSuccesses(
       utxosWithAddress.map((utxo) =>
         Effect.tryPromise(() => ledgerTrie.get(utxo.outReferenceBytes)),
@@ -354,10 +352,10 @@ const postSubmitHandler = Effect.gen(function* () {
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
     yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
-    return yield* HttpServerResponse.json({
-      error: `Invalid CBOR provided`,
-      status: 400,
-    });
+    return yield* HttpServerResponse.json(
+      { error: `Invalid CBOR provided` },
+      { status: 400 },
+    );
   } else {
     const txString = txStringParam;
     const { user: lucid } = yield* User;
