@@ -11,9 +11,10 @@ import { NodeConfig } from "@/config.js";
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 
+const LEVELDB_ENCODING_OPTS = { keyEncoding: "view", valueEncoding: "view" };
+
 export const makeMpts = () =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
     const nodeConfig = yield* NodeConfig;
     Effect.logDebug("🔹 Creating ledger and mempool tries ...");
     // Since there is no way to create an MPT from txs that are already in
@@ -33,9 +34,10 @@ export const makeMpts = () =>
 
     // Ledger MPT from the other side should use a checkpoint database —
     // its MPT building operations are paired with database ones
-    const levelDb = new Level(nodeConfig.MPT_DB_PATH, {
-      valueEncoding: "binary",
-    });
+    const levelDb = new Level<string, Uint8Array>(
+      nodeConfig.MPT_DB_PATH,
+      LEVELDB_ENCODING_OPTS,
+    );
     const ledgerTrie = yield* Effect.tryPromise({
       try: () =>
         ETH.createMPT({
@@ -135,12 +137,10 @@ export const withTrieTransaction = (
     ),
   );
 
-const LEVELDB_ENCODING_OPTS = { keyEncoding: "view", valueEncoding: "binary" };
-
 export class LevelDB {
-  _leveldb: MemoryLevel<string, string>;
+  _leveldb: MemoryLevel<string, Uint8Array>;
 
-  constructor(leveldb: MemoryLevel<string, string>) {
+  constructor(leveldb: MemoryLevel<string, Uint8Array>) {
     this._leveldb = leveldb ?? new MemoryLevel(LEVELDB_ENCODING_OPTS);
   }
 

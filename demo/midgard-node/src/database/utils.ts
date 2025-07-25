@@ -161,6 +161,26 @@ export const retrieveKeyValues = (
     mapSqlError,
   );
 
+export const retrieveNumberOfEntries = (
+  tableName: string,
+): Effect.Effect<number, Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to get number of entries`);
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{
+      count: number;
+    }>`SELECT COUNT(*) FROM ${sql(tableName)}`;
+    return rows[0].count ?? 0;
+  }).pipe(
+    Effect.withLogSpan(`get number of entries ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
 export const mapSqlError = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, Exclude<E, SqlError.SqlError> | Error, R> =>

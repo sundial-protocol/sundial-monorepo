@@ -354,10 +354,10 @@ const postSubmitHandler = Effect.gen(function* () {
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
     yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
-    return yield* HttpServerResponse.json(
-      { error: `Invalid CBOR provided` },
-      { status: 400 },
-    );
+    return yield* HttpServerResponse.json({
+      error: `Invalid CBOR provided`,
+      status: 400,
+    });
   } else {
     const txString = txStringParam;
     const { user: lucid } = yield* User;
@@ -430,9 +430,8 @@ const mergeAction = Effect.gen(function* () {
 });
 
 const mempoolAction = Effect.gen(function* () {
-  const txList = yield* MempoolDB.retrieve();
-  const numTx = BigInt(txList.length);
-  yield* mempoolTxGauge(Effect.succeed(numTx));
+  const numTx = yield* MempoolDB.retrieveTxCount();
+  yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
 
 const blockCommitmentFork = (rerunDelay: number) =>
