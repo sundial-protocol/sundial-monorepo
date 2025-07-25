@@ -7,9 +7,17 @@ import {
   retrieveKeyValues,
   retrieveNumberOfEntries,
 } from "./utils.js";
+import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import { CML, fromHex } from "@lucid-evolution/lucid";
+
+export type MempoolTx = {
+  txHash: Uint8Array;
+  txCbor: Uint8Array;
+  inputs: Uint8Array[];
+  outputs: Uint8Array[];
+};
 
 export const tableName = "mempool";
 
@@ -26,11 +34,9 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
       PRIMARY KEY (key)
     );`;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(inputsTableName)} (
-      txId BYTEA NOT NULL,
-      txIx SMALLINT NOT NULL,
-      bytes BYTEA NOT NULL,
+      outref BYTEA NOT NULL,
       spendingTxHash BYTEA NOT NULL,
-      PRIMARY KEY (txId, txIx, bytes),
+      PRIMARY KEY (outref),
       FOREIGN KEY (spendingTxHash) REFERENCES ${sql(tableName)}(key) ON DELETE CASCADE
     );`;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(outputsTableName)} (
@@ -49,50 +55,42 @@ export const insert = (
     const deserializedTx = CML.Transaction.from_cbor_bytes(txCbor);
     const txBody = deserializedTx.body();
     const txHash = CML.hash_transaction(txBody);
-    const txHashBytes = txHash.to_raw_bytes();
+    const txHashBytes = Buffer.from(txHash.to_raw_bytes());
     const inputs = txBody.inputs();
     const inputsCount = inputs.len();
-    const sql = yield* SqlClient.SqlClient;
-    yield* insertKeyValue(tableName, txHashBytes, txCbor);
+    yield* insertKeyValue(tableName, txHashBytes, Buffer.from(txCbor));
     for (let i = 0; i < inputsCount; i++) {
-      const input = inputs.get(i);
-      const inputBytes = input.to_cbor_bytes();
-      const spendingTxHash = Buffer.from(txHashBytes);
-      yield* sql`INSERT INTO ${sql(inputsTableName)} ${sql.insert({
-        txId: Buffer.from(input.transaction_id().to_raw_bytes()),
-        txIx: input.index(),
-        spendingTxHash: spendingTxHash,
-        bytes: inputBytes,
-      })} ON CONFLICT (bytes) DO UPDATE SET (spendingTxHash) = (${spendingTxHash}, ${inputBytes})`;
+      yield* insertKeyValue(
+        inputsTableName,
+        Buffer.from(inputs.get(i).to_cbor_bytes()),
+        txHashBytes,
+        "outref",
+        "spendingTxHash",
+      );
     }
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
     for (let i = 0; i < outputsCount; i++) {
-      yield* insertKeyValue(
-        outputsTableName,
-        txHashBytes,
-        outputs.get(i).to_cbor_bytes(),
-        "txHash",
-        "output",
-      );
+      const output = outputs.get(i);
+      yield* MempoolLedgerDB.insert({
+        txId: txHashBytes,
+        outref: Buffer.from(
+          CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
+        ),
+        output: Buffer.from(output.to_cbor_bytes()),
+        address: output.address().to_bech32(),
+      });
     }
   });
-
-export type DBTx = {
-  txHash: Uint8Array;
-  txCbor: Uint8Array;
-  inputs: Uint8Array[];
-  outputs: Uint8Array[];
-};
 
 /** Given a txHash, retrieves all associated values with a single SQL query.
  */
 export const retrieveByHash = (
   txHash: Uint8Array,
-): Effect.Effect<DBTx, Error, Database> =>
+): Effect.Effect<MempoolTx, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    // const rows = yield* sql<DBTx>`;
+    // const rows = yield* sql<MempoolTx>`;
     //   SELECT
     //     ${sql(tableName)}.key AS txHash,
     //     ${sql(tableName)}.value AS txCbor,
@@ -105,7 +103,7 @@ export const retrieveByHash = (
     //   GROUP BY ${sql(tableName)}.key, ${sql(tableName)}.value
     // `;
 
-    const rows = yield* sql<DBTx>`
+    const rows = yield* sql<MempoolTx>`
   SELECT 
     m.key, 
     ARRAY(SELECT bytes FROM ${sql(inputsTableName)} WHERE txHash = m.key) AS inputs,
@@ -121,14 +119,14 @@ export const retrieveByHash = (
     return rows[0];
   });
 
-export const retrieveTxCborsByHashes = (txHashes: Uint8Array[]) =>
+export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
 export const retrieve = () => retrieveKeyValues(tableName);
 
 export const retrieveTxCount = () => retrieveNumberOfEntries(tableName);
 
-export const clearTxs = (txHashes: Uint8Array[]) =>
+export const clearTxs = (txHashes: Buffer[]) =>
   delMultiple(tableName, txHashes);
 
 export const clear = () => clearTable(tableName);
