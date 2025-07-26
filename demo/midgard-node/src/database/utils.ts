@@ -1,7 +1,7 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect, Option } from "effect";
-import { Address, CML } from "@lucid-evolution/lucid";
+import { Address } from "@lucid-evolution/lucid";
 
 export const mkKeyValueCreateQuery = (
   tableName: string,
@@ -32,16 +32,22 @@ export const delMultiple = (
 export const retrieveValue = (
   tableName: string,
   key: Buffer,
-): Effect.Effect<Option.Option<Uint8Array>, Error, Database> =>
+): Effect.Effect<Buffer, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
 
-    const result = yield* sql<Uint8Array[]>`SELECT value FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT value FROM ${sql(
       tableName,
-    )} WHERE key = ${key} LIMIT 1 `;
+    )} WHERE key = ${key}`;
 
-    return Option.fromNullable(result[0]?.[0]);
+    if (result.length <= 0) {
+      yield* Effect.fail(
+        new SqlError.SqlError({ cause: `No value found for key ${key}` }),
+      );
+    }
+
+    return result[0];
   }).pipe(
     Effect.withLogSpan(`retrieve value ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -54,16 +60,16 @@ export const retrieveValue = (
 
 export const retrieveValues = (
   tableName: string,
-  keys: Buffer[],
-): Effect.Effect<Uint8Array[], Error, Database> =>
+  keys: Buffer[] | readonly Buffer[],
+): Effect.Effect<readonly Buffer[], Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
 
-    const result = yield* sql`SELECT value FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT value FROM ${sql(
       tableName,
     )} WHERE ${sql.in("key", keys)}`;
-    return result.map((row: any) => Uint8Array.from(row.value));
+    return result;
   }).pipe(
     Effect.withLogSpan(`retrieve values ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>

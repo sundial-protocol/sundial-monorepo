@@ -47,18 +47,16 @@ export const insertBlock = (
 
 export const retrieveTxHashesByHeaderHash = (
   headerHash: Buffer,
-): Effect.Effect<Uint8Array[], Error, Database> =>
+): Effect.Effect<readonly Buffer[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve txHashes for block ${headerHash}`,
     );
     const sql = yield* SqlClient.SqlClient;
 
-    const rows = yield* sql<Buffer>`SELECT txHash FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT txHash FROM ${sql(
       tableName,
     )} WHERE headerHash = ${headerHash}`;
-
-    const result = rows.map((row) => row);
 
     yield* Effect.logDebug(
       `${tableName} db: retrieved ${result.length} txHashes for block ${headerHash}`,

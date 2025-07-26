@@ -8,15 +8,7 @@ import { fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import {
-  Duration,
-  Effect,
-  Layer,
-  Metric,
-  Option,
-  pipe,
-  Schedule,
-} from "effect";
+import { Duration, Effect, Layer, Metric, pipe, Schedule } from "effect";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -74,7 +66,7 @@ const getTxHandler = Effect.gen(function* () {
     );
   }
   const txHashBytes = Buffer.from(fromHex(txHashParam));
-  const foundCbor: Uint8Array | undefined = yield* MempoolDB.retrieveByHash(
+  const foundCbor: Uint8Array = yield* MempoolDB.retrieveByHash(
     txHashBytes,
   ).pipe(
     Effect.map((mempoolTx) => mempoolTx.txCbor),
@@ -83,26 +75,11 @@ const getTxHandler = Effect.gen(function* () {
         yield* Effect.logInfo(
           `GET /tx - Transaction found in mempool: ${txHashParam}`,
         );
-        const retImmutable =
-          yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
-        if (Option.isSome(retImmutable)) {
-          yield* Effect.logInfo(
-            `GET /tx - Transaction found in immutable: ${txHashParam}`,
-          );
-          return retImmutable.value;
-        }
-        yield* Effect.logInfo(`Transaction not found: ${txHashParam}`);
-        yield* HttpServerResponse.json(
-          { error: `Transaction not found: ${txHashParam}` },
-          { status: 404 },
-        );
-        return;
+        return yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
       }),
     ),
   );
-  if (foundCbor) {
-    return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
-  }
+  return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
 }).pipe(Effect.catchAll((e) => handle500("getTx", e)));
 
 const getUtxosHandler = Effect.gen(function* () {

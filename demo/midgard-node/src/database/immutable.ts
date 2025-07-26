@@ -26,7 +26,8 @@ export const retrieve = () => retrieveKeyValues(tableName);
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   retrieveValue(tableName, txHash);
 
-export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
-  retrieveValues(tableName, txHashes);
+export const retrieveTxCborsByHashes = (
+  txHashes: Buffer[] | readonly Buffer[],
+) => retrieveValues(tableName, txHashes);
 
 export const clear = () => clearTable(tableName);
