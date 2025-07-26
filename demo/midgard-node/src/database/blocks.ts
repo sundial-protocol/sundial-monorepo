@@ -2,7 +2,6 @@ import { Effect } from "effect";
 import { clearTable, mapSqlError } from "./utils.js";
 import { SqlClient } from "@effect/sql";
 import { Database } from "@/services/database.js";
-import { toHex } from "@lucid-evolution/lucid";
 
 export const tableName = "blocks";
 

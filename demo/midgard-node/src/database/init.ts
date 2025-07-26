@@ -17,7 +17,7 @@ export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
     yield* BlocksDB.createQuery;
-    yield* mkKeyValueCreateQuery(MempoolDB.tableName);
+    yield* MempoolDB.init;
     yield* mkLedgerCreateQuery(MempoolLedgerDB.tableName);
     yield* mkKeyValueCreateQuery(ImmutableDB.tableName);
     yield* mkLedgerCreateQuery(ConfirmedLedgerDB.tableName);

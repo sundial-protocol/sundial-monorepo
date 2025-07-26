@@ -25,6 +25,6 @@ export const retrieveByAddress = (
 ): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
   retrieveLedgerEntriesWithAddress(tableName, address);
 
-export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);
+export const clearUTxOs = (refs: Buffer[]) => delMultiple(tableName, refs);
 
 export const clear = () => clearTable(tableName);

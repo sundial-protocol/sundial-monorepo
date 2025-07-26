@@ -23,7 +23,7 @@ export const tableName = "mempool";
 
 export const inputsTableName = "mempoolSpentInputs";
 
-export const outputsTableName = "mempoolOutputs";
+export const outputsTableName = MempoolLedgerDB.tableName;
 
 export const init: Effect.Effect<void, Error, Database> = Effect.gen(
   function* () {
@@ -37,11 +37,6 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
       outref BYTEA NOT NULL,
       spendingTxHash BYTEA NOT NULL,
       PRIMARY KEY (outref),
-      FOREIGN KEY (spendingTxHash) REFERENCES ${sql(tableName)}(key) ON DELETE CASCADE
-    );`;
-    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(outputsTableName)} (
-      txHash BYTEA NOT NULL,
-      output BYTEA NOT NULL,
       FOREIGN KEY (spendingTxHash) REFERENCES ${sql(tableName)}(key) ON DELETE CASCADE
     );`;
   },
@@ -86,30 +81,17 @@ export const insert = (
 /** Given a txHash, retrieves all associated values with a single SQL query.
  */
 export const retrieveByHash = (
-  txHash: Uint8Array,
+  txHash: Buffer,
 ): Effect.Effect<MempoolTx, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    // const rows = yield* sql<MempoolTx>`;
-    //   SELECT
-    //     ${sql(tableName)}.key AS txHash,
-    //     ${sql(tableName)}.value AS txCbor,
-    //     ARRAY_AGG(${sql(inputsTableName)}.input) AS inputs,
-    //     ARRAY_AGG(${sql(outputsTableName)}.output) AS outputs
-    //   FROM ${sql(tableName)}
-    //   LEFT JOIN ${sql(inputsTableName)} ON ${sql(tableName)}.key = ${sql(inputsTableName)}.txHash
-    //   LEFT JOIN ${sql(outputsTableName)} ON ${sql(tableName)}.key = ${sql(outputsTableName)}.txHash
-    //   WHERE ${sql(tableName)}.key = ${Buffer.from(txHash)}
-    //   GROUP BY ${sql(tableName)}.key, ${sql(tableName)}.value
-    // `;
-
     const rows = yield* sql<MempoolTx>`
   SELECT 
     m.key, 
-    ARRAY(SELECT bytes FROM ${sql(inputsTableName)} WHERE txHash = m.key) AS inputs,
-    ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE txHash = m.key) AS outputs
+    ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE spendingTxHash = m.key) AS inputs,
+    ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE txId = m.key) AS outputs
   FROM ${sql(tableName)} m 
-  WHERE m.key = ${Buffer.from(txHash)}
+  WHERE m.key = ${txHash}
 `;
 
     if (rows.length === 0) {

@@ -73,26 +73,36 @@ const getTxHandler = Effect.gen(function* () {
       { status: 404 },
     );
   }
-  const txHashBytes = fromHex(txHashParam);
-  const retMempool = yield* MempoolDB.retrieveTxCborByHash(txHashBytes);
-  if (Option.isSome(retMempool)) {
-    yield* Effect.logInfo(
-      `GET /tx - Transaction found in mempool: ${txHashParam}`,
-    );
-    return yield* HttpServerResponse.json({ tx: retMempool.value });
-  }
-  const retImmutable = yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
-  if (Option.isSome(retImmutable)) {
-    yield* Effect.logInfo(
-      `GET /tx - Transaction found in immutable: ${txHashParam}`,
-    );
-    return yield* HttpServerResponse.json({ tx: retImmutable.value });
-  }
-  yield* Effect.logInfo(`Transaction not found: ${txHashParam}`);
-  return yield* HttpServerResponse.json(
-    { error: `Transaction not found: ${txHashParam}` },
-    { status: 404 },
+  const txHashBytes = Buffer.from(fromHex(txHashParam));
+  const foundCbor: Uint8Array | undefined = yield* MempoolDB.retrieveByHash(
+    txHashBytes,
+  ).pipe(
+    Effect.map((mempoolTx) => mempoolTx.txCbor),
+    Effect.catchAll((_e) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo(
+          `GET /tx - Transaction found in mempool: ${txHashParam}`,
+        );
+        const retImmutable =
+          yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
+        if (Option.isSome(retImmutable)) {
+          yield* Effect.logInfo(
+            `GET /tx - Transaction found in immutable: ${txHashParam}`,
+          );
+          return retImmutable.value;
+        }
+        yield* Effect.logInfo(`Transaction not found: ${txHashParam}`);
+        yield* HttpServerResponse.json(
+          { error: `Transaction not found: ${txHashParam}` },
+          { status: 404 },
+        );
+        return;
+      }),
+    ),
   );
+  if (foundCbor) {
+    return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
+  }
 }).pipe(Effect.catchAll((e) => handle500("getTx", e)));
 
 const getUtxosHandler = Effect.gen(function* () {

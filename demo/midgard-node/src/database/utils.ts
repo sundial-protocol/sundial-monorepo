@@ -99,16 +99,16 @@ export const insertKeyValue = (
   valueLabel?: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValue`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValue`);
     const sql = yield* SqlClient.SqlClient;
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
       key,
       value,
     })} ON CONFLICT (${keyLabel ?? "key"}) DO UPDATE SET ${valueLabel ?? "value"} = ${value}`;
   }).pipe(
-    Effect.withLogSpan(`insert keyValue ${tableName}`),
+    Effect.withLogSpan(`insertKeyValue ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insert keyValue: ${JSON.stringify(e)}`),
+      Effect.logError(`${tableName} db: insertKeyValue: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
@@ -118,15 +118,13 @@ export const insertKeyValues = (
   pairs: { key: Buffer; value: Buffer }[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValues`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValues`);
     const sql = yield* SqlClient.SqlClient;
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(pairs)}`;
   }).pipe(
-    Effect.withLogSpan(`insert keyValues ${tableName}`),
+    Effect.withLogSpan(`insertKeyValues ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: insertKeyValues: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
@@ -149,10 +147,10 @@ export const retrieveKeyValues = (
       value: Uint8Array;
     }>`SELECT key, value FROM ${sql(tableName)}`;
   }).pipe(
-    Effect.withLogSpan(`insert keyValues ${tableName}`),
+    Effect.withLogSpan(`retrieveKeyValues ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
-        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
+        `${tableName} db: retrieveKeyValues: ${JSON.stringify(e)}`,
       ),
     ),
     mapSqlError,
@@ -169,10 +167,10 @@ export const retrieveNumberOfEntries = (
     }>`SELECT COUNT(*) FROM ${sql(tableName)}`;
     return rows[0].count ?? 0;
   }).pipe(
-    Effect.withLogSpan(`get number of entries ${tableName}`),
+    Effect.withLogSpan(`retrieveNumberOfEntries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
-        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
+        `${tableName} db: retrieveNumberOfEntries: ${JSON.stringify(e)}`,
       ),
     ),
     mapSqlError,
@@ -206,12 +204,6 @@ export const mkLedgerCreateQuery = (
       PRIMARY KEY (outref)
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
-
-const txOutputBytesToAddress = (txOutputBytes: Uint8Array): string => {
-  const txOutput = CML.TransactionOutput.from_cbor_bytes(txOutputBytes);
-  const address = txOutput.address().to_bech32();
-  return address;
-};
 
 export type LedgerEntry = {
   txId: Buffer;

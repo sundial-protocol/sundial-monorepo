@@ -1,21 +1,21 @@
 import { Effect } from "effect";
 import {
   clearTable,
-  insertLedgerUTxOs,
-  retrieveLedgerUTxOs,
+  insertLedgerEntries,
+  retrieveLedgerEntries,
   delMultiple,
+  LedgerEntry,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "confirmed_ledger";
 
-export const insert = (
-  utxosCBOR: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[],
-) => insertLedgerUTxOs(tableName, utxosCBOR);
+export const insertMultiple = (entries: LedgerEntry[]) =>
+  insertLedgerEntries(tableName, entries);
 
 export const retrieve = (): Effect.Effect<void, Error, Database> =>
-  retrieveLedgerUTxOs(tableName);
+  retrieveLedgerEntries(tableName);
 
-export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);
+export const clearUTxOs = (refs: Buffer[]) => delMultiple(tableName, refs);
 
 export const clear = () => clearTable(tableName);
