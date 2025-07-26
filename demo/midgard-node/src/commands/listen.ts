@@ -130,16 +130,20 @@ const getUtxosHandler = Effect.gen(function* () {
       addrDetails.address.bech32,
     );
     const { ledgerTrie } = yield* makeMpts();
-    const utxosWithAddressOrNulls = yield* Effect.allSuccesses(
-      utxosWithAddress.map((utxo) =>
-        Effect.tryPromise(() => ledgerTrie.get(utxo.outReferenceBytes)),
+    const utxosWithAddressNotConsumed = yield* Effect.allSuccesses(
+      utxosWithAddress.map((entry) =>
+        Effect.tryPromise(() => ledgerTrie.get(entry.outref)).pipe(
+          Effect.andThen((res) => {
+            if (res === null) {
+              return Effect.fail(null);
+            } else {
+              return Effect.succeed(res);
+            }
+          }),
+        ),
       ),
       { concurrency: "unbounded" },
     );
-    const utxosWithAddressNotConsumed: Uint8Array[] =
-      utxosWithAddressOrNulls.filter(
-        (e): e is Exclude<typeof e, null> => e !== null,
-      );
 
     yield* Effect.logInfo(
       `Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`,
