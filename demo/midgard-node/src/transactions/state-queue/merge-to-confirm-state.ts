@@ -1,8 +1,10 @@
 /**
- * This script performs the following tasks to merge the first block into the confirmed state:
+ * This script performs the following tasks to merge the first block into the
+ * confirmed state:
  *
  * 1. Fetch transactions of the first block by querying ImmutableDB.
- * 2. Apply those transactions to ConfirmedLedgerDB and update the table to store the updated UTxO set.
+ * 2. Apply those transactions to ConfirmedLedgerDB and update the table to
+ *    store the updated UTxO set.
  * 3. Remove all header hashes from BlocksDB associated with the merged block.
  * 4. Build and submit the merge transaction.
  */
@@ -26,7 +28,7 @@ import {
 import { Database } from "@/services/database.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
-  description: "A counter for tracking merge blocks",
+  description: "A counter for tracking merged blocks",
   bigint: true,
   incremental: true,
 });
@@ -67,11 +69,11 @@ const getStateQueueLength = (
  * Build and submit the merge transaction.
  *
  * @param lucid - The LucidEvolution instance.
- * @param db - The database instance.
  * @param fetchConfig - The configuration for fetching data.
  * @param spendScript - State queue's spending script.
  * @param mintScript - State queue's minting script.
- * @returns An Effect that resolves when the merge transaction is built and submitted.
+ * @returns An Effect that resolves when the merge transaction is built and
+ *          submitted.
  */
 export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
@@ -152,9 +154,6 @@ export const buildAndSubmitMergeTx = (
       yield* Effect.logInfo(
         "🔸 Merge transaction submitted, updating the db...",
       );
-      if (firstBlockTxs.length === 0) {
-        return;
-      }
       const { spent: spentOutRefs, produced: producedUTxOs } =
         yield* findAllSpentAndProducedUTxOs(firstBlockTxs).pipe(
           Effect.withSpan("findAllSpentAndProducedUTxOs"),

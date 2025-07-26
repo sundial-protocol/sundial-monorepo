@@ -1,26 +1,37 @@
 import { Effect } from "effect";
-import { clearTable, mapSqlError } from "./utils.js";
+import { clearTable, createInputsTable, mapSqlError } from "./utils.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 
 export const tableName = "blocks";
 
+export const inputsTableName = "blocks_spent_inputs";
+
+export const outputsTableName = "blocks_produced_outputs";
+
 export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  yield* sql`
-  CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+  yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
     headerHash BYTEA NOT NULL,
     txHash BYTEA NOT NULL UNIQUE
   );`;
+  yield* createInputsTable(inputsTableName, tableName, "txHash");
 });
 
 export const insertBlock = (
   headerHash: Buffer,
-  txHashes: Buffer[],
+  processedTxs: ProcessedTx[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     // yield* Effect.logInfo(`${tableName} db: attempt to insert blocks`);
     const sql = yield* SqlClient.SqlClient;
+
+    yield* Effect.forEach(
+      processedTxs,
+      ({ txHash, txCbor, inputs, outputs }) => {
+        return;
+      },
+    );
 
     if (txHashes.length <= 0) {
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");

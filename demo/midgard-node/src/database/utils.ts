@@ -3,6 +3,13 @@ import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
 
+export type ProcessedTx = {
+  txHash: Buffer;
+  txCbor: Buffer;
+  inputs: Buffer[];
+  outputs: Buffer[];
+};
+
 export const createKeyValueTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
@@ -103,6 +110,8 @@ export const insertKeyValue = (
   tableName: string,
   key: Buffer,
   value: Buffer,
+  keyLabel?: string,
+  valueLabel?: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValue`);
@@ -110,7 +119,9 @@ export const insertKeyValue = (
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
       key,
       value,
-    })} ON CONFLICT (key) DO UPDATE SET value = ${value}`;
+    })} ON CONFLICT (${keyLabel ?? "key"}) DO UPDATE SET ${
+      valueLabel ?? "value"
+    } = ${value}`;
   }).pipe(
     Effect.withLogSpan(`insertKeyValue ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -210,6 +221,25 @@ export const createLedgerTable = (
       PRIMARY KEY (outref)
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
+
+export const inputsTablePrimaryKeyLabel = "outref";
+
+export const inputsTableForeignKeyLabel = "spendingTxHash";
+
+export const createInputsTable = (
+  inputsTableName: string,
+  parentTableName: string,
+  keyLabel?: string,
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(inputsTableName)} (
+      ${inputsTablePrimaryKeyLabel} BYTEA NOT NULL,
+      ${inputsTableForeignKeyLabel} BYTEA NOT NULL,
+      PRIMARY KEY (${inputsTablePrimaryKeyLabel}),
+      FOREIGN KEY (${inputsTableForeignKeyLabel}) REFERENCES ${sql(parentTableName)}(${keyLabel ?? "key"}) ON DELETE CASCADE
+    );`;
+  }).pipe(Effect.withLogSpan(`creating table ${inputsTableName}`), mapSqlError);
 
 export type LedgerEntry = {
   txId: Buffer;

@@ -128,8 +128,8 @@ export class ConfirmError extends Data.TaggedError("ConfirmError")<{
  * Fetch transactions of the first block by querying BlocksDB and ImmutableDB.
  *
  * @param firstBlockUTxO - UTxO of the first block in queue.
- * @param db - The database instance.
- * @returns An Effect that resolves to an array of transactions.
+ * @returns An Effect that resolves to an array of transactions, and block's
+ *          header hash.
  */
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,

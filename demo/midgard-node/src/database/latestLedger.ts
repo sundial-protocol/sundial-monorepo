@@ -6,7 +6,7 @@ import {
   LedgerEntry,
 } from "./utils.js";
 
-export const tableName = "latest_ledger";
+export const tableName = "latestLedger";
 
 export const insertMultiple = (entries: LedgerEntry[]) =>
   insertLedgerEntries(tableName, entries);
