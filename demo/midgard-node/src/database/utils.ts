@@ -40,6 +40,7 @@ export const retrieveValue = (
     const result = yield* sql<Uint8Array[]>`SELECT value FROM ${sql(
       tableName,
     )} WHERE key = ${key} LIMIT 1 `;
+
     return Option.fromNullable(result[0]?.[0]);
   }).pipe(
     Effect.withLogSpan(`retrieve value ${tableName}`),
@@ -95,8 +96,6 @@ export const insertKeyValue = (
   tableName: string,
   key: Buffer,
   value: Buffer,
-  keyLabel?: string,
-  valueLabel?: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValue`);
@@ -104,7 +103,7 @@ export const insertKeyValue = (
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
       key,
       value,
-    })} ON CONFLICT (${keyLabel ?? "key"}) DO UPDATE SET ${valueLabel ?? "value"} = ${value}`;
+    })} ON CONFLICT (key) DO UPDATE SET value = ${value}`;
   }).pipe(
     Effect.withLogSpan(`insertKeyValue ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
