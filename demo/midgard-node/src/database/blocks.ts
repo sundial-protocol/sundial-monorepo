@@ -5,7 +5,7 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "blocks";
 
-export const createQuery = Effect.gen(function* () {
+export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`
   CREATE TABLE IF NOT EXISTS ${sql(tableName)} (

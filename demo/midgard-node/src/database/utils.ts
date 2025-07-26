@@ -1,9 +1,9 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
 
-export const mkKeyValueCreateQuery = (
+export const createKeyValueTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
@@ -69,6 +69,7 @@ export const retrieveValues = (
     const result = yield* sql<Buffer>`SELECT value FROM ${sql(
       tableName,
     )} WHERE ${sql.in("key", keys)}`;
+
     return result;
   }).pipe(
     Effect.withLogSpan(`retrieve values ${tableName}`),
@@ -138,8 +139,8 @@ export const retrieveKeyValues = (
   tableName: string,
 ): Effect.Effect<
   readonly {
-    key: Uint8Array;
-    value: Uint8Array;
+    key: Buffer;
+    value: Buffer;
   }[],
   Error,
   Database
@@ -148,8 +149,8 @@ export const retrieveKeyValues = (
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
     return yield* sql<{
-      key: Uint8Array;
-      value: Uint8Array;
+      key: Buffer;
+      value: Buffer;
     }>`SELECT key, value FROM ${sql(tableName)}`;
   }).pipe(
     Effect.withLogSpan(`retrieveKeyValues ${tableName}`),
@@ -196,7 +197,7 @@ export const mapSqlError = <A, E, R>(
     ),
   );
 
-export const mkLedgerCreateQuery = (
+export const createLedgerTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
