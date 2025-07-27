@@ -18,14 +18,13 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
+import { isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
-import { SqlClient } from "@effect/sql";
 import { makeMpts } from "@/workers/db.js";
 
 const txCounter = Metric.counter("tx_count", {
@@ -155,7 +154,9 @@ const getBlockHandler = Effect.gen(function* () {
       { status: 400 },
     );
   }
-  const hashes = yield* BlocksDB.retrieveTxHashesByBlockHash(fromHex(hdrHash));
+  const hashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(
+    Buffer.from(fromHex(hdrHash)),
+  );
   yield* Effect.logInfo(
     `GET /block - Found ${hashes.length} txs for block: ${hdrHash}`,
   );
@@ -299,8 +300,8 @@ const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
   const allPairs = yield* BlocksDB.retrieve();
   const keyValues: Record<string, number> = allPairs.reduce(
-    (acc: Record<string, number>, [b, _t]) => {
-      const bHex = toHex(b);
+    (acc: Record<string, number>, entry) => {
+      const bHex = toHex(entry.header_hash);
       if (!acc[bHex]) {
         acc[bHex] = 1;
       } else {
@@ -349,27 +350,10 @@ const postSubmitHandler = Effect.gen(function* () {
     );
   } else {
     const txString = txStringParam;
-    const { user: lucid } = yield* User;
-    return yield* Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
-      const txCBOR = fromHex(txString);
-      const deserializedTx = CML.Transaction.from_cbor_bytes(txCBOR);
-      const txBody = deserializedTx.body();
-      const txHash = CML.hash_transaction(txBody);
-      const txHashHex = txHash.to_hex();
-      const txHashBytes = txHash.to_raw_bytes();
-      const tx = lucid.fromTx(txString);
-      const { produced } = yield* findSpentAndProducedUTxOs(txCBOR);
-      yield* sql.withTransaction(
-        Effect.gen(function* () {
-          yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
-          yield* MempoolLedgerDB.insert(produced);
-        }),
-      );
-      Effect.runSync(Metric.increment(txCounter));
-      return yield* HttpServerResponse.json({
-        message: `Successfully submitted the transaction`,
-      });
+    yield* MempoolDB.insert(txString);
+    Effect.runSync(Metric.increment(txCounter));
+    return yield* HttpServerResponse.json({
+      message: `Successfully submitted the transaction`,
     });
   }
 }).pipe(

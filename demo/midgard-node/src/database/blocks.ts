@@ -85,7 +85,7 @@ export const retrieveTxHashesByHeaderHash = (
     );
     return result;
   }).pipe(
-    Effect.withLogSpan(`retrieveTxHashesByBlockHash ${tableName}`),
+    Effect.withLogSpan(`retrieveTxHashesByHeaderHash ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
         `${tableName} db: retrieving txHashes error: ${JSON.stringify(e)}`,
