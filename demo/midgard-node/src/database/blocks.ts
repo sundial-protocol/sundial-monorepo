@@ -5,21 +5,22 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "blocks";
 
+export enum Columns {
+  HEADER_HASH = "header_hash",
+  TX_HASH = "tx_hash",
+}
+
 export const inputsTableName = "blocks_spent_inputs";
 
 export const outputsTableName = "blocks_produced_outputs";
 
-export const headerHashCol = "header_hash";
-
-export const txHashCol = "tx_hash";
-
 export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-    ${sql(headerHashCol)} BYTEA NOT NULL,
-    ${sql(txHashCol)} BYTEA NOT NULL UNIQUE
+    ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
+    ${sql(Columns.TX_HASH)} BYTEA NOT NULL UNIQUE
   );`;
-  yield* createInputsTable(inputsTableName, tableName, txHashCol);
+  yield* createInputsTable(inputsTableName, tableName, Columns.TX_HASH);
 });
 
 export const insertBlock = (
@@ -71,7 +72,7 @@ export const retrieveTxHashesByHeaderHash = (
 
     const result = yield* sql<Buffer>`SELECT txHash FROM ${sql(
       tableName,
-    )} WHERE ${sql(headerHashCol)} = ${headerHash}`;
+    )} WHERE ${sql(Columns.HEADER_HASH)} = ${headerHash}`;
 
     yield* Effect.logDebug(
       `${tableName} db: retrieved ${result.length} txHashes for block ${headerHash}`,
@@ -96,9 +97,10 @@ export const retrieveHeaderHashByTxHash = (
     );
     const sql = yield* SqlClient.SqlClient;
 
-    const rows = yield* sql<Buffer>`SELECT ${sql(headerHashCol)} FROM ${sql(
-      tableName,
-    )} WHERE txHash = ${txHash} LIMIT 1`;
+    const rows =
+      yield* sql<Buffer>`SELECT ${sql(Columns.HEADER_HASH)} FROM ${sql(
+        tableName,
+      )} WHERE txHash = ${txHash} LIMIT 1`;
 
     if (rows.length <= 0) {
       const msg = `No headerHash found for ${txHash} txHash`;
@@ -129,7 +131,7 @@ export const clearBlock = (
       `${tableName} db: attempt clear block ${headerHash}`,
     );
     const sql = yield* SqlClient.SqlClient;
-    yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(headerHashCol)} = ${headerHash}`;
+    yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(Columns.HEADER_HASH)} = ${headerHash}`;
     // yield* Effect.logInfo(
     //   `${tableName} db: cleared ${result.entries()} rows for block ${toHex(headerHash)}`,
     // );

@@ -4,13 +4,15 @@ import {
   insertKeyValue,
   delMultiple,
   retrieveValues,
-  retrieveKeyValues,
   retrieveNumberOfEntries,
   createInputsTable,
   createKeyValueTable,
   ProcessedTx,
   InputsColumns,
   LedgerColumns,
+  KVColumns,
+  mapSqlError,
+  insertSpentInput,
 } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as ImmutableDB from "./immutable.js";
@@ -38,14 +40,12 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
         // The trigger simply archives the deleted row in the "spent inputs"
         // table associated with the Blocks DB.
         //
-        // TODO: Here I'm not sure if `OLD.${}` works with variables. So this is
-        // a risky inconsistency where I've duplicated literal values from
-        // `InputsColumns`.
+        // TODO: Syntax used for `OLD.` might be incorrect.
         yield* sql`CREATE OR REPLACE FUNCTION insert_inputs_into_blocks_on_delete()
         RETURNS trigger AS $$
         BEGIN
           INSERT INTO ${sql(BlocksDB.inputsTableName)}(${sql(InputsColumns.OUTREF)}, ${sql(InputsColumns.SPENDING_TX)})
-          VALUES (OLD.spent_outref, OLD.spending_tx_hash);
+          VALUES (OLD.${sql(InputsColumns.OUTREF)}, OLD.${sql(InputsColumns.SPENDING_TX)});
           RETURN OLD;
         END;
         $$ LANGUAGE plpgsql;
@@ -56,16 +56,18 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
         EXECUTE PROCEDURE insert_inputs_into_blocks_on_delete();
       `;
         // Defining another trigger to be attached to the mempool itself, for
-        // archiving transactions included in a commited block.
-        // 
+        // archiving transactions included in a committed block.
+        //
         // NOTE: The session variable is something to keep an eye out for.
+        //
+        // TODO: Syntax used for `OLD.` might be incorrect.
         yield* sql`CREATE OR REPLACE FUNCTION archive_mempool()
         RETURNS trigger AS $$
         BEGIN
-          INSERT INTO ${sql(BlocksDB.tableName)}(${sql(BlocksDB.headerHashCol)}, ${sql(BlocksDB.txHashCol)})
-          VALUES (current_setting('block_commitment.deleting_block', TRUE), OLD.key);
-          INSERT INTO ${sql(ImmutableDB.tableName)}(key, value)
-          VALUES (OLD.key, OLD.value);
+          INSERT INTO ${sql(BlocksDB.tableName)}(${sql(BlocksDB.Columns.HEADER_HASH)}, ${sql(BlocksDB.Columns.TX_HASH)})
+          VALUES (current_setting('block_commitment.deleting_block', TRUE), OLD.${sql(KVColumns.KEY)});
+          INSERT INTO ${sql(ImmutableDB.tableName)}(${sql(KVColumns.KEY)}, ${sql(KVColumns.VALUE)})
+          VALUES (OLD.${sql(KVColumns.KEY)}, OLD.${sql(KVColumns.VALUE)});
           RETURN OLD;
         END;
         $$ LANGUAGE plpgsql;
@@ -91,18 +93,21 @@ export const insert = (
     const txHashBytes = Buffer.from(txHash.to_raw_bytes());
     const inputs = txBody.inputs();
     const inputsCount = inputs.len();
-    yield* insertKeyValue(tableName, txHashBytes, Buffer.from(txCbor));
+    // Insert the tx itself in `MempoolDB`.
+    yield* insertKeyValue(tableName, {
+      key: txHashBytes,
+      value: Buffer.from(txCbor),
+    });
+    // Insert spent inputs int `inputsTableName`.
     for (let i = 0; i < inputsCount; i++) {
-      yield* insertKeyValue(
-        inputsTableName,
-        Buffer.from(inputs.get(i).to_cbor_bytes()),
-        txHashBytes,
-        InputsColumns.OUTREF,
-        InputsColumns.SPENDING_TX,
-      );
+      yield* insertSpentInput(inputsTableName, {
+        spent_outref: Buffer.from(inputs.get(i).to_cbor_bytes()),
+        spending_tx_hash: txHashBytes,
+      });
     }
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
+    // Insert produced UTxOs in `MempoolLedgerDB`.
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
       yield* MempoolLedgerDB.insert({
@@ -125,7 +130,7 @@ export const retrieveByHash = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
       SELECT 
-        m.key as txHash, 
+        m.${sql(KVColumns.KEY)} as txHash, 
         ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = txHash) AS inputs,
         ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = txHash) AS outputs
       FROM ${sql(tableName)} m 
@@ -142,23 +147,58 @@ export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
 export const retrieve = (): Effect.Effect<
-  ProcessedTx[],
+  readonly ProcessedTx[],
   Error,
   Database
-> => Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient;
-  const rows = yield* sql<ProcessedTx>`
+> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<ProcessedTx>`
     SELECT 
-      m.key, 
-      ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = m.key) AS inputs,
-      ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = m.key) AS outputs
+      m.${sql(KVColumns.KEY)} as txHash, 
+      ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = txHash) AS inputs,
+      ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = txHash) AS outputs
     FROM ${sql(tableName)} m`;
-});
-
+    return rows;
+  }).pipe(
+    Effect.withLogSpan(
+      `retrieve utxos ${tableName}, ${inputsTableName} and ${outputsTableName}`,
+    ),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: retrieval failure: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
 
 export const retrieveTxCount = () => retrieveNumberOfEntries(tableName);
 
-export const clearTxs = (txHashes: Buffer[]) =>
-  delMultiple(tableName, txHashes);
+/** Deletes all the given transactions from `MempoolDB`, which also cascades
+ * into deletion of the associated "inputs" table (spent inputs).
+ *
+ * Two triggers are fired as well:
+ * - First, the one attached to the inputs table, which is simply an "archiving"
+ *   mechanism that transfers the rows to the inputs table associated with the
+ *   blocks db
+ * - Second, the trigger attached to the mempool itself, which takes care of
+ *   inserting deleted transactions to the blocks table (which is why we need
+ *   to first set a session variable)
+ */
+// TODO: Session variable name is a magic string. It should come from a variable
+//       like other table names, columns, etc.
+export const clearTxs = (
+  txHashes: Buffer[],
+  committedBlockHeaderHash: Buffer,
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        yield* sql`SET block_commitment.deleting_block = ${committedBlockHeaderHash};`;
+        yield* delMultiple(tableName, txHashes);
+      }),
+    );
+  });
 
 export const clear = () => clearTable(tableName);
