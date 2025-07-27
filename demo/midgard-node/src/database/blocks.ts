@@ -10,6 +10,10 @@ export enum Columns {
   TX_HASH = "tx_hash",
 }
 
+type Entry = {
+  [blockCols in Columns]: Buffer;
+};
+
 export const inputsTableName = "blocks_spent_inputs";
 
 export const outputsTableName = "blocks_produced_outputs";
@@ -23,44 +27,6 @@ export const init = Effect.gen(function* () {
   yield* createInputsTable(inputsTableName, tableName, Columns.TX_HASH);
 });
 
-export const insertBlock = (
-  headerHash: Buffer,
-  processedTxs: ProcessedTx[],
-): Effect.Effect<void, Error, Database> =>
-  Effect.gen(function* () {
-    // yield* Effect.logInfo(`${tableName} db: attempt to insert blocks`);
-    const sql = yield* SqlClient.SqlClient;
-
-    yield* Effect.forEach(
-      processedTxs,
-      ({ txHash, txCbor, inputs, outputs }) => {
-        return;
-      },
-    );
-
-    if (txHashes.length <= 0) {
-      yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
-      return;
-    }
-    const rowsToInsert = txHashes.map((txHash: Uint8Array) => ({
-      headerHash: headerHash,
-      txHash: txHash,
-    }));
-
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(rowsToInsert)}`;
-
-    // yield* Effect.logInfo(
-    //   `${tableName} db: ${rowsToInsert.length} block rows inserted.`,
-    // );
-  }).pipe(
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: inserting error: ${e}`),
-    ),
-    Effect.withLogSpan(`insert ${tableName}`),
-    mapSqlError,
-    Effect.asVoid,
-  );
-
 export const retrieveTxHashesByHeaderHash = (
   headerHash: Buffer,
 ): Effect.Effect<readonly Buffer[], Error, Database> =>
@@ -70,7 +36,7 @@ export const retrieveTxHashesByHeaderHash = (
     );
     const sql = yield* SqlClient.SqlClient;
 
-    const result = yield* sql<Buffer>`SELECT txHash FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT ${sql(Columns.TX_HASH)} FROM ${sql(
       tableName,
     )} WHERE ${sql(Columns.HEADER_HASH)} = ${headerHash}`;
 
@@ -90,7 +56,7 @@ export const retrieveTxHashesByHeaderHash = (
 
 export const retrieveHeaderHashByTxHash = (
   txHash: Buffer,
-): Effect.Effect<Uint8Array, Error, Database> =>
+): Effect.Effect<Buffer, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve headerHash for txHash ${txHash}`,
@@ -100,7 +66,7 @@ export const retrieveHeaderHashByTxHash = (
     const rows =
       yield* sql<Buffer>`SELECT ${sql(Columns.HEADER_HASH)} FROM ${sql(
         tableName,
-      )} WHERE txHash = ${txHash} LIMIT 1`;
+      )} WHERE ${sql(Columns.TX_HASH)} = ${txHash} LIMIT 1`;
 
     if (rows.length <= 0) {
       const msg = `No headerHash found for ${txHash} txHash`;
@@ -123,6 +89,8 @@ export const retrieveHeaderHashByTxHash = (
     mapSqlError,
   );
 
+/** Associated inputs are also deleted.
+ */
 export const clearBlock = (
   headerHash: Buffer,
 ): Effect.Effect<void, Error, Database> =>
@@ -146,20 +114,11 @@ export const clearBlock = (
     mapSqlError,
   );
 
-type BlockRow = {
-  readonly headerHash: Buffer;
-  readonly txHash: Buffer;
-};
-
-export const retrieve = (): Effect.Effect<
-  readonly BlockRow[],
-  Error,
-  Database
-> =>
+export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<BlockRow>`SELECT * FROM ${sql(tableName)}`;
+    const result = yield* sql<Entry>`SELECT * FROM ${sql(tableName)}`;
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
   }).pipe(

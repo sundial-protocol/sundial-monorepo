@@ -58,7 +58,7 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
         // Defining another trigger to be attached to the mempool itself, for
         // archiving transactions included in a committed block.
         //
-        // NOTE: The session variable is something to keep an eye out for.
+        // TODO: The session variable must also come from a TS variable.
         //
         // TODO: Syntax used for `OLD.` might be incorrect.
         yield* sql`CREATE OR REPLACE FUNCTION archive_mempool()
