@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import {
+  KVPair,
   clearTable,
   insertKeyValue,
   insertKeyValues,
@@ -11,14 +12,11 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insert = (
-  txHash: Buffer,
-  txCbor: Buffer,
-): Effect.Effect<void, Error, Database> =>
-  insertKeyValue(tableName, txHash, txCbor);
+export const insert = (tx: KVPair): Effect.Effect<void, Error, Database> =>
+  insertKeyValue(tableName, tx);
 
 export const insertTxs = (
-  txs: { key: Buffer; value: Buffer }[],
+  txs: KVPair[],
 ): Effect.Effect<void, Error, Database> => insertKeyValues(tableName, txs);
 
 export const retrieve = () => retrieveKeyValues(tableName);
