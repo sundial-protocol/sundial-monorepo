@@ -10,6 +10,7 @@ import { Data, Effect, pipe, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
+import { ProcessedTx } from "@/database/utils.js";
 
 const RETRY_ATTEMPTS = 2;
 
@@ -134,7 +135,7 @@ export class ConfirmError extends Data.TaggedError("ConfirmError")<{
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
 ): Effect.Effect<
-  { txs: readonly Buffer[]; headerHash: string },
+  { txs: readonly ProcessedTx[]; headerHash: string },
   Error,
   Database
 > =>
@@ -142,10 +143,9 @@ export const fetchFirstBlockTxs = (
     const blockHeader =
       yield* SDK.Utils.getHeaderFromStateQueueUTxO(firstBlockUTxO);
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
-    const txHashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(
+    const txs = yield* BlocksDB.retrieveByHeaderHash(
       Buffer.from(fromHex(headerHash)),
     );
-    const txs = yield* ImmutableDB.retrieveTxCborsByHashes(txHashes);
     return { txs, headerHash };
   });
 

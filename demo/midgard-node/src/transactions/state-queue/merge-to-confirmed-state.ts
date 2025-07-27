@@ -13,10 +13,10 @@
  */
 
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
-import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import {
   Address,
+  CML,
   LucidEvolution,
   Script,
   fromHex,
@@ -28,7 +28,7 @@ import {
   handleSignSubmit,
   SubmitError,
 } from "../utils.js";
-import { Database } from "@/services/database.js";
+import { LedgerColumns, LedgerEntry } from "@/database/utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
@@ -118,9 +118,10 @@ export const buildAndSubmitMergeTx = (
       );
       // Fetch transactions from the first block
       yield* Effect.logInfo("🔸 Looking up its transactions from BlocksDB...");
-      const { txs: firstBlockTxs, headerHash } = yield* fetchFirstBlockTxs(
-        firstBlockUTxO,
-      ).pipe(Effect.withSpan("fetchFirstBlockTxs"));
+      const { txs: firstBlockTxs, headerHash: headerHashHex } =
+        yield* fetchFirstBlockTxs(firstBlockUTxO).pipe(
+          Effect.withSpan("fetchFirstBlockTxs"),
+        );
       if (firstBlockTxs.length === 0) {
         yield* Effect.logInfo(
           "🔸 ❌ Failed to find first block's transactions in BlocksDB.",
@@ -157,10 +158,33 @@ export const buildAndSubmitMergeTx = (
       yield* Effect.logInfo(
         "🔸 Merge transaction submitted, updating the db...",
       );
-      const { spent: spentOutRefs, produced: producedUTxOs } =
-        yield* findAllSpentAndProducedUTxOs(firstBlockTxs).pipe(
-          Effect.withSpan("findAllSpentAndProducedUTxOs"),
+
+      const spentOutRefs: Buffer[] = [];
+      const producedUTxOs: LedgerEntry[] = [];
+
+      firstBlockTxs.map((tx) => {
+        spentOutRefs.push(...tx.inputs);
+        producedUTxOs.push(
+          ...tx.outputs.map((o, i) => {
+            const outrefBytes = Buffer.from(
+              CML.TransactionInput.new(
+                CML.TransactionHash.from_raw_bytes(tx.txHash),
+                BigInt(i),
+              ).to_cbor_bytes(),
+            );
+            // TODO: Avoid reserializing.
+            const addr = CML.TransactionOutput.from_cbor_bytes(o)
+              .address()
+              .to_bech32();
+            return {
+              [LedgerColumns.TX_ID]: tx.txHash,
+              [LedgerColumns.OUTREF]: outrefBytes,
+              [LedgerColumns.OUTPUT]: o,
+              [LedgerColumns.ADDRESS]: addr,
+            };
+          }),
         );
+      });
 
       // - Clear all the spent UTxOs from the confirmed ledger
       // - Add all the produced UTxOs from the confirmed ledger
@@ -174,12 +198,12 @@ export const buildAndSubmitMergeTx = (
       }
       yield* Effect.logInfo("🔸 Insert produced UTxOs...");
       for (let i = 0; i < producedUTxOs.length; i += bs) {
-        yield* ConfirmedLedgerDB.insert(producedUTxOs.slice(i, i + bs))
+        yield* ConfirmedLedgerDB.insertMultiple(producedUTxOs.slice(i, i + bs))
           // .map((u) => utxoToOutRefAndCBORArray(u)),
           .pipe(Effect.withSpan(`confirmed-ledger-insert-${i}`));
       }
       yield* Effect.logInfo("🔸 Clear block from BlocksDB...");
-      yield* BlocksDB.clearBlock(fromHex(headerHash)).pipe(
+      yield* BlocksDB.clearBlock(Buffer.from(fromHex(headerHashHex))).pipe(
         Effect.withSpan("clear-block-from-BlocksDB"),
       );
       yield* Effect.logInfo("🔸 ☑️  Merge transaction completed.");
