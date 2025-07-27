@@ -2,11 +2,14 @@
  * This script performs the following tasks to merge the first block into the
  * confirmed state:
  *
- * 1. Fetch transactions of the first block by querying ImmutableDB.
- * 2. Apply those transactions to ConfirmedLedgerDB and update the table to
+ * 1. Fetches the confirmed state and the block it points to (i.e. the oldest
+ *    block in the queue).
+ * 2. Fetches the transactions of that block by querying BlocksDB and its
+ *    associated inputs table..
+ * 3. Apply those transactions to ConfirmedLedgerDB and update the table to
  *    store the updated UTxO set.
- * 3. Remove all header hashes from BlocksDB associated with the merged block.
- * 4. Build and submit the merge transaction.
+ * 4. Remove all header hashes from BlocksDB associated with the merged block.
+ * 5. Build and submit the merge transaction.
  */
 
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";

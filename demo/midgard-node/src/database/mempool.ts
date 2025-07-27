@@ -13,6 +13,7 @@ import {
   KVColumns,
   mapSqlError,
   insertSpentInput,
+  createLedgerTable,
 } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as ImmutableDB from "./immutable.js";
@@ -34,6 +35,7 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
       Effect.gen(function* () {
         yield* createKeyValueTable(tableName);
         yield* createInputsTable(inputsTableName, tableName);
+        yield* createLedgerTable(outputsTableName);
         // Defining a PostgreSQL trigger to fire whenever a row from the spent
         // inputs table is deleted.
         //
@@ -129,11 +131,11 @@ export const retrieveByHash = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
-      SELECT 
-        m.${sql(KVColumns.KEY)} as txHash, 
+      SELECT
+        m.${sql(KVColumns.KEY)} as txHash,
         ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = txHash) AS inputs,
         ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = txHash) AS outputs
-      FROM ${sql(tableName)} m 
+      FROM ${sql(tableName)} m
       WHERE txHash = ${txHash}`;
 
     if (rows.length === 0) {
@@ -154,8 +156,8 @@ export const retrieve = (): Effect.Effect<
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
-    SELECT 
-      m.${sql(KVColumns.KEY)} as txHash, 
+    SELECT
+      m.${sql(KVColumns.KEY)} as txHash,
       ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = txHash) AS inputs,
       ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = txHash) AS outputs
     FROM ${sql(tableName)} m`;
