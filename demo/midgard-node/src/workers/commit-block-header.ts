@@ -3,7 +3,7 @@ import * as SDK from "@al-ft/midgard-sdk";
 import { Effect, Schedule, pipe } from "effect";
 import { WorkerInput, WorkerOutput } from "@/utils.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
-import { BlocksDB, ImmutableDB, MempoolDB } from "@/database/index.js";
+import { MempoolDB } from "@/database/index.js";
 import {
   ConfirmError,
   handleSignSubmit,
@@ -120,47 +120,17 @@ const wrapper = (
           onConfirmFailure,
         ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
 
-        const batchSize = 100;
-
         yield* Effect.logInfo(
           "🔹 Inserting included transactions into ImmutableDB and BlocksDB...",
-        );
-
-        const batchIndices = Array.from(
-          { length: Math.ceil(mempoolTxsCount / batchSize) },
-          (_, i) => i * batchSize,
-        );
-        yield* Effect.forEach(
-          batchIndices,
-          (startIndex) => {
-            const endIndex = startIndex + batchSize;
-            const batchTxs = mempoolTxs.slice(startIndex, endIndex);
-            const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
-
-            return pipe(
-              Effect.all(
-                [
-                  ImmutableDB.insertTxs(batchTxs).pipe(
-                    Effect.withSpan(`immutable-db-insert-${startIndex}`),
-                  ),
-                  BlocksDB.insert(fromHex(newHeaderHash), batchHashes).pipe(
-                    Effect.withSpan(`blocks-db-insert-${startIndex}`),
-                  ),
-                ],
-                { concurrency: 2 },
-              ),
-              Effect.withSpan(`batch-insert-${startIndex}-${endIndex}`),
-            );
-          },
-          { concurrency: batchIndices.length },
         );
 
         yield* Effect.logInfo(
           "🔹 Clearing included transactions from MempoolDB...",
         );
-        yield* MempoolDB.clearTxs(mempoolTxHashes).pipe(
-          Effect.withSpan("clear mempool"),
-        );
+        yield* MempoolDB.clearTxs(
+          mempoolTxHashes,
+          Buffer.from(fromHex(newHeaderHash)),
+        ).pipe(Effect.withSpan("clear mempool"));
 
         const output: WorkerOutput = {
           txSize,

@@ -1,13 +1,14 @@
 import { SqlClient } from "@effect/sql";
 import { BatchDBOp } from "@ethereumjs/util";
 import { Effect } from "effect";
-import { findSpentAndProducedUTxOs } from "@/utils.js";
 import * as ETH from "@ethereumjs/mpt";
 import * as ETH_UTILS from "@ethereumjs/util";
 import { toHex } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { MemoryLevel } from "memory-level";
 import { NodeConfig } from "@/config.js";
+import { ProcessedTx } from "@/database/utils.js";
+import { Database } from "@/services/database.js";
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 
@@ -63,40 +64,44 @@ export const makeMpts = () =>
 export const processMpts = (
   ledgerTrie: ETH.MerklePatriciaTrie,
   mempoolTrie: ETH.MerklePatriciaTrie,
-  mempoolTxs: readonly { key: Uint8Array; value: Uint8Array }[],
-) =>
+  mempoolTxs: readonly ProcessedTx[],
+): Effect.Effect<
+  {
+    utxoRoot: string;
+    txRoot: string;
+    mempoolTxHashes: Buffer[];
+    sizeOfBlocksTxs: number;
+  },
+  Error,
+  Database
+> =>
   Effect.gen(function* () {
-    const mempoolTxHashes: Uint8Array[] = [];
+    const mempoolTxHashes: Buffer[] = [];
     const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfBlocksTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
-    yield* Effect.forEach(mempoolTxs, ({ key: txHash, value: txCbor }) =>
-      Effect.gen(function* () {
-        mempoolTxHashes.push(txHash);
-        sizeOfBlocksTxs += txCbor.length;
-        yield* Effect.tryPromise({
-          try: () => mempoolTrie.put(txHash, txCbor),
-          catch: (e) => new Error(`${e}`),
-        });
-        const { spent, produced } = yield* findSpentAndProducedUTxOs(
-          txCbor,
-        ).pipe(Effect.withSpan("findSpentAndProducedUTxOs"));
-        const delOps: ETH_UTILS.BatchDBOp[] = spent.map((outRef) => ({
-          type: "del",
-          key: outRef,
-        }));
-        const putOps: ETH_UTILS.BatchDBOp[] = produced.map(
-          ({
-            outReferenceBytes: outputReference,
-            txOutputBytes: txOutputBytes,
-          }) => ({
+    yield* Effect.forEach(
+      mempoolTxs,
+      ({ txHash, txCbor, inputs: spent, outputs: produced }) =>
+        Effect.gen(function* () {
+          mempoolTxHashes.push(txHash);
+          sizeOfBlocksTxs += txCbor.length;
+          yield* Effect.tryPromise({
+            try: () => mempoolTrie.put(txHash, txCbor),
+            catch: (e) => new Error(`${e}`),
+          });
+          const delOps: ETH_UTILS.BatchDBOp[] = spent.map((outRef) => ({
+            type: "del",
+            key: outRef,
+          }));
+          // TODO: Use an actual outref rather than txHash.
+          const putOps: ETH_UTILS.BatchDBOp[] = produced.map((o) => ({
             type: "put",
-            key: outputReference,
-            value: txOutputBytes,
-          }),
-        );
-        yield* Effect.sync(() => batchDBOps.push(...[...delOps, ...putOps]));
-      }),
+            key: txHash,
+            value: o,
+          }));
+          yield* Effect.sync(() => batchDBOps.push(...[...delOps, ...putOps]));
+        }),
     );
 
     yield* Effect.tryPromise({
