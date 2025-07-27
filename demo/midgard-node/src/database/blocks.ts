@@ -9,13 +9,17 @@ export const inputsTableName = "blocks_spent_inputs";
 
 export const outputsTableName = "blocks_produced_outputs";
 
+export const headerHashCol = "header_hash";
+
+export const txHashCol = "tx_hash";
+
 export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-    headerHash BYTEA NOT NULL,
-    txHash BYTEA NOT NULL UNIQUE
+    ${sql(headerHashCol)} BYTEA NOT NULL,
+    ${sql(txHashCol)} BYTEA NOT NULL UNIQUE
   );`;
-  yield* createInputsTable(inputsTableName, tableName, "txHash");
+  yield* createInputsTable(inputsTableName, tableName, txHashCol);
 });
 
 export const insertBlock = (
@@ -67,7 +71,7 @@ export const retrieveTxHashesByHeaderHash = (
 
     const result = yield* sql<Buffer>`SELECT txHash FROM ${sql(
       tableName,
-    )} WHERE headerHash = ${headerHash}`;
+    )} WHERE ${sql(headerHashCol)} = ${headerHash}`;
 
     yield* Effect.logDebug(
       `${tableName} db: retrieved ${result.length} txHashes for block ${headerHash}`,
@@ -92,7 +96,7 @@ export const retrieveHeaderHashByTxHash = (
     );
     const sql = yield* SqlClient.SqlClient;
 
-    const rows = yield* sql<Buffer>`SELECT headerHash FROM ${sql(
+    const rows = yield* sql<Buffer>`SELECT ${sql(headerHashCol)} FROM ${sql(
       tableName,
     )} WHERE txHash = ${txHash} LIMIT 1`;
 
@@ -125,7 +129,7 @@ export const clearBlock = (
       `${tableName} db: attempt clear block ${headerHash}`,
     );
     const sql = yield* SqlClient.SqlClient;
-    yield* sql`DELETE FROM ${sql(tableName)} WHERE headerHash = ${headerHash}`;
+    yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(headerHashCol)} = ${headerHash}`;
     // yield* Effect.logInfo(
     //   `${tableName} db: cleared ${result.entries()} rows for block ${toHex(headerHash)}`,
     // );

@@ -9,8 +9,8 @@ import {
   createInputsTable,
   createKeyValueTable,
   ProcessedTx,
-  inputsTablePrimaryKeyLabel,
-  inputsTableForeignKeyLabel,
+  InputsColumns,
+  LedgerColumns,
 } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as ImmutableDB from "./immutable.js";
@@ -35,13 +35,17 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
         // Defining a PostgreSQL trigger to fire whenever a row from the spent
         // inputs table is deleted.
         //
-        // The trigger simply archives the deleted row in the "spent inputs" table
-        // associated with the Blocks DB.
+        // The trigger simply archives the deleted row in the "spent inputs"
+        // table associated with the Blocks DB.
+        //
+        // TODO: Here I'm not sure if `OLD.${}` works with variables. So this is
+        // a risky inconsistency where I've duplicated literal values from
+        // `InputsColumns`.
         yield* sql`CREATE OR REPLACE FUNCTION insert_inputs_into_blocks_on_delete()
         RETURNS trigger AS $$
         BEGIN
-          INSERT INTO ${sql(BlocksDB.inputsTableName)}(${inputsTablePrimaryKeyLabel}, ${inputsTableForeignKeyLabel})
-          VALUES (OLD.${inputsTablePrimaryKeyLabel}, OLD.${inputsTableForeignKeyLabel});
+          INSERT INTO ${sql(BlocksDB.inputsTableName)}(${sql(InputsColumns.OUTREF)}, ${sql(InputsColumns.SPENDING_TX)})
+          VALUES (OLD.spent_outref, OLD.spending_tx_hash);
           RETURN OLD;
         END;
         $$ LANGUAGE plpgsql;
@@ -53,10 +57,12 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
       `;
         // Defining another trigger to be attached to the mempool itself, for
         // archiving transactions included in a commited block.
+        // 
+        // NOTE: The session variable is something to keep an eye out for.
         yield* sql`CREATE OR REPLACE FUNCTION archive_mempool()
         RETURNS trigger AS $$
         BEGIN
-          INSERT INTO ${sql(BlocksDB.tableName)}(headerHash, txHash)
+          INSERT INTO ${sql(BlocksDB.tableName)}(${sql(BlocksDB.headerHashCol)}, ${sql(BlocksDB.txHashCol)})
           VALUES (current_setting('block_commitment.deleting_block', TRUE), OLD.key);
           INSERT INTO ${sql(ImmutableDB.tableName)}(key, value)
           VALUES (OLD.key, OLD.value);
@@ -91,8 +97,8 @@ export const insert = (
         inputsTableName,
         Buffer.from(inputs.get(i).to_cbor_bytes()),
         txHashBytes,
-        "outref",
-        "spendingTxHash",
+        InputsColumns.OUTREF,
+        InputsColumns.SPENDING_TX,
       );
     }
     const outputs = txBody.outputs();
@@ -100,7 +106,7 @@ export const insert = (
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
       yield* MempoolLedgerDB.insert({
-        txId: txHashBytes,
+        tx_id: txHashBytes,
         outref: Buffer.from(
           CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
         ),
@@ -118,13 +124,12 @@ export const retrieveByHash = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
-  SELECT 
-    m.key, 
-    ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE spendingTxHash = m.key) AS inputs,
-    ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE txId = m.key) AS outputs
-  FROM ${sql(tableName)} m 
-  WHERE m.key = ${txHash}
-`;
+      SELECT 
+        m.key as txHash, 
+        ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = txHash) AS inputs,
+        ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = txHash) AS outputs
+      FROM ${sql(tableName)} m 
+      WHERE txHash = ${txHash}`;
 
     if (rows.length === 0) {
       yield* Effect.fail(new Error(`Transaction not found from ${tableName}`));
@@ -136,7 +141,20 @@ export const retrieveByHash = (
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
-export const retrieve = () => retrieveKeyValues(tableName);
+export const retrieve = (): Effect.Effect<
+  ProcessedTx[],
+  Error,
+  Database
+> => Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const rows = yield* sql<ProcessedTx>`
+    SELECT 
+      m.key, 
+      ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = m.key) AS inputs,
+      ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = m.key) AS outputs
+    FROM ${sql(tableName)} m`;
+});
+
 
 export const retrieveTxCount = () => retrieveNumberOfEntries(tableName);
 

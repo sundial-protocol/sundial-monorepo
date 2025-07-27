@@ -3,6 +3,25 @@ import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
 
+export enum LedgerColumns {
+  TX_ID = "tx_id",
+  OUTREF = "outref",
+  OUTPUT = "output",
+  ADDRESS = "address",
+}
+
+export type LedgerEntry = {
+  tx_id: Buffer;
+  outref: Buffer;
+  output: Buffer;
+  address: Address;
+};
+
+export enum InputsColumns {
+  OUTREF = "spent_outref",
+  SPENDING_TX = "spending_tx_hash",
+}
+
 export type ProcessedTx = {
   txHash: Buffer;
   txCbor: Buffer;
@@ -214,39 +233,13 @@ export const createLedgerTable = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      txId BYTEA NOT NULL,
-      outref BYTEA NOT NULL,
-      output BYTEA NOT NULL,
-      address TEXT NOT NULL,
-      PRIMARY KEY (outref)
+      ${sql(LedgerColumns.TX_ID)} BYTEA NOT NULL,
+      ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
+      ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
+      ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
+      PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
-
-export const inputsTablePrimaryKeyLabel = "outref";
-
-export const inputsTableForeignKeyLabel = "spendingTxHash";
-
-export const createInputsTable = (
-  inputsTableName: string,
-  parentTableName: string,
-  keyLabel?: string,
-): Effect.Effect<void, Error, Database> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(inputsTableName)} (
-      ${inputsTablePrimaryKeyLabel} BYTEA NOT NULL,
-      ${inputsTableForeignKeyLabel} BYTEA NOT NULL,
-      PRIMARY KEY (${inputsTablePrimaryKeyLabel}),
-      FOREIGN KEY (${inputsTableForeignKeyLabel}) REFERENCES ${sql(parentTableName)}(${keyLabel ?? "key"}) ON DELETE CASCADE
-    );`;
-  }).pipe(Effect.withLogSpan(`creating table ${inputsTableName}`), mapSqlError);
-
-export type LedgerEntry = {
-  txId: Buffer;
-  outref: Buffer;
-  output: Buffer;
-  address: Address;
-};
 
 export const insertLedgerEntry = (
   tableName: string,
@@ -321,3 +314,18 @@ export const retrieveLedgerEntriesWithAddress = (
     ),
     mapSqlError,
   );
+
+export const createInputsTable = (
+  inputsTableName: string,
+  parentTableName: string,
+  keyLabel?: string,
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(inputsTableName)} (
+      ${sql(InputsColumns.OUTREF)} BYTEA NOT NULL,
+      ${sql(InputsColumns.SPENDING_TX)} BYTEA NOT NULL,
+      PRIMARY KEY (${sql(InputsColumns.OUTREF)}),
+      FOREIGN KEY (${sql(InputsColumns.SPENDING_TX)}) REFERENCES ${sql(parentTableName)}(${sql.unsafe(keyLabel ?? "key")}) ON DELETE CASCADE
+    );`;
+  }).pipe(Effect.withLogSpan(`creating table ${inputsTableName}`), mapSqlError);
