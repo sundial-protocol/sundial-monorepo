@@ -39,7 +39,7 @@ export type ProcessedTx = {
   txHash: Buffer;
   txCbor: Buffer;
   inputs: Buffer[];
-  outputs: Buffer[];
+  outputs: LedgerEntry[];
 };
 
 export const createKeyValueTable = (

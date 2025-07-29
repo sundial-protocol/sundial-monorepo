@@ -1,4 +1,5 @@
 import { Database } from "@/services/database.js";
+import { bufferToHex } from "@/utils.js";
 import {
   clearTable,
   insertKeyValue,
@@ -20,7 +21,7 @@ import * as ImmutableDB from "./immutable.js";
 import * as BlocksDB from "./blocks.js";
 import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
-import { CML, fromHex, toHex } from "@lucid-evolution/lucid";
+import { CML, fromHex } from "@lucid-evolution/lucid";
 
 export const tableName = "mempool";
 
@@ -65,9 +66,12 @@ export const init: Effect.Effect<void, Error, Database> = Effect.gen(
         // TODO: Syntax used for `OLD.` might be incorrect.
         yield* sql`CREATE OR REPLACE FUNCTION archive_mempool()
         RETURNS trigger AS $$
+        DECLARE
+          hh BYTEA;
         BEGIN
-          INSERT INTO ${sql(BlocksDB.tableName)}(${sql(BlocksDB.Columns.HEADER_HASH)}, ${sql(BlocksDB.Columns.TX_HASH)})
-          VALUES (current_setting('block_commitment.deleting_block', TRUE), OLD.${sql(KVColumns.KEY)});
+          hh := decode(current_setting('block_commitment.deleting_block', TRUE), 'hex');
+          INSERT INTO ${sql(BlocksDB.tableName)}(${sql(BlocksDB.Columns.HEADER_HASH)}, ${sql(BlocksDB.Columns.TX_ID)})
+          VALUES (hh, OLD.${sql(KVColumns.KEY)});
           INSERT INTO ${sql(ImmutableDB.tableName)}(${sql(KVColumns.KEY)}, ${sql(KVColumns.VALUE)})
           VALUES (OLD.${sql(KVColumns.KEY)}, OLD.${sql(KVColumns.VALUE)});
           RETURN OLD;
@@ -134,12 +138,26 @@ export const retrieveByHash = (
       SELECT
         m.${sql(KVColumns.KEY)} as txHash,
         m.${sql(KVColumns.VALUE)} as txCbor,
-        ARRAY(SELECT ${sql(InputsColumns.OUTREF)} FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}) AS inputs,
-        ARRAY(SELECT ${sql(LedgerColumns.OUTPUT)} FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}) AS outputs
+        COALESCE(
+          ARRAY(
+            SELECT psi.${sql(InputsColumns.OUTREF)}
+            FROM ${sql(inputsTableName)} psi
+            WHERE psi.${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}
+          ),
+          ARRAY[]::BYTEA[]
+        ) AS inputs,
+        COALESCE(
+          ARRAY(
+            SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
+            FROM ${sql(outputsTableName)} ml
+            WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
+          ),
+          ARRAY[]::${sql(outputsTableName)}[]
+        ) AS outputs
       FROM ${sql(tableName)} m
-      WHERE txHash = ${txHash}`;
+      WHERE txHash = ${txHash}; LIMIT 1`;
 
-    if (rows.length === 0) {
+    if (rows.length <= 0) {
       yield* Effect.fail(new Error(`Transaction not found from ${tableName}`));
     }
 
@@ -160,9 +178,23 @@ export const retrieve = (): Effect.Effect<
       SELECT
         m.${sql(KVColumns.KEY)} as txHash,
         m.${sql(KVColumns.VALUE)} as txCbor,
-        ARRAY(SELECT ${sql(InputsColumns.OUTREF)} FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}) AS inputs,
-        ARRAY(SELECT ${sql(LedgerColumns.OUTPUT)} FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}) AS outputs
-      FROM ${sql(tableName)} m`;
+        COALESCE(
+          ARRAY(
+            SELECT psi.${sql(InputsColumns.OUTREF)}
+            FROM ${sql(inputsTableName)} psi
+            WHERE psi.${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}
+          ),
+          ARRAY[]::BYTEA[]
+        ) AS inputs,
+        COALESCE(
+          ARRAY(
+            SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
+            FROM ${sql(outputsTableName)} ml
+            WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
+          ),
+          ARRAY[]::${sql(outputsTableName)}[]
+        ) AS outputs
+      FROM ${sql(tableName)} m;`;
 
     return rows;
   }).pipe(
@@ -200,7 +232,9 @@ export const clearTxs = (
     const sql = yield* SqlClient.SqlClient;
     yield* sql.withTransaction(
       Effect.gen(function* () {
-        yield* sql`SET block_commitment.deleting_block = ${committedBlockHeaderHash};`;
+        yield* sql`SELECT set_config('block_commitment.deleting_block', ${
+          bufferToHex(committedBlockHeaderHash)
+        }, TRUE);`
         yield* delMultiple(tableName, txHashes);
       }),
     );

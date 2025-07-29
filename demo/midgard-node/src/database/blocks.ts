@@ -15,7 +15,7 @@ export const tableName = "blocks";
 
 export enum Columns {
   HEADER_HASH = "header_hash",
-  TX_HASH = "tx_hash",
+  TX_ID = "tx_id",
 }
 
 type Entry = {
@@ -31,9 +31,9 @@ export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
     ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
-    ${sql(Columns.TX_HASH)} BYTEA NOT NULL UNIQUE
+    ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE
   );`;
-  yield* createInputsTable(inputsTableName, tableName, Columns.TX_HASH);
+  yield* createInputsTable(inputsTableName, tableName, Columns.TX_ID);
 });
 
 export const retrieveByHeaderHash = (
@@ -43,24 +43,24 @@ export const retrieveByHeaderHash = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
       SELECT
-        blocks.${sql(Columns.TX_HASH)} as txHash,
+        bs.${sql(Columns.TX_ID)} as txHash,
         (
           SELECT ${sql(LedgerColumns.OUTPUT)}
           FROM ${sql(outputsTableName)}
-          WHERE ${sql(LedgerColumns.TX_ID)} = blocks.${sql(Columns.TX_HASH)}
+          WHERE ${sql(LedgerColumns.TX_ID)} = bs.${sql(Columns.TX_ID)}
         ) as txCbor,
         COALESCE((
           SELECT array_agg(i.${sql(InputsColumns.OUTREF)})
           FROM ${sql(inputsTableName)} i
-          WHERE i.${sql(InputsColumns.SPENDING_TX)} = blocks.${sql(Columns.TX_HASH)}
+          WHERE i.${sql(InputsColumns.SPENDING_TX)} = bs.${sql(Columns.TX_ID)}
         ), '{}') AS inputs,
         COALESCE((
           SELECT array_agg(o.${sql(LedgerColumns.OUTPUT)})
           FROM ${sql(outputsTableName)} o
-          WHERE o.${sql(LedgerColumns.TX_ID)} = blocks.${sql(Columns.TX_HASH)}
+          WHERE o.${sql(LedgerColumns.TX_ID)} = bs.${sql(Columns.TX_ID)}
         ), '{}') AS outputs,
-      FROM ${sql(tableName)} blocks
-      WHERE blocks.${sql(Columns.HEADER_HASH)} = ${headerHash}`;
+      FROM ${sql(tableName)} bs
+      WHERE bs.${sql(Columns.HEADER_HASH)} = ${headerHash};`;
     return rows;
   }).pipe(
     Effect.withLogSpan(`retrieveByHeaderHash ${tableName}`),
@@ -81,7 +81,7 @@ export const retrieveTxHashesByHeaderHash = (
     );
     const sql = yield* SqlClient.SqlClient;
 
-    const result = yield* sql<Buffer>`SELECT ${sql(Columns.TX_HASH)} FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT ${sql(Columns.TX_ID)} FROM ${sql(
       tableName,
     )} WHERE ${sql(Columns.HEADER_HASH)} = ${headerHash}`;
 
@@ -111,7 +111,7 @@ export const retrieveHeaderHashByTxHash = (
     const rows = yield* sql<Buffer>`SELECT ${sql(
       Columns.HEADER_HASH,
     )} FROM ${sql(tableName)} WHERE ${sql(
-      Columns.TX_HASH,
+      Columns.TX_ID,
     )} = ${txHash} LIMIT 1`;
 
     if (rows.length <= 0) {
