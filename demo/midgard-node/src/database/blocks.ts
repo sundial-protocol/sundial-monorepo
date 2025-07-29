@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import {
   InputsColumns,
+  KVColumns,
   LedgerColumns,
   ProcessedTx,
   clearTable,
@@ -10,6 +11,7 @@ import {
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
+import * as ImmutableDB from "./immutable.js";
 
 export const tableName = "blocks";
 
@@ -45,22 +47,29 @@ export const retrieveByHeaderHash = (
       SELECT
         bs.${sql(Columns.TX_ID)} as txHash,
         (
-          SELECT ${sql(LedgerColumns.OUTPUT)}
-          FROM ${sql(outputsTableName)}
-          WHERE ${sql(LedgerColumns.TX_ID)} = bs.${sql(Columns.TX_ID)}
+          SELECT ${sql(KVColumns.VALUE)}
+          FROM ${sql(ImmutableDB.tableName)} im
+          WHERE im.${sql(KVColumns.KEY)} = bs.${sql(Columns.TX_ID)}
         ) as txCbor,
-        COALESCE((
-          SELECT array_agg(i.${sql(InputsColumns.OUTREF)})
-          FROM ${sql(inputsTableName)} i
-          WHERE i.${sql(InputsColumns.SPENDING_TX)} = bs.${sql(Columns.TX_ID)}
-        ), '{}') AS inputs,
-        COALESCE((
-          SELECT array_agg(o.${sql(LedgerColumns.OUTPUT)})
-          FROM ${sql(outputsTableName)} o
-          WHERE o.${sql(LedgerColumns.TX_ID)} = bs.${sql(Columns.TX_ID)}
-        ), '{}') AS outputs,
+        COALESCE(
+          ARRAY(
+            SELECT bsi.${sql(InputsColumns.OUTREF)}
+            FROM ${sql(inputsTableName)} bsi
+            WHERE bsi.${sql(InputsColumns.SPENDING_TX)} = bs.${sql(Columns.TX_ID)}
+          ),
+          ARRAY[]::BYTEA[]
+        ) AS inputs,
+        COALESCE(
+          ARRAY(
+            SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
+            FROM ${MempoolLedgerDB.tableName} ml
+            WHERE ml.${sql(LedgerColumns.TX_ID)} = bs.${sql(Columns.TX_ID)}
+          ),
+          ARRAY[]::${sql(outputsTableName)}[]
+        ) AS outputs
       FROM ${sql(tableName)} bs
-      WHERE bs.${sql(Columns.HEADER_HASH)} = ${headerHash};`;
+      WHERE bs.${sql(Columns.HEADER_HASH)} = ${headerHash};`
+
     return rows;
   }).pipe(
     Effect.withLogSpan(`retrieveByHeaderHash ${tableName}`),
