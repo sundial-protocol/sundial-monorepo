@@ -20,7 +20,7 @@ import * as ImmutableDB from "./immutable.js";
 import * as BlocksDB from "./blocks.js";
 import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
-import { CML, fromHex } from "@lucid-evolution/lucid";
+import { CML, fromHex, toHex } from "@lucid-evolution/lucid";
 
 export const tableName = "mempool";
 
@@ -133,8 +133,9 @@ export const retrieveByHash = (
     const rows = yield* sql<ProcessedTx>`
       SELECT
         m.${sql(KVColumns.KEY)} as txHash,
-        ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = txHash) AS inputs,
-        ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = txHash) AS outputs
+        m.${sql(KVColumns.VALUE)} as txCbor,
+        ARRAY(SELECT ${sql(InputsColumns.OUTREF)} FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}) AS inputs,
+        ARRAY(SELECT ${sql(LedgerColumns.OUTPUT)} FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}) AS outputs
       FROM ${sql(tableName)} m
       WHERE txHash = ${txHash}`;
 
@@ -156,11 +157,13 @@ export const retrieve = (): Effect.Effect<
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
-    SELECT
-      m.${sql(KVColumns.KEY)} as txHash,
-      ARRAY(SELECT outref FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = txHash) AS inputs,
-      ARRAY(SELECT output FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = txHash) AS outputs
-    FROM ${sql(tableName)} m`;
+      SELECT
+        m.${sql(KVColumns.KEY)} as txHash,
+        m.${sql(KVColumns.VALUE)} as txCbor,
+        ARRAY(SELECT ${sql(InputsColumns.OUTREF)} FROM ${sql(inputsTableName)} WHERE ${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}) AS inputs,
+        ARRAY(SELECT ${sql(LedgerColumns.OUTPUT)} FROM ${sql(outputsTableName)} WHERE ${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}) AS outputs
+      FROM ${sql(tableName)} m`;
+
     return rows;
   }).pipe(
     Effect.withLogSpan(

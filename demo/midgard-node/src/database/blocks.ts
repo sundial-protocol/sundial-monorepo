@@ -9,7 +9,7 @@ import {
 } from "./utils.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
-import { MempoolLedgerDB } from "./index.js";
+import * as MempoolLedgerDB from "./mempoolLedger.js";
 
 export const tableName = "blocks";
 
@@ -43,7 +43,12 @@ export const retrieveByHeaderHash = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
       SELECT
-        blocks.${sql(Columns.TX_HASH)},
+        blocks.${sql(Columns.TX_HASH)} as txHash,
+        (
+          SELECT ${sql(LedgerColumns.OUTPUT)}
+          FROM ${sql(outputsTableName)}
+          WHERE ${sql(LedgerColumns.TX_ID)} = blocks.${sql(Columns.TX_HASH)}
+        ) as txCbor,
         COALESCE((
           SELECT array_agg(i.${sql(InputsColumns.OUTREF)})
           FROM ${sql(inputsTableName)} i
