@@ -94,7 +94,6 @@ export const insert = (
   txString: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(txString);
     const txCbor = fromHex(txString);
     const deserializedTx = CML.Transaction.from_cbor_bytes(txCbor);
     const txBody = deserializedTx.body();
