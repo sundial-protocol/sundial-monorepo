@@ -202,7 +202,7 @@ export const retrieve = (): Effect.Effect<
             WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
           )
         ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
-      FROM ${sql(tableName)} m LIMIT 10000;`;
+      FROM ${sql(tableName)} m LIMIT 100000;`;
 
     const result: ProcessedTx[] = yield* Effect.allSuccesses(
       rows.map((ptx) =>
