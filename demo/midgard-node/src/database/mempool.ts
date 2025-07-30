@@ -107,7 +107,9 @@ export const insert = (
       value: Buffer.from(txCbor),
     });
     // Insert spent inputs int `inputsTableName`.
+    // TODO: collect in memory and make a single query.
     for (let i = 0; i < inputsCount; i++) {
+      // "mempool_spent_inputs" maps a tx_id to all of its spent inputs
       yield* insertSpentInput(inputsTableName, {
         spent_outref: Buffer.from(inputs.get(i).to_cbor_bytes()),
         spending_tx_hash: txHashBytes,
@@ -116,6 +118,7 @@ export const insert = (
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
     // Insert produced UTxOs in `MempoolLedgerDB`.
+    // TODO: collect in memory and make a single query.
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
       yield* MempoolLedgerDB.insert({
@@ -176,7 +179,11 @@ export const retrieve = (): Effect.Effect<
 > =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<Omit<ProcessedTx, ProcessedTxColumns.OUTPUTS> & { [ProcessedTxColumns.OUTPUTS]: string[] }>`
+    const rows = yield* sql<
+      Omit<ProcessedTx, ProcessedTxColumns.OUTPUTS> & {
+        [ProcessedTxColumns.OUTPUTS]: string;
+      }
+    >`
       SELECT
         m.${sql(KVColumns.KEY)} as ${sql(ProcessedTxColumns.TX_ID)},
         m.${sql(KVColumns.VALUE)} as ${sql(ProcessedTxColumns.TX_CBOR)},
@@ -190,21 +197,32 @@ export const retrieve = (): Effect.Effect<
         ) AS ${sql(ProcessedTxColumns.INPUTS)},
         COALESCE(
           ARRAY(
-            SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
+            SELECT (ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)})
             FROM ${sql(outputsTableName)} ml
             WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
-          ),
-          ARRAY[]::${sql(outputsTableName)}[]
+          )
         ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
-      FROM ${sql(tableName)} m;`;
+      FROM ${sql(tableName)} m LIMIT 10000;`;
 
-    const result: ProcessedTx[] = yield* Effect.allSuccesses(rows.map((ptx) => Effect.gen(function* () {
-      const ledgerEntries = yield* Effect.allSuccesses(ptx[ProcessedTxColumns.OUTPUTS].map(parseLedgerEntryString));
-      return {
-        ...ptx,
-        [ProcessedTxColumns.OUTPUTS]: ledgerEntries,
-      };
-    })));
+    const result: ProcessedTx[] = yield* Effect.allSuccesses(
+      rows.map((ptx) =>
+        Effect.gen(function* () {
+          const asList = ptx[ProcessedTxColumns.OUTPUTS]
+            .replace(/[{]/g, "[")
+            .replace(/[}]/g, "]");
+          const fields = JSON.parse(asList);
+          const ledgerEntries = yield* Effect.allSuccesses(
+            fields.map(parseLedgerEntryString),
+            { concurrency: "unbounded" },
+          );
+          return {
+            ...ptx,
+            [ProcessedTxColumns.OUTPUTS]: ledgerEntries,
+          };
+        }),
+      ),
+      { concurrency: "unbounded" },
+    );
 
     return result;
   }).pipe(
@@ -242,9 +260,9 @@ export const clearTxs = (
     const sql = yield* SqlClient.SqlClient;
     yield* sql.withTransaction(
       Effect.gen(function* () {
-        yield* sql`SELECT set_config('block_commitment.deleting_block', ${
-          bufferToHex(committedBlockHeaderHash)
-        }, TRUE);`
+        yield* sql`SELECT set_config('block_commitment.deleting_block', ${bufferToHex(
+          committedBlockHeaderHash,
+        )}, TRUE);`;
         yield* delMultiple(tableName, txHashes);
       }),
     );

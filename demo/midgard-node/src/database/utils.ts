@@ -20,49 +20,16 @@ export enum LedgerColumns {
 }
 
 export type LedgerEntry = {
-  [LedgerColumns.TX_ID]: Buffer;
-  [LedgerColumns.OUTREF]: Buffer;
-  [LedgerColumns.OUTPUT]: Buffer;
-  [LedgerColumns.ADDRESS]: Address;
+  [LedgerColumns.TX_ID]: Buffer; // for linking the tables
+  [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
+  [LedgerColumns.OUTPUT]: Buffer; // for root calc
+  [LedgerColumns.ADDRESS]: Address; // for provider
 };
 
-const dbHexStringToBuffer = (byteaString: string): Buffer => {
-  // remove possible wrapping double quotes
-  let hexString = (byteaString.startsWith("\"") && byteaString.endsWith("\"")) ? byteaString.slice(1, -1) : byteaString;
-  // remove possible double backslash (escaped backslash)
-  hexString = hexString.startsWith("\\\\x") ? hexString.slice(3) : hexString;
-  // remove single backslash if present
-  hexString = hexString.startsWith("\\x") ? hexString.slice(2) : hexString;
-  return Buffer.from(hexString, "hex");
+export type MinimalLedgerEntry = {
+  [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
+  [LedgerColumns.OUTPUT]: Buffer; // for root calc
 };
-
-/** Since `@effect/sql` seems incapable of auto-parsing nested record types, we
- * need to parse the returning list of strings into `ProcessedTx[]`.
- *
- * (modified version of an AI generated code)
- */
-export const parseLedgerEntryString = (
-  rowString: string,
-): Effect.Effect<LedgerEntry, Error> =>
-  Effect.gen(function* () {
-    // Strip the outer parentheses
-    if (!rowString.startsWith('(') || !rowString.endsWith(')')) {
-      yield* Effect.fail(new Error("parseLedgerEntryString: Invalid Postgres ROW string format"));
-    }
-    const inner = rowString.slice(1, -1);
-    // Split by comma -- safe here as string (4th field) has no commas
-    const fields = inner.split(',');
-    if (fields.length !== 4) {
-      yield* Effect.fail(new Error("parseLedgerEntryString: Unexpected number of fields in ROW string"));
-    }
-    const [raw_tx_id, raw_outref, raw_cbor, raw_address] = fields;
-    return {
-      [LedgerColumns.TX_ID]: dbHexStringToBuffer(raw_tx_id),
-      [LedgerColumns.OUTREF]: dbHexStringToBuffer(raw_outref),
-      [LedgerColumns.OUTPUT]: dbHexStringToBuffer(raw_cbor),
-      [LedgerColumns.ADDRESS]: raw_address,
-    };
-  });
 
 export enum InputsColumns {
   OUTREF = "spent_outref",
@@ -84,8 +51,33 @@ export type ProcessedTx = {
   [ProcessedTxColumns.TX_ID]: Buffer;
   [ProcessedTxColumns.TX_CBOR]: Buffer;
   [ProcessedTxColumns.INPUTS]: Buffer[];
-  [ProcessedTxColumns.OUTPUTS]: LedgerEntry[];
+  [ProcessedTxColumns.OUTPUTS]: MinimalLedgerEntry[];
 };
+
+/** Since `@effect/sql` seems incapable of auto-parsing nested record types, we
+ * need to parse the returning list of strings into `ProcessedTx[]`.
+ *
+ * (modified version of an AI generated code)
+ */
+export const parseLedgerEntryString = (
+  rowString: string,
+): Effect.Effect<MinimalLedgerEntry, Error> =>
+  Effect.gen(function* () {
+    // Strip any occurrences of `x`, `\`, `"`, and outer parentheses
+    const fields = rowString.replace(/[\\\"x()]/g, "").split(",");
+    if (fields.length !== 2) {
+      yield* Effect.fail(
+        new Error(
+          "parseLedgerEntryString: Unexpected number of fields in ROW string",
+        ),
+      );
+    }
+    const [raw_outref, raw_cbor] = fields;
+    return {
+      [LedgerColumns.OUTREF]: Buffer.from(raw_outref, "hex"),
+      [LedgerColumns.OUTPUT]: Buffer.from(raw_cbor, "hex"),
+    };
+  });
 
 export const createKeyValueTable = (
   tableName: string,

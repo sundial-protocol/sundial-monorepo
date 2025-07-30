@@ -55,7 +55,7 @@ export const isHexString = (str: string): boolean => {
 export const bufferToHex = (buf: Buffer): string => {
   try {
     return buf.toString("hex");
-  } catch(_) {
+  } catch (_) {
     return "<no hex for undefined>";
   }
 };

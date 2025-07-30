@@ -69,7 +69,7 @@ export const retrieveByHeaderHash = (
           ARRAY[]::${sql(outputsTableName)}[]
         ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
       FROM ${sql(tableName)} bs
-      WHERE bs.${sql(Columns.HEADER_HASH)} = ${headerHash};`
+      WHERE bs.${sql(Columns.HEADER_HASH)} = ${headerHash};`;
 
     return rows;
   }).pipe(
@@ -120,9 +120,7 @@ export const retrieveHeaderHashByTxHash = (
 
     const rows = yield* sql<Buffer>`SELECT ${sql(
       Columns.HEADER_HASH,
-    )} FROM ${sql(tableName)} WHERE ${sql(
-      Columns.TX_ID,
-    )} = ${txHash} LIMIT 1`;
+    )} FROM ${sql(tableName)} WHERE ${sql(Columns.TX_ID)} = ${txHash} LIMIT 1`;
 
     if (rows.length <= 0) {
       const msg = `No headerHash found for ${txHash} txHash`;
