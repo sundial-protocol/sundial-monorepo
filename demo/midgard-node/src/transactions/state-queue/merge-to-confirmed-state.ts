@@ -28,7 +28,7 @@ import {
   handleSignSubmit,
   SubmitError,
 } from "../utils.js";
-import { LedgerColumns, LedgerEntry } from "@/database/utils.js";
+import { LedgerEntry } from "@/database/utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
@@ -164,26 +164,7 @@ export const buildAndSubmitMergeTx = (
 
       firstBlockTxs.map((tx) => {
         spentOutRefs.push(...tx.inputs);
-        producedUTxOs.push(
-          ...tx.outputs.map((o, i) => {
-            const outrefBytes = Buffer.from(
-              CML.TransactionInput.new(
-                CML.TransactionHash.from_raw_bytes(tx.txHash),
-                BigInt(i),
-              ).to_cbor_bytes(),
-            );
-            // TODO: Avoid reserializing.
-            const addr = CML.TransactionOutput.from_cbor_bytes(o)
-              .address()
-              .to_bech32();
-            return {
-              [LedgerColumns.TX_ID]: tx.txHash,
-              [LedgerColumns.OUTREF]: outrefBytes,
-              [LedgerColumns.OUTPUT]: o,
-              [LedgerColumns.ADDRESS]: addr,
-            };
-          }),
-        );
+        producedUTxOs.push(...tx.outputs);
       });
 
       // - Clear all the spent UTxOs from the confirmed ledger

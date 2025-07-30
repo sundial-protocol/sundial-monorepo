@@ -4,6 +4,7 @@ import {
   KVColumns,
   LedgerColumns,
   ProcessedTx,
+  ProcessedTxColumns,
   clearTable,
   createInputsTable,
   mapSqlError,
@@ -45,12 +46,12 @@ export const retrieveByHeaderHash = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
       SELECT
-        bs.${sql(Columns.TX_ID)} as txHash,
+        bs.${sql(Columns.TX_ID)} as ${sql(ProcessedTxColumns.TX_ID)},
         (
           SELECT ${sql(KVColumns.VALUE)}
           FROM ${sql(ImmutableDB.tableName)} im
           WHERE im.${sql(KVColumns.KEY)} = bs.${sql(Columns.TX_ID)}
-        ) as txCbor,
+        ) as ${sql(ProcessedTxColumns.TX_CBOR)},
         COALESCE(
           ARRAY(
             SELECT bsi.${sql(InputsColumns.OUTREF)}
@@ -58,7 +59,7 @@ export const retrieveByHeaderHash = (
             WHERE bsi.${sql(InputsColumns.SPENDING_TX)} = bs.${sql(Columns.TX_ID)}
           ),
           ARRAY[]::BYTEA[]
-        ) AS inputs,
+        ) AS ${sql(ProcessedTxColumns.INPUTS)},
         COALESCE(
           ARRAY(
             SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
@@ -66,7 +67,7 @@ export const retrieveByHeaderHash = (
             WHERE ml.${sql(LedgerColumns.TX_ID)} = bs.${sql(Columns.TX_ID)}
           ),
           ARRAY[]::${sql(outputsTableName)}[]
-        ) AS outputs
+        ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
       FROM ${sql(tableName)} bs
       WHERE bs.${sql(Columns.HEADER_HASH)} = ${headerHash};`
 

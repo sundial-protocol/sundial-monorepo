@@ -15,6 +15,8 @@ import {
   mapSqlError,
   insertSpentInput,
   createLedgerTable,
+  ProcessedTxColumns,
+  parseLedgerEntryString,
 } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as ImmutableDB from "./immutable.js";
@@ -92,6 +94,7 @@ export const insert = (
   txString: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
+    yield* Effect.logInfo(txString);
     const txCbor = fromHex(txString);
     const deserializedTx = CML.Transaction.from_cbor_bytes(txCbor);
     const txBody = deserializedTx.body();
@@ -136,8 +139,8 @@ export const retrieveByHash = (
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<ProcessedTx>`
       SELECT
-        m.${sql(KVColumns.KEY)} as txHash,
-        m.${sql(KVColumns.VALUE)} as txCbor,
+        m.${sql(KVColumns.KEY)} as ${sql(ProcessedTxColumns.TX_ID)},
+        m.${sql(KVColumns.VALUE)} as ${sql(ProcessedTxColumns.TX_CBOR)},
         COALESCE(
           ARRAY(
             SELECT psi.${sql(InputsColumns.OUTREF)}
@@ -145,7 +148,7 @@ export const retrieveByHash = (
             WHERE psi.${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}
           ),
           ARRAY[]::BYTEA[]
-        ) AS inputs,
+        ) AS ${sql(ProcessedTxColumns.INPUTS)},
         COALESCE(
           ARRAY(
             SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
@@ -153,7 +156,7 @@ export const retrieveByHash = (
             WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
           ),
           ARRAY[]::${sql(outputsTableName)}[]
-        ) AS outputs
+        ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
       FROM ${sql(tableName)} m
       WHERE txHash = ${txHash}; LIMIT 1`;
 
@@ -174,10 +177,10 @@ export const retrieve = (): Effect.Effect<
 > =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<ProcessedTx>`
+    const rows = yield* sql<Omit<ProcessedTx, ProcessedTxColumns.OUTPUTS> & { [ProcessedTxColumns.OUTPUTS]: string[] }>`
       SELECT
-        m.${sql(KVColumns.KEY)} as txHash,
-        m.${sql(KVColumns.VALUE)} as txCbor,
+        m.${sql(KVColumns.KEY)} as ${sql(ProcessedTxColumns.TX_ID)},
+        m.${sql(KVColumns.VALUE)} as ${sql(ProcessedTxColumns.TX_CBOR)},
         COALESCE(
           ARRAY(
             SELECT psi.${sql(InputsColumns.OUTREF)}
@@ -185,7 +188,7 @@ export const retrieve = (): Effect.Effect<
             WHERE psi.${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}
           ),
           ARRAY[]::BYTEA[]
-        ) AS inputs,
+        ) AS ${sql(ProcessedTxColumns.INPUTS)},
         COALESCE(
           ARRAY(
             SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
@@ -193,10 +196,18 @@ export const retrieve = (): Effect.Effect<
             WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
           ),
           ARRAY[]::${sql(outputsTableName)}[]
-        ) AS outputs
+        ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
       FROM ${sql(tableName)} m;`;
 
-    return rows;
+    const result: ProcessedTx[] = yield* Effect.allSuccesses(rows.map((ptx) => Effect.gen(function* () {
+      const ledgerEntries = yield* Effect.allSuccesses(ptx[ProcessedTxColumns.OUTPUTS].map(parseLedgerEntryString));
+      return {
+        ...ptx,
+        [ProcessedTxColumns.OUTPUTS]: ledgerEntries,
+      };
+    })));
+
+    return result;
   }).pipe(
     Effect.withLogSpan(
       `retrieve utxos ${tableName}, ${inputsTableName} and ${outputsTableName}`,

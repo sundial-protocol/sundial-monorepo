@@ -7,7 +7,7 @@ import { toHex } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { MemoryLevel } from "memory-level";
 import { NodeConfig } from "@/config.js";
-import { ProcessedTx } from "@/database/utils.js";
+import { LedgerColumns, ProcessedTx, ProcessedTxColumns } from "@/database/utils.js";
 import { Database } from "@/services/database.js";
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
@@ -82,8 +82,12 @@ export const processMpts = (
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
     yield* Effect.forEach(
       mempoolTxs,
-      ({ txHash, txCbor, inputs: spent, outputs: produced }) =>
+      (ptx: ProcessedTx) =>
         Effect.gen(function* () {
+          const txHash = ptx[ProcessedTxColumns.TX_ID];
+          const txCbor = ptx[ProcessedTxColumns.TX_CBOR];
+          const spent = ptx[ProcessedTxColumns.INPUTS];
+          const produced = ptx[ProcessedTxColumns.OUTPUTS];
           mempoolTxHashes.push(txHash);
           sizeOfBlocksTxs += txCbor.length;
           yield* Effect.tryPromise({
@@ -98,7 +102,7 @@ export const processMpts = (
           const putOps: ETH_UTILS.BatchDBOp[] = produced.map((o) => ({
             type: "put",
             key: txHash,
-            value: o,
+            value: o[LedgerColumns.OUTPUT],
           }));
           yield* Effect.sync(() => batchDBOps.push(...[...delOps, ...putOps]));
         }),

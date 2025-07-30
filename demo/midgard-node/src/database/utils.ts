@@ -26,6 +26,44 @@ export type LedgerEntry = {
   [LedgerColumns.ADDRESS]: Address;
 };
 
+const dbHexStringToBuffer = (byteaString: string): Buffer => {
+  // remove possible wrapping double quotes
+  let hexString = (byteaString.startsWith("\"") && byteaString.endsWith("\"")) ? byteaString.slice(1, -1) : byteaString;
+  // remove possible double backslash (escaped backslash)
+  hexString = hexString.startsWith("\\\\x") ? hexString.slice(3) : hexString;
+  // remove single backslash if present
+  hexString = hexString.startsWith("\\x") ? hexString.slice(2) : hexString;
+  return Buffer.from(hexString, "hex");
+};
+
+/** Since `@effect/sql` seems incapable of auto-parsing nested record types, we
+ * need to parse the returning list of strings into `ProcessedTx[]`.
+ *
+ * (modified version of an AI generated code)
+ */
+export const parseLedgerEntryString = (
+  rowString: string,
+): Effect.Effect<LedgerEntry, Error> =>
+  Effect.gen(function* () {
+    // Strip the outer parentheses
+    if (!rowString.startsWith('(') || !rowString.endsWith(')')) {
+      yield* Effect.fail(new Error("parseLedgerEntryString: Invalid Postgres ROW string format"));
+    }
+    const inner = rowString.slice(1, -1);
+    // Split by comma -- safe here as string (4th field) has no commas
+    const fields = inner.split(',');
+    if (fields.length !== 4) {
+      yield* Effect.fail(new Error("parseLedgerEntryString: Unexpected number of fields in ROW string"));
+    }
+    const [raw_tx_id, raw_outref, raw_cbor, raw_address] = fields;
+    return {
+      [LedgerColumns.TX_ID]: dbHexStringToBuffer(raw_tx_id),
+      [LedgerColumns.OUTREF]: dbHexStringToBuffer(raw_outref),
+      [LedgerColumns.OUTPUT]: dbHexStringToBuffer(raw_cbor),
+      [LedgerColumns.ADDRESS]: raw_address,
+    };
+  });
+
 export enum InputsColumns {
   OUTREF = "spent_outref",
   SPENDING_TX = "spending_tx_hash",
@@ -35,11 +73,18 @@ export type SpentInput = {
   [inputsCols in InputsColumns]: Buffer;
 };
 
+export enum ProcessedTxColumns {
+  TX_ID = "ptx_id",
+  TX_CBOR = "ptx_cbor",
+  INPUTS = "ptx_inputs",
+  OUTPUTS = "ptx_outputs",
+}
+
 export type ProcessedTx = {
-  txHash: Buffer;
-  txCbor: Buffer;
-  inputs: Buffer[];
-  outputs: LedgerEntry[];
+  [ProcessedTxColumns.TX_ID]: Buffer;
+  [ProcessedTxColumns.TX_CBOR]: Buffer;
+  [ProcessedTxColumns.INPUTS]: Buffer[];
+  [ProcessedTxColumns.OUTPUTS]: LedgerEntry[];
 };
 
 export const createKeyValueTable = (
