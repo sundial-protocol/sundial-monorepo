@@ -85,6 +85,7 @@ export const processMpts = (
 ) =>
   Effect.gen(function* () {
     const mempoolTxHashes: Uint8Array[] = [];
+    const mempoolBatchOps: ETH_UTILS.BatchDBOp[] = [];
     const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfBlocksTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
@@ -92,10 +93,11 @@ export const processMpts = (
       Effect.gen(function* () {
         mempoolTxHashes.push(txHash);
         sizeOfBlocksTxs += txCbor.length;
-        yield* Effect.tryPromise({
-          try: () => mempoolTrie.put(txHash, txCbor),
-          catch: (e) => new Error(`${e}`),
-        });
+        yield* Effect.sync(() => mempoolBatchOps.push({
+          type: "put",
+          key: txHash,
+          value: txCbor,
+        }));
         const { spent, produced } = yield* findSpentAndProducedUTxOs(
           txCbor,
           txHash,
@@ -111,20 +113,27 @@ export const processMpts = (
             value: output,
           }),
         );
-        yield* Effect.sync(() => batchDBOps.push(...[...delOps, ...putOps]));
+        yield* Effect.sync(() => batchDBOps.push(...delOps));
+        yield* Effect.sync(() => batchDBOps.push(...putOps));
       }),
     );
 
-    yield* Effect.tryPromise({
-      try: () => ledgerTrie.batch(batchDBOps),
-      catch: (e) => new Error(`${e}`),
-    });
+    yield* Effect.all([
+      Effect.tryPromise({
+        try: () => mempoolTrie.batch(mempoolBatchOps),
+        catch: (e) => new Error(`${e}`),
+      }),
+      Effect.tryPromise({
+        try: () => ledgerTrie.batch(batchDBOps),
+        catch: (e) => new Error(`${e}`),
+      }),
+    ], { concurrency: "unbounded" });
 
-    const utxoRoot = toHex(ledgerTrie.root());
     const txRoot = toHex(mempoolTrie.root());
+    const utxoRoot = toHex(ledgerTrie.root());
 
-    yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
     yield* Effect.logInfo(`🔹 New transaction root found: ${txRoot}`);
+    yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
 
     return {
       utxoRoot: utxoRoot,
