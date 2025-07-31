@@ -93,11 +93,13 @@ export const processMpts = (
       Effect.gen(function* () {
         mempoolTxHashes.push(txHash);
         sizeOfBlocksTxs += txCbor.length;
-        yield* Effect.sync(() => mempoolBatchOps.push({
-          type: "put",
-          key: txHash,
-          value: txCbor,
-        }));
+        yield* Effect.sync(() =>
+          mempoolBatchOps.push({
+            type: "put",
+            key: txHash,
+            value: txCbor,
+          }),
+        );
         const { spent, produced } = yield* findSpentAndProducedUTxOs(
           txCbor,
           txHash,
@@ -118,16 +120,19 @@ export const processMpts = (
       }),
     );
 
-    yield* Effect.all([
-      Effect.tryPromise({
-        try: () => mempoolTrie.batch(mempoolBatchOps),
-        catch: (e) => new Error(`${e}`),
-      }),
-      Effect.tryPromise({
-        try: () => ledgerTrie.batch(batchDBOps),
-        catch: (e) => new Error(`${e}`),
-      }),
-    ], { concurrency: "unbounded" });
+    yield* Effect.all(
+      [
+        Effect.tryPromise({
+          try: () => mempoolTrie.batch(mempoolBatchOps),
+          catch: (e) => new Error(`${e}`),
+        }),
+        Effect.tryPromise({
+          try: () => ledgerTrie.batch(batchDBOps),
+          catch: (e) => new Error(`${e}`),
+        }),
+      ],
+      { concurrency: "unbounded" },
+    );
 
     const txRoot = toHex(mempoolTrie.root());
     const utxoRoot = toHex(ledgerTrie.root());
