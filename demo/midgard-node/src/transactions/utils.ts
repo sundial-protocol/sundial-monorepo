@@ -11,7 +11,7 @@ import * as BlocksDB from "../database/blocks.js";
 import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
 
-const RETRY_ATTEMPTS = 2;
+const RETRY_ATTEMPTS = 1;
 
 const INIT_RETRY_AFTER_MILLIS = 5_000;
 

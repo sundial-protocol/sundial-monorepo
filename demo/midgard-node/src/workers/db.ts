@@ -11,12 +11,14 @@ import { NodeConfig } from "@/config.js";
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 
-const LEVELDB_ENCODING_OPTS = { keyEncoding: "view", valueEncoding: "view" };
+const LEVELDB_ENCODING_OPTS = {
+  keyEncoding: ETH_UTILS.KeyEncoding.Bytes,
+  valueEncoding: ETH_UTILS.ValueEncoding.Bytes,
+};
 
 export const makeMpts = () =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
-    Effect.logDebug("🔹 Creating ledger and mempool tries ...");
     // Since there is no way to create an MPT from txs that are already in
     // the mempool database, we have two options here:
     // 1. We could add txs to the MPT directly from the submit endpoint.
@@ -27,35 +29,51 @@ export const makeMpts = () =>
     //    in the mempool, this should not add any overhead compared to inserting
     //    each tx twice (in the mempool and in the tree itself). So it shouldn't
     //    become a bottleneck. If it does, we could reconsider the first option.
+    //
+    // ^ Old comment, we are now storing mempool's LevelDB on disk as well. This
+    //   allows us to continue a work that's been done in cases of failures.
+    const mempoolLevelDb = new Level<string, Uint8Array>(
+      nodeConfig.MEMPOOL_MPT_DB_PATH,
+      LEVELDB_ENCODING_OPTS,
+    );
     const mempoolTrie = yield* Effect.tryPromise({
-      try: () => ETH.createMPT({}),
+      try: () =>
+        ETH.createMPT({
+          db: new LevelDB(mempoolLevelDb),
+          useRootPersistence: true,
+          valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
+        }),
       catch: (e) => new Error(`${e}`),
     });
-
     // Ledger MPT from the other side should use a checkpoint database —
     // its MPT building operations are paired with database ones
-    const levelDb = new Level<string, Uint8Array>(
-      nodeConfig.MPT_DB_PATH,
+    const ledgerLevelDb = new Level<string, Uint8Array>(
+      nodeConfig.LEDGER_MPT_DB_PATH,
       LEVELDB_ENCODING_OPTS,
     );
     const ledgerTrie = yield* Effect.tryPromise({
       try: () =>
         ETH.createMPT({
-          db: new LevelDB(levelDb),
+          db: new LevelDB(ledgerLevelDb),
           useRootPersistence: true,
-          valueEncoding: ETH_UTILS.ValueEncoding.Bytes,
+          valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
         }),
       catch: (e) => new Error(`${e}`),
     });
+    const mempoolRootBeforeMempoolTxs = yield* Effect.tryPromise({
+      try: () => mempoolTrie.get(rootKey),
+      catch: (e) => new Error(`${e}`),
+    }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
     const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise({
       try: () => ledgerTrie.get(rootKey),
       catch: (e) => new Error(`${e}`),
     }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
     // Ensuring persisted root is stored in trie's private property
+    yield* Effect.sync(() => mempoolTrie.root(mempoolRootBeforeMempoolTxs));
     yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
     return {
-      ledgerTrie: ledgerTrie,
-      mempoolTrie: mempoolTrie,
+      ledgerTrie,
+      mempoolTrie,
     };
   });
 
@@ -80,6 +98,7 @@ export const processMpts = (
         });
         const { spent, produced } = yield* findSpentAndProducedUTxOs(
           txCbor,
+          txHash,
         ).pipe(Effect.withSpan("findSpentAndProducedUTxOs"));
         const delOps: ETH_UTILS.BatchDBOp[] = spent.map((outRef) => ({
           type: "del",
@@ -135,10 +154,10 @@ export const withTrieTransaction = (
   );
 
 export class LevelDB {
-  _leveldb: MemoryLevel<string, Uint8Array>;
+  _leveldb: Level<string, Uint8Array>;
 
-  constructor(leveldb: MemoryLevel<string, Uint8Array>) {
-    this._leveldb = leveldb ?? new MemoryLevel(LEVELDB_ENCODING_OPTS);
+  constructor(leveldb: Level<string, Uint8Array>) {
+    this._leveldb = leveldb;
   }
 
   async open() {
@@ -163,5 +182,9 @@ export class LevelDB {
 
   shallowCopy() {
     return new LevelDB(this._leveldb);
+  }
+
+  getDatabase() {
+    return this._leveldb;
   }
 }

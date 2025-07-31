@@ -1,8 +1,7 @@
 import { Effect } from "effect";
 import { clearTable, mapSqlError } from "./utils.js";
-import { SqlClient } from "@effect/sql";
+import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
-import { toHex } from "@lucid-evolution/lucid";
 
 export const tableName = "blocks";
 
@@ -92,7 +91,7 @@ export const retrieveBlockHashByTxHash = (
     if (rows.length <= 0) {
       const msg = `No block_hash found for ${txHash} tx_hash`;
       yield* Effect.logDebug(msg);
-      yield* Effect.fail(new Error(msg));
+      yield* Effect.fail(new SqlError.SqlError({ cause: msg }));
     }
     const result = rows[0].header_hash;
     yield* Effect.logDebug(

@@ -318,15 +318,15 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
   });
 }).pipe(Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)));
 
-const getLogSemaphoresHandler = Effect.gen(function* () {
-  yield* Effect.logInfo(`✍  Logging semaphores...`);
+const getLogGlobalsHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Logging global variables...`);
   yield* Effect.logInfo(`
   BLOCKS_IN_QUEUE ⋅⋅⋅⋅ ${global.BLOCKS_IN_QUEUE}
   LATEST_SYNC ⋅⋅⋅⋅⋅⋅⋅⋅ ${new Date(global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH).toLocaleString()}
   RESET_IN_PROGRESS ⋅⋅ ${global.RESET_IN_PROGRESS}
 `);
   return yield* HttpServerResponse.json({
-    message: `Semaphores logged!`,
+    message: `Global variables logged!`,
   });
 });
 
@@ -383,7 +383,7 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/reset", getResetHandler),
   HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
   HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
-  HttpRouter.get("/logSemaphores", getLogSemaphoresHandler),
+  HttpRouter.get("/logGlobals", getLogGlobalsHandler),
   HttpRouter.post("/submit", postSubmitHandler),
 );
 
@@ -508,7 +508,8 @@ export const runNode = Effect.gen(function* () {
   const monitorMempoolThread = pipe(mempoolFork());
 
   const program = Effect.all(
-    [appThread, blockCommitmentThread, mergeThread, monitorMempoolThread],
+    // [appThread, blockCommitmentThread, mergeThread, monitorMempoolThread],
+    [appThread, blockCommitmentThread, monitorMempoolThread],
     {
       concurrency: "unbounded",
     },

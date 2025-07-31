@@ -21,8 +21,7 @@ export const retrieveTxCborsByHashes = (txHashes: Uint8Array[]) =>
 
 export const retrieve = () => retrieveKeyValues(tableName);
 
-export const retrieveTxCount = () =>
-  retrieveNumberOfEntries(tableName);
+export const retrieveTxCount = () => retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (txHashes: Uint8Array[]) =>
   delMultiple(tableName, txHashes);

@@ -13,6 +13,7 @@ import { fromHex } from "@lucid-evolution/lucid";
 import { makeMpts, processMpts, withTrieTransaction } from "./db.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
+import * as FS from "fs";
 
 const emptyOutput: WorkerOutput = {
   txSize: 0,
@@ -104,12 +105,18 @@ const wrapper = (
           `🔹 Transaction built successfully. Size: ${txSize}`,
         );
 
+        let flushMempoolTrie: boolean = true;
+
         // Using sign and submit helper with confirmation so that databases are
         // only updated after a successful on-chain registration of the block.
         const onSubmitFailure = (err: SubmitError) =>
           Effect.gen(function* () {
-            yield* Effect.logError(`Sumbit tx error: ${err}`);
-            yield* Effect.fail(err.err);
+            yield* Effect.logError(`🔹 ⚠️  Sumbit tx error: ${err}`);
+            yield* Effect.logInfo(
+              "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
+            );
+            flushMempoolTrie = false;
+            // yield* Effect.fail(err.err);
           });
         const onConfirmFailure = (err: ConfirmError) =>
           Effect.logError(`Confirm tx error: ${err}`);
@@ -161,6 +168,18 @@ const wrapper = (
         yield* MempoolDB.clearTxs(mempoolTxHashes).pipe(
           Effect.withSpan("clear mempool"),
         );
+
+        if (flushMempoolTrie) {
+          yield* Effect.logInfo("🔹 Wiping mempool trie...");
+          yield* Effect.try({
+            try: () =>
+              FS.rmSync(nodeConfig.MEMPOOL_MPT_DB_PATH, {
+                recursive: true,
+                force: true,
+              }),
+            catch: (e) => new Error(`${e}`),
+          });
+        }
 
         const output: WorkerOutput = {
           txSize,
