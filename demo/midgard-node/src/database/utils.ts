@@ -261,6 +261,7 @@ export const mapSqlError = <A, E, R>(
     ),
   );
 
+// TODO: Add indices for columns which are used under `WHERE` clauses
 export const createLedgerTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
