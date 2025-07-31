@@ -109,12 +109,13 @@ const wrapper = (
 
         // Using sign and submit helper with confirmation so that databases are
         // only updated after a successful on-chain registration of the block.
-        const onSubmitFailure = (err: SubmitError) =>
+        const onSubmitFailure = (_err: SubmitError) =>
           Effect.gen(function* () {
-            yield* Effect.logError(`🔹 ⚠️  Sumbit tx error: ${err}`);
-            yield* Effect.logInfo(
-              "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
+            yield* Effect.logError(
+              "🔹 ⚠️  Tx submit failed. Mempool trie will be preserved, but db will be cleared.",
             );
+            yield* Effect.logInfo("🔹 Mempool Trie stats:");
+            console.dir(mempoolTrie.database()._stats, {depth: null});
             flushMempoolTrie = false;
             // yield* Effect.fail(err.err);
           });
