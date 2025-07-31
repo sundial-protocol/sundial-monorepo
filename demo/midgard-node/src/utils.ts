@@ -116,7 +116,10 @@ export function utxoToCBOR(utxo: UTxO): {
   };
 }
 
-export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
+export const findSpentAndProducedUTxOs = (
+  txCBOR: Uint8Array,
+  txHash?: Uint8Array,
+) =>
   Effect.gen(function* () {
     const spent: Uint8Array[] = [];
     const produced: { key: Uint8Array; value: Uint8Array }[] = [];
@@ -124,24 +127,22 @@ export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
     const txBody = tx.body();
     const inputs = txBody.inputs();
     const outputs = txBody.outputs();
-    for (let i = 0; i < inputs.len(); i++) {
+    const inputsCount = inputs.len();
+    const outputsCount = outputs.len();
+    for (let i = 0; i < inputsCount; i++) {
       yield* Effect.try({
         try: () => spent.push(inputs.get(i).to_cbor_bytes()),
         catch: (e) => new Error(`${e}`),
       });
     }
-    const txHash = CML.hash_transaction(txBody).to_hex();
-    for (let i = 0; i < outputs.len(); i++) {
-      yield* Effect.try({
-        try: () => {
-          const utxo: UTxO = {
-            txHash: txHash,
-            outputIndex: i,
-            ...coreToTxOutput(outputs.get(i)),
-          };
-          produced.push(utxoToCBOR(utxo));
-        },
-        catch: (e) => new Error(`${e}`),
+    const finalTxHash =
+      txHash === undefined
+        ? CML.hash_transaction(txBody).to_raw_bytes()
+        : txHash;
+    for (let i = 0; i < outputsCount; i++) {
+      produced.push({
+        key: finalTxHash,
+        value: outputs.get(i).to_cbor_bytes(),
       });
     }
     return { spent, produced };
@@ -158,7 +159,7 @@ export const findAllSpentAndProducedUTxOs = (
 > =>
   Effect.gen(function* () {
     const allEffects = yield* Effect.all(
-      txCBORs.map(findSpentAndProducedUTxOs),
+      txCBORs.map((txCbor) => findSpentAndProducedUTxOs(txCbor)),
     );
     return allEffects.reduce(
       (
