@@ -1,18 +1,7 @@
 import { Effect } from "effect";
-import {
-  InputsColumns,
-  KVColumns,
-  LedgerColumns,
-  ProcessedTx,
-  ProcessedTxColumns,
-  clearTable,
-  createInputsTable,
-  mapSqlError,
-} from "./utils.js";
+import { clearTable, mapSqlError } from "./utils.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
-import * as MempoolLedgerDB from "./mempoolLedger.js";
-import * as ImmutableDB from "./immutable.js";
 
 export const tableName = "blocks";
 
@@ -21,65 +10,55 @@ export enum Columns {
   TX_ID = "tx_id",
 }
 
+export enum ColumnsIndices {
+  HEADER_HASH = "idx_blocks_header_hash",
+  TX_ID = "idx_blocks_tx_id",
+}
+
 type Entry = {
   [blockCols in Columns]: Buffer;
 };
 
-export const inputsTableName = "blocks_spent_inputs";
-
-// Using mempool ledger as a sort of archive ledger. TODO
-export const outputsTableName = MempoolLedgerDB.tableName;
-
 export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-    ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
-    ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE
-  );`;
-  yield* createInputsTable(inputsTableName, tableName, Columns.TX_ID);
+  yield* sql.withTransaction(
+    Effect.gen(function* () {
+      yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+      ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
+      ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE
+    );`;
+      yield* sql`CREATE INDEX ${sql(
+        ColumnsIndices.HEADER_HASH,
+      )} ON ${sql(tableName)} (${sql(Columns.HEADER_HASH)});`;
+      yield* sql`CREATE INDEX ${sql(
+        ColumnsIndices.TX_ID,
+      )} ON ${sql(tableName)} (${sql(Columns.TX_ID)});`;
+    }),
+  );
 });
 
-export const retrieveByHeaderHash = (
+export const insert = (
   headerHash: Buffer,
-): Effect.Effect<readonly ProcessedTx[], Error, Database> =>
+  txHashes: Buffer[],
+): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<ProcessedTx>`
-      SELECT
-        bs.${sql(Columns.TX_ID)} as ${sql(ProcessedTxColumns.TX_ID)},
-        (
-          SELECT ${sql(KVColumns.VALUE)}
-          FROM ${sql(ImmutableDB.tableName)} im
-          WHERE im.${sql(KVColumns.KEY)} = bs.${sql(Columns.TX_ID)}
-        ) as ${sql(ProcessedTxColumns.TX_CBOR)},
-        COALESCE(
-          ARRAY(
-            SELECT bsi.${sql(InputsColumns.OUTREF)}
-            FROM ${sql(inputsTableName)} bsi
-            WHERE bsi.${sql(InputsColumns.SPENDING_TX)} = bs.${sql(Columns.TX_ID)}
-          ),
-          ARRAY[]::BYTEA[]
-        ) AS ${sql(ProcessedTxColumns.INPUTS)},
-        COALESCE(
-          ARRAY(
-            SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
-            FROM ${MempoolLedgerDB.tableName} ml
-            WHERE ml.${sql(LedgerColumns.TX_ID)} = bs.${sql(Columns.TX_ID)}
-          ),
-          ARRAY[]::${sql(outputsTableName)}[]
-        ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
-      FROM ${sql(tableName)} bs
-      WHERE bs.${sql(Columns.HEADER_HASH)} = ${headerHash};`;
-
-    return rows;
+    if (!txHashes.length) {
+      yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
+      return;
+    }
+    const rowsToInsert: Entry[] = txHashes.map((txHash: Buffer) => ({
+      [Columns.HEADER_HASH]: headerHash,
+      [Columns.TX_ID]: txHash,
+    }));
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(rowsToInsert)}`;
   }).pipe(
-    Effect.withLogSpan(`retrieveByHeaderHash ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieving by txHashes error: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: inserting error: ${e}`),
     ),
+    Effect.withLogSpan(`insert ${tableName}`),
     mapSqlError,
+    Effect.asVoid,
   );
 
 export const retrieveTxHashesByHeaderHash = (

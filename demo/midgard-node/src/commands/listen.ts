@@ -65,18 +65,21 @@ const getTxHandler = Effect.gen(function* () {
     );
   }
   const txHashBytes = Buffer.from(fromHex(txHashParam));
-  const foundCbor: Uint8Array = yield* MempoolDB.retrieveByHash(
+  const foundCbor: Uint8Array = yield* MempoolDB.retrieveTxCborByHash(
     txHashBytes,
   ).pipe(
-    Effect.map((mempoolTx) => mempoolTx.txCbor),
     Effect.catchAll((_e) =>
       Effect.gen(function* () {
+        const fromImmutable =  yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
         yield* Effect.logInfo(
-          `GET /tx - Transaction found in mempool: ${txHashParam}`,
+          `GET /tx - Transaction found in ImmutableDB: ${txHashParam}`,
         );
-        return yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
+        return fromImmutable;
       }),
     ),
+  );
+  yield* Effect.logInfo(
+    `GET /tx - Transaction found in mempool: ${txHashParam}`,
   );
   return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
 }).pipe(Effect.catchAll((e) => handle500("getTx", e)));

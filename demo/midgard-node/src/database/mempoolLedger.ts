@@ -1,18 +1,18 @@
 import { Effect } from "effect";
 import {
   clearTable,
-  insertLedgerEntry,
   retrieveLedgerEntries,
   retrieveLedgerEntriesWithAddress,
   delMultiple,
   LedgerEntry,
+  insertLedgerEntries,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";
 
-export const insert = (entry: LedgerEntry) =>
-  insertLedgerEntry(tableName, entry);
+export const insert = (entries: LedgerEntry[]) =>
+  insertLedgerEntries(tableName, entries);
 
 export const retrieve = (): Effect.Effect<
   readonly LedgerEntry[],

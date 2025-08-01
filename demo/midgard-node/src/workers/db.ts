@@ -7,11 +7,7 @@ import { toHex } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { MemoryLevel } from "memory-level";
 import { NodeConfig } from "@/config.js";
-import {
-  LedgerColumns,
-  ProcessedTx,
-  ProcessedTxColumns,
-} from "@/database/utils.js";
+import { LedgerColumns } from "@/database/utils.js";
 import { Database } from "@/services/database.js";
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;

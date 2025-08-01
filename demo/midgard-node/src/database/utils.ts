@@ -26,6 +26,7 @@ export type LedgerEntry = {
   [LedgerColumns.ADDRESS]: Address; // for provider
 };
 
+
 export type MinimalLedgerEntry = {
   [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.OUTPUT]: Buffer; // for root calc
@@ -39,45 +40,6 @@ export enum InputsColumns {
 export type SpentInput = {
   [inputsCols in InputsColumns]: Buffer;
 };
-
-export enum ProcessedTxColumns {
-  TX_ID = "ptx_id",
-  TX_CBOR = "ptx_cbor",
-  INPUTS = "ptx_inputs",
-  OUTPUTS = "ptx_outputs",
-}
-
-export type ProcessedTx = {
-  [ProcessedTxColumns.TX_ID]: Buffer;
-  [ProcessedTxColumns.TX_CBOR]: Buffer;
-  [ProcessedTxColumns.INPUTS]: Buffer[];
-  [ProcessedTxColumns.OUTPUTS]: MinimalLedgerEntry[];
-};
-
-/** Since `@effect/sql` seems incapable of auto-parsing nested record types, we
- * need to parse the returning list of strings into `ProcessedTx[]`.
- *
- * (modified version of an AI generated code)
- */
-export const parseLedgerEntryString = (
-  rowString: string,
-): Effect.Effect<MinimalLedgerEntry, Error> =>
-  Effect.gen(function* () {
-    // Strip any occurrences of `x`, `\`, `"`, and outer parentheses
-    const fields = rowString.replace(/[\\\"x()]/g, "").split(",");
-    if (fields.length !== 2) {
-      yield* Effect.fail(
-        new Error(
-          "parseLedgerEntryString: Unexpected number of fields in ROW string",
-        ),
-      );
-    }
-    const [raw_outref, raw_cbor] = fields;
-    return {
-      [LedgerColumns.OUTREF]: Buffer.from(raw_outref, "hex"),
-      [LedgerColumns.OUTPUT]: Buffer.from(raw_cbor, "hex"),
-    };
-  });
 
 export const createKeyValueTable = (
   tableName: string,
@@ -261,19 +223,23 @@ export const mapSqlError = <A, E, R>(
     ),
   );
 
-// TODO: Add indices for columns which are used under `WHERE` clauses
 export const createLedgerTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      ${sql(LedgerColumns.TX_ID)} BYTEA NOT NULL,
-      ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
-      ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
-      ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
-      PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
-    );`;
+    yield* sql.withTransaction(Effect.gen(function* () {
+      yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+        ${sql(LedgerColumns.TX_ID)} BYTEA NOT NULL,
+        ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
+        ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
+        ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
+        PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
+      );`;
+      yield* sql`CREATE INDEX ${sql(
+        `idx_${tableName}_${LedgerColumns.ADDRESS}`
+      )} ON ${sql(tableName)} (${sql(LedgerColumns.ADDRESS)});`;
+    }));
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 export const insertLedgerEntry = (
@@ -347,43 +313,6 @@ export const retrieveLedgerEntriesWithAddress = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
         `${tableName} db: retrieveLedgerEntriesWithAddress: ${JSON.stringify(e)}`,
-      ),
-    ),
-    mapSqlError,
-  );
-
-export const createInputsTable = (
-  inputsTableName: string,
-  parentTableName: string,
-  parentTableKeyLabel?: string,
-): Effect.Effect<void, Error, Database> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(inputsTableName)} (
-      ${sql(InputsColumns.OUTREF)} BYTEA NOT NULL,
-      ${sql(InputsColumns.SPENDING_TX)} BYTEA NOT NULL,
-      PRIMARY KEY (${sql(InputsColumns.OUTREF)}),
-      FOREIGN KEY (${sql(InputsColumns.SPENDING_TX)}) REFERENCES ${sql(parentTableName)}(${sql.unsafe(parentTableKeyLabel ?? KVColumns.KEY)}) ON DELETE CASCADE
-    );`;
-  }).pipe(Effect.withLogSpan(`creating table ${inputsTableName}`), mapSqlError);
-
-export const insertSpentInput = (
-  tableName: string,
-  spentInput: SpentInput,
-): Effect.Effect<void, Error, Database> =>
-  Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValue`);
-    const sql = yield* SqlClient.SqlClient;
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(
-      spentInput,
-    )} ON CONFLICT (${sql(InputsColumns.OUTREF)}) DO UPDATE SET ${sql(
-      InputsColumns.SPENDING_TX,
-    )} = ${spentInput.spending_tx_hash}`;
-  }).pipe(
-    Effect.withLogSpan(`insertSpentInput ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: insertSpentInput: ${JSON.stringify(e)}`,
       ),
     ),
     mapSqlError,

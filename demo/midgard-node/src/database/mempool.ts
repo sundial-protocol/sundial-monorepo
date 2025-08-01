@@ -1,94 +1,23 @@
 import { Database } from "@/services/database.js";
-import { bufferToHex } from "@/utils.js";
 import {
   clearTable,
   insertKeyValue,
   delMultiple,
   retrieveValues,
   retrieveNumberOfEntries,
-  createInputsTable,
-  createKeyValueTable,
-  ProcessedTx,
-  InputsColumns,
   LedgerColumns,
+  LedgerEntry,
+  retrieveValue,
+  KVPair,
   KVColumns,
   mapSqlError,
-  insertSpentInput,
-  createLedgerTable,
-  ProcessedTxColumns,
-  parseLedgerEntryString,
 } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import * as ImmutableDB from "./immutable.js";
-import * as BlocksDB from "./blocks.js";
-import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import { CML, fromHex } from "@lucid-evolution/lucid";
+import { SqlClient } from "@effect/sql";
 
 export const tableName = "mempool";
-
-export const inputsTableName = "mempool_spent_inputs";
-
-export const outputsTableName = MempoolLedgerDB.tableName;
-
-export const init: Effect.Effect<void, Error, Database> = Effect.gen(
-  function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* sql.withTransaction(
-      Effect.gen(function* () {
-        yield* createKeyValueTable(tableName);
-        yield* createInputsTable(inputsTableName, tableName);
-        yield* createLedgerTable(outputsTableName);
-        // Defining a PostgreSQL trigger to fire whenever a row from the spent
-        // inputs table is deleted.
-        //
-        // The trigger simply archives the deleted row in the "spent inputs"
-        // table associated with the Blocks DB.
-        //
-        // TODO: Syntax used for `OLD.` might be incorrect.
-        yield* sql`CREATE OR REPLACE FUNCTION insert_inputs_into_blocks_on_delete()
-        RETURNS trigger AS $$
-        BEGIN
-          INSERT INTO ${sql(BlocksDB.inputsTableName)}(${sql(InputsColumns.OUTREF)}, ${sql(InputsColumns.SPENDING_TX)})
-          VALUES (OLD.${sql(InputsColumns.OUTREF)}, OLD.${sql(InputsColumns.SPENDING_TX)});
-          RETURN OLD;
-        END;
-        $$ LANGUAGE plpgsql;
-      `;
-        yield* sql`CREATE TRIGGER trigger_insert_inputs_into_blocks_on_delete
-        AFTER DELETE ON ${sql(inputsTableName)}
-        FOR EACH ROW
-        EXECUTE PROCEDURE insert_inputs_into_blocks_on_delete();
-      `;
-        // Defining another trigger to be attached to the mempool itself, for
-        // archiving transactions included in a committed block.
-        //
-        // TODO: The session variable must also come from a TS variable.
-        //
-        // TODO: Syntax used for `OLD.` might be incorrect.
-        yield* sql`CREATE OR REPLACE FUNCTION archive_mempool()
-        RETURNS trigger AS $$
-        DECLARE
-          hh BYTEA;
-        BEGIN
-          hh := decode(current_setting('block_commitment.deleting_block', TRUE), 'hex');
-          INSERT INTO ${sql(BlocksDB.tableName)}(${sql(BlocksDB.Columns.HEADER_HASH)}, ${sql(BlocksDB.Columns.TX_ID)})
-          VALUES (hh, OLD.${sql(KVColumns.KEY)});
-          INSERT INTO ${sql(ImmutableDB.tableName)}(${sql(KVColumns.KEY)}, ${sql(KVColumns.VALUE)})
-          VALUES (OLD.${sql(KVColumns.KEY)}, OLD.${sql(KVColumns.VALUE)});
-          RETURN OLD;
-        END;
-        $$ LANGUAGE plpgsql;
-      `;
-        yield* sql`CREATE TRIGGER trigger_archive_mempool
-        AFTER DELETE ON ${sql(tableName)}
-        FOR EACH ROW
-        EXECUTE PROCEDURE archive_mempool();
-      `;
-      }),
-    );
-  },
-);
 
 export const insert = (
   txString: string,
@@ -106,166 +35,57 @@ export const insert = (
       key: txHashBytes,
       value: Buffer.from(txCbor),
     });
-    // Insert spent inputs int `inputsTableName`.
-    // TODO: collect in memory and make a single query.
+
+    // Remove spent inputs from MempoolLedgerDB.
+    const spent: Buffer[] = [];
     for (let i = 0; i < inputsCount; i++) {
-      // "mempool_spent_inputs" maps a tx_id to all of its spent inputs
-      yield* insertSpentInput(inputsTableName, {
-        spent_outref: Buffer.from(inputs.get(i).to_cbor_bytes()),
-        spending_tx_hash: txHashBytes,
-      });
+      spent.push(Buffer.from(inputs.get(i).to_cbor_bytes()));
     }
+    yield* MempoolLedgerDB.clearUTxOs(spent);
+
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
+    const produced: LedgerEntry[] = [];
     // Insert produced UTxOs in `MempoolLedgerDB`.
-    // TODO: collect in memory and make a single query.
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
-      yield* MempoolLedgerDB.insert({
-        tx_id: txHashBytes,
-        outref: Buffer.from(
+      produced.push({
+        [LedgerColumns.TX_ID]: txHashBytes,
+        [LedgerColumns.OUTREF]: Buffer.from(
           CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
         ),
-        output: Buffer.from(output.to_cbor_bytes()),
-        address: output.address().to_bech32(),
+        [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
+        [LedgerColumns.ADDRESS]: output.address().to_bech32(),
       });
     }
+    yield* MempoolLedgerDB.insert(produced);
   });
 
-/** Given a txHash, retrieves all associated values with a single SQL query.
- */
-export const retrieveByHash = (
-  txHash: Buffer,
-): Effect.Effect<ProcessedTx, Error, Database> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<ProcessedTx>`
-      SELECT
-        m.${sql(KVColumns.KEY)} as ${sql(ProcessedTxColumns.TX_ID)},
-        m.${sql(KVColumns.VALUE)} as ${sql(ProcessedTxColumns.TX_CBOR)},
-        COALESCE(
-          ARRAY(
-            SELECT psi.${sql(InputsColumns.OUTREF)}
-            FROM ${sql(inputsTableName)} psi
-            WHERE psi.${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}
-          ),
-          ARRAY[]::BYTEA[]
-        ) AS ${sql(ProcessedTxColumns.INPUTS)},
-        COALESCE(
-          ARRAY(
-            SELECT ROW(ml.${sql(LedgerColumns.TX_ID)}, ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)}, ml.${sql(LedgerColumns.ADDRESS)})::${sql(outputsTableName)}
-            FROM ${sql(outputsTableName)} ml
-            WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
-          ),
-          ARRAY[]::${sql(outputsTableName)}[]
-        ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
-      FROM ${sql(tableName)} m
-      WHERE txHash = ${txHash}; LIMIT 1`;
-
-    if (rows.length <= 0) {
-      yield* Effect.fail(new Error(`Transaction not found from ${tableName}`));
-    }
-
-    return rows[0];
-  });
+export const retrieveTxCborByHash = (txHash: Buffer) =>
+  retrieveValue(tableName, txHash);
 
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<
-  readonly ProcessedTx[],
-  Error,
-  Database
-> =>
+export const retrieve = (): Effect.Effect<readonly KVPair[], Error, Database> =>
   Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<
-      Omit<ProcessedTx, ProcessedTxColumns.OUTPUTS> & {
-        [ProcessedTxColumns.OUTPUTS]: string;
-      }
-    >`
-      SELECT
-        m.${sql(KVColumns.KEY)} as ${sql(ProcessedTxColumns.TX_ID)},
-        m.${sql(KVColumns.VALUE)} as ${sql(ProcessedTxColumns.TX_CBOR)},
-        COALESCE(
-          ARRAY(
-            SELECT psi.${sql(InputsColumns.OUTREF)}
-            FROM ${sql(inputsTableName)} psi
-            WHERE psi.${sql(InputsColumns.SPENDING_TX)} = m.${sql(KVColumns.KEY)}
-          ),
-          ARRAY[]::BYTEA[]
-        ) AS ${sql(ProcessedTxColumns.INPUTS)},
-        COALESCE(
-          ARRAY(
-            SELECT (ml.${sql(LedgerColumns.OUTREF)}, ml.${sql(LedgerColumns.OUTPUT)})
-            FROM ${sql(outputsTableName)} ml
-            WHERE ml.${sql(LedgerColumns.TX_ID)} = m.${sql(KVColumns.KEY)}
-          )
-        ) AS ${sql(ProcessedTxColumns.OUTPUTS)}
-      FROM ${sql(tableName)} m LIMIT 100000;`;
-
-    const result: ProcessedTx[] = yield* Effect.allSuccesses(
-      rows.map((ptx) =>
-        Effect.gen(function* () {
-          const asList = ptx[ProcessedTxColumns.OUTPUTS]
-            .replace(/[{]/g, "[")
-            .replace(/[}]/g, "]");
-          const fields = JSON.parse(asList);
-          const ledgerEntries = yield* Effect.allSuccesses(
-            fields.map(parseLedgerEntryString),
-            { concurrency: "unbounded" },
-          );
-          return {
-            ...ptx,
-            [ProcessedTxColumns.OUTPUTS]: ledgerEntries,
-          };
-        }),
-      ),
-      { concurrency: "unbounded" },
-    );
-
-    return result;
+    return yield* sql<KVPair>`SELECT ${sql(
+      KVColumns.KEY,
+    )}, ${sql(KVColumns.VALUE)} FROM ${sql(tableName)} LIMIT 100000`;
   }).pipe(
-    Effect.withLogSpan(
-      `retrieve utxos ${tableName}, ${inputsTableName} and ${outputsTableName}`,
-    ),
+    Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieval failure: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
 
 export const retrieveTxCount = () => retrieveNumberOfEntries(tableName);
 
-/** Deletes all the given transactions from `MempoolDB`, which also cascades
- * into deletion of the associated "inputs" table (spent inputs).
- *
- * Two triggers are fired as well:
- * - First, the one attached to the inputs table, which is simply an "archiving"
- *   mechanism that transfers the rows to the inputs table associated with the
- *   blocks db
- * - Second, the trigger attached to the mempool itself, which takes care of
- *   inserting deleted transactions to the blocks table (which is why we need
- *   to first set a session variable)
- */
-// TODO: Session variable name is a magic string. It should come from a variable
-//       like other table names, columns, etc.
 export const clearTxs = (
   txHashes: Buffer[],
-  committedBlockHeaderHash: Buffer,
-): Effect.Effect<void, Error, Database> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* sql.withTransaction(
-      Effect.gen(function* () {
-        yield* sql`SELECT set_config('block_commitment.deleting_block', ${bufferToHex(
-          committedBlockHeaderHash,
-        )}, TRUE);`;
-        yield* delMultiple(tableName, txHashes);
-      }),
-    );
-  });
+): Effect.Effect<void, Error, Database> => delMultiple(tableName, txHashes);
 
 export const clear = () => clearTable(tableName);
