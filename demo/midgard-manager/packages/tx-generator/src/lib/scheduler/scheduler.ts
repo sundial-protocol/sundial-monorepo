@@ -147,7 +147,7 @@ const generateUniqueUTxOs = (baseUTxO: UTxO, count: number) =>
   Array.from({ length: count }, () => ({
     ...baseUTxO,
     txHash: randomBytes(32).toString('hex').toUpperCase(),
-    outputIndex: Math.floor(Math.random() * 10), // Random outputIndex 0 -> 9
+    outputIndex: Math.floor(Math.random() * 1001), // Random outputIndex 0 -> 1000
   }));
 
     
