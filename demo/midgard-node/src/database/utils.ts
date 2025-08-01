@@ -26,7 +26,6 @@ export type LedgerEntry = {
   [LedgerColumns.ADDRESS]: Address; // for provider
 };
 
-
 export type MinimalLedgerEntry = {
   [LedgerColumns.OUTREF]: Buffer;
   [LedgerColumns.OUTPUT]: Buffer;
@@ -228,18 +227,20 @@ export const createLedgerTable = (
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    yield* sql.withTransaction(Effect.gen(function* () {
-      yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
         ${sql(LedgerColumns.TX_ID)} BYTEA NOT NULL,
         ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
         ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
         ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
         PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
       );`;
-      yield* sql`CREATE INDEX ${sql(
-        `idx_${tableName}_${LedgerColumns.ADDRESS}`
-      )} ON ${sql(tableName)} (${sql(LedgerColumns.ADDRESS)});`;
-    }));
+        yield* sql`CREATE INDEX ${sql(
+          `idx_${tableName}_${LedgerColumns.ADDRESS}`,
+        )} ON ${sql(tableName)} (${sql(LedgerColumns.ADDRESS)});`;
+      }),
+    );
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 export const insertLedgerEntry = (

@@ -115,7 +115,7 @@ const wrapper = (
               "🔹 ⚠️  Tx submit failed. Mempool trie will be preserved, but db will be cleared.",
             );
             yield* Effect.logInfo("🔹 Mempool Trie stats:");
-            console.dir(mempoolTrie.database()._stats, {depth: null});
+            console.dir(mempoolTrie.database()._stats, { depth: null });
             flushMempoolTrie = false;
             // yield* Effect.fail(err.err);
           });

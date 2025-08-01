@@ -70,7 +70,8 @@ const getTxHandler = Effect.gen(function* () {
   ).pipe(
     Effect.catchAll((_e) =>
       Effect.gen(function* () {
-        const fromImmutable =  yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
+        const fromImmutable =
+          yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
         yield* Effect.logInfo(
           `GET /tx - Transaction found in ImmutableDB: ${txHashParam}`,
         );

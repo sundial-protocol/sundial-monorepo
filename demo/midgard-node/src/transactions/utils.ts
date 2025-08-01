@@ -8,9 +8,8 @@ import {
 } from "@lucid-evolution/lucid";
 import { Data, Effect, pipe, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
-import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
-import { ProcessedTx } from "@/database/utils.js";
+import { ImmutableDB } from "@/database/index.js";
 
 const RETRY_ATTEMPTS = 1;
 
@@ -135,17 +134,18 @@ export class ConfirmError extends Data.TaggedError("ConfirmError")<{
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
 ): Effect.Effect<
-  { txs: readonly ProcessedTx[]; headerHash: string },
+  { txs: readonly Buffer[]; headerHash: Buffer },
   Error,
   Database
 > =>
   Effect.gen(function* () {
     const blockHeader =
       yield* SDK.Utils.getHeaderFromStateQueueUTxO(firstBlockUTxO);
-    const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
-    const txs = yield* BlocksDB.retrieveByHeaderHash(
-      Buffer.from(fromHex(headerHash)),
+    const headerHash = yield* SDK.Utils.hashHeader(blockHeader).pipe(
+      Effect.map((hh) => Buffer.from(fromHex(hh))),
     );
+    const txHashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(headerHash);
+    const txs = yield* ImmutableDB.retrieveTxCborsByHashes(txHashes);
     return { txs, headerHash };
   });
 

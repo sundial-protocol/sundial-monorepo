@@ -16,6 +16,7 @@ import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { CML, fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
+import { breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
@@ -23,41 +24,16 @@ export const insert = (
   txString: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    const txCbor = fromHex(txString);
-    const deserializedTx = CML.Transaction.from_cbor_bytes(txCbor);
-    const txBody = deserializedTx.body();
-    const txHash = CML.hash_transaction(txBody);
-    const txHashBytes = Buffer.from(txHash.to_raw_bytes());
-    const inputs = txBody.inputs();
-    const inputsCount = inputs.len();
+    const txCborBytes = fromHex(txString);
+    const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
     // Insert the tx itself in `MempoolDB`.
     yield* insertKeyValue(tableName, {
-      key: txHashBytes,
-      value: Buffer.from(txCbor),
+      key: txId,
+      value: txCbor,
     });
-
     // Remove spent inputs from MempoolLedgerDB.
-    const spent: Buffer[] = [];
-    for (let i = 0; i < inputsCount; i++) {
-      spent.push(Buffer.from(inputs.get(i).to_cbor_bytes()));
-    }
     yield* MempoolLedgerDB.clearUTxOs(spent);
-
-    const outputs = txBody.outputs();
-    const outputsCount = outputs.len();
-    const produced: LedgerEntry[] = [];
     // Insert produced UTxOs in `MempoolLedgerDB`.
-    for (let i = 0; i < outputsCount; i++) {
-      const output = outputs.get(i);
-      produced.push({
-        [LedgerColumns.TX_ID]: txHashBytes,
-        [LedgerColumns.OUTREF]: Buffer.from(
-          CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
-        ),
-        [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
-        [LedgerColumns.ADDRESS]: output.address().to_bech32(),
-      });
-    }
     yield* MempoolLedgerDB.insert(produced);
   });
 

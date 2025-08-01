@@ -6,9 +6,14 @@ import * as ETH_UTILS from "@ethereumjs/util";
 import { toHex } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { NodeConfig } from "@/config.js";
-import { KVColumns, KVPair, LedgerColumns, MinimalLedgerEntry } from "@/database/utils.js";
+import {
+  KVColumns,
+  KVPair,
+  LedgerColumns,
+  MinimalLedgerEntry,
+} from "@/database/utils.js";
 import { Database } from "@/services/database.js";
-import {findSpentAndProducedUTxOs} from "@/utils.js";
+import { findSpentAndProducedUTxOs } from "@/utils.js";
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 

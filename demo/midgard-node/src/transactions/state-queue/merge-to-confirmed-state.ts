@@ -29,6 +29,11 @@ import {
   SubmitError,
 } from "../utils.js";
 import { LedgerEntry } from "@/database/utils.js";
+import {
+  ProcessedTx,
+  breakDownTx,
+  findAllSpentAndProducedUTxOs,
+} from "@/utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
@@ -118,10 +123,9 @@ export const buildAndSubmitMergeTx = (
       );
       // Fetch transactions from the first block
       yield* Effect.logInfo("🔸 Looking up its transactions from BlocksDB...");
-      const { txs: firstBlockTxs, headerHash: headerHashHex } =
-        yield* fetchFirstBlockTxs(firstBlockUTxO).pipe(
-          Effect.withSpan("fetchFirstBlockTxs"),
-        );
+      const { txs: firstBlockTxs, headerHash } = yield* fetchFirstBlockTxs(
+        firstBlockUTxO,
+      ).pipe(Effect.withSpan("fetchFirstBlockTxs"));
       if (firstBlockTxs.length === 0) {
         yield* Effect.logInfo(
           "🔸 ❌ Failed to find first block's transactions in BlocksDB.",
@@ -162,10 +166,21 @@ export const buildAndSubmitMergeTx = (
       const spentOutRefs: Buffer[] = [];
       const producedUTxOs: LedgerEntry[] = [];
 
-      firstBlockTxs.map((tx) => {
-        spentOutRefs.push(...tx.inputs);
-        producedUTxOs.push(...tx.outputs);
-      });
+      yield* Effect.forEach(
+        firstBlockTxs,
+        (txCbor) =>
+          Effect.gen(function* () {
+            const { spent, produced } = yield* breakDownTx(txCbor);
+            spentOutRefs.push(...spent);
+            producedUTxOs.push(...produced);
+          }),
+        { concurrency: "unbounded" },
+      );
+
+      // const { spent: spentOutRefs, produced: producedUTxOs } =
+      //   yield* findAllSpentAndProducedUTxOs(firstBlockTxs).pipe(
+      //     Effect.withSpan("findAllSpentAndProducedUTxOs"),
+      //   );
 
       // - Clear all the spent UTxOs from the confirmed ledger
       // - Add all the produced UTxOs from the confirmed ledger
@@ -184,7 +199,7 @@ export const buildAndSubmitMergeTx = (
           .pipe(Effect.withSpan(`confirmed-ledger-insert-${i}`));
       }
       yield* Effect.logInfo("🔸 Clear block from BlocksDB...");
-      yield* BlocksDB.clearBlock(Buffer.from(fromHex(headerHashHex))).pipe(
+      yield* BlocksDB.clearBlock(headerHash).pipe(
         Effect.withSpan("clear-block-from-BlocksDB"),
       );
       yield* Effect.logInfo("🔸 ☑️  Merge transaction completed.");

@@ -11,7 +11,11 @@ import {
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 import { Effect } from "effect";
-import {LedgerColumns, MinimalLedgerEntry} from "./database/utils.js";
+import {
+  LedgerColumns,
+  LedgerEntry,
+  MinimalLedgerEntry,
+} from "./database/utils.js";
 
 export interface WorkerInput {
   data: {
@@ -24,6 +28,13 @@ export interface WorkerOutput {
   mempoolTxsCount: number;
   sizeOfBlocksTxs: number;
 }
+
+export type ProcessedTx = {
+  txId: Buffer;
+  txCbor: Buffer;
+  spent: Buffer[];
+  produced: LedgerEntry[];
+};
 
 export const chalk = new chalk_.Chalk();
 
@@ -114,7 +125,7 @@ export const setupLucid = async (
 export const findSpentAndProducedUTxOs = (
   txCBOR: Buffer,
   txHash?: Buffer,
-): Effect.Effect<{ spent: Buffer[]; produced: MinimalLedgerEntry[]; }, Error> =>
+): Effect.Effect<{ spent: Buffer[]; produced: MinimalLedgerEntry[] }, Error> =>
   Effect.gen(function* () {
     const spent: Buffer[] = [];
     const produced: MinimalLedgerEntry[] = [];
@@ -143,30 +154,43 @@ export const findSpentAndProducedUTxOs = (
     return { spent, produced };
   });
 
-export const findAllSpentAndProducedUTxOs = (
-  txCBORs: Buffer[],
-): Effect.Effect<
-  {
-    spent: Buffer[];
-    produced: MinimalLedgerEntry[];
-  },
-  Error
-> =>
+export const breakDownTx = (
+  txCbor: Uint8Array,
+): Effect.Effect<ProcessedTx, Error> =>
   Effect.gen(function* () {
-    const allEffects = yield* Effect.all(
-      txCBORs.map((txCbor) => findSpentAndProducedUTxOs(txCbor)),
-    );
-    return allEffects.reduce(
-      (
-        { spent: spentAcc, produced: producedAcc },
-        { spent: currSpent, produced: currProduced },
-      ) => {
-        return {
-          spent: [...spentAcc, ...currSpent],
-          produced: [...producedAcc, ...currProduced],
-        };
-      },
-    );
+    const deserializedTx = yield* Effect.try({
+      try: () => CML.Transaction.from_cbor_bytes(txCbor),
+      catch: (e) => new Error(`${e}`),
+    });
+    const txBody = deserializedTx.body();
+    const txHash = CML.hash_transaction(txBody);
+    const txHashBytes = Buffer.from(txHash.to_raw_bytes());
+    const inputs = txBody.inputs();
+    const inputsCount = inputs.len();
+    const spent: Buffer[] = [];
+    for (let i = 0; i < inputsCount; i++) {
+      spent.push(Buffer.from(inputs.get(i).to_cbor_bytes()));
+    }
+    const outputs = txBody.outputs();
+    const outputsCount = outputs.len();
+    const produced: LedgerEntry[] = [];
+    for (let i = 0; i < outputsCount; i++) {
+      const output = outputs.get(i);
+      produced.push({
+        [LedgerColumns.TX_ID]: txHashBytes,
+        [LedgerColumns.OUTREF]: Buffer.from(
+          CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
+        ),
+        [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
+        [LedgerColumns.ADDRESS]: output.address().to_bech32(),
+      });
+    }
+    return {
+      txId: txHashBytes,
+      txCbor: Buffer.from(txCbor),
+      spent,
+      produced,
+    };
   });
 
 export const ENV_VARS_GUIDE = `
