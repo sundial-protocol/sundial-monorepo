@@ -3,9 +3,9 @@ import {
   clearTable,
   retrieveLedgerEntries,
   retrieveLedgerEntriesWithAddress,
-  delMultiple,
   LedgerEntry,
   insertLedgerEntries,
+  delLedgerEntries,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
 
@@ -25,6 +25,6 @@ export const retrieveByAddress = (
 ): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
   retrieveLedgerEntriesWithAddress(tableName, address);
 
-export const clearUTxOs = (refs: Buffer[]) => delMultiple(tableName, refs);
+export const clearUTxOs = (refs: Buffer[]) => delLedgerEntries(tableName, refs);
 
 export const clear = () => clearTable(tableName);

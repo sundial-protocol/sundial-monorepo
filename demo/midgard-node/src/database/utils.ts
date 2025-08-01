@@ -61,8 +61,9 @@ export const delMultiple = (
     yield* Effect.logDebug(
       `${tableName} db: attempt to delete multiply entries`,
     );
-    const result =
-      yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(KVColumns.KEY)} IN ${sql.in(keys)} RETURNING ${sql(KVColumns.KEY)}`;
+    const result = yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
+      KVColumns.KEY,
+    )} IN ${sql.in(keys)} RETURNING ${sql(KVColumns.KEY)}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(Effect.withLogSpan(`delMutiple table ${tableName}`), mapSqlError);
 
@@ -318,3 +319,14 @@ export const retrieveLedgerEntriesWithAddress = (
     ),
     mapSqlError,
   );
+
+export const delLedgerEntries = (
+  tableName: string,
+  outrefs: Buffer[],
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
+      LedgerColumns.OUTREF,
+    )} IN ${sql.in(outrefs)}`;
+  });

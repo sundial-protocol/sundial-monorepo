@@ -14,7 +14,7 @@ import {
 } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
-import { CML, fromHex } from "@lucid-evolution/lucid";
+import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
 import { breakDownTx } from "@/utils.js";
 
@@ -31,11 +31,16 @@ export const insert = (
       key: txId,
       value: txCbor,
     });
-    // Remove spent inputs from MempoolLedgerDB.
-    yield* MempoolLedgerDB.clearUTxOs(spent);
     // Insert produced UTxOs in `MempoolLedgerDB`.
     yield* MempoolLedgerDB.insert(produced);
-  });
+    // Remove spent inputs from MempoolLedgerDB.
+    yield* MempoolLedgerDB.clearUTxOs(spent);
+  }).pipe(
+    Effect.withLogSpan(`insert ${tableName}`),
+    Effect.tapError((e) =>
+      Effect.logError(`${tableName} db: insert: ${JSON.stringify(e)}`),
+    ),
+  );
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   retrieveValue(tableName, txHash);
