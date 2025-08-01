@@ -103,9 +103,8 @@ export const retrieveHeaderHashByTxHash = (
 
     if (rows.length <= 0) {
       const msg = `No headerHash found for ${txHash} txHash`;
-      const err = new SqlError.SqlError({ cause: msg, message: msg });
       yield* Effect.logDebug(msg);
-      yield* Effect.fail(err);
+      yield* Effect.fail(new SqlError.SqlError({ cause: msg }));
     }
     const result = rows[0];
     yield* Effect.logDebug(

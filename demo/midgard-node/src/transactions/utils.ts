@@ -12,9 +12,9 @@ import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
 import { ProcessedTx } from "@/database/utils.js";
 
-const RETRY_ATTEMPTS = 2;
+const RETRY_ATTEMPTS = 1;
 
-const INIT_RETRY_AFTER_MILLIS = 5_000;
+const INIT_RETRY_AFTER_MILLIS = 2_000;
 
 const PAUSE_DURATION = "5 seconds";
 

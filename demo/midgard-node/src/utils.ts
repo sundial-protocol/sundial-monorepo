@@ -1,7 +1,6 @@
 import {
   Blockfrost,
   CML,
-  coreToTxOutput,
   Koios,
   Kupmios,
   Lucid,
@@ -9,11 +8,10 @@ import {
   Maestro,
   Network,
   Provider,
-  UTxO,
-  utxoToCore,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 import { Effect } from "effect";
+import {LedgerColumns, MinimalLedgerEntry} from "./database/utils.js";
 
 export interface WorkerInput {
   data: {
@@ -113,63 +111,50 @@ export const setupLucid = async (
   }
 };
 
-export function utxoToCBOR(utxo: UTxO): {
-  outReferenceBytes: Uint8Array;
-  txOutputBytes: Uint8Array;
-} {
-  const cmlUTxO = utxoToCore(utxo);
-  return {
-    outReferenceBytes: cmlUTxO.input().to_cbor_bytes(),
-    txOutputBytes: cmlUTxO.output().to_cbor_bytes(),
-  };
-}
-
-export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
+export const findSpentAndProducedUTxOs = (
+  txCBOR: Buffer,
+  txHash?: Buffer,
+): Effect.Effect<{ spent: Buffer[]; produced: MinimalLedgerEntry[]; }, Error> =>
   Effect.gen(function* () {
-    const spent: Uint8Array[] = [];
-    const produced: {
-      outReferenceBytes: Uint8Array;
-      txOutputBytes: Uint8Array;
-    }[] = [];
+    const spent: Buffer[] = [];
+    const produced: MinimalLedgerEntry[] = [];
     const tx = CML.Transaction.from_cbor_bytes(txCBOR);
     const txBody = tx.body();
     const inputs = txBody.inputs();
     const outputs = txBody.outputs();
-    for (let i = 0; i < inputs.len(); i++) {
+    const inputsCount = inputs.len();
+    const outputsCount = outputs.len();
+    for (let i = 0; i < inputsCount; i++) {
       yield* Effect.try({
-        try: () => spent.push(inputs.get(i).to_cbor_bytes()),
+        try: () => spent.push(Buffer.from(inputs.get(i).to_cbor_bytes())),
         catch: (e) => new Error(`${e}`),
       });
     }
-    const txHash = CML.hash_transaction(txBody).to_hex();
-    for (let i = 0; i < outputs.len(); i++) {
-      yield* Effect.try({
-        try: () => {
-          const utxo: UTxO = {
-            txHash: txHash,
-            outputIndex: i,
-            ...coreToTxOutput(outputs.get(i)),
-          };
-          produced.push(utxoToCBOR(utxo));
-        },
-        catch: (e) => new Error(`${e}`),
+    const finalTxHash =
+      txHash === undefined
+        ? CML.hash_transaction(txBody).to_raw_bytes()
+        : txHash;
+    for (let i = 0; i < outputsCount; i++) {
+      produced.push({
+        [LedgerColumns.OUTREF]: Buffer.from(finalTxHash),
+        [LedgerColumns.OUTPUT]: Buffer.from(outputs.get(i).to_cbor_bytes()),
       });
     }
     return { spent, produced };
   });
 
 export const findAllSpentAndProducedUTxOs = (
-  txCBORs: Uint8Array[],
+  txCBORs: Buffer[],
 ): Effect.Effect<
   {
-    spent: Uint8Array[];
-    produced: { outReferenceBytes: Uint8Array; txOutputBytes: Uint8Array }[];
+    spent: Buffer[];
+    produced: MinimalLedgerEntry[];
   },
   Error
 > =>
   Effect.gen(function* () {
     const allEffects = yield* Effect.all(
-      txCBORs.map(findSpentAndProducedUTxOs),
+      txCBORs.map((txCbor) => findSpentAndProducedUTxOs(txCbor)),
     );
     return allEffects.reduce(
       (

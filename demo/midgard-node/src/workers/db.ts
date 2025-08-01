@@ -5,19 +5,21 @@ import * as ETH from "@ethereumjs/mpt";
 import * as ETH_UTILS from "@ethereumjs/util";
 import { toHex } from "@lucid-evolution/lucid";
 import { Level } from "level";
-import { MemoryLevel } from "memory-level";
 import { NodeConfig } from "@/config.js";
-import { LedgerColumns } from "@/database/utils.js";
+import { KVColumns, KVPair, LedgerColumns, MinimalLedgerEntry } from "@/database/utils.js";
 import { Database } from "@/services/database.js";
+import {findSpentAndProducedUTxOs} from "@/utils.js";
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 
-const LEVELDB_ENCODING_OPTS = { keyEncoding: "view", valueEncoding: "view" };
+const LEVELDB_ENCODING_OPTS = {
+  keyEncoding: ETH_UTILS.KeyEncoding.Bytes,
+  valueEncoding: ETH_UTILS.ValueEncoding.Bytes,
+};
 
 export const makeMpts = () =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
-    Effect.logDebug("🔹 Creating ledger and mempool tries ...");
     // Since there is no way to create an MPT from txs that are already in
     // the mempool database, we have two options here:
     // 1. We could add txs to the MPT directly from the submit endpoint.
@@ -28,35 +30,51 @@ export const makeMpts = () =>
     //    in the mempool, this should not add any overhead compared to inserting
     //    each tx twice (in the mempool and in the tree itself). So it shouldn't
     //    become a bottleneck. If it does, we could reconsider the first option.
+    //
+    // ^ Old comment, we are now storing mempool's LevelDB on disk as well. This
+    //   allows us to continue a work that's been done in cases of failures.
+    const mempoolLevelDb = new Level<string, Uint8Array>(
+      nodeConfig.MEMPOOL_MPT_DB_PATH,
+      LEVELDB_ENCODING_OPTS,
+    );
     const mempoolTrie = yield* Effect.tryPromise({
-      try: () => ETH.createMPT({}),
+      try: () =>
+        ETH.createMPT({
+          db: new LevelDB(mempoolLevelDb),
+          useRootPersistence: true,
+          valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
+        }),
       catch: (e) => new Error(`${e}`),
     });
-
     // Ledger MPT from the other side should use a checkpoint database —
     // its MPT building operations are paired with database ones
-    const levelDb = new Level<string, Uint8Array>(
-      nodeConfig.MPT_DB_PATH,
+    const ledgerLevelDb = new Level<string, Uint8Array>(
+      nodeConfig.LEDGER_MPT_DB_PATH,
       LEVELDB_ENCODING_OPTS,
     );
     const ledgerTrie = yield* Effect.tryPromise({
       try: () =>
         ETH.createMPT({
-          db: new LevelDB(levelDb),
+          db: new LevelDB(ledgerLevelDb),
           useRootPersistence: true,
-          valueEncoding: ETH_UTILS.ValueEncoding.Bytes,
+          valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
         }),
       catch: (e) => new Error(`${e}`),
     });
+    const mempoolRootBeforeMempoolTxs = yield* Effect.tryPromise({
+      try: () => mempoolTrie.get(rootKey),
+      catch: (e) => new Error(`${e}`),
+    }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
     const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise({
       try: () => ledgerTrie.get(rootKey),
       catch: (e) => new Error(`${e}`),
     }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
     // Ensuring persisted root is stored in trie's private property
+    yield* Effect.sync(() => mempoolTrie.root(mempoolRootBeforeMempoolTxs));
     yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
     return {
-      ledgerTrie: ledgerTrie,
-      mempoolTrie: mempoolTrie,
+      ledgerTrie,
+      mempoolTrie,
     };
   });
 
@@ -64,7 +82,7 @@ export const makeMpts = () =>
 export const processMpts = (
   ledgerTrie: ETH.MerklePatriciaTrie,
   mempoolTrie: ETH.MerklePatriciaTrie,
-  mempoolTxs: readonly ProcessedTx[],
+  mempoolTxs: readonly KVPair[],
 ): Effect.Effect<
   {
     utxoRoot: string;
@@ -77,44 +95,62 @@ export const processMpts = (
 > =>
   Effect.gen(function* () {
     const mempoolTxHashes: Buffer[] = [];
+    const mempoolBatchOps: ETH_UTILS.BatchDBOp[] = [];
     const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfBlocksTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
-    yield* Effect.forEach(mempoolTxs, (ptx: ProcessedTx) =>
+    yield* Effect.forEach(mempoolTxs, (kv: KVPair) =>
       Effect.gen(function* () {
-        const txHash = ptx[ProcessedTxColumns.TX_ID];
-        const txCbor = ptx[ProcessedTxColumns.TX_CBOR];
-        const spent = ptx[ProcessedTxColumns.INPUTS];
-        const produced = ptx[ProcessedTxColumns.OUTPUTS];
+        const txHash = kv[KVColumns.KEY];
+        const txCbor = kv[KVColumns.VALUE];
         mempoolTxHashes.push(txHash);
+        const { spent, produced } = yield* findSpentAndProducedUTxOs(
+          txCbor,
+          txHash,
+        ).pipe(Effect.withSpan("findSpentAndProducedUTxOs"));
         sizeOfBlocksTxs += txCbor.length;
-        yield* Effect.tryPromise({
-          try: () => mempoolTrie.put(txHash, txCbor),
-          catch: (e) => new Error(`${e}`),
-        });
         const delOps: ETH_UTILS.BatchDBOp[] = spent.map((outRef) => ({
           type: "del",
           key: outRef,
         }));
-        const putOps: ETH_UTILS.BatchDBOp[] = produced.map((o) => ({
-          type: "put",
-          key: o[LedgerColumns.OUTREF],
-          value: o[LedgerColumns.OUTPUT],
-        }));
-        yield* Effect.sync(() => batchDBOps.push(...[...delOps, ...putOps]));
+        const putOps: ETH_UTILS.BatchDBOp[] = produced.map(
+          (le: MinimalLedgerEntry) => ({
+            type: "put",
+            key: le[LedgerColumns.OUTREF],
+            value: le[LedgerColumns.OUTPUT],
+          }),
+        );
+        yield* Effect.sync(() =>
+          mempoolBatchOps.push({
+            type: "put",
+            key: txHash,
+            value: txCbor,
+          }),
+        );
+        yield* Effect.sync(() => batchDBOps.push(...delOps));
+        yield* Effect.sync(() => batchDBOps.push(...putOps));
       }),
     );
 
-    yield* Effect.tryPromise({
-      try: () => ledgerTrie.batch(batchDBOps),
-      catch: (e) => new Error(`${e}`),
-    });
+    yield* Effect.all(
+      [
+        Effect.tryPromise({
+          try: () => mempoolTrie.batch(mempoolBatchOps),
+          catch: (e) => new Error(`${e}`),
+        }),
+        Effect.tryPromise({
+          try: () => ledgerTrie.batch(batchDBOps),
+          catch: (e) => new Error(`${e}`),
+        }),
+      ],
+      { concurrency: "unbounded" },
+    );
 
-    const utxoRoot = toHex(ledgerTrie.root());
     const txRoot = toHex(mempoolTrie.root());
+    const utxoRoot = toHex(ledgerTrie.root());
 
-    yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
     yield* Effect.logInfo(`🔹 New transaction root found: ${txRoot}`);
+    yield* Effect.logInfo(`🔹 New UTxO root found: ${utxoRoot}`);
 
     return {
       utxoRoot: utxoRoot,
@@ -144,10 +180,10 @@ export const withTrieTransaction = (
   );
 
 export class LevelDB {
-  _leveldb: MemoryLevel<string, Uint8Array>;
+  _leveldb: Level<string, Uint8Array>;
 
-  constructor(leveldb: MemoryLevel<string, Uint8Array>) {
-    this._leveldb = leveldb ?? new MemoryLevel(LEVELDB_ENCODING_OPTS);
+  constructor(leveldb: Level<string, Uint8Array>) {
+    this._leveldb = leveldb;
   }
 
   async open() {
@@ -172,5 +208,9 @@ export class LevelDB {
 
   shallowCopy() {
     return new LevelDB(this._leveldb);
+  }
+
+  getDatabase() {
+    return this._leveldb;
   }
 }

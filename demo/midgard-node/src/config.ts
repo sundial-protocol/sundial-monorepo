@@ -26,7 +26,8 @@ export type NodeConfigDep = {
   POSTGRES_PASSWORD: string;
   POSTGRES_DB: string;
   POSTGRES_HOST: string;
-  MPT_DB_PATH: string;
+  LEDGER_MPT_DB_PATH: string;
+  MEMPOOL_MPT_DB_PATH: string;
 };
 
 export const makeUserFn = (nodeConfig: NodeConfigDep) =>
@@ -91,7 +92,12 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("POSTGRES_PASSWORD").pipe(Config.withDefault("postgres")),
     Config.string("POSTGRES_DB").pipe(Config.withDefault("midgard")),
     Config.string("POSTGRES_USER").pipe(Config.withDefault("postgres")),
-    Config.string("MPT_DB").pipe(Config.withDefault("./midgard-mpt-db")),
+    Config.string("LEDGER_MPT_DB").pipe(
+      Config.withDefault("./midgard-ledger-mpt-db"),
+    ),
+    Config.string("MEMPOOL_MPT_DB").pipe(
+      Config.withDefault("./midgard-mempool-mpt-db"),
+    ),
   ]);
 
   const provider = config[0].toLowerCase();
@@ -118,7 +124,8 @@ export const makeConfig = Effect.gen(function* () {
     POSTGRES_PASSWORD: config[14],
     POSTGRES_DB: config[15],
     POSTGRES_USER: config[16],
-    MPT_DB_PATH: config[17],
+    LEDGER_MPT_DB_PATH: config[17],
+    MEMPOOL_MPT_DB_PATH: config[18],
   };
 }).pipe(Effect.orDie);
 

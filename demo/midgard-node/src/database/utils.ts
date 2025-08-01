@@ -22,14 +22,14 @@ export enum LedgerColumns {
 export type LedgerEntry = {
   [LedgerColumns.TX_ID]: Buffer; // for linking the tables
   [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
-  [LedgerColumns.OUTPUT]: Buffer; // for root calc
+  [LedgerColumns.OUTPUT]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.ADDRESS]: Address; // for provider
 };
 
 
 export type MinimalLedgerEntry = {
-  [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
-  [LedgerColumns.OUTPUT]: Buffer; // for root calc
+  [LedgerColumns.OUTREF]: Buffer;
+  [LedgerColumns.OUTPUT]: Buffer;
 };
 
 export enum InputsColumns {
