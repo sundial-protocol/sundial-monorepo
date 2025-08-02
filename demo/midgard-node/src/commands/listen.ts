@@ -4,19 +4,11 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { CML, fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
+import { fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import {
-  Duration,
-  Effect,
-  Layer,
-  Metric,
-  Option,
-  pipe,
-  Schedule,
-} from "effect";
+import { Duration, Effect, Layer, Metric, pipe, Schedule } from "effect";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -26,14 +18,14 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
+import { isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
-import { SqlClient } from "@effect/sql";
+import { makeMpts } from "@/workers/db.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -72,26 +64,25 @@ const getTxHandler = Effect.gen(function* () {
       { status: 404 },
     );
   }
-  const txHashBytes = fromHex(txHashParam);
-  const retMempool = yield* MempoolDB.retrieveTxCborByHash(txHashBytes);
-  if (Option.isSome(retMempool)) {
-    yield* Effect.logInfo(
-      `GET /tx - Transaction found in mempool: ${txHashParam}`,
-    );
-    return yield* HttpServerResponse.json({ tx: retMempool.value });
-  }
-  const retImmutable = yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
-  if (Option.isSome(retImmutable)) {
-    yield* Effect.logInfo(
-      `GET /tx - Transaction found in immutable: ${txHashParam}`,
-    );
-    return yield* HttpServerResponse.json({ tx: retImmutable.value });
-  }
-  yield* Effect.logInfo(`Transaction not found: ${txHashParam}`);
-  return yield* HttpServerResponse.json(
-    { error: `Transaction not found: ${txHashParam}` },
-    { status: 404 },
+  const txHashBytes = Buffer.from(fromHex(txHashParam));
+  const foundCbor: Uint8Array = yield* MempoolDB.retrieveTxCborByHash(
+    txHashBytes,
+  ).pipe(
+    Effect.catchAll((_e) =>
+      Effect.gen(function* () {
+        const fromImmutable =
+          yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
+        yield* Effect.logInfo(
+          `GET /tx - Transaction found in ImmutableDB: ${txHashParam}`,
+        );
+        return fromImmutable;
+      }),
+    ),
   );
+  yield* Effect.logInfo(
+    `GET /tx - Transaction found in mempool: ${txHashParam}`,
+  );
+  return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
 }).pipe(Effect.catchAll((e) => handle500("getTx", e)));
 
 const getUtxosHandler = Effect.gen(function* () {
@@ -114,13 +105,32 @@ const getUtxosHandler = Effect.gen(function* () {
         { status: 400 },
       );
     }
-    const allUTxOs = yield* MempoolLedgerDB.retrieve();
-    const filtered = allUTxOs.filter(({ value }) => {
-      const cmlOutput = CML.TransactionOutput.from_cbor_bytes(value);
-      return cmlOutput.address().to_bech32() === addrDetails.address.bech32;
+
+    const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(
+      addrDetails.address.bech32,
+    );
+    const { ledgerTrie } = yield* makeMpts();
+    const utxosWithAddressNotConsumed = yield* Effect.allSuccesses(
+      utxosWithAddress.map((entry) =>
+        Effect.tryPromise(() => ledgerTrie.get(entry.outref)).pipe(
+          Effect.andThen((res) => {
+            if (res === null) {
+              return Effect.fail(null);
+            } else {
+              return Effect.succeed(res);
+            }
+          }),
+        ),
+      ),
+      { concurrency: "unbounded" },
+    );
+
+    yield* Effect.logInfo(
+      `Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`,
+    );
+    return yield* HttpServerResponse.json({
+      utxos: utxosWithAddressNotConsumed,
     });
-    yield* Effect.logInfo(`Found ${filtered.length} UTXOs for ${addr}`);
-    return yield* HttpServerResponse.json({ utxos: filtered });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
     return yield* HttpServerResponse.json(
@@ -148,7 +158,9 @@ const getBlockHandler = Effect.gen(function* () {
       { status: 400 },
     );
   }
-  const hashes = yield* BlocksDB.retrieveTxHashesByBlockHash(fromHex(hdrHash));
+  const hashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(
+    Buffer.from(fromHex(hdrHash)),
+  );
   yield* Effect.logInfo(
     `GET /block - Found ${hashes.length} txs for block: ${hdrHash}`,
   );
@@ -292,8 +304,8 @@ const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
   const allPairs = yield* BlocksDB.retrieve();
   const keyValues: Record<string, number> = allPairs.reduce(
-    (acc: Record<string, number>, [b, _t]) => {
-      const bHex = toHex(b);
+    (acc: Record<string, number>, entry) => {
+      const bHex = toHex(entry.header_hash);
       if (!acc[bHex]) {
         acc[bHex] = 1;
       } else {
@@ -318,20 +330,20 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
   });
 }).pipe(Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)));
 
-const getLogSemaphoresHandler = Effect.gen(function* () {
-  yield* Effect.logInfo(`✍  Logging semaphores...`);
+const getLogGlobalsHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Logging global variables...`);
   yield* Effect.logInfo(`
   BLOCKS_IN_QUEUE ⋅⋅⋅⋅ ${global.BLOCKS_IN_QUEUE}
   LATEST_SYNC ⋅⋅⋅⋅⋅⋅⋅⋅ ${new Date(global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH).toLocaleString()}
   RESET_IN_PROGRESS ⋅⋅ ${global.RESET_IN_PROGRESS}
 `);
   return yield* HttpServerResponse.json({
-    message: `Semaphores logged!`,
+    message: `Global variables logged!`,
   });
 });
 
 const postSubmitHandler = Effect.gen(function* () {
-  // yield* Effect.logInfo(`◻️ Submit request received for transaction`);
+  // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
@@ -342,23 +354,10 @@ const postSubmitHandler = Effect.gen(function* () {
     );
   } else {
     const txString = txStringParam;
-    const { user: lucid } = yield* User;
-    return yield* Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
-      const txCBOR = fromHex(txString);
-      const tx = lucid.fromTx(txString);
-      const { spent, produced } = yield* findSpentAndProducedUTxOs(txCBOR);
-      yield* sql.withTransaction(
-        Effect.gen(function* () {
-          yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
-          yield* MempoolLedgerDB.clearUTxOs(spent);
-          yield* MempoolLedgerDB.insert(produced);
-        }),
-      );
-      Effect.runSync(Metric.increment(txCounter));
-      return yield* HttpServerResponse.json({
-        message: `Successfully submitted the transaction`,
-      });
+    yield* MempoolDB.insert(txString);
+    Effect.runSync(Metric.increment(txCounter));
+    return yield* HttpServerResponse.json({
+      message: `Successfully submitted the transaction`,
     });
   }
 }).pipe(
@@ -383,7 +382,7 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/reset", getResetHandler),
   HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
   HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
-  HttpRouter.get("/logSemaphores", getLogSemaphoresHandler),
+  HttpRouter.get("/logGlobals", getLogGlobalsHandler),
   HttpRouter.post("/submit", postSubmitHandler),
 );
 

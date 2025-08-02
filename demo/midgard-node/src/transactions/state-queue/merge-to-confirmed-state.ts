@@ -1,17 +1,22 @@
 /**
- * This script performs the following tasks to merge the first block into the confirmed state:
+ * This script performs the following tasks to merge the first block into the
+ * confirmed state:
  *
- * 1. Fetch transactions of the first block by querying ImmutableDB.
- * 2. Apply those transactions to ConfirmedLedgerDB and update the table to store the updated UTxO set.
- * 3. Remove all header hashes from BlocksDB associated with the merged block.
- * 4. Build and submit the merge transaction.
+ * 1. Fetches the confirmed state and the block it points to (i.e. the oldest
+ *    block in the queue).
+ * 2. Fetches the transactions of that block by querying BlocksDB and its
+ *    associated inputs table..
+ * 3. Apply those transactions to ConfirmedLedgerDB and update the table to
+ *    store the updated UTxO set.
+ * 4. Remove all header hashes from BlocksDB associated with the merged block.
+ * 5. Build and submit the merge transaction.
  */
 
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
-import { findAllSpentAndProducedUTxOs } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import {
   Address,
+  CML,
   LucidEvolution,
   Script,
   fromHex,
@@ -23,10 +28,15 @@ import {
   handleSignSubmit,
   SubmitError,
 } from "../utils.js";
-import { Database } from "@/services/database.js";
+import { LedgerEntry } from "@/database/utils.js";
+import {
+  ProcessedTx,
+  breakDownTx,
+  findAllSpentAndProducedUTxOs,
+} from "@/utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
-  description: "A counter for tracking merge blocks",
+  description: "A counter for tracking merged blocks",
   bigint: true,
   incremental: true,
 });
@@ -67,18 +77,19 @@ const getStateQueueLength = (
  * Build and submit the merge transaction.
  *
  * @param lucid - The LucidEvolution instance.
- * @param db - The database instance.
  * @param fetchConfig - The configuration for fetching data.
  * @param spendScript - State queue's spending script.
  * @param mintScript - State queue's minting script.
- * @returns An Effect that resolves when the merge transaction is built and submitted.
+ * @returns An Effect that resolves when the merge transaction is built and
+ *          submitted.
  */
 export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   spendScript: Script,
   mintScript: Script,
-): Effect.Effect<void, Error, Database> =>
+  // ): Effect.Effect<void, Error, Database> =>
+) =>
   Effect.gen(function* () {
     const currentStateQueueLength = yield* getStateQueueLength(
       lucid,
@@ -151,13 +162,25 @@ export const buildAndSubmitMergeTx = (
       yield* Effect.logInfo(
         "🔸 Merge transaction submitted, updating the db...",
       );
-      if (firstBlockTxs.length === 0) {
-        return;
-      }
-      const { spent: spentOutRefs, produced: producedUTxOs } =
-        yield* findAllSpentAndProducedUTxOs(firstBlockTxs).pipe(
-          Effect.withSpan("findAllSpentAndProducedUTxOs"),
-        );
+
+      const spentOutRefs: Buffer[] = [];
+      const producedUTxOs: LedgerEntry[] = [];
+
+      yield* Effect.forEach(
+        firstBlockTxs,
+        (txCbor) =>
+          Effect.gen(function* () {
+            const { spent, produced } = yield* breakDownTx(txCbor);
+            spentOutRefs.push(...spent);
+            producedUTxOs.push(...produced);
+          }),
+        { concurrency: "unbounded" },
+      );
+
+      // const { spent: spentOutRefs, produced: producedUTxOs } =
+      //   yield* findAllSpentAndProducedUTxOs(firstBlockTxs).pipe(
+      //     Effect.withSpan("findAllSpentAndProducedUTxOs"),
+      //   );
 
       // - Clear all the spent UTxOs from the confirmed ledger
       // - Add all the produced UTxOs from the confirmed ledger
@@ -171,12 +194,12 @@ export const buildAndSubmitMergeTx = (
       }
       yield* Effect.logInfo("🔸 Insert produced UTxOs...");
       for (let i = 0; i < producedUTxOs.length; i += bs) {
-        yield* ConfirmedLedgerDB.insert(producedUTxOs.slice(i, i + bs))
+        yield* ConfirmedLedgerDB.insertMultiple(producedUTxOs.slice(i, i + bs))
           // .map((u) => utxoToOutRefAndCBORArray(u)),
           .pipe(Effect.withSpan(`confirmed-ledger-insert-${i}`));
       }
       yield* Effect.logInfo("🔸 Clear block from BlocksDB...");
-      yield* BlocksDB.clearBlock(fromHex(headerHash)).pipe(
+      yield* BlocksDB.clearBlock(headerHash).pipe(
         Effect.withSpan("clear-block-from-BlocksDB"),
       );
       yield* Effect.logInfo("🔸 ☑️  Merge transaction completed.");

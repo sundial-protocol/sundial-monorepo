@@ -1,45 +1,91 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
+import { Address } from "@lucid-evolution/lucid";
 
-export const mkKeyValueCreateQuery = (
+export enum KVColumns {
+  KEY = "key",
+  VALUE = "value",
+}
+
+export type KVPair = {
+  [kvCols in KVColumns]: Buffer;
+};
+
+export enum LedgerColumns {
+  TX_ID = "tx_id",
+  OUTREF = "outref",
+  OUTPUT = "output",
+  ADDRESS = "address",
+}
+
+export type LedgerEntry = {
+  [LedgerColumns.TX_ID]: Buffer; // for linking the tables
+  [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
+  [LedgerColumns.OUTPUT]: Buffer; // for root calc and updating the ledger
+  [LedgerColumns.ADDRESS]: Address; // for provider
+};
+
+export type MinimalLedgerEntry = {
+  [LedgerColumns.OUTREF]: Buffer;
+  [LedgerColumns.OUTPUT]: Buffer;
+};
+
+export enum InputsColumns {
+  OUTREF = "spent_outref",
+  SPENDING_TX = "spending_tx_hash",
+}
+
+export type SpentInput = {
+  [inputsCols in InputsColumns]: Buffer;
+};
+
+export const createKeyValueTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      key BYTEA NOT NULL,
-      value BYTEA NOT NULL,
-      PRIMARY KEY (key)
+      ${sql(KVColumns.KEY)} BYTEA NOT NULL,
+      ${sql(KVColumns.VALUE)} BYTEA NOT NULL,
+      PRIMARY KEY (${sql(KVColumns.KEY)})
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 export const delMultiple = (
   tableName: string,
-  keys: Uint8Array[],
+  keys: Buffer[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(
       `${tableName} db: attempt to delete multiply entries`,
     );
-    const result =
-      yield* sql`DELETE FROM ${sql(tableName)} WHERE key IN ${sql.in(keys)} RETURNING key`;
+    const result = yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
+      KVColumns.KEY,
+    )} IN ${sql.in(keys)} RETURNING ${sql(KVColumns.KEY)}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(Effect.withLogSpan(`delMutiple table ${tableName}`), mapSqlError);
 
 export const retrieveValue = (
   tableName: string,
-  key: Uint8Array,
-): Effect.Effect<Option.Option<Uint8Array>, Error, Database> =>
+  key: Buffer,
+): Effect.Effect<Buffer, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
 
-    const result = yield* sql<Uint8Array[]>`SELECT value FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT ${sql(KVColumns.VALUE)} FROM ${sql(
       tableName,
-    )} WHERE key = ${Buffer.from(key)} LIMIT 1 `;
-    return Option.fromNullable(result[0]?.[0]);
+    )} WHERE ${sql(KVColumns.KEY)} = ${key}`;
+
+    if (result.length <= 0) {
+      yield* Effect.fail(
+        new SqlError.SqlError({ cause: `No value found for key ${key}` }),
+      );
+    }
+
+    return result[0];
   }).pipe(
     Effect.withLogSpan(`retrieve value ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -52,16 +98,17 @@ export const retrieveValue = (
 
 export const retrieveValues = (
   tableName: string,
-  keys: Uint8Array[],
-): Effect.Effect<Uint8Array[], Error, Database> =>
+  keys: Buffer[] | readonly Buffer[],
+): Effect.Effect<readonly Buffer[], Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
 
-    const result = yield* sql`SELECT value FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT ${sql(KVColumns.VALUE)} FROM ${sql(
       tableName,
-    )} WHERE ${sql.in("key", keys.map(Buffer.from))}`;
-    return result.map((row: any) => Uint8Array.from(row.value));
+    )} WHERE ${sql.in(KVColumns.KEY, keys)}`;
+
+    return result;
   }).pipe(
     Effect.withLogSpan(`retrieve values ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -92,76 +139,50 @@ export const clearTable = (
 
 export const insertKeyValue = (
   tableName: string,
-  key: Uint8Array,
-  value: Uint8Array,
+  kvPair: KVPair,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValue`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValue`);
     const sql = yield* SqlClient.SqlClient;
-    const valueBuffer: Buffer = Buffer.from(value);
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert({
-      key: Buffer.from(key),
-      value: valueBuffer,
-    })} ON CONFLICT (key) DO UPDATE SET value = ${valueBuffer}`;
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(
+      kvPair,
+    )} ON CONFLICT (${sql(KVColumns.KEY)}) DO UPDATE SET ${sql(KVColumns.VALUE)} = ${kvPair.value}`;
   }).pipe(
-    Effect.withLogSpan(`insert keyValue ${tableName}`),
+    Effect.withLogSpan(`insertKeyValue ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insert keyValue: ${JSON.stringify(e)}`),
+      Effect.logError(`${tableName} db: insertKeyValue: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
 
 export const insertKeyValues = (
   tableName: string,
-  values: { key: Uint8Array; value: Uint8Array }[],
+  pairs: KVPair[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insert keyValues`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValues`);
     const sql = yield* SqlClient.SqlClient;
-    const pairs = values.map((kv) => ({
-      key: Buffer.from(kv.key),
-      value: Buffer.from(kv.value),
-    }));
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(pairs)}`;
   }).pipe(
-    Effect.withLogSpan(`insert keyValues ${tableName}`),
+    Effect.withLogSpan(`insertKeyValues ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: insertKeyValues: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
 
 export const retrieveKeyValues = (
   tableName: string,
-): Effect.Effect<
-  {
-    key: Uint8Array;
-    value: Uint8Array;
-  }[],
-  Error,
-  Database
-> =>
+): Effect.Effect<readonly KVPair[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql`SELECT * FROM ${sql(tableName)}`;
-    return rows.map((row: unknown) => {
-      const { key, value } = row as {
-        key: Buffer;
-        value: Buffer;
-      };
-      return {
-        key: new Uint8Array(key.buffer, key.byteOffset, key.byteLength),
-        value: new Uint8Array(value.buffer, value.byteOffset, value.byteLength),
-      };
-    });
+    return yield* sql<KVPair>`SELECT ${sql(KVColumns.KEY)}, ${sql(KVColumns.VALUE)} FROM ${sql(tableName)}`;
   }).pipe(
-    Effect.withLogSpan(`insert keyValues ${tableName}`),
+    Effect.withLogSpan(`retrieveKeyValues ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
-        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
+        `${tableName} db: retrieveKeyValues: ${JSON.stringify(e)}`,
       ),
     ),
     mapSqlError,
@@ -178,10 +199,10 @@ export const retrieveNumberOfEntries = (
     }>`SELECT COUNT(*) FROM ${sql(tableName)}`;
     return rows[0].count ?? 0;
   }).pipe(
-    Effect.withLogSpan(`get number of entries ${tableName}`),
+    Effect.withLogSpan(`retrieveNumberOfEntries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
-        `${tableName} db: insert keyValues: ${JSON.stringify(e)}`,
+        `${tableName} db: retrieveNumberOfEntries: ${JSON.stringify(e)}`,
       ),
     ),
     mapSqlError,
@@ -201,3 +222,111 @@ export const mapSqlError = <A, E, R>(
       },
     ),
   );
+
+export const createLedgerTable = (
+  tableName: string,
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+        ${sql(LedgerColumns.TX_ID)} BYTEA NOT NULL,
+        ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
+        ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
+        ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
+        PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
+      );`;
+        yield* sql`CREATE INDEX ${sql(
+          `idx_${tableName}_${LedgerColumns.ADDRESS}`,
+        )} ON ${sql(tableName)} (${sql(LedgerColumns.ADDRESS)});`;
+      }),
+    );
+  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
+
+export const insertLedgerEntry = (
+  tableName: string,
+  entry: LedgerEntry,
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to insert LedgerUTxO`);
+    const sql = yield* SqlClient.SqlClient;
+    // No need to handle conflicts.
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entry)}`;
+  }).pipe(
+    Effect.withLogSpan(`insertLedgerEntry ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: insertLedgerEntry: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
+export const insertLedgerEntries = (
+  tableName: string,
+  entries: LedgerEntry[],
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to insert LedgerUTxOs`);
+    const sql = yield* SqlClient.SqlClient;
+
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}`;
+  }).pipe(
+    Effect.withLogSpan(`insertLedgerEntries ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: insertLedgerEntries: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
+export const retrieveLedgerEntries = (
+  tableName: string,
+): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieveLedgerEntries`);
+    const sql = yield* SqlClient.SqlClient;
+    return yield* sql<LedgerEntry>`SELECT * FROM ${sql(tableName)}`;
+  }).pipe(
+    Effect.withLogSpan(`retrieveLedgerEntries ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: retrieveLedgerEntries: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
+export const retrieveLedgerEntriesWithAddress = (
+  tableName: string,
+  address: Address,
+): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve LedgerUTxOs`);
+    const sql = yield* SqlClient.SqlClient;
+
+    return yield* sql<LedgerEntry>`SELECT * FROM ${sql(
+      tableName,
+    )} WHERE ${sql(LedgerColumns.ADDRESS)} = ${address}`;
+  }).pipe(
+    Effect.withLogSpan(`retrieveLedgerEntriesWithAddress ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: retrieveLedgerEntriesWithAddress: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
+export const delLedgerEntries = (
+  tableName: string,
+  outrefs: Buffer[],
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
+      LedgerColumns.OUTREF,
+    )} IN ${sql.in(outrefs)}`;
+  });

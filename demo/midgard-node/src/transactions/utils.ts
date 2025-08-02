@@ -8,12 +8,12 @@ import {
 } from "@lucid-evolution/lucid";
 import { Data, Effect, pipe, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
-import * as ImmutableDB from "../database/immutable.js";
 import { Database } from "@/services/database.js";
+import { ImmutableDB } from "@/database/index.js";
 
-const RETRY_ATTEMPTS = 2;
+const RETRY_ATTEMPTS = 1;
 
-const INIT_RETRY_AFTER_MILLIS = 5_000;
+const INIT_RETRY_AFTER_MILLIS = 2_000;
 
 const PAUSE_DURATION = "5 seconds";
 
@@ -128,19 +128,23 @@ export class ConfirmError extends Data.TaggedError("ConfirmError")<{
  * Fetch transactions of the first block by querying BlocksDB and ImmutableDB.
  *
  * @param firstBlockUTxO - UTxO of the first block in queue.
- * @param db - The database instance.
- * @returns An Effect that resolves to an array of transactions.
+ * @returns An Effect that resolves to an array of transactions, and block's
+ *          header hash.
  */
 export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
-): Effect.Effect<{ txs: Uint8Array[]; headerHash: string }, Error, Database> =>
+): Effect.Effect<
+  { txs: readonly Buffer[]; headerHash: Buffer },
+  Error,
+  Database
+> =>
   Effect.gen(function* () {
     const blockHeader =
       yield* SDK.Utils.getHeaderFromStateQueueUTxO(firstBlockUTxO);
-    const headerHash = yield* SDK.Utils.hashHeader(blockHeader);
-    const txHashes = yield* BlocksDB.retrieveTxHashesByBlockHash(
-      fromHex(headerHash),
+    const headerHash = yield* SDK.Utils.hashHeader(blockHeader).pipe(
+      Effect.map((hh) => Buffer.from(fromHex(hh))),
     );
+    const txHashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(headerHash);
     const txs = yield* ImmutableDB.retrieveTxCborsByHashes(txHashes);
     return { txs, headerHash };
   });

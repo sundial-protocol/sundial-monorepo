@@ -1,7 +1,6 @@
 import {
   Blockfrost,
   CML,
-  coreToTxOutput,
   Koios,
   Kupmios,
   Lucid,
@@ -9,11 +8,14 @@ import {
   Maestro,
   Network,
   Provider,
-  UTxO,
-  utxoToCore,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 import { Effect } from "effect";
+import {
+  LedgerColumns,
+  LedgerEntry,
+  MinimalLedgerEntry,
+} from "./database/utils.js";
 
 export interface WorkerInput {
   data: {
@@ -26,6 +28,13 @@ export interface WorkerOutput {
   mempoolTxsCount: number;
   sizeOfBlocksTxs: number;
 }
+
+export type ProcessedTx = {
+  txId: Buffer;
+  txCbor: Buffer;
+  spent: Buffer[];
+  produced: LedgerEntry[];
+};
 
 export const chalk = new chalk_.Chalk();
 
@@ -50,6 +59,14 @@ export const logInfo = (msg: string) => {
 export const isHexString = (str: string): boolean => {
   const hexRegex = /^[0-9A-Fa-f]+$/;
   return hexRegex.test(str);
+};
+
+export const bufferToHex = (buf: Buffer): string => {
+  try {
+    return buf.toString("hex");
+  } catch (_) {
+    return "<no hex for undefined>";
+  }
 };
 
 export const setupLucid = async (
@@ -105,72 +122,75 @@ export const setupLucid = async (
   }
 };
 
-export function utxoToCBOR(utxo: UTxO): {
-  key: Uint8Array;
-  value: Uint8Array;
-} {
-  const cmlUTxO = utxoToCore(utxo);
-  return {
-    key: cmlUTxO.input().to_cbor_bytes(),
-    value: cmlUTxO.output().to_cbor_bytes(),
-  };
-}
-
-export const findSpentAndProducedUTxOs = (txCBOR: Uint8Array) =>
+export const findSpentAndProducedUTxOs = (
+  txCBOR: Buffer,
+  txHash?: Buffer,
+): Effect.Effect<{ spent: Buffer[]; produced: MinimalLedgerEntry[] }, Error> =>
   Effect.gen(function* () {
-    const spent: Uint8Array[] = [];
-    const produced: { key: Uint8Array; value: Uint8Array }[] = [];
+    const spent: Buffer[] = [];
+    const produced: MinimalLedgerEntry[] = [];
     const tx = CML.Transaction.from_cbor_bytes(txCBOR);
     const txBody = tx.body();
     const inputs = txBody.inputs();
     const outputs = txBody.outputs();
-    for (let i = 0; i < inputs.len(); i++) {
+    const inputsCount = inputs.len();
+    const outputsCount = outputs.len();
+    for (let i = 0; i < inputsCount; i++) {
       yield* Effect.try({
-        try: () => spent.push(inputs.get(i).to_cbor_bytes()),
+        try: () => spent.push(Buffer.from(inputs.get(i).to_cbor_bytes())),
         catch: (e) => new Error(`${e}`),
       });
     }
-    const txHash = CML.hash_transaction(txBody).to_hex();
-    for (let i = 0; i < outputs.len(); i++) {
-      yield* Effect.try({
-        try: () => {
-          const utxo: UTxO = {
-            txHash: txHash,
-            outputIndex: i,
-            ...coreToTxOutput(outputs.get(i)),
-          };
-          produced.push(utxoToCBOR(utxo));
-        },
-        catch: (e) => new Error(`${e}`),
+    const finalTxHash =
+      txHash === undefined
+        ? CML.hash_transaction(txBody).to_raw_bytes()
+        : txHash;
+    for (let i = 0; i < outputsCount; i++) {
+      produced.push({
+        [LedgerColumns.OUTREF]: Buffer.from(finalTxHash),
+        [LedgerColumns.OUTPUT]: Buffer.from(outputs.get(i).to_cbor_bytes()),
       });
     }
     return { spent, produced };
   });
 
-export const findAllSpentAndProducedUTxOs = (
-  txCBORs: Uint8Array[],
-): Effect.Effect<
-  {
-    spent: Uint8Array[];
-    produced: { key: Uint8Array; value: Uint8Array }[];
-  },
-  Error
-> =>
+export const breakDownTx = (
+  txCbor: Uint8Array,
+): Effect.Effect<ProcessedTx, Error> =>
   Effect.gen(function* () {
-    const allEffects = yield* Effect.all(
-      txCBORs.map(findSpentAndProducedUTxOs),
-    );
-    return allEffects.reduce(
-      (
-        { spent: spentAcc, produced: producedAcc },
-        { spent: currSpent, produced: currProduced },
-      ) => {
-        return {
-          spent: [...spentAcc, ...currSpent],
-          produced: [...producedAcc, ...currProduced],
-        };
-      },
-    );
+    const deserializedTx = yield* Effect.try({
+      try: () => CML.Transaction.from_cbor_bytes(txCbor),
+      catch: (e) => new Error(`${e}`),
+    });
+    const txBody = deserializedTx.body();
+    const txHash = CML.hash_transaction(txBody);
+    const txHashBytes = Buffer.from(txHash.to_raw_bytes());
+    const inputs = txBody.inputs();
+    const inputsCount = inputs.len();
+    const spent: Buffer[] = [];
+    for (let i = 0; i < inputsCount; i++) {
+      spent.push(Buffer.from(inputs.get(i).to_cbor_bytes()));
+    }
+    const outputs = txBody.outputs();
+    const outputsCount = outputs.len();
+    const produced: LedgerEntry[] = [];
+    for (let i = 0; i < outputsCount; i++) {
+      const output = outputs.get(i);
+      produced.push({
+        [LedgerColumns.TX_ID]: txHashBytes,
+        [LedgerColumns.OUTREF]: Buffer.from(
+          CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
+        ),
+        [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
+        [LedgerColumns.ADDRESS]: output.address().to_bech32(),
+      });
+    }
+    return {
+      txId: txHashBytes,
+      txCbor: Buffer.from(txCbor),
+      spent,
+      produced,
+    };
   });
 
 export const ENV_VARS_GUIDE = `

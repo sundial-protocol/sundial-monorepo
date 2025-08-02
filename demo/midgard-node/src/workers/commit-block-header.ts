@@ -13,6 +13,7 @@ import { fromHex } from "@lucid-evolution/lucid";
 import { makeMpts, processMpts, withTrieTransaction } from "./db.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
+import * as FS from "fs";
 
 const emptyOutput: WorkerOutput = {
   txSize: 0,
@@ -104,12 +105,19 @@ const wrapper = (
           `🔹 Transaction built successfully. Size: ${txSize}`,
         );
 
+        let flushMempoolTrie: boolean = true;
+
         // Using sign and submit helper with confirmation so that databases are
         // only updated after a successful on-chain registration of the block.
-        const onSubmitFailure = (err: SubmitError) =>
+        const onSubmitFailure = (_err: SubmitError) =>
           Effect.gen(function* () {
-            yield* Effect.logError(`Sumbit tx error: ${err}`);
-            yield* Effect.fail(err.err);
+            yield* Effect.logError(
+              "🔹 ⚠️  Tx submit failed. Mempool trie will be preserved, but db will be cleared.",
+            );
+            yield* Effect.logInfo("🔹 Mempool Trie stats:");
+            console.dir(mempoolTrie.database()._stats, { depth: null });
+            flushMempoolTrie = false;
+            // yield* Effect.fail(err.err);
           });
         const onConfirmFailure = (err: ConfirmError) =>
           Effect.logError(`Confirm tx error: ${err}`);
@@ -120,10 +128,14 @@ const wrapper = (
           onConfirmFailure,
         ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
 
+        const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
         const batchSize = 100;
 
         yield* Effect.logInfo(
           "🔹 Inserting included transactions into ImmutableDB and BlocksDB...",
+        );
+        yield* Effect.logInfo(
+          "🔹 Clearing included transactions from MempoolDB...",
         );
 
         const batchIndices = Array.from(
@@ -143,11 +155,14 @@ const wrapper = (
                   ImmutableDB.insertTxs(batchTxs).pipe(
                     Effect.withSpan(`immutable-db-insert-${startIndex}`),
                   ),
-                  BlocksDB.insert(fromHex(newHeaderHash), batchHashes).pipe(
+                  BlocksDB.insert(newHeaderHashBuffer, batchHashes).pipe(
                     Effect.withSpan(`blocks-db-insert-${startIndex}`),
                   ),
+                  MempoolDB.clearTxs(batchHashes).pipe(
+                    Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
+                  ),
                 ],
-                { concurrency: 2 },
+                { concurrency: "unbounded" },
               ),
               Effect.withSpan(`batch-insert-${startIndex}-${endIndex}`),
             );
@@ -155,12 +170,17 @@ const wrapper = (
           { concurrency: batchIndices.length },
         );
 
-        yield* Effect.logInfo(
-          "🔹 Clearing included transactions from MempoolDB...",
-        );
-        yield* MempoolDB.clearTxs(mempoolTxHashes).pipe(
-          Effect.withSpan("clear mempool"),
-        );
+        if (flushMempoolTrie) {
+          yield* Effect.logInfo("🔹 Wiping mempool trie...");
+          yield* Effect.try({
+            try: () =>
+              FS.rmSync(nodeConfig.MEMPOOL_MPT_DB_PATH, {
+                recursive: true,
+                force: true,
+              }),
+            catch: (e) => new Error(`${e}`),
+          });
+        }
 
         const output: WorkerOutput = {
           txSize,

@@ -1,23 +1,30 @@
 import { Effect } from "effect";
 import {
   clearTable,
-  insertKeyValues,
-  retrieveKeyValues,
-  delMultiple,
+  retrieveLedgerEntries,
+  retrieveLedgerEntriesWithAddress,
+  LedgerEntry,
+  insertLedgerEntries,
+  delLedgerEntries,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";
 
-export const insert = (utxosCBOR: { key: Uint8Array; value: Uint8Array }[]) =>
-  insertKeyValues(tableName, utxosCBOR);
+export const insert = (entries: LedgerEntry[]) =>
+  insertLedgerEntries(tableName, entries);
 
 export const retrieve = (): Effect.Effect<
-  { key: Uint8Array; value: Uint8Array }[],
+  readonly LedgerEntry[],
   Error,
   Database
-> => retrieveKeyValues(tableName);
+> => retrieveLedgerEntries(tableName);
 
-export const clearUTxOs = (refs: Uint8Array[]) => delMultiple(tableName, refs);
+export const retrieveByAddress = (
+  address: string,
+): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
+  retrieveLedgerEntriesWithAddress(tableName, address);
+
+export const clearUTxOs = (refs: Buffer[]) => delLedgerEntries(tableName, refs);
 
 export const clear = () => clearTable(tableName);
