@@ -26,6 +26,7 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
 import { makeMpts } from "@/workers/db.js";
+import { insertGenesisUtxos } from "@/database/genesis.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -490,6 +491,11 @@ export const runNode = Effect.gen(function* () {
   }));
 
   yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
+
+  yield* insertGenesisUtxos("lace-demo/genesis.json").pipe(
+    Effect.provide(Database.layer),
+    Effect.provide(NodeConfig.layer),
+  );
 
   const ListenLayer = Layer.provide(
     HttpServer.serve(router),
