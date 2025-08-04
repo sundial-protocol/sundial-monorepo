@@ -31,6 +31,11 @@ export const handleSignSubmit = (
   onConfirmFailure: (error: ConfirmError) => Effect.Effect<void, Error>,
 ): Effect.Effect<string | void, Error> =>
   Effect.gen(function* () {
+    const walletAddr = yield* Effect.tryPromise({
+      try: () => lucid.wallet().address(),
+      catch: (e) => new Error(`${e}`),
+    });
+    yield* Effect.logInfo(`✍  Signing tx with ${walletAddr}...`);
     const signed = yield* signBuilder.sign
       .withWallet()
       .completeProgram()

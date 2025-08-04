@@ -16,10 +16,8 @@ import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import {
   Address,
-  CML,
   LucidEvolution,
   Script,
-  fromHex,
 } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import {
@@ -30,9 +28,7 @@ import {
 } from "../utils.js";
 import { LedgerEntry } from "@/database/utils.js";
 import {
-  ProcessedTx,
   breakDownTx,
-  findAllSpentAndProducedUTxOs,
 } from "@/utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
