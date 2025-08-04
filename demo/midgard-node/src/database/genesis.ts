@@ -31,13 +31,13 @@ export const insertGenesisUtxos = (): Effect.Effect<
 
     if (genesisFilePath === null) {
       yield* Effect.logInfo(
-        `🔹 No genesis UTXOs file path provided, skipping insertion`,
+        `🟣 No genesis UTXOs file path provided, skipping insertion`,
       );
       return;
     }
 
     yield* Effect.logInfo(
-      `🔹 Checking for genesis UTXOs file: ${genesisFilePath}`,
+      `🟣 Checking for genesis UTXOs file: ${genesisFilePath}`,
     );
 
     const fileExists = yield* Effect.tryPromise({
@@ -51,7 +51,7 @@ export const insertGenesisUtxos = (): Effect.Effect<
 
     if (!fileExists) {
       yield* Effect.logInfo(
-        `🔹 No genesis UTXOs file found at ${genesisFilePath}, skipping genesis UTXO insertion`,
+        `🟣 No genesis UTXOs file found at ${genesisFilePath}, skipping genesis UTXO insertion`,
       );
       return;
     }
@@ -75,7 +75,7 @@ export const insertGenesisUtxos = (): Effect.Effect<
     }
 
     yield* Effect.logInfo(
-      `🔹 Found ${genesisData.utxos.length} genesis UTXOs to insert`,
+      `🟣 Found ${genesisData.utxos.length} genesis UTXOs to insert`,
     );
 
     // Convert genesis UTXOs to LedgerEntry format and insert into MPT
@@ -92,12 +92,12 @@ export const insertGenesisUtxos = (): Effect.Effect<
     });
 
     yield* Effect.logInfo(
-      `🔹 Debug: Inserting ${ledgerEntries.length} UTXOs into trie`,
+      `🟣 Debug: Inserting ${ledgerEntries.length} UTXOs into trie`,
     );
 
     yield* MempoolLedgerDB.insert(ledgerEntries);
 
     yield* Effect.logInfo(
-      `🔹 Successfully inserted ${ledgerEntries.length} genesis UTXOs into MPT database`,
+      `🟣 Successfully inserted ${ledgerEntries.length} genesis UTXOs into MPT database`,
     );
   });
