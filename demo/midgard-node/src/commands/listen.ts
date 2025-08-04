@@ -115,9 +115,7 @@ const getUtxosHandler = Effect.gen(function* () {
       value: entry.output,
     }));
 
-    yield* Effect.logInfo(
-      `Found ${response.length} UTXOs for ${addr}`,
-    );
+    yield* Effect.logInfo(`Found ${response.length} UTXOs for ${addr}`);
     return yield* HttpServerResponse.json({
       utxos: response,
     });
