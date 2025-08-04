@@ -492,7 +492,7 @@ export const runNode = Effect.gen(function* () {
 
   yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
 
-  yield* insertGenesisUtxos("lace-demo/genesis.json").pipe(
+  yield* insertGenesisUtxos(nodeConfig.GENESIS_UTXOS_PATH).pipe(
     Effect.provide(Database.layer),
     Effect.provide(NodeConfig.layer),
   );

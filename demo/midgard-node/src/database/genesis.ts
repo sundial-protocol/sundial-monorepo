@@ -97,7 +97,6 @@ export const insertGenesisUtxos = (
     // Insert into both trie and database
     yield* Effect.forEach(ledgerEntries, (entry) =>
       Effect.gen(function* () {
-        yield* Effect.sync(() => console.log("out", entry.outref));
         yield* Effect.tryPromise({
           try: () =>
             ledgerTrie.put(

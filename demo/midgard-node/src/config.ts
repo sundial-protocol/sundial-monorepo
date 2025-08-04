@@ -28,6 +28,7 @@ export type NodeConfigDep = {
   POSTGRES_HOST: string;
   LEDGER_MPT_DB_PATH: string;
   MEMPOOL_MPT_DB_PATH: string;
+  GENESIS_UTXOS_PATH: string | null;
 };
 
 export const makeUserFn = (nodeConfig: NodeConfigDep) =>
@@ -98,6 +99,7 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("MEMPOOL_MPT_DB").pipe(
       Config.withDefault("./midgard-mempool-mpt-db"),
     ),
+    Config.string("GENESIS_UTXOS_PATH").pipe(Config.withDefault(null)),
   ]);
 
   const provider = config[0].toLowerCase();
@@ -126,6 +128,7 @@ export const makeConfig = Effect.gen(function* () {
     POSTGRES_USER: config[16],
     LEDGER_MPT_DB_PATH: config[17],
     MEMPOOL_MPT_DB_PATH: config[18],
+    GENESIS_UTXOS_PATH: config[19],
   };
 }).pipe(Effect.orDie);
 
