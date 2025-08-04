@@ -3,7 +3,6 @@ import { NodeConfig } from "@/config.js";
 import { Database } from "@/services/database.js";
 import { LedgerColumns } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { makeMpts } from "@/workers/db.js";
 import {
   UTxO,
   utxoToTransactionInput,
@@ -92,11 +91,7 @@ export const insertGenesisUtxos = (): Effect.Effect<void, Error, Database | Node
       `🔹 Debug: Inserting ${ledgerEntries.length} UTXOs into trie`,
     );
 
-    yield* Effect.forEach(ledgerEntries, (entry) =>
-      Effect.gen(function* () {
-        yield* MempoolLedgerDB.insert([entry]);
-      }),
-    );
+    yield* MempoolLedgerDB.insert(ledgerEntries);
 
     yield* Effect.logInfo(
       `🔹 Successfully inserted ${ledgerEntries.length} genesis UTXOs into MPT database`,
