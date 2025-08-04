@@ -8,8 +8,10 @@ import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { createKeyValueTable, createLedgerTable } from "./utils.js";
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
+import { insertGenesisUtxos } from "./genesis.js";
+import { NodeConfig } from "@/config.js";
 
-export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
+export const initializeDb: () => Effect.Effect<void, Error, Database | NodeConfig> = () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     // yield* sql`SET default_transaction_read_only TO 'off'`;
@@ -24,4 +26,6 @@ export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
     yield* createLedgerTable(LatestLedgerDB.tableName);
 
     Effect.logInfo("Connected to the PostgreSQL database");
+
+    yield* insertGenesisUtxos();
   });
