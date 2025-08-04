@@ -21,10 +21,11 @@ export type GenesisUtxosFile = {
  * @param genesisFilePath - Path to the JSON file containing genesis UTXOs, or null to skip
  * @returns Effect that succeeds if UTXOs were inserted, or fails if file doesn't exist or other errors
  */
-export const insertGenesisUtxos = (
-  genesisFilePath: string | null,
-): Effect.Effect<void, Error, NodeConfig | Database> =>
+export const insertGenesisUtxos = (): Effect.Effect<void, Error, Database | NodeConfig> =>
   Effect.gen(function* () {
+    const nodeConfig = yield* NodeConfig;
+    const genesisFilePath = nodeConfig.GENESIS_UTXOS_PATH;
+
     if (genesisFilePath === null) {
       yield* Effect.logInfo(
         `🔹 No genesis UTXOs file path provided, skipping insertion`,
@@ -74,9 +75,6 @@ export const insertGenesisUtxos = (
       `🔹 Found ${genesisData.utxos.length} genesis UTXOs to insert`,
     );
 
-    const { ledgerTrie } = yield* makeMpts();
-    yield* Effect.sync(() => ledgerTrie.checkpoint());
-
     // Convert genesis UTXOs to LedgerEntry format and insert into MPT
     const ledgerEntries = genesisData.utxos.map((utxo) => {
       const input = utxoToTransactionInput(utxo);
@@ -94,18 +92,8 @@ export const insertGenesisUtxos = (
       `🔹 Debug: Inserting ${ledgerEntries.length} UTXOs into trie`,
     );
 
-    // Insert into both trie and database
     yield* Effect.forEach(ledgerEntries, (entry) =>
       Effect.gen(function* () {
-        yield* Effect.tryPromise({
-          try: () =>
-            ledgerTrie.put(
-              entry[LedgerColumns.OUTREF],
-              entry[LedgerColumns.OUTPUT],
-            ),
-          catch: (e) =>
-            new Error(`Failed to insert genesis UTXO into trie: ${e}`),
-        });
         yield* MempoolLedgerDB.insert([entry]);
       }),
     );
@@ -113,5 +101,4 @@ export const insertGenesisUtxos = (
     yield* Effect.logInfo(
       `🔹 Successfully inserted ${ledgerEntries.length} genesis UTXOs into MPT database`,
     );
-    yield* Effect.sync(() => ledgerTrie.commit());
   });
