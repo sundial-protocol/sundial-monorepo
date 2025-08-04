@@ -20,7 +20,11 @@ export type GenesisUtxosFile = {
  * @param genesisFilePath - Path to the JSON file containing genesis UTXOs, or null to skip
  * @returns Effect that succeeds if UTXOs were inserted, or fails if file doesn't exist or other errors
  */
-export const insertGenesisUtxos = (): Effect.Effect<void, Error, Database | NodeConfig> =>
+export const insertGenesisUtxos = (): Effect.Effect<
+  void,
+  Error,
+  Database | NodeConfig
+> =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const genesisFilePath = nodeConfig.GENESIS_UTXOS_PATH;
