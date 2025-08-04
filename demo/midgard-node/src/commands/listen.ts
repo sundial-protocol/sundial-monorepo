@@ -25,7 +25,6 @@ import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
-import { makeMpts } from "@/workers/db.js";
 import { insertGenesisUtxos } from "@/database/genesis.js";
 
 const txCounter = Metric.counter("tx_count", {
@@ -110,27 +109,17 @@ const getUtxosHandler = Effect.gen(function* () {
     const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(
       addrDetails.address.bech32,
     );
-    const { ledgerTrie } = yield* makeMpts();
-    const utxosWithAddressNotConsumed = yield* Effect.allSuccesses(
-      utxosWithAddress.map((entry) =>
-        Effect.tryPromise(() => ledgerTrie.get(entry.outref)).pipe(
-          Effect.andThen((res) => {
-            if (res === null) {
-              return Effect.fail(null);
-            } else {
-              return Effect.succeed(res);
-            }
-          }),
-        ),
-      ),
-      { concurrency: "unbounded" },
-    );
+
+    const response = utxosWithAddress.map((entry) => ({
+      outref: entry.outref,
+      value: entry.output,
+    }));
 
     yield* Effect.logInfo(
-      `Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`,
+      `Found ${response.length} UTXOs for ${addr}`,
     );
     return yield* HttpServerResponse.json({
-      utxos: utxosWithAddressNotConsumed,
+      utxos: response,
     });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
