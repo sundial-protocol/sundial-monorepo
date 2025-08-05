@@ -25,6 +25,7 @@ import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
+import {insertGenesisUtxos} from "@/database/genesis.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -157,6 +158,7 @@ const getBlockHandler = Effect.gen(function* () {
 const getInitHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✨ Initialization request received`);
   const result = yield* StateQueueTx.stateQueueInit;
+  yield* insertGenesisUtxos;
   yield* Effect.logInfo(`GET /init - Initialization successful: ${result}`);
   return yield* HttpServerResponse.json({
     message: `Initiation successful: ${result}`,

@@ -29,7 +29,7 @@ export const initializeDb: () => Effect.Effect<
     yield* createLedgerTable(ConfirmedLedgerDB.tableName);
     yield* createLedgerTable(LatestLedgerDB.tableName);
 
-    Effect.logInfo("Connected to the PostgreSQL database");
+    yield* insertGenesisUtxos;
 
-    yield* insertGenesisUtxos();
+    Effect.logInfo("PostgreSQL database initialized Successfully.");
   });
