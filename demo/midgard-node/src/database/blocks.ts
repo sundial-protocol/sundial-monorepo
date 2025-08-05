@@ -161,7 +161,7 @@ export const retrieveMinimal = (): Effect.Effect<readonly MinimalEntry[], Error,
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve headerHashes and txHashes`);
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<MinimalEntry>`SELECT (${sql(Columns.HEADER_HASH), sql(Columns.TX_ID)}) FROM ${sql(tableName)}`;
+    const result = yield* sql<MinimalEntry>`SELECT (${sql(Columns.HEADER_HASH)}, ${sql(Columns.TX_ID)}) FROM ${sql(tableName)}`;
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
   }).pipe(

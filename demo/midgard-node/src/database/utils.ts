@@ -1,15 +1,22 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
-import { Address } from "@lucid-evolution/lucid";
 
 export enum KVColumns {
   KEY = "key",
   VALUE = "value",
+  TIMESTAMPTZ = "time_stamp_tz",
 }
 
 export type KVPair = {
-  [kvCols in KVColumns]: Buffer;
+  [KVColumns.KEY]: Buffer;
+  [KVColumns.VALUE]: Buffer;
+};
+
+export type KVEntries = {
+  [KVColumns.KEY]: Buffer;
+  [KVColumns.VALUE]: Buffer;
+  [KVColumns.TIMESTAMPTZ]: Date;
 };
 
 export const createKeyValueTable = (
@@ -20,6 +27,7 @@ export const createKeyValueTable = (
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(KVColumns.KEY)} BYTEA NOT NULL,
       ${sql(KVColumns.VALUE)} BYTEA NOT NULL,
+      ${sql(KVColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
       PRIMARY KEY (${sql(KVColumns.KEY)})
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
@@ -155,6 +163,23 @@ export const retrieveKeyValues = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
         `${tableName} db: retrieveKeyValues: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
+export const retrieve = (
+  tableName: string,
+): Effect.Effect<readonly KVEntries[], Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
+    const sql = yield* SqlClient.SqlClient;
+    return yield* sql<KVEntries>`SELECT ${sql(KVColumns.KEY)}, ${sql(KVColumns.VALUE)}, ${sql(KVColumns.TIMESTAMPTZ)} FROM ${sql(tableName)}`;
+  }).pipe(
+    Effect.withLogSpan(`retrieve ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: retrieve: ${JSON.stringify(e)}`,
       ),
     ),
     mapSqlError,
