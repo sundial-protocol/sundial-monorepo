@@ -127,11 +127,14 @@ export const insertGenesisUtxos: Effect.Effect<
   const { ledgerTrie } = yield* makeMpts();
 
   yield* Effect.tryPromise({
-    try: () => ledgerTrie.batch(ledgerEntries.map((le) => ({
-      type: "put",
-      key: le[LedgerColumns.OUTREF],
-      value: le[LedgerColumns.OUTPUT],
-    }))),
+    try: () =>
+      ledgerTrie.batch(
+        ledgerEntries.map((le) => ({
+          type: "put",
+          key: le[LedgerColumns.OUTREF],
+          value: le[LedgerColumns.OUTPUT],
+        })),
+      ),
     catch: (e) => new Error(`${e}`),
   });
 

@@ -26,6 +26,7 @@ import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
 import { insertGenesisUtxos } from "@/database/genesis.js";
+import { deleteLedgerMpt, deleteMempoolMpt } from "@/workers/db.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -228,6 +229,8 @@ const getResetHandler = Effect.gen(function* () {
       ImmutableDB.clear(),
       LatestLedgerDB.clear(),
       ConfirmedLedgerDB.clear(),
+      deleteMempoolMpt,
+      deleteLedgerMpt,
     ],
     { discard: true },
   );
