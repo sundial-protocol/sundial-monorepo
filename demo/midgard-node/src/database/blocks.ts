@@ -152,6 +152,24 @@ export const clearBlock = (
     mapSqlError,
   );
 
+export const retrieveHeaderHashTxHash = (): Effect.Effect<readonly Entry[], Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo(`${tableName} db: attempt to retrieve headerHashes and txHashes`);
+    const sql = yield* SqlClient.SqlClient;
+    const result = yield* sql<Entry>`SELECT (${sql(Columns.HEADER_HASH), sql(Columns.TX_ID)}) FROM ${sql(tableName)}`;
+    yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
+    return result;
+  }).pipe(
+    Effect.withLogSpan(`retrieve ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
+      ),
+    ),
+    mapSqlError,
+  );
+
+
 export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);

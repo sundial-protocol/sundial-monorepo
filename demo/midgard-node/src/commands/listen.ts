@@ -302,7 +302,7 @@ ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
 
 const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
-  const allPairs = yield* BlocksDB.retrieve();
+  const allPairs = yield* BlocksDB.retrieveHeaderHashTxHash();
   const keyValues: Record<string, number> = allPairs.reduce(
     (acc: Record<string, number>, entry) => {
       const bHex = toHex(entry.header_hash);
