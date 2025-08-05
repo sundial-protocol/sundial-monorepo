@@ -5,6 +5,8 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "blocks";
 
+const TIMESTAMPTZ = "time_stamp_tz"
+
 export enum Columns {
   HEADER_HASH = "header_hash",
   TX_ID = "tx_id",
@@ -14,6 +16,7 @@ export enum ColumnsIndices {
   HEADER_HASH = "idx_blocks_header_hash",
   TX_ID = "idx_blocks_tx_id",
 }
+
 
 type Entry = {
   [blockCols in Columns]: Buffer;
@@ -25,7 +28,8 @@ export const init = Effect.gen(function* () {
     Effect.gen(function* () {
       yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
-      ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE
+      ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE,
+      ${TIMESTAMPTZ} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
     );`;
       yield* sql`CREATE INDEX ${sql(
         ColumnsIndices.HEADER_HASH,
