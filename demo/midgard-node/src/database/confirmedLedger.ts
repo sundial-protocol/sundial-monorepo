@@ -1,11 +1,11 @@
 import { Effect } from "effect";
 import {
   clearTable,
-  delMultiple,
 } from "./utils.js";
 import {
   insertLedgerEntries,
   retrieveLedgerEntries,
+  delLedgerEntries,
   LedgerEntry,
 } from "./utilsLedger.js"
 
@@ -19,6 +19,6 @@ export const insertMultiple = (entries: LedgerEntry[]) =>
 export const retrieve = (): Effect.Effect<void, Error, Database> =>
   retrieveLedgerEntries(tableName);
 
-export const clearUTxOs = (refs: Buffer[]) => delMultiple(tableName, refs);
+export const clearUTxOs = (refs: Buffer[]) => delLedgerEntries(tableName, refs);
 
 export const clear = () => clearTable(tableName);
