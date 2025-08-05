@@ -16,15 +16,15 @@ export enum ColumnsIndices {
   TX_ID = "idx_blocks_tx_id",
 }
 
-type Entry = {
+export type Entry = {
+  [Columns.HEADER_HASH]: Buffer;
+  [Columns.TX_ID]: Buffer;
+};
+
+type EntryTimeStamped = {
   [Columns.HEADER_HASH]: Buffer;
   [Columns.TX_ID]: Buffer;
   [Columns.TIMESTAMPTZ]: Date;
-};
-
-export type MinimalEntry = {
-  [Columns.HEADER_HASH]: Buffer;
-  [Columns.TX_ID]: Buffer;
 };
 
 export const init = Effect.gen(function* () {
@@ -56,7 +56,7 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: MinimalEntry[] = txHashes.map((txHash: Buffer) => ({
+    const rowsToInsert: Entry[] = txHashes.map((txHash: Buffer) => ({
       [Columns.HEADER_HASH]: headerHash,
       [Columns.TX_ID]: txHash,
     }));
@@ -157,11 +157,11 @@ export const clearBlock = (
     mapSqlError,
   );
 
-export const retrieveMinimal = (): Effect.Effect<readonly MinimalEntry[], Error, Database> =>
+export const retrieveWithoutTimeStamps = (): Effect.Effect<readonly Entry[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve headerHashes and txHashes`);
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<MinimalEntry>`SELECT (${sql(Columns.HEADER_HASH)}, ${sql(Columns.TX_ID)}) FROM ${sql(tableName)}`;
+    const result = yield* sql<Entry>`SELECT (${sql(Columns.HEADER_HASH)}, ${sql(Columns.TX_ID)}) FROM ${sql(tableName)}`;
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
   }).pipe(
@@ -175,11 +175,11 @@ export const retrieveMinimal = (): Effect.Effect<readonly MinimalEntry[], Error,
   );
 
 
-export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly EntryTimeStamped[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<Entry>`SELECT * FROM ${sql(tableName)}`;
+    const result = yield* sql<EntryTimeStamped>`SELECT * FROM ${sql(tableName)}`;
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
   }).pipe(

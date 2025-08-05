@@ -17,7 +17,14 @@ export type LedgerEntry = {
   [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.OUTPUT]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.ADDRESS]: Address; // for provider
-  [LedgerColumns.TIMESTAMPTZ]: Date; // for provider
+};
+
+export type LedgerEntryTimeStamped = {
+  [LedgerColumns.TX_ID]: Buffer;
+  [LedgerColumns.OUTREF]: Buffer;
+  [LedgerColumns.OUTPUT]: Buffer;
+  [LedgerColumns.ADDRESS]: Address;
+  [LedgerColumns.TIMESTAMPTZ]: Date;
 };
 
 export type MinimalLedgerEntry = {
@@ -96,11 +103,11 @@ export const insertLedgerEntries = (
 
 export const retrieveLedgerEntries = (
   tableName: string,
-): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
+): Effect.Effect<readonly LedgerEntryTimeStamped[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieveLedgerEntries`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<LedgerEntry>`SELECT * FROM ${sql(tableName)}`;
+    return yield* sql<LedgerEntryTimeStamped>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
     Effect.withLogSpan(`retrieveLedgerEntries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -114,12 +121,12 @@ export const retrieveLedgerEntries = (
 export const retrieveLedgerEntriesWithAddress = (
   tableName: string,
   address: Address,
-): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
+): Effect.Effect<readonly LedgerEntryTimeStamped[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve LedgerUTxOs`);
     const sql = yield* SqlClient.SqlClient;
 
-    return yield* sql<LedgerEntry>`SELECT * FROM ${sql(
+    return yield* sql<LedgerEntryTimeStamped>`SELECT * FROM ${sql(
       tableName,
     )} WHERE ${sql(LedgerColumns.ADDRESS)} = ${address}`;
   }).pipe(

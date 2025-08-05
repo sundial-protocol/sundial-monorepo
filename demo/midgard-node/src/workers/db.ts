@@ -9,9 +9,12 @@ import { NodeConfig } from "@/config.js";
 import {
   KVColumns,
   KVPair,
+} from "@/database/utils.js";
+import {
   LedgerColumns,
   MinimalLedgerEntry,
-} from "@/database/utils.js";
+} from "@/database/utilsLedger.js";
+
 import { Database } from "@/services/database.js";
 import { findSpentAndProducedUTxOs } from "@/utils.js";
 // Key of the row which its value is the persisted trie root.
