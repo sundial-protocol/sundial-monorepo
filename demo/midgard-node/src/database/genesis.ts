@@ -11,7 +11,12 @@ import {
 } from "@lucid-evolution/lucid";
 import { NodeConfig } from "@/config.js";
 
-const makeGenesisUTxOs = (network: Network, seedA: string, seedB: string, seedC: string): UTxO[] => [
+const makeGenesisUTxOs = (
+  network: Network,
+  seedA: string,
+  seedB: string,
+  seedC: string,
+): UTxO[] => [
   {
     txHash: "bb217abaca60fc0ca68c1555eca6a96d2478547818ae76ce6836133f3cc546e0",
     outputIndex: 1,
@@ -76,47 +81,46 @@ export const insertGenesisUtxos: Effect.Effect<
   void,
   Error,
   NodeConfig | Database
-> =
-  Effect.gen(function* () {
-    const config = yield* NodeConfig;
+> = Effect.gen(function* () {
+  const config = yield* NodeConfig;
 
-    if (config.NETWORK === "Mainnet") {
-      yield* Effect.logInfo(`🟣 On mainnet—No genesis UTxOs will be inserted.`);
-      return;
-    }
+  if (config.NETWORK === "Mainnet") {
+    yield* Effect.logInfo(`🟣 On mainnet—No genesis UTxOs will be inserted.`);
+    return;
+  }
 
-    const genesisUTxOs = makeGenesisUTxOs(
-      config.NETWORK,
-      config.TESTNET_GENESIS_WALLET_SEED_PHRASE_A,
-      config.TESTNET_GENESIS_WALLET_SEED_PHRASE_B,
-      config.TESTNET_GENESIS_WALLET_SEED_PHRASE_C,
-    );
+  const genesisUTxOs = makeGenesisUTxOs(
+    config.NETWORK,
+    config.TESTNET_GENESIS_WALLET_SEED_PHRASE_A,
+    config.TESTNET_GENESIS_WALLET_SEED_PHRASE_B,
+    config.TESTNET_GENESIS_WALLET_SEED_PHRASE_C,
+  );
 
-    yield* Effect.logInfo(
-      `🟣 On testnet—Inserting ${genesisUTxOs.length} genesis UTxOs...`,
-    );
+  yield* Effect.logInfo(
+    `🟣 On testnet—Inserting ${genesisUTxOs.length} genesis UTxOs...`,
+  );
 
-    // Convert genesis UTxOs to LedgerEntry format and insert into MPT
-    const ledgerEntries = genesisUTxOs.map((utxo: UTxO) => {
-      const input = utxoToTransactionInput(utxo);
-      const output = utxoToTransactionOutput(utxo);
+  // Convert genesis UTxOs to LedgerEntry format and insert into MPT
+  const ledgerEntries = genesisUTxOs.map((utxo: UTxO) => {
+    const input = utxoToTransactionInput(utxo);
+    const output = utxoToTransactionOutput(utxo);
 
-      return {
-        [LedgerColumns.TX_ID]: Buffer.from(utxo.txHash, "hex"),
-        [LedgerColumns.OUTREF]: Buffer.from(input.to_cbor_bytes()),
-        [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
-        [LedgerColumns.ADDRESS]: utxo.address,
-      };
-    });
-
-    yield* Effect.logInfo(
-      `🟣 Debug: Inserting ${ledgerEntries.length} UTxOs into trie`,
-    );
-
-    yield* MempoolLedgerDB.insert(ledgerEntries);
-
-    yield* Effect.logInfo(
-      `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs into MPT database. Funded addresses are:
-${Array.from(new Set(genesisUTxOs.map((u) => u.address))).join("\n")}`,
-    );
+    return {
+      [LedgerColumns.TX_ID]: Buffer.from(utxo.txHash, "hex"),
+      [LedgerColumns.OUTREF]: Buffer.from(input.to_cbor_bytes()),
+      [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
+      [LedgerColumns.ADDRESS]: utxo.address,
+    };
   });
+
+  yield* Effect.logInfo(
+    `🟣 Debug: Inserting ${ledgerEntries.length} UTxOs into trie`,
+  );
+
+  yield* MempoolLedgerDB.insert(ledgerEntries);
+
+  yield* Effect.logInfo(
+    `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs into MPT database. Funded addresses are:
+${Array.from(new Set(genesisUTxOs.map((u) => u.address))).join("\n")}`,
+  );
+});
