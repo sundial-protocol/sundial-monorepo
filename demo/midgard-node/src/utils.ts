@@ -17,13 +17,25 @@ import {
   MinimalLedgerEntry,
 } from "./database/utils.js";
 
-export interface WorkerInput {
+export interface BlockCommitmentWorkerInput {
   data: {
     command: string;
   };
 }
 
-export interface WorkerOutput {
+// Empty string for `submittedTxHash` is meant to represent failed submission.
+export interface BlockCommitmentWorkerOutput {
+  submittedTxHash: string;
+  txSize: number;
+  mempoolTxsCount: number;
+  sizeOfBlocksTxs: number;
+}
+
+export interface BlockConfirmationWorkerInput {
+  data: BlockCommitmentWorkerOutput;
+}
+
+export interface BlockConfirmationWorkerOutput {
   txSize: number;
   mempoolTxsCount: number;
   sizeOfBlocksTxs: number;

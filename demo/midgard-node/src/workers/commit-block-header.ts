@@ -1,7 +1,10 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect, Schedule, pipe } from "effect";
-import { WorkerInput, WorkerOutput } from "@/utils.js";
+import {
+  BlockCommitmentWorkerInput as WorkerInput,
+  BlockCommitmentWorkerOutput as WorkerOutput,
+} from "@/utils.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { BlocksDB, ImmutableDB, MempoolDB } from "@/database/index.js";
 import {
@@ -16,6 +19,7 @@ import { Database } from "@/services/database.js";
 import * as FS from "fs";
 
 const emptyOutput: WorkerOutput = {
+  submittedTxHash: "",
   txSize: 0,
   mempoolTxsCount: 0,
   sizeOfBlocksTxs: 0,
