@@ -4,12 +4,12 @@ import { Effect, Schedule, pipe } from "effect";
 import {
   BlockCommitmentWorkerInput as WorkerInput,
   BlockCommitmentWorkerOutput as WorkerOutput,
+  deserializeStateQueueUTxO,
 } from "@/utils.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { BlocksDB, ImmutableDB, MempoolDB } from "@/database/index.js";
 import {
-  ConfirmError,
-  handleSignSubmit,
+  handleSignSubmitNoConfirmation,
   SubmitError,
 } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
@@ -18,7 +18,7 @@ import {
   makeMpts,
   processMpts,
   withTrieTransaction,
-} from "./db.js";
+} from "./utils/mpt.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 
@@ -30,7 +30,7 @@ const emptyOutput: WorkerOutput = {
 };
 
 const wrapper = (
-  _input: WorkerInput,
+  workerInput: WorkerInput,
 ): Effect.Effect<WorkerOutput, Error, NodeConfig | User | Database> =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
@@ -49,8 +49,6 @@ const wrapper = (
 
     const { ledgerTrie, mempoolTrie } = yield* makeMpts();
 
-    lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
-
     return yield* withTrieTransaction(
       ledgerTrie,
       Effect.gen(function* () {
@@ -58,29 +56,33 @@ const wrapper = (
           yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
         const { policyId, spendScript, spendScriptAddress, mintScript } =
           yield* makeAlwaysSucceedsServiceFn(nodeConfig);
-        const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-          stateQueueAddress: spendScriptAddress,
-          stateQueuePolicyId: policyId,
-        };
-        const retryPolicy = Schedule.exponential("100 millis").pipe(
-          Schedule.compose(Schedule.recurs(4)),
+
+        // const retryPolicy = Schedule.exponential("100 millis").pipe(
+        //   Schedule.compose(Schedule.recurs(4)),
+        // );
+        // yield* Effect.logInfo("🔹 Fetching latest commited block...");
+
+        if (workerInput.data.availableConfirmedBlock === "") {
+          return emptyOutput;
+        }
+
+        const latestBlock = yield* deserializeStateQueueUTxO(
+          workerInput.data.availableConfirmedBlock,
         );
-        yield* Effect.logInfo("🔹 Fetching latest commited block...");
-        const latestBlock =
-          yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
-            lucid,
-            fetchConfig,
-          ).pipe(
-            Effect.retry(retryPolicy),
-            Effect.withSpan("fetchLatestCommittedBlockProgram"),
-          );
+        //  yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
+        //    lucid,
+        //    fetchConfig,
+        //  ).pipe(
+        //    Effect.retry(retryPolicy),
+        //    Effect.withSpan("fetchLatestCommittedBlockProgram"),
+        //  );
         yield* Effect.logInfo(
           "🔹 Finding updated block datum and new header...",
         );
         const { nodeDatum: updatedNodeDatum, header: newHeader } =
           yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
             lucid,
-            latestBlock,
+            latestBlock.datum,
             utxoRoot,
             txRoot,
             BigInt(endTime),
@@ -102,6 +104,11 @@ const wrapper = (
         const aoUpdateCommitmentTimeParams = {};
 
         yield* Effect.logInfo("🔹 Building block commitment transaction...");
+        const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+          stateQueueAddress: spendScriptAddress,
+          stateQueuePolicyId: policyId,
+        };
+        lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
         const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
           lucid,
           fetchConfig,
@@ -127,13 +134,10 @@ const wrapper = (
             flushMempoolTrie = false;
             // yield* Effect.fail(err.err);
           });
-        const onConfirmFailure = (err: ConfirmError) =>
-          Effect.logError(`Confirm tx error: ${err}`);
-        yield* handleSignSubmit(
+        yield* handleSignSubmitNoConfirmation(
           lucid,
           txBuilder,
           onSubmitFailure,
-          onConfirmFailure,
         ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
 
         const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));

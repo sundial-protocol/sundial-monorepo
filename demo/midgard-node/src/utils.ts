@@ -8,6 +8,8 @@ import {
   Maestro,
   Network,
   Provider,
+  coreToUtxo,
+  utxoToCore,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 import { Effect } from "effect";
@@ -16,30 +18,35 @@ import {
   LedgerEntry,
   MinimalLedgerEntry,
 } from "./database/utils.js";
+import * as SDK from "@al-ft/midgard-sdk";
+
+// Datatype to use CBOR hex of state queue UTxOs for transferability.
+export type SerializedStateQueueUTxO =
+  Omit<SDK.TxBuilder.StateQueue.StateQueueUTxO, "utxo"> & { utxo: string };
 
 export interface BlockCommitmentWorkerInput {
   data: {
-    command: string;
+    availableConfirmedBlock: "" | SerializedStateQueueUTxO;
   };
 }
 
 // Empty string for `submittedTxHash` is meant to represent failed submission.
-export interface BlockCommitmentWorkerOutput {
+export type BlockCommitmentWorkerOutput = {
   submittedTxHash: string;
   txSize: number;
   mempoolTxsCount: number;
   sizeOfBlocksTxs: number;
-}
+};
 
-export interface BlockConfirmationWorkerInput {
+export type BlockConfirmationWorkerInput = {
   data: BlockCommitmentWorkerOutput;
-}
+};
 
-export interface BlockConfirmationWorkerOutput {
+export type BlockConfirmationWorkerOutput = {
   txSize: number;
   mempoolTxsCount: number;
   sizeOfBlocksTxs: number;
-}
+};
 
 export type ProcessedTx = {
   txId: Buffer;
@@ -219,3 +226,29 @@ Kupmios:
 \u0009${chalk.bold("KUPO_URL")}   \u0009 URL of your Kupo instance
 \u0009${chalk.bold("OGMIOS_URL")} \u0009 URL of your Ogmios instance
 `;
+
+export const serializeStateQueueUTxO = (
+  stateQueueUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
+): Effect.Effect<SerializedStateQueueUTxO, Error> => Effect.gen(function* () {
+  const core = yield* Effect.try({
+    try: () => utxoToCore(stateQueueUTxO.utxo),
+    catch: (e) => new Error(`${e}`),
+  });
+  return {
+    ...stateQueueUTxO,
+    utxo: core.to_cbor_hex(),
+  }
+});
+
+export const deserializeStateQueueUTxO = (
+  stateQueueUTxO: SerializedStateQueueUTxO,
+): Effect.Effect<SDK.TxBuilder.StateQueue.StateQueueUTxO, Error> => Effect.gen(function* () {
+  const u = yield* Effect.try({
+    try: () => coreToUtxo(CML.TransactionUnspentOutput.from_cbor_hex(stateQueueUTxO.utxo)),
+    catch: (e) => new Error(`${e}`),
+  });
+  return {
+    ...stateQueueUTxO,
+    utxo: u,
+  }
+});
