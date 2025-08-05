@@ -9,6 +9,7 @@ export enum LedgerColumns {
   OUTREF = "outref",
   OUTPUT = "output",
   ADDRESS = "address",
+  TIMESTAMPTZ = "time_stamp_tz",
 }
 
 export type LedgerEntry = {
@@ -16,6 +17,7 @@ export type LedgerEntry = {
   [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.OUTPUT]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.ADDRESS]: Address; // for provider
+  [LedgerColumns.TIMESTAMPTZ]: Date; // for provider
 };
 
 export type MinimalLedgerEntry = {
@@ -44,6 +46,7 @@ export const createLedgerTable = (
         ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
         ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
         ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
+        ${sql(LedgerColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
         PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
       );`;
         yield* sql`CREATE INDEX ${sql(
