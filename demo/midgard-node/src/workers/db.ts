@@ -14,6 +14,8 @@ import {
 } from "@/database/utils.js";
 import { Database } from "@/services/database.js";
 import { findSpentAndProducedUTxOs } from "@/utils.js";
+import * as FS from "fs";
+
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
 
@@ -81,6 +83,24 @@ export const makeMpts = () =>
       ledgerTrie,
       mempoolTrie,
     };
+  });
+
+export const deleteMempoolMpt: Effect.Effect<void, Error, NodeConfig> =
+  Effect.gen(function* () {
+    const config = yield* NodeConfig;
+    yield* Effect.try({
+      try: () => FS.rmSync(config.MEMPOOL_MPT_DB_PATH, {}),
+      catch: (e) => new Error(`${e}`),
+    });
+  });
+
+export const deleteLedgerMpt: Effect.Effect<void, Error, NodeConfig> =
+  Effect.gen(function* () {
+    const config = yield* NodeConfig;
+    yield* Effect.try({
+      try: () => FS.rmSync(config.LEDGER_MPT_DB_PATH, {}),
+      catch: (e) => new Error(`${e}`),
+    });
   });
 
 // Make mempool trie, and fill it with ledger trie with processed mempool txs

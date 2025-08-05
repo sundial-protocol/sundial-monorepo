@@ -18,14 +18,15 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { isHexString } from "../utils.js";
+import { bufferToHex, isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
-import { makeMpts } from "@/workers/db.js";
+import { insertGenesisUtxos } from "@/database/genesis.js";
+import { deleteLedgerMpt, deleteMempoolMpt } from "@/workers/db.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -109,27 +110,15 @@ const getUtxosHandler = Effect.gen(function* () {
     const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(
       addrDetails.address.bech32,
     );
-    const { ledgerTrie } = yield* makeMpts();
-    const utxosWithAddressNotConsumed = yield* Effect.allSuccesses(
-      utxosWithAddress.map((entry) =>
-        Effect.tryPromise(() => ledgerTrie.get(entry.outref)).pipe(
-          Effect.andThen((res) => {
-            if (res === null) {
-              return Effect.fail(null);
-            } else {
-              return Effect.succeed(res);
-            }
-          }),
-        ),
-      ),
-      { concurrency: "unbounded" },
-    );
 
-    yield* Effect.logInfo(
-      `Found ${utxosWithAddressNotConsumed.length} UTXOs for ${addr}`,
-    );
+    const response = utxosWithAddress.map((entry) => ({
+      outref: bufferToHex(entry.outref),
+      value: bufferToHex(entry.output),
+    }));
+
+    yield* Effect.logInfo(`Found ${response.length} UTxOs for ${addr}`);
     return yield* HttpServerResponse.json({
-      utxos: utxosWithAddressNotConsumed,
+      utxos: response,
     });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
@@ -170,6 +159,7 @@ const getBlockHandler = Effect.gen(function* () {
 const getInitHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✨ Initialization request received`);
   const result = yield* StateQueueTx.stateQueueInit;
+  yield* insertGenesisUtxos;
   yield* Effect.logInfo(`GET /init - Initialization successful: ${result}`);
   return yield* HttpServerResponse.json({
     message: `Initiation successful: ${result}`,
@@ -239,6 +229,8 @@ const getResetHandler = Effect.gen(function* () {
       ImmutableDB.clear(),
       LatestLedgerDB.clear(),
       ConfirmedLedgerDB.clear(),
+      deleteMempoolMpt,
+      deleteLedgerMpt,
     ],
     { discard: true },
   );
