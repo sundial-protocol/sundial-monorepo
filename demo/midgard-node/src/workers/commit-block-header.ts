@@ -13,10 +13,14 @@ import {
   SubmitError,
 } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
-import { makeMpts, processMpts, withTrieTransaction } from "./db.js";
+import {
+  deleteMempoolMpt,
+  makeMpts,
+  processMpts,
+  withTrieTransaction,
+} from "./db.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
-import * as FS from "fs";
 
 const emptyOutput: WorkerOutput = {
   submittedTxHash: "",
@@ -176,14 +180,7 @@ const wrapper = (
 
         if (flushMempoolTrie) {
           yield* Effect.logInfo("🔹 Wiping mempool trie...");
-          yield* Effect.try({
-            try: () =>
-              FS.rmSync(nodeConfig.MEMPOOL_MPT_DB_PATH, {
-                recursive: true,
-                force: true,
-              }),
-            catch: (e) => new Error(`${e}`),
-          });
+          yield* deleteMempoolMpt;
         }
 
         const output: WorkerOutput = {

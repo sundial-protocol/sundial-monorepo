@@ -28,6 +28,9 @@ export type NodeConfigDep = {
   POSTGRES_HOST: string;
   LEDGER_MPT_DB_PATH: string;
   MEMPOOL_MPT_DB_PATH: string;
+  TESTNET_GENESIS_WALLET_SEED_PHRASE_A: string;
+  TESTNET_GENESIS_WALLET_SEED_PHRASE_B: string;
+  TESTNET_GENESIS_WALLET_SEED_PHRASE_C: string;
 };
 
 export const makeUserFn = (nodeConfig: NodeConfigDep) =>
@@ -98,6 +101,9 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("MEMPOOL_MPT_DB").pipe(
       Config.withDefault("./midgard-mempool-mpt-db"),
     ),
+    Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_A"),
+    Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_B"),
+    Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_C"),
   ]);
 
   const provider = config[0].toLowerCase();
@@ -126,6 +132,9 @@ export const makeConfig = Effect.gen(function* () {
     POSTGRES_USER: config[16],
     LEDGER_MPT_DB_PATH: config[17],
     MEMPOOL_MPT_DB_PATH: config[18],
+    TESTNET_GENESIS_WALLET_SEED_PHRASE_A: config[19],
+    TESTNET_GENESIS_WALLET_SEED_PHRASE_B: config[20],
+    TESTNET_GENESIS_WALLET_SEED_PHRASE_C: config[21],
   };
 }).pipe(Effect.orDie);
 
