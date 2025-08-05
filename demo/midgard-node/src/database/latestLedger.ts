@@ -1,10 +1,12 @@
 import {
   clearTable,
+  delMultiple,
+} from "./utils.js";
+import {
   insertLedgerEntries,
   retrieveLedgerEntries,
-  delMultiple,
   LedgerEntry,
-} from "./utils.js";
+} from "./utilsLedger.js"
 
 export const tableName = "latest_ledger";
 

@@ -1,12 +1,15 @@
 import { Effect } from "effect";
 import {
   clearTable,
+} from "./utils.js";
+import {
+  insertLedgerEntries,
   retrieveLedgerEntries,
   retrieveLedgerEntriesWithAddress,
-  LedgerEntry,
-  insertLedgerEntries,
   delLedgerEntries,
-} from "./utils.js";
+  LedgerEntry,
+} from "./utilsLedger.js"
+
 import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";

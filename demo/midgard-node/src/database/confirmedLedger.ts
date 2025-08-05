@@ -1,11 +1,14 @@
 import { Effect } from "effect";
 import {
   clearTable,
+  delMultiple,
+} from "./utils.js";
+import {
   insertLedgerEntries,
   retrieveLedgerEntries,
-  delMultiple,
   LedgerEntry,
-} from "./utils.js";
+} from "./utilsLedger.js"
+
 import { Database } from "@/services/database.js";
 
 export const tableName = "confirmed_ledger";
