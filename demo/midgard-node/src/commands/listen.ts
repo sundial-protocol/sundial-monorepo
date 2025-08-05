@@ -18,7 +18,7 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { isHexString } from "../utils.js";
+import { bufferToHex, isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
@@ -110,11 +110,11 @@ const getUtxosHandler = Effect.gen(function* () {
     );
 
     const response = utxosWithAddress.map((entry) => ({
-      outref: entry.outref,
-      value: entry.output,
+      outref: bufferToHex(entry.outref),
+      value: bufferToHex(entry.output),
     }));
 
-    yield* Effect.logInfo(`Found ${response.length} UTXOs for ${addr}`);
+    yield* Effect.logInfo(`Found ${response.length} UTxOs for ${addr}`);
     return yield* HttpServerResponse.json({
       utxos: response,
     });
@@ -476,9 +476,7 @@ export const runNode = Effect.gen(function* () {
     ),
   }));
 
-  yield* InitDB.initializeDb().pipe(
-    Effect.provide(Database.layer),
-  );
+  yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
 
   const ListenLayer = Layer.provide(
     HttpServer.serve(router),
