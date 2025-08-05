@@ -5,11 +5,10 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "blocks";
 
-const TIMESTAMPTZ = "time_stamp_tz"
-
 export enum Columns {
   HEADER_HASH = "header_hash",
   TX_ID = "tx_id",
+  TIMESTAMPTZ = "time_stamp_tz",
 }
 
 export enum ColumnsIndices {
@@ -17,9 +16,15 @@ export enum ColumnsIndices {
   TX_ID = "idx_blocks_tx_id",
 }
 
-
 type Entry = {
-  [blockCols in Columns]: Buffer;
+  [Columns.HEADER_HASH]: Buffer;
+  [Columns.TX_ID]: Buffer;
+  [Columns.TIMESTAMPTZ]: Date;
+};
+
+export type MinimalEntry = {
+  [Columns.HEADER_HASH]: Buffer;
+  [Columns.TX_ID]: Buffer;
 };
 
 export const init = Effect.gen(function* () {
@@ -29,7 +34,7 @@ export const init = Effect.gen(function* () {
       yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
       ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE,
-      ${TIMESTAMPTZ} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
+      ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
     );`;
       yield* sql`CREATE INDEX ${sql(
         ColumnsIndices.HEADER_HASH,
@@ -51,7 +56,7 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: Entry[] = txHashes.map((txHash: Buffer) => ({
+    const rowsToInsert: MinimalEntry[] = txHashes.map((txHash: Buffer) => ({
       [Columns.HEADER_HASH]: headerHash,
       [Columns.TX_ID]: txHash,
     }));
