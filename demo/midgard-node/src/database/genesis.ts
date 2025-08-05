@@ -10,6 +10,7 @@ import {
   walletFromSeed,
 } from "@lucid-evolution/lucid";
 import { NodeConfig } from "@/config.js";
+import { makeMpts } from "@/workers/db.js";
 
 const makeGenesisUTxOs = (
   network: Network,
@@ -114,10 +115,25 @@ export const insertGenesisUtxos: Effect.Effect<
   });
 
   yield* Effect.logInfo(
-    `🟣 Debug: Inserting ${ledgerEntries.length} UTxOs into trie`,
+    `🟣 Debug: Inserting ${ledgerEntries.length} UTxOs into MempoolLedgerDB...`,
   );
 
   yield* MempoolLedgerDB.insert(ledgerEntries);
+
+  yield* Effect.logInfo(
+    `🟣 Debug: Inserting ${ledgerEntries.length} UTxOs into trie...`,
+  );
+
+  const { ledgerTrie } = yield* makeMpts();
+
+  yield* Effect.tryPromise({
+    try: () => ledgerTrie.batch(ledgerEntries.map((le) => ({
+      type: "put",
+      key: le[LedgerColumns.OUTREF],
+      value: le[LedgerColumns.OUTPUT],
+    }))),
+    catch: (e) => new Error(`${e}`),
+  });
 
   yield* Effect.logInfo(
     `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs into MPT database. Funded addresses are:
