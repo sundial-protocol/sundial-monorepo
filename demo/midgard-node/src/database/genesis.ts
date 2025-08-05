@@ -27,12 +27,13 @@ export const insertGenesisUtxos = (): Effect.Effect<
 > =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
-    const genesisFilePath = nodeConfig.GENESIS_UTXOS_PATH;
+    let genesisFilePath = nodeConfig.GENESIS_UTXOS_PATH;
 
     if (genesisFilePath === null) {
       yield* Effect.logInfo(
-        `🟣 No genesis UTXOs file path provided, skipping insertion`,
+        `🟣 No genesis UTXOs file path provided, using 'lace-demo/genesis-utxos.json' as default path`,
       );
+      genesisFilePath = "lace-demo/genesis-utxos.json";
       return;
     }
 
