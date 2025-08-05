@@ -8,79 +8,32 @@ import {
   utxoToTransactionInput,
   utxoToTransactionOutput,
 } from "@lucid-evolution/lucid";
-import * as fs from "node:fs";
-
-// Type for the JSON file structure using Lucid UTxO
-export type GenesisUtxosFile = {
-  utxos: UTxO[];
-};
+import { genesisUtxos } from "./../../lace-demo/genesis.js";
 
 /**
- * Inserts genesis UTXOs from a JSON file into the MPT database
- * @param genesisFilePath - Path to the JSON file containing genesis UTXOs, or null to skip
- * @returns Effect that succeeds if UTXOs were inserted, or fails if file doesn't exist or other errors
+ * Inserts genesis UTXOs from the imported TypeScript module into the MPT database
+ * @returns Effect that succeeds if UTXOs were inserted, or fails on errors
  */
 export const insertGenesisUtxos = (): Effect.Effect<
   void,
   Error,
-  Database | NodeConfig
+  Database
 > =>
   Effect.gen(function* () {
-    const nodeConfig = yield* NodeConfig;
-    let genesisFilePath = nodeConfig.GENESIS_UTXOS_PATH;
-
-    if (genesisFilePath === null) {
-      yield* Effect.logInfo(
-        `🟣 No genesis UTXOs file path provided, using 'lace-demo/genesis-utxos.json' as default path`,
-      );
-      genesisFilePath = "lace-demo/genesis-utxos.json";
-      return;
-    }
-
-    yield* Effect.logInfo(
-      `🟣 Checking for genesis UTXOs file: ${genesisFilePath}`,
-    );
-
-    const fileExists = yield* Effect.tryPromise({
-      try: () => fs.promises.access(genesisFilePath, fs.constants.F_OK),
-      catch: () =>
-        new Error(`Genesis UTXOs file not found: ${genesisFilePath}`),
-    }).pipe(
-      Effect.map(() => true),
-      Effect.catchAll(() => Effect.succeed(false)),
-    );
-
-    if (!fileExists) {
-      yield* Effect.logInfo(
-        `🟣 No genesis UTXOs file found at ${genesisFilePath}, skipping genesis UTXO insertion`,
-      );
-      return;
-    }
-
-    const fileContent = yield* Effect.tryPromise({
-      try: () => fs.promises.readFile(genesisFilePath, "utf-8"),
-      catch: (e) => new Error(`Failed to read genesis UTXOs file: ${e}`),
-    });
-
-    const genesisData: GenesisUtxosFile = yield* Effect.try({
-      try: () => JSON.parse(fileContent),
-      catch: (e) => new Error(`Failed to parse genesis UTXOs JSON: ${e}`),
-    });
-
-    if (!genesisData.utxos || !Array.isArray(genesisData.utxos)) {
+    if (!genesisUtxos || !Array.isArray(genesisUtxos)) {
       yield* Effect.fail(
         new Error(
-          "Invalid genesis UTXOs file format: missing or invalid 'utxos' array",
+          "Invalid genesis UTXOs: missing or invalid genesisUtxos array",
         ),
       );
     }
 
     yield* Effect.logInfo(
-      `🟣 Found ${genesisData.utxos.length} genesis UTXOs to insert`,
+      `🟣 Found ${genesisUtxos.length} genesis UTXOs to insert`,
     );
 
     // Convert genesis UTXOs to LedgerEntry format and insert into MPT
-    const ledgerEntries = genesisData.utxos.map((utxo) => {
+    const ledgerEntries = genesisUtxos.map((utxo: UTxO) => {
       const input = utxoToTransactionInput(utxo);
       const output = utxoToTransactionOutput(utxo);
 

@@ -478,7 +478,6 @@ export const runNode = Effect.gen(function* () {
 
   yield* InitDB.initializeDb().pipe(
     Effect.provide(Database.layer),
-    Effect.provide(NodeConfig.layer),
   );
 
   const ListenLayer = Layer.provide(
