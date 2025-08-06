@@ -181,6 +181,15 @@ export const breakDownTx = (
     };
   });
 
+/**
+ * Given a batch size and a total count, the required continuation will be
+ * provided with start and end indices.
+ *
+ * @param batchSize - Size of each batch
+ * @param totalCount - Total count of the iterable meant to be batched
+ * @param opName - A name to make logs more readable (doesn't affect the logic)
+ * @param effectMaker - A continuation that is provided with starting and ending indices for each batch.
+ */
 export const batchProgram = <A, C>(
   batchSize: number,
   totalCount: number,

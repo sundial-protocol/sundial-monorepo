@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, Schedule, pipe } from "effect";
+import { Effect, pipe } from "effect";
 import {
   WorkerInput,
   WorkerOutput,
@@ -62,10 +62,6 @@ const wrapper = (
         const { policyId, spendScript, spendScriptAddress, mintScript } =
           yield* makeAlwaysSucceedsServiceFn(nodeConfig);
 
-        // yield* Effect.forEach(
-        //   batchIndices,
-        //   (startIndex) => {
-
         if (workerInput.data.availableConfirmedBlock === "") {
           // The tx confirmation worker has not yet confirmed a previously
           // submitted tx, so the root we have found can not be used yet.
@@ -102,23 +98,12 @@ const wrapper = (
           };
         }
 
-        // const retryPolicy = Schedule.exponential("100 millis").pipe(
-        //   Schedule.compose(Schedule.recurs(4)),
-        // );
-        // yield* Effect.logInfo("🔹 Fetching latest commited block...");
         yield* Effect.logInfo(
           "🔹 Previous submitted block is now confirmed, deserializing...",
         );
         const latestBlock = yield* deserializeStateQueueUTxO(
           workerInput.data.availableConfirmedBlock,
         );
-        //  yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
-        //    lucid,
-        //    fetchConfig,
-        //  ).pipe(
-        //    Effect.retry(retryPolicy),
-        //    Effect.withSpan("fetchLatestCommittedBlockProgram"),
-        //  );
         yield* Effect.logInfo(
           "🔹 Finding updated block datum and new header...",
         );
@@ -163,71 +148,80 @@ const wrapper = (
           `🔹 Transaction built successfully. Size: ${txSize}`,
         );
 
-        let flushMempoolTrie: boolean = true;
-
-        // Using sign and submit helper with confirmation so that databases are
-        // only updated after a successful on-chain registration of the block.
-        const onSubmitFailure = (_err: SubmitError) =>
+        const onSubmitFailure = (err: SubmitError) =>
           Effect.gen(function* () {
+            yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err}`);
             yield* Effect.logError(
-              "🔹 ⚠️  Tx submit failed. Mempool trie will be preserved, but db will be cleared.",
+              "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
             );
             yield* Effect.logInfo("🔹 Mempool Trie stats:");
             console.dir(mempoolTrie.database()._stats, { depth: null });
-            flushMempoolTrie = false;
-            // yield* Effect.fail(err.err);
+            return {
+              type: "SkippedSubmissionOutput",
+              mempoolTxsCount,
+            };
           });
 
-        yield* handleSignSubmitNoConfirmation(
+        const txHash = yield* handleSignSubmitNoConfirmation(
           lucid,
           txBuilder,
           onSubmitFailure,
         ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
 
+        // TODO: This failure case is already taken care of with
+        //       `onSubmitFailure`. We should refactor the code so that this
+        //       won't be needed.
+        if (!txHash) {
+          return yield* onSubmitFailure(
+            new SubmitError({
+              err: new Error("Tx submission failed for an unknown reason."),
+            }),
+          );
+        }
+
         const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
 
         yield* Effect.logInfo(
-          "🔹 Inserting included transactions into ImmutableDB and BlocksDB...",
+          "🔹 Inserting included transactions into ImmutableDB and BlocksDB, clearing all the processed txs from MempoolDB and ProcessedMempoolDB, and deleting mempool LevelDB...",
         );
-        yield* Effect.logInfo(
-          "🔹 Clearing included transactions from MempoolDB...",
+        yield* Effect.all(
+          [
+            batchProgram(
+              BATCH_SIZE,
+              mempoolTxsCount,
+              "successful-commit",
+              (startIndex: number, endIndex: number) => {
+                const batchTxs = mempoolTxs.slice(startIndex, endIndex);
+                const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
+                return Effect.all(
+                  [
+                    ImmutableDB.insertTxs(batchTxs).pipe(
+                      Effect.withSpan(`immutable-db-insert-${startIndex}`),
+                    ),
+                    BlocksDB.insert(newHeaderHashBuffer, batchHashes).pipe(
+                      Effect.withSpan(`blocks-db-insert-${startIndex}`),
+                    ),
+                    MempoolDB.clearTxs(batchHashes).pipe(
+                      Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
+                    ),
+                  ],
+                  { concurrency: "unbounded" },
+                );
+              },
+            ),
+            ProcessedMempoolDB.clear(),
+            deleteMempoolMpt,
+          ],
+          { concurrency: "unbounded" },
         );
 
-        yield* batchProgram(
-          BATCH_SIZE,
-          mempoolTxsCount,
-          "successful-commit",
-          (startIndex: number, endIndex: number) => {
-            const batchTxs = mempoolTxs.slice(startIndex, endIndex);
-            const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
-            return Effect.all(
-              [
-                ImmutableDB.insertTxs(batchTxs).pipe(
-                  Effect.withSpan(`immutable-db-insert-${startIndex}`),
-                ),
-                BlocksDB.insert(newHeaderHashBuffer, batchHashes).pipe(
-                  Effect.withSpan(`blocks-db-insert-${startIndex}`),
-                ),
-                MempoolDB.clearTxs(batchHashes).pipe(
-                  Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
-                ),
-              ],
-              { concurrency: "unbounded" },
-            );
-          },
-        );
-
-        if (flushMempoolTrie) {
-          yield* Effect.logInfo("🔹 Wiping mempool trie...");
-          yield* deleteMempoolMpt;
-        }
-
-        const output: WorkerOutput = {
+        return {
+          type: "SuccessfulSubmissionOutput",
+          submittedTxHash: txHash,
           txSize,
           mempoolTxsCount,
           sizeOfBlocksTxs,
         };
-        return output;
       }),
     );
   });

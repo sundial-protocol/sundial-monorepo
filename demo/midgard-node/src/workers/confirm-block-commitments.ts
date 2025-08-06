@@ -15,6 +15,10 @@ const wrapper = (
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
+    const retryPolicy = Schedule.exponential("100 millis").pipe(
+      Schedule.compose(Schedule.recurs(4)),
+    );
+    yield* Effect.logInfo("🔹 Fetching latest commited block...");
     return {
       type: "FailedConfirmationOutput",
     };
