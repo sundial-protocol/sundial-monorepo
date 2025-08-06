@@ -1,11 +1,22 @@
-import { WorkerOutput as BlockCommitmentWorkerOutput } from "./commit-block-header.js";
+import {
+  WorkerOutput as BlockCommitmentWorkerOutput,
+  SerializedStateQueueUTxO,
+} from "./commit-block-header.js";
 
 export type WorkerInput = {
   data: BlockCommitmentWorkerOutput;
 };
 
-export type BlockConfirmationWorkerOutput = {
-  txSize: number;
-  mempoolTxsCount: number;
-  sizeOfBlocksTxs: number;
+export type SuccessfulConfirmationOutput = {
+  type: "SuccessfulConfirmationOutput";
+  blocksUTxO: SerializedStateQueueUTxO;
 };
+
+export type FailedConfirmationOutput = {
+  type: "FailedConfirmationOutput";
+  error: string;
+};
+
+export type WorkerOutput =
+  | SuccessfulConfirmationOutput
+  | FailedConfirmationOutput;

@@ -239,4 +239,3 @@ export class LevelDB {
     return this._leveldb;
   }
 }
-

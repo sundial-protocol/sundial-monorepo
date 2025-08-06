@@ -23,9 +23,7 @@ import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 
 const emptyOutput: WorkerOutput = {
-  type: "FailedSubmissionOutput",
-  mempoolTxsCount: 0,
-  sizeOfBlocksTxs: 0,
+  type: "EmptyMempoolOutput",
 };
 
 const wrapper = (
@@ -62,7 +60,10 @@ const wrapper = (
         // yield* Effect.logInfo("🔹 Fetching latest commited block...");
 
         if (workerInput.data.availableConfirmedBlock === "") {
-          return emptyOutput;
+          return {
+            type: "SkippedSubmissionOutput",
+            mempoolTxsCount,
+          };
         }
 
         const latestBlock = yield* deserializeStateQueueUTxO(
@@ -133,6 +134,7 @@ const wrapper = (
             flushMempoolTrie = false;
             // yield* Effect.fail(err.err);
           });
+
         yield* handleSignSubmitNoConfirmation(
           lucid,
           txBuilder,
@@ -212,6 +214,7 @@ Effect.runPromise(
   program.pipe(
     Effect.catchAll((e) =>
       Effect.succeed({
+        type: "FailureOutput",
         error: e instanceof Error ? e.message : "Unknown error from MPT worker",
       }),
     ),
