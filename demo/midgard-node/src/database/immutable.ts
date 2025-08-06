@@ -1,27 +1,27 @@
 import { Effect } from "effect";
 import {
-  KVColumns,
-  KVEntries,
+  TXColumns,
+  TXEntries,
   clearTable,
-  insertKeyValue,
-  insertKeyValues,
+  insertTX,
+  insertTXs,
   retrieveValue,
   retrieveValues,
-  retrieveKVEntries,
+  retrieveTXEntries,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insert = (tx: Omit<KVEntries, KVColumns.TIMESTAMPTZ>
+export const insert = (tx: Omit<TXEntries, TXColumns.TIMESTAMPTZ>
 ): Effect.Effect<void, Error, Database> =>
-  insertKeyValue(tableName, tx);
+  insertTX(tableName, tx);
 
 export const insertTxs = (
-  txs: Omit<KVEntries, KVColumns.TIMESTAMPTZ>[],
-): Effect.Effect<void, Error, Database> => insertKeyValues(tableName, txs);
+  txs: Omit<TXEntries, TXColumns.TIMESTAMPTZ>[],
+): Effect.Effect<void, Error, Database> => insertTXs(tableName, txs);
 
-export const retrieve = () => retrieveKVEntries(tableName);
+export const retrieve = () => retrieveTXEntries(tableName);
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   retrieveValue(tableName, txHash);

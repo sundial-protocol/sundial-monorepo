@@ -2,34 +2,34 @@ import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 
-export enum KVColumns {
-  KEY = "key",
-  VALUE = "value",
+export enum TXColumns {
+  TX_ID = "tx_id",
+  TX = "tx",
   TIMESTAMPTZ = "time_stamp_tz",
 }
 
-export type KVEntries = {
-  [KVColumns.KEY]: Buffer;
-  [KVColumns.VALUE]: Buffer;
-  [KVColumns.TIMESTAMPTZ]: Date;
+export type TXEntries = {
+  [TXColumns.TX_ID]: Buffer;
+  [TXColumns.TX]: Buffer;
+  [TXColumns.TIMESTAMPTZ]: Date;
 };
 
-export const createKeyValueTable = (
+export const createTXTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      ${sql(KVColumns.KEY)} BYTEA NOT NULL,
-      ${sql(KVColumns.VALUE)} BYTEA NOT NULL,
-      ${sql(KVColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
-      PRIMARY KEY (${sql(KVColumns.KEY)})
+      ${sql(TXColumns.TX_ID)} BYTEA NOT NULL,
+      ${sql(TXColumns.TX)} BYTEA NOT NULL,
+      ${sql(TXColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
+      PRIMARY KEY (${sql(TXColumns.TX_ID)})
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 export const delMultiple = (
   tableName: string,
-  keys: Buffer[],
+  tx_id: Buffer[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
@@ -37,26 +37,26 @@ export const delMultiple = (
       `${tableName} db: attempt to delete multiply entries`,
     );
     const result = yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
-      KVColumns.KEY,
-    )} IN ${sql.in(keys)} RETURNING ${sql(KVColumns.KEY)}`;
+      TXColumns.TX_ID,
+    )} IN ${sql.in(tx_id)} RETURNING ${sql(TXColumns.TX_ID)}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(Effect.withLogSpan(`delMutiple table ${tableName}`), mapSqlError);
 
 export const retrieveValue = (
   tableName: string,
-  key: Buffer,
+  tx_id: Buffer,
 ): Effect.Effect<Buffer, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
 
-    const result = yield* sql<Buffer>`SELECT ${sql(KVColumns.VALUE)} FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT ${sql(TXColumns.TX)} FROM ${sql(
       tableName,
-    )} WHERE ${sql(KVColumns.KEY)} = ${key}`;
+    )} WHERE ${sql(TXColumns.TX_ID)} = ${tx_id}`;
 
     if (result.length <= 0) {
       yield* Effect.fail(
-        new SqlError.SqlError({ cause: `No value found for key ${key}` }),
+        new SqlError.SqlError({ cause: `No value found for tx_id ${tx_id}` }),
       );
     }
 
@@ -73,15 +73,15 @@ export const retrieveValue = (
 
 export const retrieveValues = (
   tableName: string,
-  keys: Buffer[] | readonly Buffer[],
+  tx_ids: Buffer[] | readonly Buffer[],
 ): Effect.Effect<readonly Buffer[], Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
 
-    const result = yield* sql<Buffer>`SELECT ${sql(KVColumns.VALUE)} FROM ${sql(
+    const result = yield* sql<Buffer>`SELECT ${sql(TXColumns.TX)} FROM ${sql(
       tableName,
-    )} WHERE ${sql.in(KVColumns.KEY, keys)}`;
+    )} WHERE ${sql.in(TXColumns.TX_ID, tx_ids)}`;
 
     return result;
   }).pipe(
@@ -112,47 +112,47 @@ export const clearTable = (
     mapSqlError,
   );
 
-export const insertKeyValue = (
+export const insertTX = (
   tableName: string,
-  kvPair: Omit<KVEntries, KVColumns.TIMESTAMPTZ>,
+  txPair: Omit<TXEntries, TXColumns.TIMESTAMPTZ>,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValue`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insertTX`);
     const sql = yield* SqlClient.SqlClient;
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(
-      kvPair,
-    )} ON CONFLICT (${sql(KVColumns.KEY)}) DO UPDATE SET ${sql(KVColumns.VALUE)} = ${kvPair.value}`;
+      txPair,
+    )} ON CONFLICT (${sql(TXColumns.TX_ID)}) DO UPDATE SET ${sql(TXColumns.TX)} = ${txPair.tx}`;
   }).pipe(
-    Effect.withLogSpan(`insertKeyValue ${tableName}`),
+    Effect.withLogSpan(`insertTX ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insertKeyValue: ${JSON.stringify(e)}`),
+      Effect.logError(`${tableName} db: insertTX: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
 
-export const insertKeyValues = (
+export const insertTXs = (
   tableName: string,
-  pairs: Omit<KVEntries, KVColumns.TIMESTAMPTZ>[],
+  pairs: Omit<TXEntries, TXColumns.TIMESTAMPTZ>[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValues`);
+    yield* Effect.logDebug(`${tableName} db: attempt to insertTXs`);
     const sql = yield* SqlClient.SqlClient;
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(pairs)}`;
   }).pipe(
-    Effect.withLogSpan(`insertKeyValues ${tableName}`),
+    Effect.withLogSpan(`insertTXs ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insertKeyValues: ${JSON.stringify(e)}`),
+      Effect.logError(`${tableName} db: insertTXs: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
 
-export const retrieveKVEntries = (
+export const retrieveTXEntries = (
   tableName: string,
-): Effect.Effect<readonly KVEntries[], Error, Database> =>
+): Effect.Effect<readonly TXEntries[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<KVEntries>`SELECT * FROM ${sql(tableName)}`;
+    return yield* sql<TXEntries>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
