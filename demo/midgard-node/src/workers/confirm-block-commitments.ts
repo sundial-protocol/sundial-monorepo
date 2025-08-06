@@ -32,7 +32,10 @@ Effect.runPromise(
     Effect.catchAll((e) =>
       Effect.succeed({
         type: "FailedConfirmationOutput",
-        error: e instanceof Error ? e.message : "Unknown error from tx confirmation worker",
+        error:
+          e instanceof Error
+            ? e.message
+            : "Unknown error from tx confirmation worker",
       }),
     ),
   ),

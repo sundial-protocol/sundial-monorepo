@@ -10,7 +10,7 @@ import {
   Provider,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Effect } from "effect";
+import { Effect, pipe } from "effect";
 import {
   LedgerColumns,
   LedgerEntry,
@@ -180,6 +180,32 @@ export const breakDownTx = (
       produced,
     };
   });
+
+export const batchProgram = <A, C>(
+  batchSize: number,
+  totalCount: number,
+  opName: string,
+  effectMaker: (
+    startIndex: number,
+    endIndex: number,
+  ) => Effect.Effect<A, Error, C>,
+) => {
+  const batchIndices = Array.from(
+    { length: Math.ceil(totalCount / batchSize) },
+    (_, i) => i * batchSize,
+  );
+  return Effect.forEach(
+    batchIndices,
+    (startIndex) => {
+      const endIndex = startIndex + batchSize;
+      return pipe(
+        effectMaker(startIndex, endIndex),
+        Effect.withSpan(`batch-${opName}-${startIndex}-${endIndex}`),
+      );
+    },
+    { concurrency: "unbounded" },
+  );
+};
 
 export const ENV_VARS_GUIDE = `
 Make sure you first have set the environment variable for your seed phrase:

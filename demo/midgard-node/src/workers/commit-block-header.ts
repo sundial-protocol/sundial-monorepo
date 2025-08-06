@@ -7,7 +7,12 @@ import {
   deserializeStateQueueUTxO,
 } from "@/workers/utils/commit-block-header.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
-import { BlocksDB, ImmutableDB, MempoolDB } from "@/database/index.js";
+import {
+  BlocksDB,
+  ImmutableDB,
+  MempoolDB,
+  ProcessedMempoolDB,
+} from "@/database/index.js";
 import {
   handleSignSubmitNoConfirmation,
   SubmitError,
@@ -21,10 +26,9 @@ import {
 } from "./utils/mpt.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
+import { batchProgram } from "@/utils.js";
 
-const emptyOutput: WorkerOutput = {
-  type: "EmptyMempoolOutput",
-};
+const BATCH_SIZE = 100;
 
 const wrapper = (
   workerInput: WorkerInput,
@@ -34,14 +38,18 @@ const wrapper = (
     const { user: lucid } = yield* User;
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
+
     const mempoolTxs = yield* MempoolDB.retrieve();
+    const endTime = Date.now();
     const mempoolTxsCount = mempoolTxs.length;
 
     if (mempoolTxsCount === 0) {
       yield* Effect.logInfo("🔹 No transactions were found in MempoolDB");
-      return emptyOutput;
+      return {
+        type: "EmptyMempoolOutput",
+      };
     }
-    const endTime = Date.now();
+
     yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
 
     const { ledgerTrie, mempoolTrie } = yield* makeMpts();
@@ -54,18 +62,53 @@ const wrapper = (
         const { policyId, spendScript, spendScriptAddress, mintScript } =
           yield* makeAlwaysSucceedsServiceFn(nodeConfig);
 
-        // const retryPolicy = Schedule.exponential("100 millis").pipe(
-        //   Schedule.compose(Schedule.recurs(4)),
-        // );
-        // yield* Effect.logInfo("🔹 Fetching latest commited block...");
+        // yield* Effect.forEach(
+        //   batchIndices,
+        //   (startIndex) => {
 
         if (workerInput.data.availableConfirmedBlock === "") {
+          // The tx confirmation worker has not yet confirmed a previously
+          // submitted tx, so the root we have found can not be used yet.
+          // However, it is stored on disk in our LevelDB mempool. Therefore,
+          // the processed txs must be transferred to `ProccessedMempoolDB` from
+          // `MempoolDB`.
+          //
+          // TODO: Handle failures properly.
+          yield* batchProgram(
+            BATCH_SIZE,
+            mempoolTxsCount,
+            "skipped-submission-db-transfer",
+            (startIndex: number, endIndex: number) => {
+              const batchTxs = mempoolTxs.slice(startIndex, endIndex);
+              const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
+              return Effect.all(
+                [
+                  ProcessedMempoolDB.insertTxs(batchTxs).pipe(
+                    Effect.withSpan(
+                      `processed-mempool-db-insert-${startIndex}`,
+                    ),
+                  ),
+                  MempoolDB.clearTxs(batchHashes).pipe(
+                    Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
+                  ),
+                ],
+                { concurrency: "unbounded" },
+              );
+            },
+          );
           return {
             type: "SkippedSubmissionOutput",
             mempoolTxsCount,
           };
         }
 
+        // const retryPolicy = Schedule.exponential("100 millis").pipe(
+        //   Schedule.compose(Schedule.recurs(4)),
+        // );
+        // yield* Effect.logInfo("🔹 Fetching latest commited block...");
+        yield* Effect.logInfo(
+          "🔹 Previous submitted block is now confirmed, deserializing...",
+        );
         const latestBlock = yield* deserializeStateQueueUTxO(
           workerInput.data.availableConfirmedBlock,
         );
@@ -142,7 +185,6 @@ const wrapper = (
         ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
 
         const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
-        const batchSize = 100;
 
         yield* Effect.logInfo(
           "🔹 Inserting included transactions into ImmutableDB and BlocksDB...",
@@ -151,36 +193,28 @@ const wrapper = (
           "🔹 Clearing included transactions from MempoolDB...",
         );
 
-        const batchIndices = Array.from(
-          { length: Math.ceil(mempoolTxsCount / batchSize) },
-          (_, i) => i * batchSize,
-        );
-        yield* Effect.forEach(
-          batchIndices,
-          (startIndex) => {
-            const endIndex = startIndex + batchSize;
+        yield* batchProgram(
+          BATCH_SIZE,
+          mempoolTxsCount,
+          "successful-commit",
+          (startIndex: number, endIndex: number) => {
             const batchTxs = mempoolTxs.slice(startIndex, endIndex);
             const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
-
-            return pipe(
-              Effect.all(
-                [
-                  ImmutableDB.insertTxs(batchTxs).pipe(
-                    Effect.withSpan(`immutable-db-insert-${startIndex}`),
-                  ),
-                  BlocksDB.insert(newHeaderHashBuffer, batchHashes).pipe(
-                    Effect.withSpan(`blocks-db-insert-${startIndex}`),
-                  ),
-                  MempoolDB.clearTxs(batchHashes).pipe(
-                    Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
-                  ),
-                ],
-                { concurrency: "unbounded" },
-              ),
-              Effect.withSpan(`batch-insert-${startIndex}-${endIndex}`),
+            return Effect.all(
+              [
+                ImmutableDB.insertTxs(batchTxs).pipe(
+                  Effect.withSpan(`immutable-db-insert-${startIndex}`),
+                ),
+                BlocksDB.insert(newHeaderHashBuffer, batchHashes).pipe(
+                  Effect.withSpan(`blocks-db-insert-${startIndex}`),
+                ),
+                MempoolDB.clearTxs(batchHashes).pipe(
+                  Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
+                ),
+              ],
+              { concurrency: "unbounded" },
             );
           },
-          { concurrency: batchIndices.length },
         );
 
         if (flushMempoolTrie) {
