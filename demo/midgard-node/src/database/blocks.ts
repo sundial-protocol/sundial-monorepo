@@ -16,12 +16,7 @@ export enum ColumnsIndices {
   TX_ID = "idx_blocks_tx_id",
 }
 
-export type Entry = {
-  [Columns.HEADER_HASH]: Buffer;
-  [Columns.TX_ID]: Buffer;
-};
-
-type EntryTimeStamped = {
+type Entry = {
   [Columns.HEADER_HASH]: Buffer;
   [Columns.TX_ID]: Buffer;
   [Columns.TIMESTAMPTZ]: Date;
@@ -56,7 +51,7 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: Entry[] = txHashes.map((txHash: Buffer) => ({
+    const rowsToInsert: Omit<Entry, Columns.TIMESTAMPTZ>[] = txHashes.map((txHash: Buffer) => ({
       [Columns.HEADER_HASH]: headerHash,
       [Columns.TX_ID]: txHash,
     }));
@@ -175,11 +170,11 @@ export const retrieveWithoutTimeStamps = (): Effect.Effect<readonly Entry[], Err
   );
 
 
-export const retrieve = (): Effect.Effect<readonly EntryTimeStamped[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly Omit<Entry, Columns.TIMESTAMPTZ>[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<EntryTimeStamped>`SELECT * FROM ${sql(tableName)}`;
+    const result = yield* sql<Omit<Entry, Columns.TIMESTAMPTZ>>`SELECT * FROM ${sql(tableName)}`;
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
   }).pipe(
