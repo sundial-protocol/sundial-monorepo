@@ -1,25 +1,27 @@
 import { Effect } from "effect";
 import {
-  KVPair,
+  KVColumns,
+  KVEntries,
   clearTable,
   insertKeyValue,
   insertKeyValues,
-  retrieveKeyValues,
   retrieveValue,
   retrieveValues,
+  retrieveKVEntries,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insert = (tx: KVPair): Effect.Effect<void, Error, Database> =>
+export const insert = (tx: Omit<KVEntries, KVColumns.TIMESTAMPTZ>
+): Effect.Effect<void, Error, Database> =>
   insertKeyValue(tableName, tx);
 
 export const insertTxs = (
-  txs: KVPair[],
+  txs: Omit<KVEntries, KVColumns.TIMESTAMPTZ>[],
 ): Effect.Effect<void, Error, Database> => insertKeyValues(tableName, txs);
 
-export const retrieve = () => retrieveKeyValues(tableName);
+export const retrieve = () => retrieveKVEntries(tableName);
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   retrieveValue(tableName, txHash);

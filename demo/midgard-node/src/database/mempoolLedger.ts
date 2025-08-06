@@ -8,13 +8,14 @@ import {
   retrieveLedgerEntriesWithAddress,
   delLedgerEntries,
   LedgerEntry,
+  LedgerColumns,
 } from "./utilsLedger.js"
 
 import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";
 
-export const insert = (entries: LedgerEntry[]) =>
+export const insert = (entries: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[]) =>
   insertLedgerEntries(tableName, entries);
 
 export const retrieve = (): Effect.Effect<

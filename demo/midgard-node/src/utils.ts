@@ -33,7 +33,7 @@ export type ProcessedTx = {
   txId: Buffer;
   txCbor: Buffer;
   spent: Buffer[];
-  produced: LedgerEntry[];
+  produced: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[];
 };
 
 export const chalk = new chalk_.Chalk();
@@ -173,7 +173,7 @@ export const breakDownTx = (
     }
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
-    const produced: LedgerEntry[] = [];
+    const produced: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[] = [];
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
       produced.push({

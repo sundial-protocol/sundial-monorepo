@@ -8,11 +8,6 @@ export enum KVColumns {
   TIMESTAMPTZ = "time_stamp_tz",
 }
 
-export type KVPair = {
-  [KVColumns.KEY]: Buffer;
-  [KVColumns.VALUE]: Buffer;
-};
-
 export type KVEntries = {
   [KVColumns.KEY]: Buffer;
   [KVColumns.VALUE]: Buffer;
@@ -119,7 +114,7 @@ export const clearTable = (
 
 export const insertKeyValue = (
   tableName: string,
-  kvPair: KVPair,
+  kvPair: Omit<KVEntries, KVColumns.TIMESTAMPTZ>,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValue`);
@@ -137,7 +132,7 @@ export const insertKeyValue = (
 
 export const insertKeyValues = (
   tableName: string,
-  pairs: KVPair[],
+  pairs: Omit<KVEntries, KVColumns.TIMESTAMPTZ>[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertKeyValues`);
@@ -151,30 +146,13 @@ export const insertKeyValues = (
     mapSqlError,
   );
 
-export const retrieveKeyValues = (
-  tableName: string,
-): Effect.Effect<readonly KVPair[], Error, Database> =>
-  Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
-    const sql = yield* SqlClient.SqlClient;
-    return yield* sql<KVPair>`SELECT ${sql(KVColumns.KEY)}, ${sql(KVColumns.VALUE)} FROM ${sql(tableName)}`;
-  }).pipe(
-    Effect.withLogSpan(`retrieveKeyValues ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieveKeyValues: ${JSON.stringify(e)}`,
-      ),
-    ),
-    mapSqlError,
-  );
-
-export const retrieve = (
+export const retrieveKVEntries = (
   tableName: string,
 ): Effect.Effect<readonly KVEntries[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<KVEntries>`SELECT ${sql(KVColumns.KEY)}, ${sql(KVColumns.VALUE)}, ${sql(KVColumns.TIMESTAMPTZ)} FROM ${sql(tableName)}`;
+    return yield* sql<KVEntries>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>

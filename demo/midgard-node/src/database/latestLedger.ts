@@ -6,11 +6,12 @@ import {
   retrieveLedgerEntries,
   delLedgerEntries,
   LedgerEntry,
+  LedgerColumns,
 } from "./utilsLedger.js"
 
 export const tableName = "latest_ledger";
 
-export const insertMultiple = (entries: LedgerEntry[]) =>
+export const insertMultiple = (entries: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[]) =>
   insertLedgerEntries(tableName, entries);
 
 export const retrieve = () => retrieveLedgerEntries(tableName);

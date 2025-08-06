@@ -5,10 +5,8 @@ import {
   delMultiple,
   retrieveValues,
   retrieveNumberOfEntries,
-  LedgerColumns,
-  LedgerEntry,
   retrieveValue,
-  KVPair,
+  KVEntries,
   KVColumns,
   mapSqlError,
 } from "./utils.js";
@@ -48,11 +46,11 @@ export const retrieveTxCborByHash = (txHash: Buffer) =>
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<readonly KVPair[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly Omit<KVEntries, KVColumns.TIMESTAMPTZ>[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<KVPair>`SELECT ${sql(
+    return yield* sql<Omit<KVEntries, KVColumns.TIMESTAMPTZ>>`SELECT ${sql(
       KVColumns.KEY,
     )}, ${sql(KVColumns.VALUE)} FROM ${sql(tableName)} LIMIT 100000`;
   }).pipe(
