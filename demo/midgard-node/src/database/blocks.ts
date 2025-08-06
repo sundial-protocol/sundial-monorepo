@@ -6,7 +6,7 @@ import { Database } from "@/services/database.js";
 export const tableName = "blocks";
 
 export enum Columns {
-  ID = "id",
+  INDEX = "index",
   HEADER_HASH = "header_hash",
   TX_ID = "tx_id",
   TIMESTAMPTZ = "time_stamp_tz",
@@ -18,7 +18,7 @@ export enum ColumnsIndices {
 }
 
 type Entry = {
-  [Columns.ID]: number;
+  [Columns.INDEX]: number;
   [Columns.HEADER_HASH]: Buffer;
   [Columns.TX_ID]: Buffer;
   [Columns.TIMESTAMPTZ]: Date;
@@ -29,7 +29,7 @@ export const init = Effect.gen(function* () {
   yield* sql.withTransaction(
     Effect.gen(function* () {
       yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      ${sql(Columns.ID)} SERIAL,
+      ${sql(Columns.INDEX)} SERIAL,
       ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
       ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE,
       ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
@@ -54,7 +54,7 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: Omit<Entry, Columns.TIMESTAMPTZ | Columns.ID>[] = txHashes.map((txHash: Buffer) => ({
+    const rowsToInsert: Omit<Entry, Columns.TIMESTAMPTZ | Columns.INDEX>[] = txHashes.map((txHash: Buffer) => ({
       [Columns.HEADER_HASH]: headerHash,
       [Columns.TX_ID]: txHash,
     }));
