@@ -1,9 +1,4 @@
-// Build a tx Merkle root with all the mempool txs
-
-import {
-  WorkerOutput,
-  WorkerInput,
-} from "@/workers/utils/commit-block-header.js";
+import { WorkerOutput } from "@/workers/utils/commit-block-header.js";
 import { Effect, Metric } from "effect";
 import { Worker } from "worker_threads";
 
@@ -55,7 +50,7 @@ export const buildAndSubmitCommitmentBlock = () =>
         },
       );
       worker.on("message", (output: WorkerOutput) => {
-        if ("error" in output) {
+        if (output.type === "FailureOutput") {
           resume(Effect.fail(new Error(`Error in worker: ${output.error}`)));
         } else {
           resume(Effect.succeed(output));

@@ -27,6 +27,7 @@ import {
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 import { batchProgram } from "@/utils.js";
+import { KVColumns } from "@/database/utils.js";
 
 const BATCH_SIZE = 100;
 
@@ -160,6 +161,7 @@ const wrapper = (
             return {
               type: "SkippedSubmissionOutput",
               mempoolTxsCount,
+              sizeOfProcessedTxs,
             };
           });
 
@@ -182,26 +184,42 @@ const wrapper = (
 
         const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
 
+        const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve();
+
         yield* Effect.logInfo(
           "🔹 Inserting included transactions into ImmutableDB and BlocksDB, clearing all the processed txs from MempoolDB and ProcessedMempoolDB, and deleting mempool LevelDB...",
         );
         yield* Effect.all(
           [
             batchProgram(
-              BATCH_SIZE,
+              Math.floor(BATCH_SIZE / 2),
               mempoolTxsCount,
               "successful-commit",
               (startIndex: number, endIndex: number) => {
                 const batchTxs = mempoolTxs.slice(startIndex, endIndex);
                 const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
+                const batchHashesForBlocks = [...batchHashes];
+
+                const batchProcessedTxs = processedMempoolTxs.slice(
+                  startIndex,
+                  endIndex,
+                );
+
+                for (let i = 0; i < batchProcessedTxs.length; i++) {
+                  const kv = batchProcessedTxs[i];
+                  batchTxs.push(kv);
+                  batchHashesForBlocks.push(kv[KVColumns.KEY]);
+                }
+
                 return Effect.all(
                   [
                     ImmutableDB.insertTxs(batchTxs).pipe(
                       Effect.withSpan(`immutable-db-insert-${startIndex}`),
                     ),
-                    BlocksDB.insert(newHeaderHashBuffer, batchHashes).pipe(
-                      Effect.withSpan(`blocks-db-insert-${startIndex}`),
-                    ),
+                    BlocksDB.insert(
+                      newHeaderHashBuffer,
+                      batchHashesForBlocks,
+                    ).pipe(Effect.withSpan(`blocks-db-insert-${startIndex}`)),
                     MempoolDB.clearTxs(batchHashes).pipe(
                       Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
                     ),
