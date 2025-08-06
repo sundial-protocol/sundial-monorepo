@@ -7,6 +7,7 @@ import {
   retrieveLedgerEntries,
   delLedgerEntries,
   LedgerEntry,
+  LedgerEntryTimeStamped,
 } from "./utilsLedger.js"
 
 import { Database } from "@/services/database.js";
@@ -16,8 +17,7 @@ export const tableName = "confirmed_ledger";
 export const insertMultiple = (entries: LedgerEntry[]) =>
   insertLedgerEntries(tableName, entries);
 
-export const retrieve = (): Effect.Effect<void, Error, Database> =>
-  retrieveLedgerEntries(tableName);
+export const retrieve = () => retrieveLedgerEntries(tableName);
 
 export const clearUTxOs = (refs: Buffer[]) => delLedgerEntries(tableName, refs);
 
