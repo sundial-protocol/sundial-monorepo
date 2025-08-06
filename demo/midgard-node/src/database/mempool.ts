@@ -1,13 +1,13 @@
 import { Database } from "@/services/database.js";
 import {
   clearTable,
-  insertKeyValue,
+  insertTX,
   delMultiple,
   retrieveValues,
   retrieveNumberOfEntries,
   retrieveValue,
-  KVEntries,
-  KVColumns,
+  TXEntries,
+  TXColumns,
   mapSqlError,
 } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
@@ -25,9 +25,9 @@ export const insert = (
     const txCborBytes = fromHex(txString);
     const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
     // Insert the tx itself in `MempoolDB`.
-    yield* insertKeyValue(tableName, {
-      key: txId,
-      value: txCbor,
+    yield* insertTX(tableName, {
+      tx_id: txId,
+      tx: txCbor,
     });
     // Insert produced UTxOs in `MempoolLedgerDB`.
     yield* MempoolLedgerDB.insert(produced);
@@ -46,13 +46,13 @@ export const retrieveTxCborByHash = (txHash: Buffer) =>
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<readonly Omit<KVEntries, KVColumns.TIMESTAMPTZ>[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly Omit<TXEntries, TXColumns.TIMESTAMPTZ>[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<Omit<KVEntries, KVColumns.TIMESTAMPTZ>>`SELECT ${sql(
-      KVColumns.KEY,
-    )}, ${sql(KVColumns.VALUE)} FROM ${sql(tableName)} LIMIT 100000`;
+    return yield* sql<Omit<TXEntries, TXColumns.TIMESTAMPTZ>>`SELECT ${sql(
+      TXColumns.TX_ID,
+    )}, ${sql(TXColumns.TX)} FROM ${sql(tableName)} LIMIT 100000`;
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
