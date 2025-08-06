@@ -57,7 +57,7 @@ const wrapper = (
     return yield* withTrieTransaction(
       ledgerTrie,
       Effect.gen(function* () {
-        const { utxoRoot, txRoot, mempoolTxHashes, sizeOfBlocksTxs } =
+        const { utxoRoot, txRoot, mempoolTxHashes, sizeOfProcessedTxs } =
           yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
         const { policyId, spendScript, spendScriptAddress, mintScript } =
           yield* makeAlwaysSucceedsServiceFn(nodeConfig);
@@ -95,6 +95,7 @@ const wrapper = (
           return {
             type: "SkippedSubmissionOutput",
             mempoolTxsCount,
+            sizeOfProcessedTxs,
           };
         }
 
@@ -219,8 +220,10 @@ const wrapper = (
           type: "SuccessfulSubmissionOutput",
           submittedTxHash: txHash,
           txSize,
-          mempoolTxsCount,
-          sizeOfBlocksTxs,
+          mempoolTxsCount:
+            mempoolTxsCount + workerInput.data.mempoolTxsCountSoFar,
+          sizeOfBlocksTxs:
+            sizeOfProcessedTxs + workerInput.data.sizeOfProcessedTxsSoFar,
         };
       }),
     );

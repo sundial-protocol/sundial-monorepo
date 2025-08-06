@@ -5,6 +5,8 @@ import { CML, coreToUtxo, utxoToCore } from "@lucid-evolution/lucid";
 export interface WorkerInput {
   data: {
     availableConfirmedBlock: "" | SerializedStateQueueUTxO;
+    mempoolTxsCountSoFar: number;
+    sizeOfProcessedTxsSoFar: number;
   };
 }
 
@@ -19,6 +21,7 @@ export type SuccessfulSubmissionOutput = {
 export type SkippedSubmissionOutput = {
   type: "SkippedSubmissionOutput";
   mempoolTxsCount: number;
+  sizeOfProcessedTxs: number;
 };
 
 export type EmptyMempoolOutput = {
