@@ -1,3 +1,4 @@
+import { parentPort, workerData } from "worker_threads";
 import {
   Blockfrost,
   CML,
@@ -23,6 +24,11 @@ export type ProcessedTx = {
   spent: Buffer[];
   produced: LedgerEntry[];
 };
+
+// For some reason importing these directly into the new confirmation worker
+// failed. This is probably a temporary workaround.
+export const reexportedParentPort = parentPort;
+export const reexportedWorkerData = workerData;
 
 export const chalk = new chalk_.Chalk();
 

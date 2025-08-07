@@ -1,5 +1,8 @@
+import {
+  reexportedParentPort as parentPort,
+  reexportedWorkerData as workerData,
+} from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { parentPort, workerData } from "worker_threads";
 import { Effect, Schedule, pipe } from "effect";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
