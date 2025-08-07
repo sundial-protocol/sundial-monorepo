@@ -7,12 +7,11 @@ import {
   retrieveLedgerEntries,
   delLedgerEntries,
   LedgerEntry,
-  LedgerColumns,
 } from "./utilsLedger.js"
 
 export const tableName = "confirmed_ledger";
 
-export const insertMultiple = (entries: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[]) =>
+export const insertMultiple = (entries: LedgerEntry[]) =>
   insertLedgerEntries(tableName, entries);
 
 export const retrieve = () => retrieveLedgerEntries(tableName);

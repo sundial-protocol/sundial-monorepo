@@ -1,6 +1,6 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 
 export enum TXColumns {
   TX_ID = "tx_id",
@@ -11,7 +11,7 @@ export enum TXColumns {
 export type TXEntries = {
   [TXColumns.TX_ID]: Buffer;
   [TXColumns.TX]: Buffer;
-  [TXColumns.TIMESTAMPTZ]: Date;
+  [TXColumns.TIMESTAMPTZ]?: Date;
 };
 
 export const createTXTable = (
@@ -22,7 +22,7 @@ export const createTXTable = (
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(TXColumns.TX_ID)} BYTEA NOT NULL,
       ${sql(TXColumns.TX)} BYTEA NOT NULL,
-      ${sql(TXColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
+      ${sql(TXColumns.TIMESTAMPTZ)} TIMESTAMPTZ,
       PRIMARY KEY (${sql(TXColumns.TX_ID)})
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
@@ -114,7 +114,7 @@ export const clearTable = (
 
 export const insertTX = (
   tableName: string,
-  txPair: Omit<TXEntries, TXColumns.TIMESTAMPTZ>,
+  txPair: TXEntries,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTX`);
@@ -132,7 +132,7 @@ export const insertTX = (
 
 export const insertTXs = (
   tableName: string,
-  pairs: Omit<TXEntries, TXColumns.TIMESTAMPTZ>[],
+  pairs: TXEntries[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTXs`);

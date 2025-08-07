@@ -10,7 +10,7 @@ import {
   Provider,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import {
   LedgerColumns,
   LedgerEntry,
@@ -33,7 +33,7 @@ export type ProcessedTx = {
   txId: Buffer;
   txCbor: Buffer;
   spent: Buffer[];
-  produced: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[];
+  produced: LedgerEntry[];
 };
 
 export const chalk = new chalk_.Chalk();
@@ -173,7 +173,7 @@ export const breakDownTx = (
     }
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
-    const produced: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[] = [];
+    const produced: LedgerEntry[] = [];
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
       produced.push({
@@ -188,8 +188,8 @@ export const breakDownTx = (
     return {
       txId: txHashBytes,
       txCbor: Buffer.from(txCbor),
-      spent,
-      produced,
+      spent: spent,
+      produced: produced,
     };
   });
 

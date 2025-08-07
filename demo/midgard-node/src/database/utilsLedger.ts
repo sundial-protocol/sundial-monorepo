@@ -1,6 +1,6 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import { Address } from "@lucid-evolution/lucid";
 import { mapSqlError } from "./utils.js";
 
@@ -17,7 +17,7 @@ export type LedgerEntry = {
   [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.OUTPUT]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.ADDRESS]: Address; // for provider
-  [LedgerColumns.TIMESTAMPTZ]: Date; // for provider
+  [LedgerColumns.TIMESTAMPTZ]?: Date; // for provider
 };
 
 export type MinimalLedgerEntry = {
@@ -46,7 +46,7 @@ export const createLedgerTable = (
         ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
         ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
         ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
-        ${sql(LedgerColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
+        ${sql(LedgerColumns.TIMESTAMPTZ)} TIMESTAMPTZ,
         PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
       );`;
         yield* sql`CREATE INDEX ${sql(
@@ -58,7 +58,7 @@ export const createLedgerTable = (
 
 export const insertLedgerEntry = (
   tableName: string,
-  entry: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>,
+  entry: LedgerEntry,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert LedgerUTxO`);
@@ -77,7 +77,7 @@ export const insertLedgerEntry = (
 
 export const insertLedgerEntries = (
   tableName: string,
-  entries: Omit<LedgerEntry, LedgerColumns.TIMESTAMPTZ>[],
+  entries: LedgerEntry[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert LedgerUTxOs`);
@@ -118,7 +118,6 @@ export const retrieveLedgerEntriesWithAddress = (
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve LedgerUTxOs`);
     const sql = yield* SqlClient.SqlClient;
-
     return yield* sql<LedgerEntry>`SELECT * FROM ${sql(
       tableName,
     )} WHERE ${sql(LedgerColumns.ADDRESS)} = ${address}`;

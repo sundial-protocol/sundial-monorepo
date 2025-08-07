@@ -46,11 +46,11 @@ export const retrieveTxCborByHash = (txHash: Buffer) =>
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<readonly Omit<TXEntries, TXColumns.TIMESTAMPTZ>[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly TXEntries[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<Omit<TXEntries, TXColumns.TIMESTAMPTZ>>`SELECT ${sql(
+    return yield* sql<TXEntries>`SELECT ${sql(
       TXColumns.TX_ID,
     )}, ${sql(TXColumns.TX)} FROM ${sql(tableName)} LIMIT 100000`;
   }).pipe(

@@ -13,12 +13,12 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insert = (tx: Omit<TXEntries, TXColumns.TIMESTAMPTZ>
+export const insert = (tx: TXEntries
 ): Effect.Effect<void, Error, Database> =>
   insertTX(tableName, tx);
 
 export const insertTxs = (
-  txs: Omit<TXEntries, TXColumns.TIMESTAMPTZ>[],
+  txs: TXEntries[],
 ): Effect.Effect<void, Error, Database> => insertTXs(tableName, txs);
 
 export const retrieve = () => retrieveTXEntries(tableName);

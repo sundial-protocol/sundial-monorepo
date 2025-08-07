@@ -18,11 +18,14 @@ export enum ColumnsIndices {
 }
 
 type Entry = {
-  [Columns.HEIGHT]: number;
   [Columns.HEADER_HASH]: Buffer;
   [Columns.TX_ID]: Buffer;
-  [Columns.TIMESTAMPTZ]: Date;
 };
+
+type FullEntry = Entry & {
+  [Columns.HEIGHT]: number;
+  [Columns.TIMESTAMPTZ]: Date;
+}
 
 export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -54,7 +57,7 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: Omit<Entry, Columns.TIMESTAMPTZ | Columns.HEIGHT>[] = txHashes.map((txHash: Buffer) => ({
+    const rowsToInsert: Entry[] = txHashes.map((txHash: Buffer) => ({
       [Columns.HEADER_HASH]: headerHash,
       [Columns.TX_ID]: txHash,
     }));
@@ -155,29 +158,11 @@ export const clearBlock = (
     mapSqlError,
   );
 
-export const retrieveWithoutTimeStamps = (): Effect.Effect<readonly Entry[], Error, Database> =>
-  Effect.gen(function* () {
-    yield* Effect.logInfo(`${tableName} db: attempt to retrieve headerHashes and txHashes`);
-    const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<Entry>`SELECT (${sql(Columns.HEADER_HASH)}, ${sql(Columns.TX_ID)}) FROM ${sql(tableName)}`;
-    yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
-    return result;
-  }).pipe(
-    Effect.withLogSpan(`retrieve ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
-      ),
-    ),
-    mapSqlError,
-  );
-
-
-export const retrieve = (): Effect.Effect<readonly Omit<Entry, Columns.TIMESTAMPTZ>[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly FullEntry[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<Omit<Entry, Columns.TIMESTAMPTZ>>`SELECT * FROM ${sql(tableName)}`;
+    const result = yield* sql<FullEntry>`SELECT * FROM ${sql(tableName)}`;
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
   }).pipe(
