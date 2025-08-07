@@ -3,6 +3,7 @@ import { SqlClient, SqlError } from "@effect/sql";
 import { Effect, Option } from "effect";
 import { Address } from "@lucid-evolution/lucid";
 import { mapSqlError } from "./utils.js";
+import { Columns } from "./blocks.js";
 
 export enum LedgerColumns {
   TX_ID = "tx_id",
@@ -12,13 +13,18 @@ export enum LedgerColumns {
   TIMESTAMPTZ = "time_stamp_tz",
 }
 
-export type LedgerEntry = {
+export type LedgerEntryNoTimeStamp = {
   [LedgerColumns.TX_ID]: Buffer; // for linking the tables
   [LedgerColumns.OUTREF]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.OUTPUT]: Buffer; // for root calc and updating the ledger
   [LedgerColumns.ADDRESS]: Address; // for provider
-  [LedgerColumns.TIMESTAMPTZ]?: Date; // for provider
 };
+
+export type LedgerEntryWithTimeStamp = LedgerEntryNoTimeStamp & {
+  [LedgerColumns.TIMESTAMPTZ]: Date; // for provider
+};
+
+export type LedgerEntry = LedgerEntryNoTimeStamp | LedgerEntryWithTimeStamp
 
 export type MinimalLedgerEntry = {
   [LedgerColumns.OUTREF]: Buffer;
@@ -46,7 +52,7 @@ export const createLedgerTable = (
         ${sql(LedgerColumns.OUTREF)} BYTEA NOT NULL,
         ${sql(LedgerColumns.OUTPUT)} BYTEA NOT NULL,
         ${sql(LedgerColumns.ADDRESS)} TEXT NOT NULL,
-        ${sql(LedgerColumns.TIMESTAMPTZ)} TIMESTAMPTZ,
+        ${sql(LedgerColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
         PRIMARY KEY (${sql(LedgerColumns.OUTREF)})
       );`;
         yield* sql`CREATE INDEX ${sql(
@@ -96,11 +102,11 @@ export const insertLedgerEntries = (
 
 export const retrieveLedgerEntries = (
   tableName: string,
-): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
+): Effect.Effect<readonly LedgerEntryWithTimeStamp[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieveLedgerEntries`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<LedgerEntry>`SELECT * FROM ${sql(tableName)}`;
+    return yield* sql<LedgerEntryWithTimeStamp>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
     Effect.withLogSpan(`retrieveLedgerEntries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -114,11 +120,11 @@ export const retrieveLedgerEntries = (
 export const retrieveLedgerEntriesWithAddress = (
   tableName: string,
   address: Address,
-): Effect.Effect<readonly LedgerEntry[], Error, Database> =>
+): Effect.Effect<readonly LedgerEntryWithTimeStamp[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve LedgerUTxOs`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<LedgerEntry>`SELECT * FROM ${sql(
+    return yield* sql<LedgerEntryWithTimeStamp>`SELECT * FROM ${sql(
       tableName,
     )} WHERE ${sql(LedgerColumns.ADDRESS)} = ${address}`;
   }).pipe(

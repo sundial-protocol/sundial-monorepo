@@ -10,7 +10,7 @@ import {
   Provider,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 import {
   LedgerColumns,
   LedgerEntry,

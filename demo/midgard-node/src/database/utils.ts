@@ -8,11 +8,16 @@ export enum TXColumns {
   TIMESTAMPTZ = "time_stamp_tz",
 }
 
-export type TXEntries = {
+export type TXEntriesNoTimeStamp = {
   [TXColumns.TX_ID]: Buffer;
   [TXColumns.TX]: Buffer;
-  [TXColumns.TIMESTAMPTZ]?: Date;
 };
+
+export type TXEntriesWithTimeStamp = TXEntriesNoTimeStamp & {
+  [TXColumns.TIMESTAMPTZ]: Date;
+};
+
+export type TXEntries = TXEntriesNoTimeStamp | TXEntriesWithTimeStamp
 
 export const createTXTable = (
   tableName: string,
@@ -22,7 +27,7 @@ export const createTXTable = (
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(TXColumns.TX_ID)} BYTEA NOT NULL,
       ${sql(TXColumns.TX)} BYTEA NOT NULL,
-      ${sql(TXColumns.TIMESTAMPTZ)} TIMESTAMPTZ,
+      ${sql(TXColumns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
       PRIMARY KEY (${sql(TXColumns.TX_ID)})
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
@@ -148,11 +153,11 @@ export const insertTXs = (
 
 export const retrieveTXEntries = (
   tableName: string,
-): Effect.Effect<readonly TXEntries[], Error, Database> =>
+): Effect.Effect<readonly TXEntriesWithTimeStamp[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<TXEntries>`SELECT * FROM ${sql(tableName)}`;
+    return yield* sql<TXEntriesWithTimeStamp>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
