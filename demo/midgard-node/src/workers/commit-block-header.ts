@@ -270,7 +270,9 @@ Effect.runPromise(
   ),
 ).then((output) => {
   Effect.runSync(
-    Effect.logInfo(`👷 Work completed (${JSON.stringify(output)}).`),
+    Effect.logInfo(
+      `👷 Block commitment work completed (${JSON.stringify(output)}).`,
+    ),
   );
   parentPort?.postMessage(output);
 });

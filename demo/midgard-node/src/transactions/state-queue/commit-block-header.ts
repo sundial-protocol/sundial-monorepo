@@ -36,7 +36,7 @@ export const buildAndSubmitCommitmentBlock = () =>
       return yield* Effect.logInfo("🔹 Reset in progress...");
     }
     const worker = Effect.async<WorkerOutput, Error, never>((resume) => {
-      Effect.runSync(Effect.logInfo(`👷 Starting worker...`));
+      Effect.runSync(Effect.logInfo(`👷 Starting block commitment worker...`));
       const worker = new Worker(
         new URL("./commit-block-header.js", import.meta.url),
         {
@@ -51,19 +51,27 @@ export const buildAndSubmitCommitmentBlock = () =>
       );
       worker.on("message", (output: WorkerOutput) => {
         if (output.type === "FailureOutput") {
-          resume(Effect.fail(new Error(`Error in worker: ${output.error}`)));
+          resume(
+            Effect.fail(
+              new Error(`Error in commitment worker: ${output.error}`),
+            ),
+          );
         } else {
           resume(Effect.succeed(output));
         }
         worker.terminate();
       });
       worker.on("error", (e: Error) => {
-        resume(Effect.fail(new Error(`Error in worker: ${e}`)));
+        resume(Effect.fail(new Error(`Error in commitment worker: ${e}`)));
         worker.terminate();
       });
       worker.on("exit", (code: number) => {
         if (code !== 0) {
-          resume(Effect.fail(new Error(`Worker exited with code: ${code}`)));
+          resume(
+            Effect.fail(
+              new Error(`Commitment worker exited with code: ${code}`),
+            ),
+          );
         }
       });
       return Effect.sync(() => {
