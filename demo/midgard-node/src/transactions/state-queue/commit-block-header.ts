@@ -77,6 +77,7 @@ export const buildAndSubmitCommitmentBlock = () =>
       case "SuccessfulSubmissionOutput": {
         global.BLOCKS_IN_QUEUE += 1;
         global.AVAILABLE_CONFIRMED_BLOCK = "";
+        global.UNCONFIRMED_SUBMITTED_BLOCK = workerOutput.submittedTxHash;
         yield* commitBlockTxSizeGauge(Effect.succeed(workerOutput.txSize));
         yield* commitBlockNumTxGauge(
           Effect.succeed(BigInt(workerOutput.mempoolTxsCount)),

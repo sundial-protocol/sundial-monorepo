@@ -1,15 +1,19 @@
-import {
-  WorkerOutput as BlockCommitmentWorkerOutput,
-  SerializedStateQueueUTxO,
-} from "./commit-block-header.js";
+import { TxHash } from "@lucid-evolution/lucid";
+import { SerializedStateQueueUTxO } from "./commit-block-header.js";
 
 export type WorkerInput = {
-  data: BlockCommitmentWorkerOutput;
+  data: {
+    unconfirmedSubmittedBlock: "" | TxHash;
+  };
 };
 
 export type SuccessfulConfirmationOutput = {
   type: "SuccessfulConfirmationOutput";
   blocksUTxO: SerializedStateQueueUTxO;
+};
+
+export type NoTxForConfirmationOutput = {
+  type: "NoTxForConfirmationOutput";
 };
 
 export type FailedConfirmationOutput = {
@@ -19,4 +23,5 @@ export type FailedConfirmationOutput = {
 
 export type WorkerOutput =
   | SuccessfulConfirmationOutput
+  | NoTxForConfirmationOutput
   | FailedConfirmationOutput;

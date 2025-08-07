@@ -2,13 +2,13 @@ import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { CML, coreToUtxo, utxoToCore } from "@lucid-evolution/lucid";
 
-export interface WorkerInput {
+export type WorkerInput = {
   data: {
     availableConfirmedBlock: "" | SerializedStateQueueUTxO;
     mempoolTxsCountSoFar: number;
     sizeOfProcessedTxsSoFar: number;
   };
-}
+};
 
 export type SuccessfulSubmissionOutput = {
   type: "SuccessfulSubmissionOutput";

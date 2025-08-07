@@ -23,7 +23,7 @@ import {
   makeMpts,
   processMpts,
   withTrieTransaction,
-} from "./utils/mpt.js";
+} from "@/workers/utils/mpt.js";
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 import { batchProgram } from "@/utils.js";
@@ -228,7 +228,7 @@ const wrapper = (
                 );
               },
             ),
-            ProcessedMempoolDB.clear(),
+            ProcessedMempoolDB.clear(), // uses `TRUNCATE` so no need for batching.
             deleteMempoolMpt,
           ],
           { concurrency: "unbounded" },

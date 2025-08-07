@@ -1,3 +1,4 @@
+import { TxHash } from "@lucid-evolution/lucid";
 import { SerializedStateQueueUTxO } from "./workers/utils/commit-block-header.ts";
 
 export {};
@@ -25,4 +26,6 @@ declare global {
   // Accumulator for the total size of L2 transactions submitted in a state
   // queue block.
   var PROCESSED_UNSUBMITTED_TXS_SIZE: number;
+
+  var UNCONFIRMED_SUBMITTED_BLOCK: "" | TxHash;
 }

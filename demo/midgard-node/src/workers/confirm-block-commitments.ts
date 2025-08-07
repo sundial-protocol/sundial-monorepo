@@ -1,3 +1,4 @@
+import * as SDK from "@al-ft/midgard-sdk";
 import { parentPort, workerData } from "worker_threads";
 import { Effect, Schedule, pipe } from "effect";
 import { NodeConfig, User } from "@/config.js";
@@ -6,22 +7,61 @@ import {
   WorkerInput,
   WorkerOutput,
 } from "@/workers/utils/confirm-block-commitments.js";
+import { serializeStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
+import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 
 const inputData = workerData as WorkerInput;
 
 const wrapper = (
-  inputData: WorkerInput,
+  workerInput: WorkerInput,
 ): Effect.Effect<WorkerOutput, Error, NodeConfig | User | Database> =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
-    const retryPolicy = Schedule.exponential("100 millis").pipe(
-      Schedule.compose(Schedule.recurs(4)),
-    );
-    yield* Effect.logInfo("🔹 Fetching latest commited block...");
-    return {
-      type: "FailedConfirmationOutput",
-    };
+    if (workerInput.data.unconfirmedSubmittedBlock === "") {
+      return {
+        type: "NoTxForConfirmationOutput",
+      };
+    } else {
+      const targetTxHash = workerInput.data.unconfirmedSubmittedBlock;
+      yield* Effect.logInfo(`🟤 Confirming tx: ${targetTxHash}`);
+      yield* Effect.retry(
+        Effect.tryPromise({
+          try: () => lucid.awaitTx(targetTxHash),
+          catch: (e) => new Error(`${e}`),
+        }),
+        Schedule.recurs(4),
+      );
+      yield* Effect.logInfo("🟤 Tx confirmed. Fetching the block...");
+      const { policyId, spendScriptAddress } =
+        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+      const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+        stateQueueAddress: spendScriptAddress,
+        stateQueuePolicyId: policyId,
+      };
+      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
+        lucid,
+        fetchConfig,
+      );
+      if (latestBlock.utxo.txHash == targetTxHash) {
+        yield* Effect.logInfo("🟤 Serializing state queue UTxO...");
+        const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
+        yield* Effect.logInfo("🟤 Done.");
+        return {
+          type: "SuccessfulConfirmationOutput",
+          blocksUTxO: serializedUTxO,
+        };
+      } else {
+        yield* Effect.logInfo(
+          "🟤 ⚠️  Latest block's txHash doesn't match the confirmed tx.",
+        );
+        return {
+          type: "FailedConfirmationOutput",
+          error:
+            "Tx confirmed, but fetching the latest block did not yield a UTxO with the same txHash",
+        };
+      }
+    }
   });
 
 const program = pipe(
@@ -45,7 +85,9 @@ Effect.runPromise(
   ),
 ).then((output) => {
   Effect.runSync(
-    Effect.logInfo(`👷 Work completed (${JSON.stringify(output)}).`),
+    Effect.logInfo(
+      `👷 Confirmation work completed (${JSON.stringify(output)}).`,
+    ),
   );
   parentPort?.postMessage(output);
 });
