@@ -17,12 +17,12 @@ export enum ColumnsIndices {
   TX_ID = "idx_blocks_tx_id",
 }
 
-type Entry = {
+type EntryNoHeightAndTS = {
   [Columns.HEADER_HASH]: Buffer;
   [Columns.TX_ID]: Buffer;
 };
 
-type FullEntry = Entry & {
+type Entry = EntryNoHeightAndTS & {
   [Columns.HEIGHT]: number;
   [Columns.TIMESTAMPTZ]: Date;
 }
@@ -57,7 +57,7 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: Entry[] = txHashes.map((txHash: Buffer) => ({
+    const rowsToInsert: EntryNoHeightAndTS[] = txHashes.map((txHash: Buffer) => ({
       [Columns.HEADER_HASH]: headerHash,
       [Columns.TX_ID]: txHash,
     }));
@@ -158,11 +158,11 @@ export const clearBlock = (
     mapSqlError,
   );
 
-export const retrieve = (): Effect.Effect<readonly FullEntry[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<FullEntry>`SELECT * FROM ${sql(tableName)}`;
+    const result = yield* sql<Entry>`SELECT * FROM ${sql(tableName)}`;
     yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
     return result;
   }).pipe(

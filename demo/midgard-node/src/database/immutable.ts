@@ -1,27 +1,26 @@
 import { Effect } from "effect";
 import {
-  TXColumns,
-  TXEntries,
+  TxEntries,
   clearTable,
-  insertTX,
-  insertTXs,
+  insertTx,
+  insertTxs,
   retrieveValue,
   retrieveValues,
-  retrieveTXEntries,
+  retrieveTxEntries,
 } from "./utils.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insert = (tx: TXEntries
+export const insertTransaction = (tx: TxEntries
 ): Effect.Effect<void, Error, Database> =>
-  insertTX(tableName, tx);
+  insertTx(tableName, tx);
 
-export const insertTxs = (
-  txs: TXEntries[],
-): Effect.Effect<void, Error, Database> => insertTXs(tableName, txs);
+export const insertTransactions = (
+  txs: TxEntries[],
+): Effect.Effect<void, Error, Database> => insertTxs(tableName, txs);
 
-export const retrieve = () => retrieveTXEntries(tableName);
+export const retrieve = () => retrieveTxEntries(tableName);
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   retrieveValue(tableName, txHash);
