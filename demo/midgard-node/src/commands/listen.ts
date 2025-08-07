@@ -17,8 +17,8 @@ import {
   LatestLedgerDB,
   MempoolDB,
   MempoolLedgerDB,
-} from "@/database/index.js";
-import { bufferToHex, isHexString } from "@/utils.js";
+} from "../database/index.js";
+import { bufferToHex, isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";

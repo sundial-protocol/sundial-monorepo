@@ -5,7 +5,6 @@ import {
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect, Schedule, pipe } from "effect";
 import { NodeConfig, User } from "@/config.js";
-import { Database } from "@/services/database.js";
 import {
   WorkerInput,
   WorkerOutput,
@@ -17,7 +16,7 @@ const inputData = workerData as WorkerInput;
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, Error, NodeConfig | User | Database> =>
+): Effect.Effect<WorkerOutput, Error, NodeConfig | User> =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
@@ -69,7 +68,6 @@ const wrapper = (
 
 const program = pipe(
   wrapper(inputData),
-  Effect.provide(Database.layer),
   Effect.provide(User.layer),
   Effect.provide(NodeConfig.layer),
 );
