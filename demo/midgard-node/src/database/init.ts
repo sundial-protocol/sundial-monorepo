@@ -5,8 +5,9 @@ import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
 import * as MempoolDB from "./mempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { createTxTable } from "./utils/tx.js";
-import { createLedgerTable } from "./utils/ledger.js"
+import * as TxUtils from "@/database/utils/tx.js";
+import * as LedgerUtils from "@/database/utils/ledger.js";
+
 
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
@@ -19,11 +20,11 @@ export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
     yield* BlocksDB.init;
-    yield* createTxTable(MempoolDB.tableName);
-    yield* createLedgerTable(MempoolLedgerDB.tableName);
-    yield* createTxTable(ImmutableDB.tableName);
-    yield* createLedgerTable(ConfirmedLedgerDB.tableName);
-    yield* createLedgerTable(LatestLedgerDB.tableName);
+    yield* TxUtils.createTable(MempoolDB.tableName);
+    yield* LedgerUtils.createTable(MempoolLedgerDB.tableName);
+    yield* TxUtils.createTable(ImmutableDB.tableName);
+    yield* LedgerUtils.createTable(ConfirmedLedgerDB.tableName);
+    yield* LedgerUtils.createTable(LatestLedgerDB.tableName);
 
     Effect.logInfo("Connected to the PostgreSQL database");
   });
