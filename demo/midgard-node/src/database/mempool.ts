@@ -9,7 +9,7 @@ import {
   TxEntry,
   TxColumns,
   mapSqlError,
-} from "./utils.js";
+} from "./utils/tx.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";

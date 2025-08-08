@@ -4,5 +4,5 @@ export * as ImmutableDB from "./immutable.js";
 export * as LatestLedgerDB from "./latestLedger.js";
 export * as MempoolDB from "./mempool.js";
 export * as MempoolLedgerDB from "./mempoolLedger.js";
-export * as UtilsDB from "./utils.js";
+export * as UtilsDB from "./utils/tx.js";
 export * as InitDB from "./init.js";

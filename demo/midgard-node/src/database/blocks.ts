@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { clearTable, mapSqlError } from "./utils.js";
+import { clearTable, mapSqlError } from "./utils/tx.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 
