@@ -6,7 +6,7 @@ import {
   retrieveValues,
   retrieveNumberOfEntries,
   retrieveValue,
-  TxEntries,
+  TxEntry,
   TxColumns,
   mapSqlError,
 } from "./utils.js";
@@ -46,11 +46,11 @@ export const retrieveTxCborByHash = (txHash: Buffer) =>
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<readonly TxEntries[], Error, Database> =>
+export const retrieve = (): Effect.Effect<readonly TxEntry[], Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<TxEntries>`SELECT ${sql(
+    return yield* sql<TxEntry>`SELECT ${sql(
       TxColumns.TX_ID,
     )}, ${sql(TxColumns.TX)} FROM ${sql(tableName)} LIMIT 100000`;
   }).pipe(

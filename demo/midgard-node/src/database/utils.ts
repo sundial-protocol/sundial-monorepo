@@ -17,7 +17,7 @@ export type TxEntryWithTimeStamp = TxEntryNoTimeStamp & {
   [TxColumns.TIMESTAMPTZ]: Date;
 };
 
-export type TxEntries = TxEntryNoTimeStamp | TxEntryWithTimeStamp
+export type TxEntry = TxEntryNoTimeStamp | TxEntryWithTimeStamp
 
 export const createTxTable = (
   tableName: string,
@@ -119,7 +119,7 @@ export const clearTable = (
 
 export const insertTx = (
   tableName: string,
-  txPair: TxEntries,
+  txPair: TxEntry,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTX`);
@@ -137,7 +137,7 @@ export const insertTx = (
 
 export const insertTxs = (
   tableName: string,
-  pairs: TxEntries[],
+  pairs: TxEntry[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTXs`);
