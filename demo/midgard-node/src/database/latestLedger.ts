@@ -1,13 +1,12 @@
 import {
   clearTable,
-} from "./utils.js";
+} from "@/utils/tx.js";
 import {
   insertLedgerEntries,
   retrieveLedgerEntries,
   delLedgerEntries,
   LedgerEntry,
-  LedgerColumns,
-} from "./utilsLedger.js"
+} from "@/utils/ledger.js"
 
 export const tableName = "latest_ledger";
 

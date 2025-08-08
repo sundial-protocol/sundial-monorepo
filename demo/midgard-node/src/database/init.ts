@@ -5,8 +5,8 @@ import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
 import * as MempoolDB from "./mempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { createTXTable } from "./utils.js";
-import { createLedgerTable } from "./utilsLedger.js"
+import { createTxTable } from "@/utils/tx.js";
+import { createLedgerTable } from "@/utils/ledger.js"
 
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
@@ -19,9 +19,9 @@ export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
     yield* BlocksDB.init;
-    yield* createTXTable(MempoolDB.tableName);
+    yield* createTxTable(MempoolDB.tableName);
     yield* createLedgerTable(MempoolLedgerDB.tableName);
-    yield* createTXTable(ImmutableDB.tableName);
+    yield* createTxTable(ImmutableDB.tableName);
     yield* createLedgerTable(ConfirmedLedgerDB.tableName);
     yield* createLedgerTable(LatestLedgerDB.tableName);
 

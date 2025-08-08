@@ -15,7 +15,7 @@ import {
   LedgerColumns,
   LedgerEntry,
   MinimalLedgerEntry,
-} from "./database/utilsLedger.js";
+} from "./ledger.js";
 
 export interface WorkerInput {
   data: {

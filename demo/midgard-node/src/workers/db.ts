@@ -9,11 +9,11 @@ import { NodeConfig } from "@/config.js";
 import {
   KVColumns,
   KVPair,
-} from "@/database/utils.js";
+} from "@/database/utils/utils.js";
 import {
   LedgerColumns,
   MinimalLedgerEntry,
-} from "@/database/utilsLedger.js";
+} from "@/database/utils/utilsLedger.js";
 
 import { Database } from "@/services/database.js";
 import { findSpentAndProducedUTxOs } from "@/utils.js";

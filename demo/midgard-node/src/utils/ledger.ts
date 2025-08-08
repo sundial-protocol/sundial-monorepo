@@ -1,9 +1,8 @@
 import { Database } from "@/services/database.js";
-import { SqlClient, SqlError } from "@effect/sql";
-import { Effect, Option } from "effect";
+import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
-import { mapSqlError } from "./utils.js";
-import { Columns } from "./blocks.js";
+import { mapSqlError } from "./tx.js";
 
 export enum LedgerColumns {
   TX_ID = "tx_id",

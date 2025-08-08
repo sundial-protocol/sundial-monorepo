@@ -18,7 +18,7 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { isHexString } from "../utils.js";
+import { isHexString } from "../utils/common.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";

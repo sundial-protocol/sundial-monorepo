@@ -1,6 +1,6 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 
 export enum TxColumns {
   TX_ID = "tx_id",
