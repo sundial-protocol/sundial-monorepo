@@ -1,13 +1,13 @@
 import { Effect } from "effect";
 import {
   clearTable,
-} from "@/utils/tx.js";
+} from "./utils/tx.js";
 import {
   insertLedgerEntries,
   retrieveLedgerEntries,
   delLedgerEntries,
   LedgerEntry,
-} from "@/utils/ledger.js"
+} from "./utils/ledger.js"
 
 export const tableName = "confirmed_ledger";
 

@@ -1,14 +1,14 @@
 import { Effect } from "effect";
 import {
   clearTable,
-} from "@/utils/tx.js";
+} from "./utils/tx.js";
 import {
   insertLedgerEntries,
   retrieveLedgerEntries,
   retrieveLedgerEntriesWithAddress,
   delLedgerEntries,
   LedgerEntry,
-} from "@/utils/ledger.js"
+} from "./utils/ledger.js"
 
 import { Database } from "@/services/database.js";
 

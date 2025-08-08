@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { ENV_VARS_GUIDE, chalk } from "./utils/common.js";
+import { ENV_VARS_GUIDE, chalk } from "./utils.js";
 import { runNode } from "./commands/index.js";
 import packageJson from "../package.json" with { type: "json" };
 import { Effect, pipe } from "effect";

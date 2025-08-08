@@ -7,7 +7,7 @@ import {
   retrieveValue,
   retrieveValues,
   retrieveTxEntries,
-} from "@/utils/tx.js";
+} from "./utils/tx.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";

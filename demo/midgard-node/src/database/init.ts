@@ -5,8 +5,8 @@ import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
 import * as MempoolDB from "./mempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { createTxTable } from "@/utils/tx.js";
-import { createLedgerTable } from "@/utils/ledger.js"
+import { createTxTable } from "./utils/tx.js";
+import { createLedgerTable } from "./utils/ledger.js"
 
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
