@@ -7,7 +7,7 @@ import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
-import { breakDownTx } from "../utils.js";
+import { breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
