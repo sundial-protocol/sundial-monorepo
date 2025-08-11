@@ -75,8 +75,14 @@ export const makeMpts = () =>
     const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise({
       try: () => ledgerTrie.get(rootKey),
       catch: (e) => new Error(`${e}`),
-    }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
-    // Ensuring persisted root is stored in trie's private property
+    }).pipe(
+      Effect.orElse(() =>
+        Effect.gen(function* () {
+          return ledgerTrie.EMPTY_TRIE_ROOT;
+        }),
+      ),
+    );
+    // Ensuring persisted root is stored in tries' private properties
     yield* Effect.sync(() => mempoolTrie.root(mempoolRootBeforeMempoolTxs));
     yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
     return {
