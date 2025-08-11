@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import * as Common from "@/database/utils/common.js"
+import { mapSqlError, clearTable } from "@/database/utils/common.js"
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 
@@ -67,7 +67,7 @@ export const insert = (
       Effect.logError(`${tableName} db: inserting error: ${e}`),
     ),
     Effect.withLogSpan(`insert ${tableName}`),
-    Common.mapSqlError,
+    mapSqlError,
     Effect.asVoid,
   );
 
@@ -95,7 +95,7 @@ export const retrieveTxHashesByHeaderHash = (
         `${tableName} db: retrieving txHashes error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveHeaderHashByTxHash = (
@@ -128,7 +128,7 @@ export const retrieveHeaderHashByTxHash = (
         `${tableName} db: retrieving headerHash error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 /** Associated inputs are also deleted.
@@ -155,7 +155,7 @@ export const clearBlock = (
         `${tableName} db: clearing block error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
@@ -172,8 +172,8 @@ export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
         `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const clear = (): Effect.Effect<void, Error, Database> =>
-  Common.clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));
+  clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import * as TxUtils from "@/database/utils/tx.js";
-import * as Common from "@/database/utils/common.js"
+import { clearTable } from "@/database/utils/common.js"
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
@@ -22,4 +22,4 @@ export const retrieveTxCborsByHashes = (
   txHashes: Buffer[] | readonly Buffer[],
 ) => TxUtils.retrieveValues(tableName, txHashes);
 
-export const clear = () => Common.clearTable(tableName);
+export const clear = () => clearTable(tableName);

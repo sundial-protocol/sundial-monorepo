@@ -2,7 +2,7 @@ import { Database } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
-import * as Common from "@/database/utils/common.js"
+import { mapSqlError } from "@/database/utils/common.js"
 
 export enum Columns {
   TX_ID = "tx_id",
@@ -59,7 +59,7 @@ export const createTable = (
         )} ON ${sql(tableName)} (${sql(Columns.ADDRESS)});`;
       }),
     );
-  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), Common.mapSqlError);
+  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 export const insertEntry = (
   tableName: string,
@@ -77,7 +77,7 @@ export const insertEntry = (
         `${tableName} db: insertEntry: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const insertEntries = (
@@ -96,7 +96,7 @@ export const insertEntries = (
         `${tableName} db: insertEntries: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveEntries = (
@@ -113,7 +113,7 @@ export const retrieveEntries = (
         `${tableName} db: retrieveEntries: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveEntriesWithAddress = (
@@ -133,7 +133,7 @@ export const retrieveEntriesWithAddress = (
         `${tableName} db: retrieveEntriesWithAddress: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const delEntries = (

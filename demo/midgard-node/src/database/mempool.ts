@@ -1,7 +1,7 @@
 import { Database } from "@/services/database.js";
 import * as TxUtils from "@/database/utils/tx.js";
 import * as LedgerUtils from "@/database/utils/ledger.js";
-import * as Common from "@/database/utils/common.js"
+import { clearTable, mapSqlError } from "@/database/utils/common.js"
 
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
@@ -49,9 +49,9 @@ export const retrieve = (): Effect.Effect<readonly TxUtils.Entry[], Error, Datab
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
+      Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`)
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveTxCount = () => TxUtils.retrieveNumberOfEntries(tableName);
@@ -60,4 +60,4 @@ export const clearTxs = (
   txHashes: Buffer[],
 ): Effect.Effect<void, Error, Database> => TxUtils.delMultiple(tableName, txHashes);
 
-export const clear = () => Common.clearTable(tableName);
+export const clear = clearTable(tableName);
