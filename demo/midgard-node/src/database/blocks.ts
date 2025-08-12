@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { mapSqlError, clearTable } from "@/database/utils/common.js"
+import { mapSqlError, clearTable } from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 
@@ -25,7 +25,7 @@ type EntryNoHeightAndTS = {
 type Entry = EntryNoHeightAndTS & {
   [Columns.HEIGHT]: number;
   [Columns.TIMESTAMPTZ]: Date;
-}
+};
 
 export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -57,10 +57,12 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: EntryNoHeightAndTS[] = txHashes.map((txHash: Buffer) => ({
-      [Columns.HEADER_HASH]: headerHash,
-      [Columns.TX_ID]: txHash,
-    }));
+    const rowsToInsert: EntryNoHeightAndTS[] = txHashes.map(
+      (txHash: Buffer) => ({
+        [Columns.HEADER_HASH]: headerHash,
+        [Columns.TX_ID]: txHash,
+      }),
+    );
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(rowsToInsert)}`;
   }).pipe(
     Effect.tapErrorTag("SqlError", (e) =>

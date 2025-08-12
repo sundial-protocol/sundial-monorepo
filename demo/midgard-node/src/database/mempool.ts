@@ -1,6 +1,6 @@
 import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
-import { clearTable, mapSqlError } from "@/database/utils/common.js"
+import { clearTable, mapSqlError } from "@/database/utils/common.js";
 
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
@@ -38,7 +38,11 @@ export const retrieveTxCborByHash = (txHash: Buffer) =>
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
   Tx.retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<readonly Tx.Entry[], Error, Database> =>
+export const retrieve = (): Effect.Effect<
+  readonly Tx.Entry[],
+  Error,
+  Database
+> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
@@ -48,7 +52,7 @@ export const retrieve = (): Effect.Effect<readonly Tx.Entry[], Error, Database> 
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`)
+      Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );

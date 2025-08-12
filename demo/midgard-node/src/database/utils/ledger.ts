@@ -2,7 +2,7 @@ import { Database } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
-import { mapSqlError } from "@/database/utils/common.js"
+import { mapSqlError } from "@/database/utils/common.js";
 
 export enum Columns {
   TX_ID = "tx_id",
@@ -23,7 +23,7 @@ export type EntryWithTimeStamp = EntryNoTimeStamp & {
   [Columns.TIMESTAMPTZ]: Date; // for provider
 };
 
-export type Entry = EntryNoTimeStamp | EntryWithTimeStamp
+export type Entry = EntryNoTimeStamp | EntryWithTimeStamp;
 
 export type MinimalEntry = {
   [Columns.OUTREF]: Buffer;
@@ -73,9 +73,7 @@ export const insertEntry = (
   }).pipe(
     Effect.withLogSpan(`insertEntry ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: insertEntry: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: insertEntry: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
@@ -92,9 +90,7 @@ export const insertEntries = (
   }).pipe(
     Effect.withLogSpan(`insertEntries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: insertEntries: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: insertEntries: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
@@ -109,9 +105,7 @@ export const retrieveEntries = (
   }).pipe(
     Effect.withLogSpan(`retrieveEntries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieveEntries: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: retrieveEntries: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );

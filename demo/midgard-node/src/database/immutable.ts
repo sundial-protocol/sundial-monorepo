@@ -1,15 +1,15 @@
 import { Effect } from "effect";
 import * as Tx from "@/database/utils/tx.js";
-import { clearTable } from "@/database/utils/common.js"
+import { clearTable } from "@/database/utils/common.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insertTransaction = (tx: Tx.Entry
-): Effect.Effect<void, Error, Database> =>
-  Tx.insertEntry(tableName, tx);
+export const insertTx = (
+  tx: Tx.Entry,
+): Effect.Effect<void, Error, Database> => Tx.insertEntry(tableName, tx);
 
-export const insertTransactions = (
+export const insertTxs = (
   txs: Tx.Entry[],
 ): Effect.Effect<void, Error, Database> => Tx.insertEntries(tableName, txs);
 
