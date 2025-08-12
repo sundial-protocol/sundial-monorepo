@@ -30,15 +30,6 @@ export type MinimalEntry = {
   [Columns.OUTPUT]: Buffer;
 };
 
-export enum InputsColumns {
-  OUTREF = "spent_outref",
-  SPENDING_TX = "spending_tx_hash",
-}
-
-export type SpentInput = {
-  [inputsCols in InputsColumns]: Buffer;
-};
-
 export const createTable = (
   tableName: string,
 ): Effect.Effect<void, Error, Database> =>
