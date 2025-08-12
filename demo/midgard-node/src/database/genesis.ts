@@ -2,15 +2,8 @@ import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { LedgerColumns } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import {
-  UTxO,
-  utxoToTransactionInput,
-  utxoToTransactionOutput,
-} from "@lucid-evolution/lucid";
+import { UTxO, utxoToCore } from "@lucid-evolution/lucid";
 import { NodeConfig } from "@/config.js";
-import { makeMpts } from "@/workers/utils/mpt.js";
-
-
 
 /**
  * Inserts genesis UTXOs from the imported TypeScript module into the MPT database
@@ -29,13 +22,11 @@ export const insertGenesisUtxos: Effect.Effect<
   }
 
   const ledgerEntries = config.GENESIS_UTXOS.map((utxo: UTxO) => {
-    const input = utxoToTransactionInput(utxo);
-    const output = utxoToTransactionOutput(utxo);
-
+    const core = utxoToCore(utxo);
     return {
       [LedgerColumns.TX_ID]: Buffer.from(utxo.txHash, "hex"),
-      [LedgerColumns.OUTREF]: Buffer.from(input.to_cbor_bytes()),
-      [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
+      [LedgerColumns.OUTREF]: Buffer.from(core.input().to_cbor_bytes()),
+      [LedgerColumns.OUTPUT]: Buffer.from(core.output().to_cbor_bytes()),
       [LedgerColumns.ADDRESS]: utxo.address,
     };
   });

@@ -3,7 +3,7 @@ import { BatchDBOp } from "@ethereumjs/util";
 import { Effect } from "effect";
 import * as ETH from "@ethereumjs/mpt";
 import * as ETH_UTILS from "@ethereumjs/util";
-import { toHex } from "@lucid-evolution/lucid";
+import { UTxO, toHex, utxoToCore } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { NodeConfig } from "@/config.js";
 import {
@@ -78,7 +78,29 @@ export const makeMpts = () =>
     }).pipe(
       Effect.orElse(() =>
         Effect.gen(function* () {
-          return ledgerTrie.EMPTY_TRIE_ROOT;
+          yield* Effect.sync(() => ledgerTrie.root(ledgerTrie.EMPTY_TRIE_ROOT));
+          const ops: ETH_UTILS.BatchDBOp[] = yield* Effect.forEach(
+            nodeConfig.GENESIS_UTXOS,
+            (u: UTxO) =>
+              Effect.gen(function* () {
+                const core = yield* Effect.try({
+                  try: () => utxoToCore(u),
+                  catch: (e) => new Error(`${e}`),
+                });
+                const op: ETH_UTILS.BatchDBOp = {
+                  type: "put",
+                  key: Buffer.from(core.input().to_cbor_bytes()),
+                  value: Buffer.from(core.output().to_cbor_bytes()),
+                };
+                return op;
+              }),
+          );
+          yield* Effect.tryPromise({
+            try: () => ledgerTrie.batch(ops),
+            catch: (e) => new Error(`${e}`),
+          });
+          const rootAfterGenesis = yield* Effect.sync(() => ledgerTrie.root());
+          return rootAfterGenesis;
         }),
       ),
     );

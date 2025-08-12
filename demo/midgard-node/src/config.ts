@@ -1,4 +1,11 @@
-import { Blockfrost, Kupmios, Lucid, Network, UTxO, walletFromSeed } from "@lucid-evolution/lucid";
+import {
+  Blockfrost,
+  Kupmios,
+  Lucid,
+  Network,
+  UTxO,
+  walletFromSeed,
+} from "@lucid-evolution/lucid";
 import { Config, Context, Effect, Layer } from "effect";
 
 const SUPPORTED_PROVIDERS = ["kupmios", "blockfrost"] as const;
@@ -120,67 +127,67 @@ export const makeConfig = Effect.gen(function* () {
   const seedC = config[22];
 
   const genesisUtxos: UTxO[] = [
-      {
-        txHash:
-          "bb217abaca60fc0ca68c1555eca6a96d2478547818ae76ce6836133f3cc546e0",
-        outputIndex: 1,
-        address: walletFromSeed(seedA, { network }).address,
-        assets: {
-          lovelace: BigInt("4027026465"),
-          "25561d09e55d60b64525b9cdb3cfbec23c94c0634320fec2eaddde584c616365436f696e33":
-            BigInt("10000"),
-        },
+    {
+      txHash:
+        "bb217abaca60fc0ca68c1555eca6a96d2478547818ae76ce6836133f3cc546e0",
+      outputIndex: 1,
+      address: walletFromSeed(seedA, { network }).address,
+      assets: {
+        lovelace: BigInt("4027026465"),
+        "25561d09e55d60b64525b9cdb3cfbec23c94c0634320fec2eaddde584c616365436f696e33":
+          BigInt("10000"),
       },
-      {
-        txHash:
-          "c7c0973c6bbf1a04a9f306da7814b4fa564db649bf48b0bd93c273bd03143547",
-        outputIndex: 0,
-        address: walletFromSeed(seedA, { network }).address,
-        assets: {
-          lovelace: BigInt("3289566"),
-          "5c677ba4dd295d9286e0e22786fea9ed735a6ae9c07e7a45ae4d95c84372696d696e616c50756e6b73204c6f6f74":
-            BigInt("1"),
-        },
+    },
+    {
+      txHash:
+        "c7c0973c6bbf1a04a9f306da7814b4fa564db649bf48b0bd93c273bd03143547",
+      outputIndex: 0,
+      address: walletFromSeed(seedA, { network }).address,
+      assets: {
+        lovelace: BigInt("3289566"),
+        "5c677ba4dd295d9286e0e22786fea9ed735a6ae9c07e7a45ae4d95c84372696d696e616c50756e6b73204c6f6f74":
+          BigInt("1"),
       },
-      {
-        txHash:
-          "d1a25b8e9c3b985d9d2f0a5f2e6ca7efa1c43b10f2c0b61f29e4a2cd8142b09e",
-        outputIndex: 0,
-        address: walletFromSeed(seedB, { network }).address,
-        assets: {
-          lovelace: BigInt("200"),
-        },
+    },
+    {
+      txHash:
+        "d1a25b8e9c3b985d9d2f0a5f2e6ca7efa1c43b10f2c0b61f29e4a2cd8142b09e",
+      outputIndex: 0,
+      address: walletFromSeed(seedB, { network }).address,
+      assets: {
+        lovelace: BigInt("200"),
       },
-      {
-        txHash:
-          "ea0f3c47bf18b02e9deb4e3a1239d8b263d765c4f7a3d12a9f62e8775e8c6141",
-        outputIndex: 1,
-        address: walletFromSeed(seedB, { network }).address,
-        assets: {
-          lovelace: BigInt("1500"),
-        },
+    },
+    {
+      txHash:
+        "ea0f3c47bf18b02e9deb4e3a1239d8b263d765c4f7a3d12a9f62e8775e8c6141",
+      outputIndex: 1,
+      address: walletFromSeed(seedB, { network }).address,
+      assets: {
+        lovelace: BigInt("1500"),
       },
-      {
-        txHash:
-          "f40b9f6a507af50aad4ccf6c15157b6d05c7affe23ec55cf4109cc2549c97a37",
-        outputIndex: 2,
-        address: walletFromSeed(seedB, { network }).address,
-        assets: {
-          lovelace: BigInt("125243"),
-        },
+    },
+    {
+      txHash:
+        "f40b9f6a507af50aad4ccf6c15157b6d05c7affe23ec55cf4109cc2549c97a37",
+      outputIndex: 2,
+      address: walletFromSeed(seedB, { network }).address,
+      assets: {
+        lovelace: BigInt("125243"),
       },
-      {
-        txHash:
-          "8e32d18c07cba2b65577bc829a9875e2fc3cdb554d5b0abbb3d4e3a71a3e3e3d",
-        outputIndex: 0,
-        address: walletFromSeed(seedC, { network }).address,
-        assets: {
-          lovelace: BigInt("300"),
-          "25561d09e55d60b64525b9cdb3cfbec23c94c0634320fec2eaddde584c616365436f696e33":
-            BigInt("15"),
-        },
+    },
+    {
+      txHash:
+        "8e32d18c07cba2b65577bc829a9875e2fc3cdb554d5b0abbb3d4e3a71a3e3e3d",
+      outputIndex: 0,
+      address: walletFromSeed(seedC, { network }).address,
+      assets: {
+        lovelace: BigInt("300"),
+        "25561d09e55d60b64525b9cdb3cfbec23c94c0634320fec2eaddde584c616365436f696e33":
+          BigInt("15"),
       },
-    ]
+    },
+  ];
 
   return {
     L1_PROVIDER: provider,
@@ -203,7 +210,7 @@ export const makeConfig = Effect.gen(function* () {
     POSTGRES_USER: config[17],
     LEDGER_MPT_DB_PATH: config[18],
     MEMPOOL_MPT_DB_PATH: config[19],
-    GENESIS_UTXOS: network === "Mainnet" ? [] : genesisUtxos
+    GENESIS_UTXOS: network === "Mainnet" ? [] : genesisUtxos,
   };
 }).pipe(Effect.orDie);
 
