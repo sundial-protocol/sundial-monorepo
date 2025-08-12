@@ -118,28 +118,8 @@ export const makeConfig = Effect.gen(function* () {
   const seedA = config[20];
   const seedB = config[21];
   const seedC = config[22];
-  return {
-    L1_PROVIDER: provider,
-    L1_BLOCKFROST_API_URL: config[1],
-    L1_BLOCKFROST_KEY: config[2],
-    L1_OGMIOS_KEY: config[3],
-    L1_KUPO_KEY: config[4],
-    L1_OPERATOR_SEED_PHRASE: config[5],
-    L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX: config[6],
-    NETWORK: network,
-    PORT: config[8],
-    WAIT_BETWEEN_BLOCK_COMMITMENT: config[9],
-    WAIT_BETWEEN_BLOCK_CONFIRMATION: config[10],
-    WAIT_BETWEEN_MERGE_TXS: config[11],
-    PROM_METRICS_PORT: config[12],
-    OLTP_EXPORTER_URL: config[13],
-    POSTGRES_HOST: config[14],
-    POSTGRES_PASSWORD: config[15],
-    POSTGRES_DB: config[16],
-    POSTGRES_USER: config[17],
-    LEDGER_MPT_DB_PATH: config[18],
-    MEMPOOL_MPT_DB_PATH: config[19],
-    GENESIS_UTXOS: network === "Mainnet" ? [] : [
+
+  const genesisUtxos: UTxO[] = [
       {
         txHash:
           "bb217abaca60fc0ca68c1555eca6a96d2478547818ae76ce6836133f3cc546e0",
@@ -200,7 +180,30 @@ export const makeConfig = Effect.gen(function* () {
             BigInt("15"),
         },
       },
-    ],
+    ]
+
+  return {
+    L1_PROVIDER: provider,
+    L1_BLOCKFROST_API_URL: config[1],
+    L1_BLOCKFROST_KEY: config[2],
+    L1_OGMIOS_KEY: config[3],
+    L1_KUPO_KEY: config[4],
+    L1_OPERATOR_SEED_PHRASE: config[5],
+    L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX: config[6],
+    NETWORK: network,
+    PORT: config[8],
+    WAIT_BETWEEN_BLOCK_COMMITMENT: config[9],
+    WAIT_BETWEEN_BLOCK_CONFIRMATION: config[10],
+    WAIT_BETWEEN_MERGE_TXS: config[11],
+    PROM_METRICS_PORT: config[12],
+    OLTP_EXPORTER_URL: config[13],
+    POSTGRES_HOST: config[14],
+    POSTGRES_PASSWORD: config[15],
+    POSTGRES_DB: config[16],
+    POSTGRES_USER: config[17],
+    LEDGER_MPT_DB_PATH: config[18],
+    MEMPOOL_MPT_DB_PATH: config[19],
+    GENESIS_UTXOS: network === "Mainnet" ? [] : genesisUtxos
   };
 }).pipe(Effect.orDie);
 
