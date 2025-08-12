@@ -14,11 +14,7 @@
 
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import {
-  Address,
-  LucidEvolution,
-  Script,
-} from "@lucid-evolution/lucid";
+import { Address, LucidEvolution, Script } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import {
   ConfirmError,
@@ -26,10 +22,8 @@ import {
   handleSignSubmit,
   SubmitError,
 } from "../utils.js";
-import { LedgerEntry } from "@/database/utils.js";
-import {
-  breakDownTx,
-} from "@/utils.js";
+import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
+import { breakDownTx } from "@/utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",

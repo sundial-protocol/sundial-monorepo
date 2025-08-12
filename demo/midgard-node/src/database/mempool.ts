@@ -1,17 +1,7 @@
 import { Database } from "@/services/database.js";
-import {
-  clearTable,
-  insertKeyValue,
-  delMultiple,
-  retrieveValues,
-  retrieveNumberOfEntries,
-  LedgerColumns,
-  LedgerEntry,
-  retrieveValue,
-  KVPair,
-  KVColumns,
-  mapSqlError,
-} from "./utils.js";
+import * as Tx from "@/database/utils/tx.js";
+import { clearTable, mapSqlError } from "@/database/utils/common.js";
+
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
@@ -27,9 +17,9 @@ export const insert = (
     const txCborBytes = fromHex(txString);
     const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
     // Insert the tx itself in `MempoolDB`.
-    yield* insertKeyValue(tableName, {
-      key: txId,
-      value: txCbor,
+    yield* Tx.insertEntry(tableName, {
+      tx_id: txId,
+      tx: txCbor,
     });
     // Insert produced UTxOs in `MempoolLedgerDB`.
     yield* MempoolLedgerDB.insert(produced);
@@ -43,18 +33,22 @@ export const insert = (
   );
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
-  retrieveValue(tableName, txHash);
+  Tx.retrieveValue(tableName, txHash);
 
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
-  retrieveValues(tableName, txHashes);
+  Tx.retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<readonly KVPair[], Error, Database> =>
+export const retrieve = (): Effect.Effect<
+  readonly Tx.Entry[],
+  Error,
+  Database
+> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<KVPair>`SELECT ${sql(
-      KVColumns.KEY,
-    )}, ${sql(KVColumns.VALUE)} FROM ${sql(tableName)} LIMIT 100000`;
+    return yield* sql<Tx.Entry>`SELECT ${sql(
+      Tx.Columns.TX_ID,
+    )}, ${sql(Tx.Columns.TX)} FROM ${sql(tableName)} LIMIT 100000`;
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -63,10 +57,10 @@ export const retrieve = (): Effect.Effect<readonly KVPair[], Error, Database> =>
     mapSqlError,
   );
 
-export const retrieveTxCount = () => retrieveNumberOfEntries(tableName);
+export const retrieveTxCount = () => Tx.retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
   txHashes: Buffer[],
-): Effect.Effect<void, Error, Database> => delMultiple(tableName, txHashes);
+): Effect.Effect<void, Error, Database> => Tx.delMultiple(tableName, txHashes);
 
 export const clear = () => clearTable(tableName);

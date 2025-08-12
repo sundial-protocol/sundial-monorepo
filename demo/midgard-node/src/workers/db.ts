@@ -6,12 +6,9 @@ import * as ETH_UTILS from "@ethereumjs/util";
 import { toHex } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { NodeConfig } from "@/config.js";
-import {
-  KVColumns,
-  KVPair,
-  LedgerColumns,
-  MinimalLedgerEntry,
-} from "@/database/utils.js";
+import * as Tx from "@/database/utils/tx.js";
+import * as Ledger from "@/database/utils/ledger.js";
+
 import { Database } from "@/services/database.js";
 import { findSpentAndProducedUTxOs } from "@/utils.js";
 import * as FS from "fs";
@@ -107,7 +104,7 @@ export const deleteLedgerMpt: Effect.Effect<void, Error, NodeConfig> =
 export const processMpts = (
   ledgerTrie: ETH.MerklePatriciaTrie,
   mempoolTrie: ETH.MerklePatriciaTrie,
-  mempoolTxs: readonly KVPair[],
+  mempoolTxs: readonly Tx.EntryNoTimeStamp[],
 ): Effect.Effect<
   {
     utxoRoot: string;
@@ -124,10 +121,10 @@ export const processMpts = (
     const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfBlocksTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
-    yield* Effect.forEach(mempoolTxs, (kv: KVPair) =>
+    yield* Effect.forEach(mempoolTxs, (entry: Tx.EntryNoTimeStamp) =>
       Effect.gen(function* () {
-        const txHash = kv[KVColumns.KEY];
-        const txCbor = kv[KVColumns.VALUE];
+        const txHash = entry[Tx.Columns.TX_ID];
+        const txCbor = entry[Tx.Columns.TX];
         mempoolTxHashes.push(txHash);
         const { spent, produced } = yield* findSpentAndProducedUTxOs(
           txCbor,
@@ -139,10 +136,10 @@ export const processMpts = (
           key: outRef,
         }));
         const putOps: ETH_UTILS.BatchDBOp[] = produced.map(
-          (le: MinimalLedgerEntry) => ({
+          (le: Ledger.MinimalEntry) => ({
             type: "put",
-            key: le[LedgerColumns.OUTREF],
-            value: le[LedgerColumns.OUTPUT],
+            key: le[Ledger.Columns.OUTREF],
+            value: le[Ledger.Columns.OUTPUT],
           }),
         );
         yield* Effect.sync(() =>
