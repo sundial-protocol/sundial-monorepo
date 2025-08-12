@@ -1,14 +1,13 @@
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
-import { LedgerColumns, LedgerEntry } from "./utils.js";
+import { LedgerColumns } from "./utils.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import {
   UTxO,
   utxoToTransactionInput,
   utxoToTransactionOutput,
-  walletFromSeed,
 } from "@lucid-evolution/lucid";
-import { NodeConfig, NodeConfigDep } from "@/config.js";
+import { NodeConfig } from "@/config.js";
 import { makeMpts } from "@/workers/utils/mpt.js";
 
 
@@ -52,25 +51,7 @@ export const insertGenesisUtxos: Effect.Effect<
   yield* MempoolLedgerDB.insert(ledgerEntries);
 
   yield* Effect.logInfo(
-    `🟣 Debug: Inserting ${ledgerEntries.length} UTxOs into trie...`,
-  );
-
-  const { ledgerTrie } = yield* makeMpts();
-
-  yield* Effect.tryPromise({
-    try: () =>
-      ledgerTrie.batch(
-        ledgerEntries.map((le) => ({
-          type: "put",
-          key: le[LedgerColumns.OUTREF],
-          value: le[LedgerColumns.OUTPUT],
-        })),
-      ),
-    catch: (e) => new Error(`${e}`),
-  });
-
-  yield* Effect.logInfo(
-    `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs into MPT database. Funded addresses are:
-${Array.from(new Set(genesisUTxOs.map((u) => u.address))).join("\n")}`,
+    `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs. Funded addresses are:
+${Array.from(new Set(config.GENESIS_UTXOS.map((u) => u.address))).join("\n")}`,
   );
 });
