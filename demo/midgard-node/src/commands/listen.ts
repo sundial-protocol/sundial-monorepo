@@ -396,7 +396,7 @@ const blockConfirmationAction = Effect.gen(function* () {
   const worker = Effect.async<BlockConfirmationWorkerOutput, Error>(
     (resume) => {
       Effect.runSync(
-        Effect.logInfo(`👷 Starting block confirmation worker...`),
+        Effect.logInfo(`🔍 Starting block confirmation worker...`),
       );
       const worker = new Worker(
         new URL("./confirm-block-commitments.js", import.meta.url),

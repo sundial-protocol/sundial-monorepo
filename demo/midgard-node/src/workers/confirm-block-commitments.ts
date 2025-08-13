@@ -104,7 +104,7 @@ Effect.runPromise(
 ).then((output) => {
   Effect.runSync(
     Effect.logInfo(
-      `👷 Confirmation work completed (${JSON.stringify(output)}).`,
+      `🔍 Confirmation work completed (${JSON.stringify(output)}).`,
     ),
   );
   parentPort?.postMessage(output);

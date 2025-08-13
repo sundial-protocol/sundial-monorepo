@@ -114,19 +114,21 @@ export const deleteMempoolMpt: Effect.Effect<void, Error, NodeConfig> =
   Effect.gen(function* () {
     const config = yield* NodeConfig;
     yield* Effect.try({
-      try: () => FS.rmSync(config.MEMPOOL_MPT_DB_PATH, {}),
+      try: () =>
+        FS.rmSync(config.MEMPOOL_MPT_DB_PATH, { recursive: true, force: true }),
       catch: (e) => new Error(`${e}`),
     });
-  });
+  }).pipe(Effect.withLogSpan("Delete mempool MPT"));
 
 export const deleteLedgerMpt: Effect.Effect<void, Error, NodeConfig> =
   Effect.gen(function* () {
     const config = yield* NodeConfig;
     yield* Effect.try({
-      try: () => FS.rmSync(config.LEDGER_MPT_DB_PATH, {}),
+      try: () =>
+        FS.rmSync(config.LEDGER_MPT_DB_PATH, { recursive: true, force: true }),
       catch: (e) => new Error(`${e}`),
     });
-  });
+  }).pipe(Effect.withLogSpan("Delete ledger MPT"));
 
 // Make mempool trie, and fill it with ledger trie with processed mempool txs
 export const processMpts = (
