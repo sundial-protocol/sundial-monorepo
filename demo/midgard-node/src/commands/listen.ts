@@ -42,7 +42,7 @@ const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   bigint: true,
 });
 
-const handle500 = (location: string, error: Error | HttpBodyError) =>
+const handle500 = (location: string, error: Error | HttpBodyError | unknown) =>
   Effect.gen(function* () {
     yield* Effect.logInfo(
       `Something went wrong at ${location} handler: ${error}`,
@@ -296,8 +296,8 @@ ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
 
 const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
-  const allPairs = yield* BlocksDB.retrieve();
-  const keyValues: Record<string, number> = allPairs.reduce(
+  const allBlocksData = yield* BlocksDB.retrieve();
+  const keyValues: Record<string, number> = allBlocksData.reduce(
     (acc: Record<string, number>, entry) => {
       const bHex = toHex(entry.header_hash);
       if (!acc[bHex]) {

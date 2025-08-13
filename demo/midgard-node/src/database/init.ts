@@ -6,7 +6,8 @@ import * as LatestLedgerDB from "./latestLedger.js";
 import * as MempoolDB from "./mempool.js";
 import * as ProcessedMempoolDB from "./processedMempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { createKeyValueTable, createLedgerTable } from "./utils.js";
+import * as Tx from "@/database/utils/tx.js";
+import * as Ledger from "@/database/utils/ledger.js";
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
@@ -24,12 +25,12 @@ export const initializeDb: () => Effect.Effect<
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
     yield* BlocksDB.init;
-    yield* createKeyValueTable(MempoolDB.tableName);
-    yield* createKeyValueTable(ProcessedMempoolDB.tableName);
-    yield* createLedgerTable(MempoolLedgerDB.tableName);
-    yield* createKeyValueTable(ImmutableDB.tableName);
-    yield* createLedgerTable(ConfirmedLedgerDB.tableName);
-    yield* createLedgerTable(LatestLedgerDB.tableName);
+    yield* Tx.createTable(MempoolDB.tableName);
+    yield* Tx.createTable(ProcessedMempoolDB.tableName);
+    yield* Ledger.createTable(MempoolLedgerDB.tableName);
+    yield* Tx.createTable(ImmutableDB.tableName);
+    yield* Ledger.createTable(ConfirmedLedgerDB.tableName);
+    yield* Ledger.createTable(LatestLedgerDB.tableName);
 
     yield* insertGenesisUtxos;
 

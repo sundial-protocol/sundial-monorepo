@@ -12,17 +12,13 @@ import {
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
 import { Effect, pipe } from "effect";
-import {
-  LedgerColumns,
-  LedgerEntry,
-  MinimalLedgerEntry,
-} from "./database/utils.js";
+import * as Ledger from "@/database/utils/ledger.js";
 
 export type ProcessedTx = {
   txId: Buffer;
   txCbor: Buffer;
   spent: Buffer[];
-  produced: LedgerEntry[];
+  produced: Ledger.Entry[];
 };
 
 // For some reason importing these directly into the new confirmation worker
@@ -119,10 +115,10 @@ export const setupLucid = async (
 export const findSpentAndProducedUTxOs = (
   txCBOR: Buffer,
   txHash?: Buffer,
-): Effect.Effect<{ spent: Buffer[]; produced: MinimalLedgerEntry[] }, Error> =>
+): Effect.Effect<{ spent: Buffer[]; produced: Ledger.MinimalEntry[] }, Error> =>
   Effect.gen(function* () {
     const spent: Buffer[] = [];
-    const produced: MinimalLedgerEntry[] = [];
+    const produced: Ledger.MinimalEntry[] = [];
     const tx = CML.Transaction.from_cbor_bytes(txCBOR);
     const txBody = tx.body();
     const inputs = txBody.inputs();
@@ -141,8 +137,8 @@ export const findSpentAndProducedUTxOs = (
         : txHash;
     for (let i = 0; i < outputsCount; i++) {
       produced.push({
-        [LedgerColumns.OUTREF]: Buffer.from(finalTxHash),
-        [LedgerColumns.OUTPUT]: Buffer.from(outputs.get(i).to_cbor_bytes()),
+        [Ledger.Columns.OUTREF]: Buffer.from(finalTxHash),
+        [Ledger.Columns.OUTPUT]: Buffer.from(outputs.get(i).to_cbor_bytes()),
       });
     }
     return { spent, produced };
@@ -167,23 +163,23 @@ export const breakDownTx = (
     }
     const outputs = txBody.outputs();
     const outputsCount = outputs.len();
-    const produced: LedgerEntry[] = [];
+    const produced: Ledger.Entry[] = [];
     for (let i = 0; i < outputsCount; i++) {
       const output = outputs.get(i);
       produced.push({
-        [LedgerColumns.TX_ID]: txHashBytes,
-        [LedgerColumns.OUTREF]: Buffer.from(
+        [Ledger.Columns.TX_ID]: txHashBytes,
+        [Ledger.Columns.OUTREF]: Buffer.from(
           CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
         ),
-        [LedgerColumns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
-        [LedgerColumns.ADDRESS]: output.address().to_bech32(),
+        [Ledger.Columns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
+        [Ledger.Columns.ADDRESS]: output.address().to_bech32(),
       });
     }
     return {
       txId: txHashBytes,
       txCbor: Buffer.from(txCbor),
-      spent,
-      produced,
+      spent: spent,
+      produced: produced,
     };
   });
 
