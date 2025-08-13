@@ -3,6 +3,7 @@ import { SerializedStateQueueUTxO } from "./commit-block-header.js";
 
 export type WorkerInput = {
   data: {
+    firstRun: boolean;
     unconfirmedSubmittedBlock: "" | TxHash;
   };
 };

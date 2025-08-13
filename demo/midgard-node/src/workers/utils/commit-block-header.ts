@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
-import { CML, coreToUtxo, utxoToCore } from "@lucid-evolution/lucid";
+import { CML, Data, coreToUtxo, utxoToCore } from "@lucid-evolution/lucid";
 
 export type WorkerInput = {
   data: {
@@ -43,8 +43,8 @@ export type WorkerOutput =
 // transferability.
 export type SerializedStateQueueUTxO = Omit<
   SDK.TxBuilder.StateQueue.StateQueueUTxO,
-  "utxo"
-> & { utxo: string };
+  "utxo" | "datum"
+> & { utxo: string; datum: string };
 
 export const serializeStateQueueUTxO = (
   stateQueueUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
@@ -54,9 +54,14 @@ export const serializeStateQueueUTxO = (
       try: () => utxoToCore(stateQueueUTxO.utxo),
       catch: (e) => new Error(`${e}`),
     });
+    const datumCBOR = yield* Effect.try({
+      try: () => Data.to(stateQueueUTxO.datum, SDK.TxBuilder.StateQueue.Datum),
+      catch: (e) => new Error(`${e}`),
+    });
     return {
       ...stateQueueUTxO,
       utxo: core.to_cbor_hex(),
+      datum: datumCBOR,
     };
   });
 
@@ -71,8 +76,14 @@ export const deserializeStateQueueUTxO = (
         ),
       catch: (e) => new Error(`${e}`),
     });
+    const d = yield* Effect.try({
+      try: () =>
+        Data.from(stateQueueUTxO.datum, SDK.TxBuilder.StateQueue.Datum),
+      catch: (e) => new Error(`${e}`),
+    });
     return {
       ...stateQueueUTxO,
       utxo: u,
+      datum: d,
     };
   });

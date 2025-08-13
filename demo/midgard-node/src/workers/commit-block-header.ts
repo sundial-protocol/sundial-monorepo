@@ -27,7 +27,7 @@ import {
 import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 import { batchProgram } from "@/utils.js";
-import { KVColumns } from "@/database/utils.js";
+import { Columns as TxColumns } from "@/database/utils/tx.js";
 
 const BATCH_SIZE = 100;
 
@@ -206,9 +206,9 @@ const wrapper = (
                 );
 
                 for (let i = 0; i < batchProcessedTxs.length; i++) {
-                  const kv = batchProcessedTxs[i];
-                  batchTxs.push(kv);
-                  batchHashesForBlocks.push(kv[KVColumns.KEY]);
+                  const txPair = batchProcessedTxs[i];
+                  batchTxs.push(txPair);
+                  batchHashesForBlocks.push(txPair[TxColumns.TX_ID]);
                 }
 
                 return Effect.all(

@@ -4,15 +4,33 @@ import {
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Effect, Schedule, pipe } from "effect";
-import { NodeConfig, User } from "@/config.js";
+import { NodeConfig, NodeConfigDep, User } from "@/config.js";
 import {
   WorkerInput,
   WorkerOutput,
 } from "@/workers/utils/confirm-block-commitments.js";
 import { serializeStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
+import { LucidEvolution } from "@lucid-evolution/lucid";
 
 const inputData = workerData as WorkerInput;
+
+const fetchLatestBlock = (
+  nodeConfig: NodeConfigDep,
+  lucid: LucidEvolution,
+): Effect.Effect<SDK.TxBuilder.StateQueue.StateQueueUTxO, Error> =>
+  Effect.gen(function* () {
+    const { policyId, spendScriptAddress } =
+      yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+    const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+      stateQueueAddress: spendScriptAddress,
+      stateQueuePolicyId: policyId,
+    };
+    return yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
+      lucid,
+      fetchConfig,
+    );
+  });
 
 const wrapper = (
   workerInput: WorkerInput,
@@ -20,7 +38,15 @@ const wrapper = (
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
-    if (workerInput.data.unconfirmedSubmittedBlock === "") {
+    if (workerInput.data.firstRun) {
+      yield* Effect.logInfo("🟤 First run. Fetching the latest block...");
+      const latestBlock = yield* fetchLatestBlock(nodeConfig, lucid);
+      const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
+      return {
+        type: "SuccessfulConfirmationOutput",
+        blocksUTxO: serializedUTxO,
+      };
+    } else if (workerInput.data.unconfirmedSubmittedBlock === "") {
       return {
         type: "NoTxForConfirmationOutput",
       };
@@ -35,16 +61,7 @@ const wrapper = (
         Schedule.recurs(4),
       );
       yield* Effect.logInfo("🟤 Tx confirmed. Fetching the block...");
-      const { policyId, spendScriptAddress } =
-        yield* makeAlwaysSucceedsServiceFn(nodeConfig);
-      const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-        stateQueueAddress: spendScriptAddress,
-        stateQueuePolicyId: policyId,
-      };
-      const latestBlock = yield* SDK.Endpoints.fetchLatestCommittedBlockProgram(
-        lucid,
-        fetchConfig,
-      );
+      const latestBlock = yield* fetchLatestBlock(nodeConfig, lucid);
       if (latestBlock.utxo.txHash == targetTxHash) {
         yield* Effect.logInfo("🟤 Serializing state queue UTxO...");
         const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);

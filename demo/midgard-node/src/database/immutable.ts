@@ -5,9 +5,8 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insertTx = (
-  tx: Tx.Entry,
-): Effect.Effect<void, Error, Database> => Tx.insertEntry(tableName, tx);
+export const insertTx = (tx: Tx.Entry): Effect.Effect<void, Error, Database> =>
+  Tx.insertEntry(tableName, tx);
 
 export const insertTxs = (
   txs: Tx.Entry[],

@@ -105,10 +105,10 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("POSTGRES_DB").pipe(Config.withDefault("midgard")),
     Config.string("POSTGRES_USER").pipe(Config.withDefault("postgres")),
     Config.string("LEDGER_MPT_DB_PATH").pipe(
-      Config.withDefault("./midgard-ledger-mpt-db"),
+      Config.withDefault("midgard-ledger-mpt-db"),
     ),
     Config.string("MEMPOOL_MPT_DB_PATH").pipe(
-      Config.withDefault("./midgard-mempool-mpt-db"),
+      Config.withDefault("midgard-mempool-mpt-db"),
     ),
     Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_A"),
     Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_B"),
