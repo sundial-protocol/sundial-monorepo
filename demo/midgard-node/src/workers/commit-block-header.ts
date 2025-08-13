@@ -152,7 +152,7 @@ const wrapper = (
             return pipe(
               Effect.all(
                 [
-                  ImmutableDB.insertTxs(batchTxs).pipe(
+                  ImmutableDB.insertTransactions(batchTxs).pipe(
                     Effect.withSpan(`immutable-db-insert-${startIndex}`),
                   ),
                   BlocksDB.insert(newHeaderHashBuffer, batchHashes).pipe(
