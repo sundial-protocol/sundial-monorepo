@@ -2,15 +2,20 @@ import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { mapSqlError } from "@/database/utils/common.js"
+import { Address } from "@lucid-evolution/lucid";
+import * as MempoolDB from "@/database/mempool.js"
+import * as ImmutableDB from "@/database/immutable.js"
+import * as Tx from "@/database/utils/tx.js"
+
 
 export enum Columns {
-  TX_HASH = "tx",
+  TX_ID = "tx_id",
   ADDRESS = "address",
 }
 
 export type Entry = {
-  [Columns.TX_HASH]: Buffer;
-  [Columns.ADDRESS]: Buffer;
+  [Columns.TX_ID]: Buffer;
+  [Columns.ADDRESS]: Address;
 };
 
 export const createTable = (
@@ -19,77 +24,10 @@ export const createTable = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      ${sql(Columns.TX_HASH)} BYTEA NOT NULL,
+      ${sql(Columns.TX_ID)} BYTEA NOT NULL,
       ${sql(Columns.ADDRESS)} BYTEA NOT NULL,
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
-
-export const delTxHash = (
-  tableName: string,
-  tx_hash: Buffer,
-): Effect.Effect<void, Error, Database> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* Effect.logDebug(
-      `${tableName} db: attempt to delete all entries with tx_hash`,
-    );
-    const result = yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
-      Columns.TX_HASH,
-    )} = ${tx_hash}`;
-    yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
-  }).pipe(Effect.withLogSpan(`delTxHash table ${tableName}`), mapSqlError);
-
-export const retrieveOne = (
-  tableName: string,
-  tx_hash: Buffer,
-): Effect.Effect<Buffer, Error, Database> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
-
-    const result = yield* sql<Buffer>`SELECT ${sql(Columns.ADDRESS)} FROM ${sql(
-      tableName,
-    )} WHERE ${sql(Columns.TX_HASH)} = ${tx_hash}`;
-
-    if (result.length <= 0) {
-      yield* Effect.fail(
-        new SqlError.SqlError({ cause: `No value found for tx_hash ${tx_hash}` }),
-      );
-    }
-
-    return result[0];
-  }).pipe(
-    Effect.withLogSpan(`retrieve value ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
-      ),
-    ),
-    mapSqlError,
-  );
-
-export const retrieveMultiple = (
-  tableName: string,
-  tx_hashes: Buffer[] | readonly Buffer[],
-): Effect.Effect<readonly Buffer[], Error, Database> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
-
-    const result = yield* sql<Buffer>`SELECT ${sql(Columns.ADDRESS)} FROM ${sql(
-      tableName,
-    )} WHERE ${sql.in(Columns.TX_HASH, tx_hashes)}`;
-
-    return result;
-  }).pipe(
-    Effect.withLogSpan(`retrieve values ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieving values error: ${JSON.stringify(e)}`,
-      ),
-    ),
-    mapSqlError,
-  );
 
 export const insertEntries = (
   tableName: string,
@@ -107,19 +45,60 @@ export const insertEntries = (
     mapSqlError,
   );
 
-export const retrieveEntries = (
+export const delTxHash = (
   tableName: string,
-): Effect.Effect<readonly Entry[], Error, Database> =>
+  tx_hash: Buffer,
+): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve entries`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<Entry>`SELECT * FROM ${sql(tableName)}`;
+    yield* Effect.logDebug(
+      `${tableName} db: attempt to delete all entries with tx_hash`,
+    );
+    const result = yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
+      Columns.TX_ID,
+    )} = ${tx_hash}`;
+    yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
+  }).pipe(Effect.withLogSpan(`delTxHash table ${tableName}`), mapSqlError);
+
+/**
+ * Retreives all cbors from MempoolDB and ImmutableDB
+ * which mention provided address.
+ *
+ * Works by doing an inner join with tables
+ * [tx_id | address] and [tx_id | tx],
+ * getting [address | tx] as a result.
+ */
+export const retrieve = (
+  tableName: string,
+  address: Address,
+): Effect.Effect<Buffer, Error, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
+    const result = yield* sql<Buffer>`SELECT ${sql(Columns.ADDRESS)} FROM (
+    SELECT ${Tx.Columns.TX_ID}
+    FROM ${MempoolDB.tableName}
+    UNION
+    SELECT ${Tx.Columns.TX_ID}
+    FROM ${ImmutableDB.tableName}
+    ) AS tx_union
+    INNER JOIN ${sql(tableName)} ON tx_union.${Tx.Columns.TX_ID} = ${sql(tableName)}.${Columns.TX_ID};
+    WHERE ${sql(Columns.ADDRESS)} = ${address}`;
+
+    if (result.length <= 0) {
+      yield* Effect.fail(
+        new SqlError.SqlError({ cause: `No value found for address ${address}` }),
+      );
+    }
+
+    return result[0];
   }).pipe(
-    Effect.withLogSpan(`retrieve ${tableName}`),
+    Effect.withLogSpan(`retrieve value ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(
-        `${tableName} db: retrieve: ${JSON.stringify(e)}`,
+        `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
       ),
     ),
     mapSqlError,
   );
+
