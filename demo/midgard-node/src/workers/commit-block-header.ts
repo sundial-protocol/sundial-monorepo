@@ -158,7 +158,7 @@ const wrapper = (
 
           const onSubmitFailure = (err: SubmitError) =>
             Effect.gen(function* () {
-              yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err}`);
+              yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err.err}`);
               yield* Effect.logError(
                 "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
               );

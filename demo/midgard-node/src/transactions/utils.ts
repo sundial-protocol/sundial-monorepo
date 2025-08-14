@@ -32,7 +32,6 @@ export const handleSignSubmit = (
 ): Effect.Effect<string | void, Error> =>
   Effect.gen(function* () {
     const txHash = yield* signSubmitHelper(lucid, signBuilder);
-    yield* Effect.logInfo(`🚀 Transaction submitted: ${txHash}`);
     yield* Effect.logInfo(`⏳ Confirming Transaction...`);
     yield* Effect.tryPromise({
       try: () => lucid.awaitTx(txHash, 10_000),
@@ -99,6 +98,9 @@ const signSubmitHelper = (
       .withWallet()
       .completeProgram()
       .pipe(Effect.mapError((err) => new SignError({ err })));
+    yield* Effect.logInfo(`Signed tx CBOR is:
+${signed.toCBOR()}
+`);
     yield* Effect.logInfo("✉️  Submitting transaction...");
     const txHash = yield* signed.submitProgram().pipe(
       Effect.retry(
