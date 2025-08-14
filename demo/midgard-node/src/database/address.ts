@@ -7,7 +7,7 @@ import * as MempoolDB from "@/database/mempool.js"
 import * as ImmutableDB from "@/database/immutable.js"
 import * as Tx from "@/database/utils/tx.js"
 import * as Ledger from "@/database/utils/ledger.js"
-import { ConfirmedLedgerDB, LatestLedgerDB, MempoolLedgerDB } from "./index.js";
+import { MempoolLedgerDB } from "./index.js";
 
 const tableName = "address"
 
@@ -40,26 +40,17 @@ export const insert = (
     yield* Effect.logDebug(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
 
-    const spentData = yield* sql<Ledger.EntryWithTimeStamp>
-    `SELECT ${sql(Ledger.Columns.ADDRESS)}
+    const inputEntries = yield* sql<Entry>
+    `SELECT (${sql(Ledger.Columns.TX_ID as Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS as Columns.ADDRESS)})
     FROM ${sql(MempoolLedgerDB.tableName)}
     WHERE ${sql(Columns.TX_ID)} IN ${sql.in(spent)}`;
-
-    const inputEntries : Entry[] = spentData.map((e) => ({
-      [Columns.TX_ID]: e[Ledger.Columns.TX_ID],
-      [Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
-    }))
 
     const outputEntries : Entry[] = produced.map((e) => ({
       [Columns.TX_ID]: e[Ledger.Columns.TX_ID],
       [Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
     }))
 
-    var entries = []
-    entries.push(...inputEntries)
-    entries.push(...outputEntries)
-
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}`;
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert([...inputEntries, ...outputEntries])}`;
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
