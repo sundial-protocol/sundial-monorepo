@@ -4,10 +4,10 @@ import * as ConfirmedLedgerDB from "./confirmedLedger.js";
 import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
 import * as MempoolDB from "./mempool.js";
+import * as ProcessedMempoolDB from "./processedMempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
-
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
@@ -26,6 +26,7 @@ export const initializeDb: () => Effect.Effect<
 
     yield* BlocksDB.init;
     yield* Tx.createTable(MempoolDB.tableName);
+    yield* Tx.createTable(ProcessedMempoolDB.tableName);
     yield* Ledger.createTable(MempoolLedgerDB.tableName);
     yield* Tx.createTable(ImmutableDB.tableName);
     yield* Ledger.createTable(ConfirmedLedgerDB.tableName);

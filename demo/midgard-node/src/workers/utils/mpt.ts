@@ -3,7 +3,7 @@ import { BatchDBOp } from "@ethereumjs/util";
 import { Effect } from "effect";
 import * as ETH from "@ethereumjs/mpt";
 import * as ETH_UTILS from "@ethereumjs/util";
-import { toHex } from "@lucid-evolution/lucid";
+import { UTxO, toHex, utxoToCore } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { NodeConfig } from "@/config.js";
 import * as Tx from "@/database/utils/tx.js";
@@ -72,8 +72,36 @@ export const makeMpts = () =>
     const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise({
       try: () => ledgerTrie.get(rootKey),
       catch: (e) => new Error(`${e}`),
-    }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
-    // Ensuring persisted root is stored in trie's private property
+    }).pipe(
+      Effect.orElse(() =>
+        Effect.gen(function* () {
+          yield* Effect.sync(() => ledgerTrie.root(ledgerTrie.EMPTY_TRIE_ROOT));
+          const ops: ETH_UTILS.BatchDBOp[] = yield* Effect.forEach(
+            nodeConfig.GENESIS_UTXOS,
+            (u: UTxO) =>
+              Effect.gen(function* () {
+                const core = yield* Effect.try({
+                  try: () => utxoToCore(u),
+                  catch: (e) => new Error(`${e}`),
+                });
+                const op: ETH_UTILS.BatchDBOp = {
+                  type: "put",
+                  key: Buffer.from(core.input().to_cbor_bytes()),
+                  value: Buffer.from(core.output().to_cbor_bytes()),
+                };
+                return op;
+              }),
+          );
+          yield* Effect.tryPromise({
+            try: () => ledgerTrie.batch(ops),
+            catch: (e) => new Error(`${e}`),
+          });
+          const rootAfterGenesis = yield* Effect.sync(() => ledgerTrie.root());
+          return rootAfterGenesis;
+        }),
+      ),
+    );
+    // Ensuring persisted root is stored in tries' private properties
     yield* Effect.sync(() => mempoolTrie.root(mempoolRootBeforeMempoolTxs));
     yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
     return {
@@ -86,31 +114,33 @@ export const deleteMempoolMpt: Effect.Effect<void, Error, NodeConfig> =
   Effect.gen(function* () {
     const config = yield* NodeConfig;
     yield* Effect.try({
-      try: () => FS.rmSync(config.MEMPOOL_MPT_DB_PATH, {}),
+      try: () =>
+        FS.rmSync(config.MEMPOOL_MPT_DB_PATH, { recursive: true, force: true }),
       catch: (e) => new Error(`${e}`),
     });
-  });
+  }).pipe(Effect.withLogSpan("Delete mempool MPT"));
 
 export const deleteLedgerMpt: Effect.Effect<void, Error, NodeConfig> =
   Effect.gen(function* () {
     const config = yield* NodeConfig;
     yield* Effect.try({
-      try: () => FS.rmSync(config.LEDGER_MPT_DB_PATH, {}),
+      try: () =>
+        FS.rmSync(config.LEDGER_MPT_DB_PATH, { recursive: true, force: true }),
       catch: (e) => new Error(`${e}`),
     });
-  });
+  }).pipe(Effect.withLogSpan("Delete ledger MPT"));
 
 // Make mempool trie, and fill it with ledger trie with processed mempool txs
 export const processMpts = (
   ledgerTrie: ETH.MerklePatriciaTrie,
   mempoolTrie: ETH.MerklePatriciaTrie,
-  mempoolTxs: readonly Tx.EntryNoTimeStamp[],
+  mempoolTxs: readonly Tx.Entry[],
 ): Effect.Effect<
   {
     utxoRoot: string;
     txRoot: string;
     mempoolTxHashes: Buffer[];
-    sizeOfBlocksTxs: number;
+    sizeOfProcessedTxs: number;
   },
   Error,
   Database
@@ -119,9 +149,9 @@ export const processMpts = (
     const mempoolTxHashes: Buffer[] = [];
     const mempoolBatchOps: ETH_UTILS.BatchDBOp[] = [];
     const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
-    let sizeOfBlocksTxs = 0;
+    let sizeOfProcessedTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
-    yield* Effect.forEach(mempoolTxs, (entry: Tx.EntryNoTimeStamp) =>
+    yield* Effect.forEach(mempoolTxs, (entry: Tx.Entry) =>
       Effect.gen(function* () {
         const txHash = entry[Tx.Columns.TX_ID];
         const txCbor = entry[Tx.Columns.TX];
@@ -130,7 +160,7 @@ export const processMpts = (
           txCbor,
           txHash,
         ).pipe(Effect.withSpan("findSpentAndProducedUTxOs"));
-        sizeOfBlocksTxs += txCbor.length;
+        sizeOfProcessedTxs += txCbor.length;
         const delOps: ETH_UTILS.BatchDBOp[] = spent.map((outRef) => ({
           type: "del",
           key: outRef,
@@ -178,7 +208,7 @@ export const processMpts = (
       utxoRoot: utxoRoot,
       txRoot: txRoot,
       mempoolTxHashes: mempoolTxHashes,
-      sizeOfBlocksTxs: sizeOfBlocksTxs,
+      sizeOfProcessedTxs: sizeOfProcessedTxs,
     };
   });
 
