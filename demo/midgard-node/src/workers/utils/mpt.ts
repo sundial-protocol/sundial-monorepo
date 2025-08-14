@@ -134,7 +134,7 @@ export const deleteLedgerMpt: Effect.Effect<void, Error, NodeConfig> =
 export const processMpts = (
   ledgerTrie: ETH.MerklePatriciaTrie,
   mempoolTrie: ETH.MerklePatriciaTrie,
-  mempoolTxs: readonly Tx.EntryNoTimeStamp[],
+  mempoolTxs: readonly Tx.Entry[],
 ): Effect.Effect<
   {
     utxoRoot: string;
@@ -151,7 +151,7 @@ export const processMpts = (
     const batchDBOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfProcessedTxs = 0;
     yield* Effect.logInfo("🔹 Going through mempool txs and finding roots...");
-    yield* Effect.forEach(mempoolTxs, (entry: Tx.EntryNoTimeStamp) =>
+    yield* Effect.forEach(mempoolTxs, (entry: Tx.Entry) =>
       Effect.gen(function* () {
         const txHash = entry[Tx.Columns.TX_ID];
         const txCbor = entry[Tx.Columns.TX];

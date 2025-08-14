@@ -47,7 +47,9 @@ const getStateQueueLength = (
       MAX_LIFE_OF_LOCAL_SYNC
     ) {
       // We consider in-memory state queue length stale.
-      yield* Effect.logInfo(`🔸 Fetching state queue length from ${stateQueueAddress}...`);
+      yield* Effect.logInfo(
+        `🔸 Fetching state queue length from ${stateQueueAddress}...`,
+      );
       const stateQueueUtxos = yield* Effect.tryPromise({
         try: () => lucid.utxosAt(stateQueueAddress),
         catch: (e) => new Error(`${e}`),
