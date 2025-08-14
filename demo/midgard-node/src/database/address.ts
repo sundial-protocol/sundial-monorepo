@@ -9,6 +9,8 @@ import * as Tx from "@/database/utils/tx.js"
 import * as Ledger from "@/database/utils/ledger.js"
 import { ConfirmedLedgerDB, LatestLedgerDB, MempoolLedgerDB } from "./index.js";
 
+const tableName = "address"
+
 export enum Columns {
   TX_ID = "tx_id",
   ADDRESS = "address",
@@ -20,7 +22,6 @@ export type Entry = {
 };
 
 export const createTable = (
-  tableName: string,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
@@ -31,63 +32,34 @@ export const createTable = (
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 
-/**
- * Inserts transaction entry by looking up
- * addresses and output references in the ledger tables
- * for provided transaction IDs.
- *
- * Looks up all output addresses from ledger databases,
- * then takes transaction ids in found output references
- * and repeats the process on their transaction ids as well.
- */
 export const insert = (
-  tableName: string,
-  transactionIds: Buffer[],
+  spent: Buffer[],
+  produced: Ledger.Entry[]
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
 
-    const allDataForEntries = yield* sql<Ledger.EntryWithTimeStamp>
-    `SELECT * FROM (
-      SELECT *
-      FROM ${sql(MempoolLedgerDB.tableName)}
-      UNION
-      SELECT *
-      FROM ${sql(LatestLedgerDB.tableName)}
-      UNION
-      SELECT *
-      FROM ${sql(ConfirmedLedgerDB.tableName)}
-    ) AS ledger_union
-    WHERE ${sql(Columns.TX_ID)} IN ${sql.in(transactionIds)}`;
+    const spentData = yield* sql<Ledger.EntryWithTimeStamp>
+    `SELECT ${sql(Ledger.Columns.ADDRESS)}
+    FROM ${sql(MempoolLedgerDB.tableName)}
+    WHERE ${sql(Columns.TX_ID)} IN ${sql.in(spent)}`;
 
-    const outputEntries : Entry[] = allDataForEntries.map((e) => ({
+    const inputEntries : Entry[] = spentData.map((e) => ({
       [Columns.TX_ID]: e[Ledger.Columns.TX_ID],
       [Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
     }))
 
-    const outRefs = allDataForEntries.map((e) => e[Ledger.Columns.OUTREF]).map((buf) => CML.TransactionInput.from_cbor_bytes(buf))
-    const refTxIds = outRefs.map((i) => i.transaction_id()).map(tx_id => Buffer.from(tx_id.to_raw_bytes()))
-
-    const allDataForOutRefs = yield* sql<Ledger.EntryWithTimeStamp>
-    `SELECT ${sql(Ledger.Columns.ADDRESS)} FROM (
-      SELECT *
-      FROM ${sql(MempoolLedgerDB.tableName)}
-      UNION
-      SELECT *
-      FROM ${sql(LatestLedgerDB.tableName)}
-      UNION
-      SELECT *
-      FROM ${sql(ConfirmedLedgerDB.tableName)}
-    ) AS ledger_union
-    WHERE ${sql(Columns.TX_ID)} IN ${sql.in(refTxIds)}`;
-
-    const inputEntries : Entry[] = allDataForOutRefs.map((e) => ({
+    const outputEntries : Entry[] = produced.map((e) => ({
       [Columns.TX_ID]: e[Ledger.Columns.TX_ID],
       [Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
     }))
 
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert([...inputEntries, ...outputEntries])}`;
+    var entries = []
+    entries.push(...inputEntries)
+    entries.push(...outputEntries)
+
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}`;
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -97,7 +69,6 @@ export const insert = (
   );
 
 export const insertEntries = (
-  tableName: string,
   entries: Entry[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
@@ -113,7 +84,6 @@ export const insertEntries = (
   );
 
 export const delTxHash = (
-  tableName: string,
   tx_hash: Buffer,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
@@ -136,7 +106,6 @@ export const delTxHash = (
  * getting [address | tx] as a result.
  */
 export const retrieve = (
-  tableName: string,
   address: Address,
 ): Effect.Effect<Buffer, Error, Database> =>
   Effect.gen(function* () {
