@@ -11,14 +11,9 @@ import { MempoolLedgerDB } from "./index.js";
 
 const tableName = "address"
 
-export enum Columns {
-  TX_ID = "tx_id",
-  ADDRESS = "address",
-}
-
 export type Entry = {
-  [Columns.TX_ID]: Buffer;
-  [Columns.ADDRESS]: Address;
+  [Ledger.Columns.TX_ID]: Buffer;
+  [Ledger.Columns.ADDRESS]: Address;
 };
 
 export const createTable = (
@@ -26,8 +21,8 @@ export const createTable = (
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      ${sql(Columns.TX_ID)} BYTEA NOT NULL,
-      ${sql(Columns.ADDRESS)} BYTEA NOT NULL,
+      ${sql(Ledger.Columns.TX_ID)} BYTEA NOT NULL,
+      ${sql(Ledger.Columns.ADDRESS)} BYTEA NOT NULL,
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
@@ -41,13 +36,13 @@ export const insert = (
     const sql = yield* SqlClient.SqlClient;
 
     const inputEntries = yield* sql<Entry>
-    `SELECT (${sql(Ledger.Columns.TX_ID as Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS as Columns.ADDRESS)})
+    `SELECT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)})
     FROM ${sql(MempoolLedgerDB.tableName)}
-    WHERE ${sql(Columns.TX_ID)} IN ${sql.in(spent)}`;
+    WHERE ${sql(Ledger.Columns.TX_ID)} IN ${sql.in(spent)}`;
 
     const outputEntries : Entry[] = produced.map((e) => ({
-      [Columns.TX_ID]: e[Ledger.Columns.TX_ID],
-      [Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
+      [Ledger.Columns.TX_ID]: e[Ledger.Columns.TX_ID],
+      [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
     }))
 
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert([...inputEntries, ...outputEntries])}`;
@@ -83,7 +78,7 @@ export const delTxHash = (
       `${tableName} db: attempt to delete all entries with tx_hash`,
     );
     const result = yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
-      Columns.TX_ID,
+      Ledger.Columns.TX_ID,
     )} = ${tx_hash}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(Effect.withLogSpan(`delTxHash table ${tableName}`), mapSqlError);
@@ -109,8 +104,8 @@ export const retrieve = (
     SELECT ${Tx.Columns.TX_ID}
     FROM ${sql(ImmutableDB.tableName)}
     ) AS tx_union
-    INNER JOIN ${sql(tableName)} ON tx_union.${Tx.Columns.TX_ID} = ${sql(tableName)}.${Columns.TX_ID};
-    WHERE ${sql(Columns.ADDRESS)} = ${address}`;
+    INNER JOIN ${sql(tableName)} ON tx_union.${Tx.Columns.TX_ID} = ${sql(tableName)}.${Ledger.Columns.TX_ID};
+    WHERE ${sql(Ledger.Columns.ADDRESS)} = ${address}`;
 
     if (result.length <= 0) {
       yield* Effect.fail(
