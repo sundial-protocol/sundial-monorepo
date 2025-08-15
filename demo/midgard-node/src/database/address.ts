@@ -93,7 +93,7 @@ export const delTxHash = (
  */
 export const retrieve = (
   address: Address,
-): Effect.Effect<Buffer, Error, Database> =>
+): Effect.Effect<readonly Buffer[], Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
@@ -112,8 +112,7 @@ export const retrieve = (
         new SqlError.SqlError({ cause: `No value found for address ${address}` }),
       );
     }
-
-    return result[0];
+    return result;
   }).pipe(
     Effect.withLogSpan(`retrieve value ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
