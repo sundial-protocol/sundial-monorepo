@@ -23,13 +23,7 @@ import {
   SubmitError,
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
-<<<<<<< HEAD
-import {
-  breakDownTx,
-} from "@/utils.js";
-=======
 import { breakDownTx } from "@/utils.js";
->>>>>>> main
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
