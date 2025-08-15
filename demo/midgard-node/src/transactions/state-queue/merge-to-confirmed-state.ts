@@ -14,11 +14,7 @@
 
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import {
-  Address,
-  LucidEvolution,
-  Script,
-} from "@lucid-evolution/lucid";
+import { Address, LucidEvolution, Script } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import {
   ConfirmError,
@@ -27,9 +23,13 @@ import {
   SubmitError,
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
+<<<<<<< HEAD
 import {
   breakDownTx,
 } from "@/utils.js";
+=======
+import { breakDownTx } from "@/utils.js";
+>>>>>>> main
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
@@ -53,13 +53,15 @@ const getStateQueueLength = (
       MAX_LIFE_OF_LOCAL_SYNC
     ) {
       // We consider in-memory state queue length stale.
-      yield* Effect.logInfo("🔸 Fetching state queue length...");
+      yield* Effect.logInfo(
+        `🔸 Fetching state queue length from ${stateQueueAddress}...`,
+      );
       const stateQueueUtxos = yield* Effect.tryPromise({
         try: () => lucid.utxosAt(stateQueueAddress),
         catch: (e) => new Error(`${e}`),
       });
 
-      global.BLOCKS_IN_QUEUE = stateQueueUtxos.length - 1;
+      global.BLOCKS_IN_QUEUE = Math.max(0, stateQueueUtxos.length - 1);
 
       global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH = Date.now();
 

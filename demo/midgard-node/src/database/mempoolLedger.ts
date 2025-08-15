@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import * as Ledger from "@/database/utils/ledger.js";
-import { clearTable } from "@/database/utils/common.js"
+import { clearTable } from "@/database/utils/common.js";
 
 import { Database } from "@/services/database.js";
 
@@ -20,6 +20,7 @@ export const retrieveByAddress = (
 ): Effect.Effect<readonly Ledger.Entry[], Error, Database> =>
   Ledger.retrieveEntriesWithAddress(tableName, address);
 
-export const clearUTxOs = (refs: Buffer[]) => Ledger.delEntries(tableName, refs);
+export const clearUTxOs = (refs: Buffer[]) =>
+  Ledger.delEntries(tableName, refs);
 
 export const clear = () => clearTable(tableName);

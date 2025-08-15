@@ -1,7 +1,7 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
-import { mapSqlError } from "@/database/utils/common.js"
+import { mapSqlError } from "@/database/utils/common.js";
 
 export enum Columns {
   TX_ID = "tx_id",
@@ -18,7 +18,7 @@ export type EntryWithTimeStamp = EntryNoTimeStamp & {
   [Columns.TIMESTAMPTZ]: Date;
 };
 
-export type Entry = EntryNoTimeStamp | EntryWithTimeStamp
+export type Entry = EntryNoTimeStamp | EntryWithTimeStamp;
 
 export const createTable = (
   tableName: string,
@@ -100,7 +100,6 @@ export const retrieveValues = (
     mapSqlError,
   );
 
-
 export const insertEntry = (
   tableName: string,
   txPair: Entry,
@@ -145,9 +144,7 @@ export const retrieveEntries = (
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieve: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
     mapSqlError,
   );
@@ -171,4 +168,3 @@ export const retrieveNumberOfEntries = (
     ),
     mapSqlError,
   );
-
