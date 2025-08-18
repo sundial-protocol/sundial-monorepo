@@ -2,7 +2,7 @@ import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { mapSqlError } from "@/database/utils/common.js";
-import { Address, CML } from "@lucid-evolution/lucid";
+import { Address } from "@lucid-evolution/lucid";
 import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
 import * as Tx from "@/database/utils/tx.js";
@@ -21,7 +21,7 @@ export const createTable = (): Effect.Effect<void, Error, Database> =>
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(Ledger.Columns.TX_ID)} BYTEA NOT NULL,
-      ${sql(Ledger.Columns.ADDRESS)} BYTEA NOT NULL,
+      ${sql(Ledger.Columns.ADDRESS)} TEXT NOT NULL
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
@@ -96,14 +96,16 @@ export const retrieve = (
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
     const result = yield* sql<Buffer>`SELECT ${sql(Tx.Columns.TX)} FROM (
-    SELECT ${sql(Tx.Columns.TX_ID)}
-    FROM ${MempoolDB.tableName}
-    UNION
-    SELECT ${Tx.Columns.TX_ID}
-    FROM ${sql(ImmutableDB.tableName)}
+      SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
+      FROM ${MempoolDB.tableName}
+      UNION
+      SELECT ${Tx.Columns.TX_ID}, ${sql(Tx.Columns.TX)}
+      FROM ${sql(ImmutableDB.tableName)}
     ) AS tx_union
-    INNER JOIN ${sql(tableName)} ON tx_union.${sql(Tx.Columns.TX_ID)} = ${sql(tableName)}.${sql(Ledger.Columns.TX_ID)};
-    WHERE ${sql(Ledger.Columns.ADDRESS)} = ${address}`;
+    INNER JOIN ${sql(
+      tableName,
+    )} ON tx_union.${sql(Tx.Columns.TX_ID)} = ${sql(tableName)}.${sql(Ledger.Columns.TX_ID)}
+    WHERE ${sql(Ledger.Columns.ADDRESS)} = ${address};`;
 
     if (result.length <= 0) {
       yield* Effect.fail(

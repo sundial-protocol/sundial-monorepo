@@ -10,7 +10,7 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { Duration, Effect, Layer, Metric, pipe, Schedule } from "effect";
 import {
-  AddressDB,
+  AddressHistoryDB,
   BlocksDB,
   ConfirmedLedgerDB,
   ImmutableDB,
@@ -91,7 +91,7 @@ const getTxHandler = Effect.gen(function* () {
 
 const getUtxosHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
-  const addr = params["addr"];
+  const addr = params["address"];
 
   if (typeof addr !== "string") {
     yield* Effect.logInfo(`GET /utxos - Invalid address type: ${addr}`);
@@ -275,7 +275,7 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
       );
     }
 
-    const cbors = yield* AddressDB.retrieve(addrDetails.address.bech32);
+    const cbors = yield* AddressHistoryDB.retrieve(addrDetails.address.bech32);
     yield* Effect.logInfo(`Found ${cbors.length} CBORs with ${addr}`);
     return yield* HttpServerResponse.json({
       cbors: cbors,
@@ -287,7 +287,7 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
       { status: 400 },
     );
   }
-}).pipe(Effect.catchAll((e) => handle500("getCBORsWithAddress", e)));
+}).pipe(Effect.catchAll((e) => handle500("getTxsOfAddressHandler", e)));
 
 const getLogStateQueueHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Drawing state queue UTxOs...`);
