@@ -6,7 +6,7 @@ import { Effect } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
 import { breakDownTx } from "@/utils.js";
-import * as AddressDB from "@/database/address.js"
+import * as AddressDB from "@/database/addressHistory.js"
 
 
 export const tableName = "mempool";

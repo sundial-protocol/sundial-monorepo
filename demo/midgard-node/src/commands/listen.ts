@@ -254,12 +254,12 @@ const getResetHandler = Effect.gen(function* () {
   ),
 );
 
-const getCBORsWithAddressHandler = Effect.gen(function* () {
+const getTxsOfAddressHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
-  const addr = params["addr"];
+  const addr = params["address"];
 
   if (typeof addr !== "string") {
-    yield* Effect.logInfo(`GET /utxos - Invalid address type: ${addr}`);
+    yield* Effect.logInfo(`GET /txs - Invalid address type: ${addr}`);
     return yield* HttpServerResponse.json(
       { error: `Invalid address type: ${addr}` },
       { status: 400 },
@@ -416,7 +416,7 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/commit", getCommitEndpoint),
   HttpRouter.get("/merge", getMergeHandler),
   HttpRouter.get("/reset", getResetHandler),
-  HttpRouter.get("/cbors", getCBORsWithAddressHandler),
+  HttpRouter.get("/txs", getTxsOfAddressHandler),
   HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
   HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
   HttpRouter.get("/logGlobals", getLogGlobalsHandler),

@@ -9,7 +9,7 @@ import * as Tx from "@/database/utils/tx.js"
 import * as Ledger from "@/database/utils/ledger.js"
 import { MempoolLedgerDB } from "./index.js";
 
-const tableName = "address"
+const tableName = "address_history";
 
 export type Entry = {
   [Ledger.Columns.TX_ID]: Buffer;
@@ -26,6 +26,20 @@ export const createTable = (
     );`;
   }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
+export const insertEntries = (
+  entries: Entry[],
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(`${tableName} db: attempt to insert entries`);
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}`;
+  }).pipe(
+    Effect.withLogSpan(`entries ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
+    ),
+    mapSqlError,
+  );
 
 export const insert = (
   spent: Buffer[],
@@ -45,22 +59,7 @@ export const insert = (
       [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
     }))
 
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert([...inputEntries, ...outputEntries])}`;
-  }).pipe(
-    Effect.withLogSpan(`entries ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
-    ),
-    mapSqlError,
-  );
-
-export const insertEntries = (
-  entries: Entry[],
-): Effect.Effect<void, Error, Database> =>
-  Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to insert entries`);
-    const sql = yield* SqlClient.SqlClient;
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}`;
+    insertEntries([...inputEntries, ...outputEntries]);
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -104,7 +103,7 @@ export const retrieve = (
     SELECT ${Tx.Columns.TX_ID}
     FROM ${sql(ImmutableDB.tableName)}
     ) AS tx_union
-    INNER JOIN ${sql(tableName)} ON tx_union.${Tx.Columns.TX_ID} = ${sql(tableName)}.${Ledger.Columns.TX_ID};
+    INNER JOIN ${sql(tableName)} ON tx_union.${sql(Tx.Columns.TX_ID)} = ${sql(tableName)}.${sql(Ledger.Columns.TX_ID)};
     WHERE ${sql(Ledger.Columns.ADDRESS)} = ${address}`;
 
     if (result.length <= 0) {
