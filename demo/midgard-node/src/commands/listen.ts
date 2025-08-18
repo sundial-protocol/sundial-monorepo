@@ -276,9 +276,7 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
     }
 
     const cbors = yield* AddressDB.retrieve(addrDetails.address.bech32);
-    yield* Effect.logInfo(
-      `Found ${cbors.length} CBORs with ${addr}`,
-    );
+    yield* Effect.logInfo(`Found ${cbors.length} CBORs with ${addr}`);
     return yield* HttpServerResponse.json({
       cbors: cbors,
     });

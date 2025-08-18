@@ -1,12 +1,12 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
-import { mapSqlError } from "@/database/utils/common.js"
+import { mapSqlError } from "@/database/utils/common.js";
 import { Address, CML } from "@lucid-evolution/lucid";
-import * as MempoolDB from "@/database/mempool.js"
-import * as ImmutableDB from "@/database/immutable.js"
-import * as Tx from "@/database/utils/tx.js"
-import * as Ledger from "@/database/utils/ledger.js"
+import * as MempoolDB from "@/database/mempool.js";
+import * as ImmutableDB from "@/database/immutable.js";
+import * as Tx from "@/database/utils/tx.js";
+import * as Ledger from "@/database/utils/ledger.js";
 import { MempoolLedgerDB } from "./index.js";
 
 const tableName = "address_history";
@@ -16,8 +16,7 @@ export type Entry = {
   [Ledger.Columns.ADDRESS]: Address;
 };
 
-export const createTable = (
-): Effect.Effect<void, Error, Database> =>
+export const createTable = (): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
@@ -43,21 +42,21 @@ export const insertEntries = (
 
 export const insert = (
   spent: Buffer[],
-  produced: Ledger.Entry[]
+  produced: Ledger.Entry[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
 
-    const inputEntries = yield* sql<Entry>
-    `SELECT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)})
+    const inputEntries =
+      yield* sql<Entry>`SELECT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)})
     FROM ${sql(MempoolLedgerDB.tableName)}
     WHERE ${sql(Ledger.Columns.TX_ID)} IN ${sql.in(spent)}`;
 
-    const outputEntries : Entry[] = produced.map((e) => ({
+    const outputEntries: Entry[] = produced.map((e) => ({
       [Ledger.Columns.TX_ID]: e[Ledger.Columns.TX_ID],
-      [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS]
-    }))
+      [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
+    }));
 
     insertEntries([...inputEntries, ...outputEntries]);
   }).pipe(
@@ -108,7 +107,9 @@ export const retrieve = (
 
     if (result.length <= 0) {
       yield* Effect.fail(
-        new SqlError.SqlError({ cause: `No value found for address ${address}` }),
+        new SqlError.SqlError({
+          cause: `No value found for address ${address}`,
+        }),
       );
     }
     return result;
