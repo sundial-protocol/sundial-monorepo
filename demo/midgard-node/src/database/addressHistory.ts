@@ -2,7 +2,7 @@ import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { clearTable, mapSqlError } from "@/database/utils/common.js";
-import { Address } from "@lucid-evolution/lucid";
+import { Address, CML } from "@lucid-evolution/lucid";
 import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
 import * as Tx from "@/database/utils/tx.js";
@@ -125,4 +125,5 @@ export const retrieve = (
     mapSqlError,
   );
 
-export const clear = clearTable(tableName);
+export const clear = (): Effect.Effect<void, Error, Database> =>
+  clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));
