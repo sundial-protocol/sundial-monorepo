@@ -226,12 +226,13 @@ const getResetHandler = Effect.gen(function* () {
   yield* StateQueueTx.resetStateQueue;
   yield* Effect.all(
     [
-      MempoolDB.clear(),
-      MempoolLedgerDB.clear(),
-      BlocksDB.clear(),
-      ImmutableDB.clear(),
-      LatestLedgerDB.clear(),
-      ConfirmedLedgerDB.clear(),
+      MempoolDB.clear,
+      MempoolLedgerDB.clear,
+      BlocksDB.clear,
+      ImmutableDB.clear,
+      LatestLedgerDB.clear,
+      ConfirmedLedgerDB.clear,
+      AddressHistoryDB.clear,
       deleteMempoolMpt,
       deleteLedgerMpt,
     ],

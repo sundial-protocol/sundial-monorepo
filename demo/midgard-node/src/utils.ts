@@ -200,6 +200,7 @@ export const batchProgram = <A, C>(
     startIndex: number,
     endIndex: number,
   ) => Effect.Effect<A, Error, C>,
+  concurrencyOverride?: number,
 ) => {
   const batchIndices = Array.from(
     { length: Math.ceil(totalCount / batchSize) },
@@ -214,7 +215,7 @@ export const batchProgram = <A, C>(
         Effect.withSpan(`batch-${opName}-${startIndex}-${endIndex}`),
       );
     },
-    { concurrency: "unbounded" },
+    { concurrency: concurrencyOverride ?? "unbounded" },
   );
 };
 

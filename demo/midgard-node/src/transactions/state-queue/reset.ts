@@ -10,6 +10,7 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { NodeConfig, User } from "@/config.js";
 import { Effect } from "effect";
 import { ConfirmError, handleSignSubmit, SubmitError } from "../utils.js";
+import { batchProgram } from "@/utils.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
@@ -61,6 +62,7 @@ export const resetStateQueue = Effect.gen(function* () {
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
 
+  yield* Effect.logInfo("🚧 Fetching state queue UTxOs...");
   const allStateQueueUTxOs =
     yield* SDK.Endpoints.fetchUnsortedStateQueueUTxOsProgram(
       lucid,
@@ -69,18 +71,28 @@ export const resetStateQueue = Effect.gen(function* () {
 
   lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
 
-  // Collect and burn 10 UTxOs and asset names at a time:
+  // Collect and burn 40 UTxOs and asset names at a time:
   const batchSize = 40;
-  for (let i = 0; i < allStateQueueUTxOs.length; i += batchSize) {
-    const batch = allStateQueueUTxOs.slice(i, i + batchSize);
-    yield* collectAndBurnStateQueueNodesProgram(
-      lucid,
-      fetchConfig,
-      alwaysSucceeds.spendScript,
-      alwaysSucceeds.mintScript,
-      batch,
-    );
-  }
+  yield* batchProgram(
+    batchSize,
+    allStateQueueUTxOs.length,
+    "resetStateQueue",
+    (startIndex, endIndex) =>
+      Effect.gen(function* () {
+        const batch = allStateQueueUTxOs.slice(startIndex, endIndex);
+        yield* Effect.logInfo(`🚧 Batch ${startIndex}-${endIndex}`);
+        collectAndBurnStateQueueNodesProgram(
+          lucid,
+          fetchConfig,
+          alwaysSucceeds.spendScript,
+          alwaysSucceeds.mintScript,
+          batch,
+        );
+      }),
+    1,
+  );
+  yield* Effect.logInfo(`🚧 Resetting global variables...`);
   global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH = Date.now();
   global.BLOCKS_IN_QUEUE = 0;
+  yield* Effect.logInfo(`🚧 Done.`);
 });

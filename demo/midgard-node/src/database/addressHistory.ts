@@ -1,7 +1,7 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
-import { mapSqlError } from "@/database/utils/common.js";
+import { clearTable, mapSqlError } from "@/database/utils/common.js";
 import { Address } from "@lucid-evolution/lucid";
 import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
@@ -124,3 +124,5 @@ export const retrieve = (
     ),
     mapSqlError,
   );
+
+export const clear = clearTable(tableName);
