@@ -13,6 +13,7 @@ import {
 import * as chalk_ from "chalk";
 import { Effect, pipe } from "effect";
 import * as Ledger from "@/database/utils/ledger.js";
+import { DeserializationError, SerializationError } from "./error.js";
 
 export type ProcessedTx = {
   txId: Buffer;
@@ -115,7 +116,10 @@ export const setupLucid = async (
 export const findSpentAndProducedUTxOs = (
   txCBOR: Buffer,
   txHash?: Buffer,
-): Effect.Effect<{ spent: Buffer[]; produced: Ledger.MinimalEntry[] }, Error> =>
+): Effect.Effect<
+  { spent: Buffer[]; produced: Ledger.MinimalEntry[] },
+  SerializationError
+> =>
   Effect.gen(function* () {
     const spent: Buffer[] = [];
     const produced: Ledger.MinimalEntry[] = [];
@@ -128,7 +132,12 @@ export const findSpentAndProducedUTxOs = (
     for (let i = 0; i < inputsCount; i++) {
       yield* Effect.try({
         try: () => spent.push(Buffer.from(inputs.get(i).to_cbor_bytes())),
-        catch: (e) => new Error(`${e}`),
+        catch: (e) => {
+          throw new SerializationError({
+            message: `An error occurred on input CBOR serialization ${inputs.get(i)}`,
+            cause: e,
+          });
+        },
       });
     }
     const finalTxHash =
@@ -146,11 +155,16 @@ export const findSpentAndProducedUTxOs = (
 
 export const breakDownTx = (
   txCbor: Uint8Array,
-): Effect.Effect<ProcessedTx, Error> =>
+): Effect.Effect<ProcessedTx, DeserializationError> =>
   Effect.gen(function* () {
     const deserializedTx = yield* Effect.try({
       try: () => CML.Transaction.from_cbor_bytes(txCbor),
-      catch: (e) => new Error(`${e}`),
+      catch: (e) => {
+        throw new DeserializationError({
+          message: `Failed to deserialize transaction: ${e}`,
+          cause: e,
+        });
+      },
     });
     const txBody = deserializedTx.body();
     const txHash = CML.hash_transaction(txBody);
