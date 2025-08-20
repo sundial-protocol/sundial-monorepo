@@ -1,25 +1,11 @@
 import { Database } from "@/services/database.js";
-import { SqlClient, SqlError } from "@effect/sql";
+import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
-
-export const mapSqlError = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, Exclude<E, SqlError.SqlError> | Error, R> =>
-  effect.pipe(
-    Effect.catchAll(
-      (e): Effect.Effect<A, Exclude<E, SqlError.SqlError> | Error, R> => {
-        if (e instanceof SqlError.SqlError) {
-          return Effect.fail(
-            new Error(`SQL Error (${e._tag}): ${JSON.stringify(e)}`),
-          );
-        } else return Effect.fail(e as Exclude<E, SqlError.SqlError>);
-      },
-    ),
-  );
+import { DatabaseError, mapDeleteError } from "./error.js";
 
 export const clearTable = (
   tableName: string,
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to clear table`);
     const sql = yield* SqlClient.SqlClient;
@@ -32,5 +18,5 @@ export const clearTable = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: clearing error: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
+    mapDeleteError(tableName),
   );

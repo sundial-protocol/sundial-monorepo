@@ -2,15 +2,19 @@ import { Effect } from "effect";
 import * as Tx from "@/database/utils/tx.js";
 import { clearTable } from "@/database/utils/common.js";
 import { Database } from "@/services/database.js";
+import { DatabaseError } from "./utils/error.js";
 
 export const tableName = "processed_mempool";
 
-export const insertTx = (tx: Tx.Entry): Effect.Effect<void, Error, Database> =>
+export const insertTx = (
+  tx: Tx.Entry,
+): Effect.Effect<void, DatabaseError, Database> =>
   Tx.insertEntry(tableName, tx);
 
 export const insertTxs = (
   txs: Tx.Entry[],
-): Effect.Effect<void, Error, Database> => Tx.insertEntries(tableName, txs);
+): Effect.Effect<void, DatabaseError, Database> =>
+  Tx.insertEntries(tableName, txs);
 
 export const retrieve = () => Tx.retrieveEntries(tableName);
 
