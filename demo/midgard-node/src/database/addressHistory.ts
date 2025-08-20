@@ -16,7 +16,7 @@ export type Entry = {
   [Ledger.Columns.ADDRESS]: Address;
 };
 
-export const createTable = (): Effect.Effect<void, Error, Database> =>
+export const init: Effect.Effect<void, Error, Database> =
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
@@ -125,5 +125,4 @@ export const retrieve = (
     mapSqlError,
   );
 
-export const clear : Effect.Effect<void, Error, Database> =
-  clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));
+export const clear = clearTable(tableName)
