@@ -12,7 +12,7 @@ import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";
-import { DatabaseError } from "./utils/common.js";
+import { DatabaseError, OtherDatabaseError } from "./utils/common.js";
 
 export const initializeDb: () => Effect.Effect<
   void,
@@ -39,11 +39,13 @@ export const initializeDb: () => Effect.Effect<
   }).pipe(
     Effect.mapError((error: unknown) =>
       error instanceof SqlError.SqlError
-        ? DatabaseError.other(`Failed to initialize database`, undefined, error)
-        : DatabaseError.other(
-            `Unknown error during database initialization: ${error}`,
-            undefined,
-            error,
-          ),
+        ? new OtherDatabaseError({
+            message: `Failed to initialize database`,
+            cause: error,
+          })
+        : new OtherDatabaseError({
+            message: `Unknown error during database initialization: ${error}`,
+            cause: error,
+          }),
     ),
   );

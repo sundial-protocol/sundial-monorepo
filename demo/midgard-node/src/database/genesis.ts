@@ -4,7 +4,7 @@ import { Columns as LedgerColumns } from "./utils/ledger.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { UTxO, utxoToCore } from "@lucid-evolution/lucid";
 import { NodeConfig } from "@/config.js";
-import { DatabaseError } from "@/error.js";
+import { DatabaseError } from "./utils/common.js";
 
 /**
  * Inserts genesis UTXOs from the imported TypeScript module into the MPT database

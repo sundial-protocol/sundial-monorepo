@@ -3,6 +3,7 @@ import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import {
   DatabaseError,
+  SelectError,
   mapCreateTableError,
   mapSelectError,
   mapInsertError,
@@ -74,10 +75,10 @@ export const retrieveValue = (
 
     if (result.length <= 0) {
       yield* Effect.fail(
-        DatabaseError.select(
-          `No value found for tx_id ${tx_id.toString("hex")}`,
-          tableName,
-        ),
+        new SelectError({
+          message: `No value found for tx_id ${tx_id.toString("hex")}`,
+          table: tableName,
+        }),
       );
     }
 

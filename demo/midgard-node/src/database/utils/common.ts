@@ -1,6 +1,7 @@
+import { Effect } from "effect";
 import { Database } from "@/services/database.js";
+import { Data } from "effect";
 import { SqlClient, SqlError } from "@effect/sql";
-import { Data, Effect } from "effect";
 
 export const clearTable = (
   tableName: string,
@@ -20,47 +21,43 @@ export const clearTable = (
     mapDeleteError(tableName),
   );
 
-  export class DatabaseError extends Data.TaggedError("DatabaseError")<{
+export type DatabaseError = SelectError | InsertError | UpdateError | DeleteError | CreateTableError | OtherDatabaseError;
+
+export class SelectError extends Data.TaggedError("SelectError")<{
   readonly message: string;
-  readonly operation:
-    | "select"
-    | "insert"
-    | "update"
-    | "delete"
-    | "createTable"
-    | "other";
   readonly table?: string;
   readonly cause?: unknown;
-}> {
-  static select(message: string, table?: string, cause?: unknown) {
-    return new DatabaseError({ message, operation: "select", table, cause });
-  }
+}> {}
 
-  static insert(message: string, table?: string, cause?: unknown) {
-    return new DatabaseError({ message, operation: "insert", table, cause });
-  }
+export class InsertError extends Data.TaggedError("InsertError")<{
+  readonly message: string;
+  readonly table?: string;
+  readonly cause?: unknown;
+}> {}
 
-  static update(message: string, table?: string, cause?: unknown) {
-    return new DatabaseError({ message, operation: "update", table, cause });
-  }
+export class UpdateError extends Data.TaggedError("UpdateError")<{
+  readonly message: string;
+  readonly table?: string;
+  readonly cause?: unknown;
+}> {}
 
-  static delete(message: string, table?: string, cause?: unknown) {
-    return new DatabaseError({ message, operation: "delete", table, cause });
-  }
+export class DeleteError extends Data.TaggedError("DeleteError")<{
+  readonly message: string;
+  readonly table?: string;
+  readonly cause?: unknown;
+}> {}
 
-  static createTable(message: string, table?: string, cause?: unknown) {
-    return new DatabaseError({
-      message,
-      operation: "createTable",
-      table,
-      cause,
-    });
-  }
+export class CreateTableError extends Data.TaggedError("CreateTableError")<{
+  readonly message: string;
+  readonly table?: string;
+  readonly cause?: unknown;
+}> {}
 
-  static other(message: string, table?: string, cause?: unknown) {
-    return new DatabaseError({ message, operation: "other", table, cause });
-  }
-}
+export class OtherDatabaseError extends Data.TaggedError("OtherDatabaseError")<{
+  readonly message: string;
+  readonly table?: string;
+  readonly cause?: unknown;
+}> {}
 
 /**
  * Helper function to map SQL errors to DatabaseError for createTable operations
@@ -70,16 +67,16 @@ export const clearTable = (
 export const mapCreateTableError = (tableName: string) =>
   Effect.mapError((error: unknown) =>
     error instanceof SqlError.SqlError
-      ? DatabaseError.createTable(
-          `Failed to create table ${tableName}`,
-          tableName,
-          error,
-        )
-      : DatabaseError.createTable(
-          `Unknown error during table creation: ${error}`,
-          tableName,
-          error,
-        ),
+      ? new CreateTableError({
+          message: `Failed to create table ${tableName}`,
+          table: tableName,
+          cause: error,
+        })
+      : new CreateTableError({
+          message: `Unknown error during table creation: ${error}`,
+          table: tableName,
+          cause: error,
+        }),
   );
 
 /**
@@ -90,16 +87,16 @@ export const mapCreateTableError = (tableName: string) =>
 export const mapSelectError = (tableName: string) =>
   Effect.mapError((error: unknown) =>
     error instanceof SqlError.SqlError
-      ? DatabaseError.select(
-          `Failed to select from table ${tableName}`,
-          tableName,
-          error,
-        )
-      : DatabaseError.select(
-          `Unknown error during select: ${error}`,
-          tableName,
-          error,
-        ),
+      ? new SelectError({
+          message: `Failed to select from table ${tableName}`,
+          table: tableName,
+          cause: error,
+        })
+      : new SelectError({
+          message: `Unknown error during select: ${error}`,
+          table: tableName,
+          cause: error,
+        }),
   );
 
 /**
@@ -110,16 +107,16 @@ export const mapSelectError = (tableName: string) =>
 export const mapInsertError = (tableName: string) =>
   Effect.mapError((error: unknown) =>
     error instanceof SqlError.SqlError
-      ? DatabaseError.insert(
-          `Failed to insert into table ${tableName}`,
-          tableName,
-          error,
-        )
-      : DatabaseError.insert(
-          `Unknown error during insert: ${error}`,
-          tableName,
-          error,
-        ),
+      ? new InsertError({
+          message: `Failed to insert into table ${tableName}`,
+          table: tableName,
+          cause: error,
+        })
+      : new InsertError({
+          message: `Unknown error during insert: ${error}`,
+          table: tableName,
+          cause: error,
+        }),
   );
 
 /**
@@ -130,16 +127,16 @@ export const mapInsertError = (tableName: string) =>
 export const mapUpdateError = (tableName: string) =>
   Effect.mapError((error: unknown) =>
     error instanceof SqlError.SqlError
-      ? DatabaseError.update(
-          `Failed to update table ${tableName}`,
-          tableName,
-          error,
-        )
-      : DatabaseError.update(
-          `Unknown error during update: ${error}`,
-          tableName,
-          error,
-        ),
+      ? new UpdateError({
+          message: `Failed to update table ${tableName}`,
+          table: tableName,
+          cause: error,
+        })
+      : new UpdateError({
+          message: `Unknown error during update: ${error}`,
+          table: tableName,
+          cause: error,
+        }),
   );
 
 /**
@@ -150,14 +147,14 @@ export const mapUpdateError = (tableName: string) =>
 export const mapDeleteError = (tableName: string) =>
   Effect.mapError((error: unknown) =>
     error instanceof SqlError.SqlError
-      ? DatabaseError.delete(
-          `Failed to delete from table ${tableName}`,
-          tableName,
-          error,
-        )
-      : DatabaseError.delete(
-          `Unknown error during delete: ${error}`,
-          tableName,
-          error,
-        ),
+      ? new DeleteError({
+          message: `Failed to delete from table ${tableName}`,
+          table: tableName,
+          cause: error,
+        })
+      : new DeleteError({
+          message: `Unknown error during delete: ${error}`,
+          table: tableName,
+          cause: error,
+        }),
   );

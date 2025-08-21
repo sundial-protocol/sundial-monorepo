@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import * as Ledger from "@/database/utils/ledger.js";
 import { clearTable } from "@/database/utils/common.js";
 import { Database } from "@/services/database.js";
-import { DatabaseError } from "@/error.js";
+import { DatabaseError } from "./utils/common.js";
 
 export const tableName = "mempool_ledger";
 
