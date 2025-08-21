@@ -10,7 +10,9 @@ import { Data, Effect, pipe, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
 import { Database } from "@/services/database.js";
 import { ImmutableDB } from "@/database/index.js";
-import { DatabaseError } from "@/database/utils/error.js";
+import { DatabaseError } from "@/database/utils/common.js";
+import { mapError } from "effect/Exit";
+import { SerializationError } from "@/utils.js";
 
 const RETRY_ATTEMPTS = 1;
 
@@ -150,15 +152,24 @@ export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
 ): Effect.Effect<
   { txs: readonly Buffer[]; headerHash: Buffer },
-  DatabaseError,
+  DatabaseError | SerializationError,
   Database
 > =>
   Effect.gen(function* () {
     const blockHeader = yield* SDK.Utils.getHeaderFromStateQueueDatum(
       firstBlockUTxO.datum,
+    ).pipe(
+      Effect.mapError((e) => new SerializationError({
+        message: `An error occurred on getting header from state queue datum`,
+        cause: e
+      }))
     );
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader).pipe(
       Effect.map((hh) => Buffer.from(fromHex(hh))),
+      Effect.mapError((e) => new SerializationError({
+        message: `An error occurred on hashing block header ${blockHeader}`,
+        cause: e
+      }))
     );
     const txHashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(headerHash);
     const txs = yield* ImmutableDB.retrieveTxCborsByHashes(txHashes);
