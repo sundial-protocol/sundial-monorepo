@@ -57,11 +57,12 @@ const wrapper = (
       yield* Effect.retry(
         Effect.tryPromise({
           try: () => lucid.awaitTx(targetTxHash),
-          catch: (e) => new ConfirmError({
+          catch: (e) =>
+            new ConfirmError({
               message: `Failed to confirm transaction`,
               txHash: targetTxHash,
               cause: e,
-          }),
+            }),
         }),
         Schedule.recurs(4),
       );

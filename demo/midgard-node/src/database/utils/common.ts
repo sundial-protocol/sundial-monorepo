@@ -21,7 +21,13 @@ export const clearTable = (
     mapDeleteError(tableName),
   );
 
-export type DatabaseError = SelectError | InsertError | UpdateError | DeleteError | CreateTableError | OtherDatabaseError;
+export type DatabaseError =
+  | SelectError
+  | InsertError
+  | UpdateError
+  | DeleteError
+  | CreateTableError
+  | OtherDatabaseError;
 
 export class SelectError extends Data.TaggedError("SelectError")<{
   readonly message: string;

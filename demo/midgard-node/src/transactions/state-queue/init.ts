@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { AlwaysSucceeds } from "@/services/index.js";
 import { NodeConfig, User } from "@/config.js";
-import { handleSignSubmit,  TransactionError } from "../utils.js";
+import { handleSignSubmit, TransactionError } from "../utils.js";
 
 export const stateQueueInit = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;

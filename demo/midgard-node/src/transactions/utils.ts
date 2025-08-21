@@ -41,11 +41,12 @@ export const handleSignSubmit = (
     yield* Effect.logInfo(`⏳ Confirming Transaction...`);
     yield* Effect.tryPromise({
       try: () => lucid.awaitTx(txHash, 10_000),
-      catch: (e: unknown) => new ConfirmError({
-        message:  `Failed to confirm transaction`,
-        txHash,
-        cause: e,
-      }),
+      catch: (e: unknown) =>
+        new ConfirmError({
+          message: `Failed to confirm transaction`,
+          txHash,
+          cause: e,
+        }),
     });
     yield* Effect.logInfo(`🎉 Transaction confirmed: ${txHash}`);
     yield* Effect.logInfo(`⌛ Pausing for ${PAUSE_DURATION}...`);
@@ -103,9 +104,10 @@ const signSubmitHelper = (
   Effect.gen(function* () {
     const walletAddr = yield* Effect.tryPromise({
       try: () => lucid.wallet().address(),
-      catch: (e) => new SignError({
+      catch: (e) =>
+        new SignError({
           message: `Failed to get wallet address:`,
-          cause: e
+          cause: e,
         }),
     }).pipe(Effect.catchAll((_e) => Effect.succeed("<unknown>")));
     yield* Effect.logInfo(`✍  Signing tx with ${walletAddr}...`);
@@ -113,10 +115,12 @@ const signSubmitHelper = (
       .withWallet()
       .completeProgram()
       .pipe(
-        Effect.mapError((e) => new SignError({
-          message: `Failed to sign transaction:`,
-          cause: e
-        }),
+        Effect.mapError(
+          (e) =>
+            new SignError({
+              message: `Failed to sign transaction:`,
+              cause: e,
+            }),
         ),
       );
     yield* Effect.logInfo(`Signed tx CBOR is:
@@ -130,11 +134,12 @@ ${signed.toCBOR()}
           Schedule.recurs(RETRY_ATTEMPTS),
         ),
       ),
-      Effect.mapError((e) =>
-        new SubmitError({
-          message: `Failed to submit transaction:`,
-          cause: e
-        }),
+      Effect.mapError(
+        (e) =>
+          new SubmitError({
+            message: `Failed to submit transaction:`,
+            cause: e,
+          }),
       ),
     );
     yield* Effect.logInfo(`🚀 Transaction submitted: ${txHash}`);
@@ -159,17 +164,23 @@ export const fetchFirstBlockTxs = (
     const blockHeader = yield* SDK.Utils.getHeaderFromStateQueueDatum(
       firstBlockUTxO.datum,
     ).pipe(
-      Effect.mapError((e) => new SerializationError({
-        message: `An error occurred on getting header from state queue datum`,
-        cause: e
-      }))
+      Effect.mapError(
+        (e) =>
+          new SerializationError({
+            message: `An error occurred on getting header from state queue datum`,
+            cause: e,
+          }),
+      ),
     );
     const headerHash = yield* SDK.Utils.hashHeader(blockHeader).pipe(
       Effect.map((hh) => Buffer.from(fromHex(hh))),
-      Effect.mapError((e) => new SerializationError({
-        message: `An error occurred on hashing block header ${blockHeader}`,
-        cause: e
-      }))
+      Effect.mapError(
+        (e) =>
+          new SerializationError({
+            message: `An error occurred on hashing block header ${blockHeader}`,
+            cause: e,
+          }),
+      ),
     );
     const txHashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(headerHash);
     const txs = yield* ImmutableDB.retrieveTxCborsByHashes(txHashes);
@@ -188,8 +199,7 @@ export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
   );
 };
 
-export type TransactionError = SignError | SubmitError | ConfirmError
-
+export type TransactionError = SignError | SubmitError | ConfirmError;
 
 export class SignError extends Data.TaggedError("SignError")<{
   readonly message: string;
