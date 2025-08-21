@@ -2,13 +2,13 @@ import { Effect } from "effect";
 import { clearTable } from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
-import { DatabaseError } from "@/error.js";
 import {
+  DatabaseError,
   mapCreateTableError,
   mapDeleteError,
   mapInsertError,
   mapSelectError,
-} from "./utils/error.js";
+} from "@/database/utils/common.js";
 
 export const tableName = "blocks";
 

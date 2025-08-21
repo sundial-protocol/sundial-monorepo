@@ -7,7 +7,7 @@ import {
   mapSelectError,
   mapInsertError,
   mapDeleteError,
-} from "./error.js";
+} from "@/database/utils/common.js";
 
 export enum Columns {
   TX_ID = "tx_id",

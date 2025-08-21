@@ -8,12 +8,9 @@ import { Level } from "level";
 import { NodeConfig } from "@/config.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
-
 import { Database } from "@/services/database.js";
-import { findSpentAndProducedUTxOs } from "@/utils.js";
+import { findSpentAndProducedUTxOs, SerializationError } from "@/utils.js";
 import * as FS from "fs";
-import { DatabaseError } from "@/database/utils/error.js";
-import { SerializationError } from "@/error.js";
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;

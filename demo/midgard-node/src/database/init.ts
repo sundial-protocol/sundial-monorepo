@@ -12,7 +12,7 @@ import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";
-import { DatabaseError } from "./utils/error.js";
+import { DatabaseError } from "./utils/common.js";
 
 export const initializeDb: () => Effect.Effect<
   void,

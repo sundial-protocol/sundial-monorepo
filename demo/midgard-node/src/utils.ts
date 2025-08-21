@@ -11,9 +11,8 @@ import {
   Provider,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Effect, pipe } from "effect";
+import { Data, Effect, pipe } from "effect";
 import * as Ledger from "@/database/utils/ledger.js";
-import { DeserializationError, SerializationError } from "./error.js";
 
 export type ProcessedTx = {
   txId: Buffer;
@@ -246,3 +245,21 @@ Kupmios:
 \u0009${chalk.bold("KUPO_URL")}   \u0009 URL of your Kupo instance
 \u0009${chalk.bold("OGMIOS_URL")} \u0009 URL of your Ogmios instance
 `;
+
+// General errors that doesn't have a specific domain
+export class DeserializationError extends Data.TaggedError(
+  "DeserializationError",
+)<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class SerializationError extends Data.TaggedError("SerializationError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class LucidError extends Data.TaggedError("LucidError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}

@@ -29,7 +29,7 @@ import { insertGenesisUtxos } from "@/database/genesis.js";
 import { deleteLedgerMpt, deleteMempoolMpt } from "@/workers/utils/mpt.js";
 import { Worker } from "worker_threads";
 import { WorkerOutput as BlockConfirmationWorkerOutput } from "@/workers/utils/confirm-block-commitments.js";
-import { WorkerError } from "@/workers/utils/error.js";
+import { WorkerError } from "@/workers/utils/common.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",

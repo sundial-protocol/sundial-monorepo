@@ -2,13 +2,13 @@ import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
-import { DatabaseError } from "@/error.js";
 import {
+  DatabaseError,
   mapCreateTableError,
   mapDeleteError,
   mapInsertError,
   mapSelectError,
-} from "./error.js";
+} from "@/database/utils/common.js";
 
 export enum Columns {
   TX_ID = "tx_id",

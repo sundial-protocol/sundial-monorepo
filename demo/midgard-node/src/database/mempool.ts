@@ -1,18 +1,17 @@
 import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
-import { clearTable } from "@/database/utils/common.js";
+import { clearTable, DatabaseError, mapSelectError } from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
-import { breakDownTx } from "@/utils.js";
-import { DatabaseError, mapSelectError } from "./utils/error.js";
+import { breakDownTx, DeserializationError } from "@/utils.js";
 
 export const tableName = "mempool";
 
 export const insert = (
   txString: string,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, DatabaseError | DeserializationError, Database> =>
   Effect.gen(function* () {
     const txCborBytes = fromHex(txString);
     const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);

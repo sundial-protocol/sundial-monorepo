@@ -18,9 +18,8 @@ import { Address, LucidEvolution, Script } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import { fetchFirstBlockTxs, handleSignSubmit } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
-import { breakDownTx } from "@/utils.js";
+import { breakDownTx, LucidError } from "@/utils.js";
 import { TransactionError } from "@/transactions/utils.js";
-import { LucidError } from "@/error.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",

@@ -28,7 +28,7 @@ import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 import { batchProgram } from "@/utils.js";
 import { Columns as TxColumns } from "@/database/utils/tx.js";
-import { WorkerError } from "./utils/error.js";
+import { WorkerError } from "./utils/common.js";
 
 const BATCH_SIZE = 100;
 

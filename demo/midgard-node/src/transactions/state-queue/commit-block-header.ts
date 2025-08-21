@@ -1,7 +1,7 @@
 import { WorkerOutput } from "@/workers/utils/commit-block-header.js";
 import { Effect, Metric } from "effect";
 import { Worker } from "worker_threads";
-import { WorkerError } from "@/workers/utils/error.js";
+import { WorkerError } from "@/workers/utils/common.js";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
