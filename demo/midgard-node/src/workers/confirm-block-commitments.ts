@@ -12,7 +12,7 @@ import {
 import { serializeStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { LucidEvolution } from "@lucid-evolution/lucid";
-import { TransactionError } from "@/transactions/utils.js";
+import { ConfirmError } from "@/transactions/utils.js";
 
 const inputData = workerData as WorkerInput;
 
@@ -57,12 +57,11 @@ const wrapper = (
       yield* Effect.retry(
         Effect.tryPromise({
           try: () => lucid.awaitTx(targetTxHash),
-          catch: (e) =>
-            TransactionError.confirm(
-              `Failed to confirm transaction: ${e}`,
-              targetTxHash,
-              e,
-            ),
+          catch: (e) => new ConfirmError({
+              message: `Failed to confirm transaction`,
+              txHash: targetTxHash,
+              cause: e,
+          }),
         }),
         Schedule.recurs(4),
       );

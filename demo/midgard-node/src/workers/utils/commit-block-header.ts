@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { CML, Data, coreToUtxo, utxoToCore } from "@lucid-evolution/lucid";
-import { SerializationError, DeserializationError } from "@/error.js";
+import { SerializationError, DeserializationError } from "@/utils.js";
 
 export type WorkerInput = {
   data: {
