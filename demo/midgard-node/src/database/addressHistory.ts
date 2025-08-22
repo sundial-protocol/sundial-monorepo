@@ -2,7 +2,7 @@ import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { clearTable, mapSqlError } from "@/database/utils/common.js";
-import { Address, CML } from "@lucid-evolution/lucid";
+import { Address } from "@lucid-evolution/lucid";
 import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
 import * as Tx from "@/database/utils/tx.js";
@@ -100,7 +100,7 @@ export const retrieve = (
       SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
       FROM ${MempoolDB.tableName}
       UNION
-      SELECT ${Tx.Columns.TX_ID}, ${sql(Tx.Columns.TX)}
+      SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
       FROM ${sql(ImmutableDB.tableName)}
     ) AS tx_union
     INNER JOIN ${sql(
