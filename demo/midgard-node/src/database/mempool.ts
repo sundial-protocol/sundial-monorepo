@@ -1,13 +1,11 @@
 import { Database } from "@/services/database.js";
-import * as TxUtils from "@/database/utils/tx.js";
-import * as LedgerUtils from "@/database/utils/ledger.js";
-import * as Common from "@/database/utils/common.js"
-
+import * as Tx from "@/database/utils/tx.js";
+import { clearTable, mapSqlError } from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect, Queue } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
-import { breakDownTx } from "../utils.js";
+import { breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
@@ -37,7 +35,7 @@ export const insert = (
     const txCborBytes = fromHex(txString);
     const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
     // Insert the tx itself in `MempoolDB`.
-    yield* TxUtils.insertEntry(tableName, {
+    yield* Tx.insertEntry(tableName, {
       tx_id: txId,
       tx: txCbor,
     });
@@ -53,30 +51,34 @@ export const insert = (
   );
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
-  TxUtils.retrieveValue(tableName, txHash);
+  Tx.retrieveValue(tableName, txHash);
 
 export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
-  TxUtils.retrieveValues(tableName, txHashes);
+  Tx.retrieveValues(tableName, txHashes);
 
-export const retrieve = (): Effect.Effect<readonly TxUtils.Entry[], Error, Database> =>
+export const retrieve = (): Effect.Effect<
+  readonly Tx.Entry[],
+  Error,
+  Database
+> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
-    return yield* sql<TxUtils.Entry>`SELECT ${sql(
-      TxUtils.Columns.TX_ID,
-    )}, ${sql(TxUtils.Columns.TX)} FROM ${sql(tableName)} LIMIT 100000`;
+    return yield* sql<Tx.Entry>`SELECT ${sql(
+      Tx.Columns.TX_ID,
+    )}, ${sql(Tx.Columns.TX)} FROM ${sql(tableName)} LIMIT 100000`;
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
-export const retrieveTxCount = () => TxUtils.retrieveNumberOfEntries(tableName);
+export const retrieveTxCount = () => Tx.retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
   txHashes: Buffer[],
-): Effect.Effect<void, Error, Database> => TxUtils.delMultiple(tableName, txHashes);
+): Effect.Effect<void, Error, Database> => Tx.delMultiple(tableName, txHashes);
 
-export const clear = () => Common.clearTable(tableName);
+export const clear = () => clearTable(tableName);

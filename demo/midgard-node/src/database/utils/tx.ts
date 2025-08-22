@@ -1,7 +1,7 @@
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
-import * as Common from "@/database/utils/common.js"
+import { mapSqlError } from "@/database/utils/common.js";
 
 export enum Columns {
   TX_ID = "tx_id",
@@ -18,7 +18,7 @@ export type EntryWithTimeStamp = EntryNoTimeStamp & {
   [Columns.TIMESTAMPTZ]: Date;
 };
 
-export type Entry = EntryNoTimeStamp | EntryWithTimeStamp
+export type Entry = EntryNoTimeStamp | EntryWithTimeStamp;
 
 export const createTable = (
   tableName: string,
@@ -31,7 +31,7 @@ export const createTable = (
       ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
       PRIMARY KEY (${sql(Columns.TX_ID)})
     );`;
-  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), Common.mapSqlError);
+  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 export const delMultiple = (
   tableName: string,
@@ -46,7 +46,7 @@ export const delMultiple = (
       Columns.TX_ID,
     )} IN ${sql.in(tx_id)} RETURNING ${sql(Columns.TX_ID)}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
-  }).pipe(Effect.withLogSpan(`delMutiple table ${tableName}`), Common.mapSqlError);
+  }).pipe(Effect.withLogSpan(`delMutiple table ${tableName}`), mapSqlError);
 
 export const retrieveValue = (
   tableName: string,
@@ -74,7 +74,7 @@ export const retrieveValue = (
         `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveValues = (
@@ -97,9 +97,8 @@ export const retrieveValues = (
         `${tableName} db: retrieving values error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
-
 
 export const insertEntry = (
   tableName: string,
@@ -116,7 +115,7 @@ export const insertEntry = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTX: ${JSON.stringify(e)}`),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const insertEntries = (
@@ -132,7 +131,7 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTXs: ${JSON.stringify(e)}`),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveEntries = (
@@ -145,11 +144,9 @@ export const retrieveEntries = (
   }).pipe(
     Effect.withLogSpan(`retrieve ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieve: ${JSON.stringify(e)}`,
-      ),
+      Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveNumberOfEntries = (
@@ -169,6 +166,5 @@ export const retrieveNumberOfEntries = (
         `${tableName} db: retrieveNumberOfEntries: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
-

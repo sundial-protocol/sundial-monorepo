@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import * as Common from "@/database/utils/common.js"
+import { mapSqlError, clearTable } from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 
@@ -25,7 +25,7 @@ type EntryNoHeightAndTS = {
 type Entry = EntryNoHeightAndTS & {
   [Columns.HEIGHT]: number;
   [Columns.TIMESTAMPTZ]: Date;
-}
+};
 
 export const init = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -57,17 +57,19 @@ export const insert = (
       yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
       return;
     }
-    const rowsToInsert: EntryNoHeightAndTS[] = txHashes.map((txHash: Buffer) => ({
-      [Columns.HEADER_HASH]: headerHash,
-      [Columns.TX_ID]: txHash,
-    }));
+    const rowsToInsert: EntryNoHeightAndTS[] = txHashes.map(
+      (txHash: Buffer) => ({
+        [Columns.HEADER_HASH]: headerHash,
+        [Columns.TX_ID]: txHash,
+      }),
+    );
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(rowsToInsert)}`;
   }).pipe(
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: inserting error: ${e}`),
     ),
     Effect.withLogSpan(`insert ${tableName}`),
-    Common.mapSqlError,
+    mapSqlError,
     Effect.asVoid,
   );
 
@@ -95,7 +97,7 @@ export const retrieveTxHashesByHeaderHash = (
         `${tableName} db: retrieving txHashes error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieveHeaderHashByTxHash = (
@@ -128,7 +130,7 @@ export const retrieveHeaderHashByTxHash = (
         `${tableName} db: retrieving headerHash error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 /** Associated inputs are also deleted.
@@ -155,7 +157,7 @@ export const clearBlock = (
         `${tableName} db: clearing block error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
@@ -172,8 +174,8 @@ export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
         `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
       ),
     ),
-    Common.mapSqlError,
+    mapSqlError,
   );
 
 export const clear = (): Effect.Effect<void, Error, Database> =>
-  Common.clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));
+  clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));

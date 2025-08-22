@@ -4,15 +4,20 @@ import * as ConfirmedLedgerDB from "./confirmedLedger.js";
 import * as ImmutableDB from "./immutable.js";
 import * as LatestLedgerDB from "./latestLedger.js";
 import * as MempoolDB from "./mempool.js";
+import * as ProcessedMempoolDB from "./processedMempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import * as TxUtils from "@/database/utils/tx.js";
-import * as LedgerUtils from "@/database/utils/ledger.js";
-
-
+import * as Tx from "@/database/utils/tx.js";
+import * as Ledger from "@/database/utils/ledger.js";
 import { Effect } from "effect";
 import { Database } from "@/services/database.js";
+import { insertGenesisUtxos } from "./genesis.js";
+import { NodeConfig } from "@/config.js";
 
-export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
+export const initializeDb: () => Effect.Effect<
+  void,
+  Error,
+  Database | NodeConfig
+> = () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     // yield* sql`SET default_transaction_read_only TO 'off'`;
@@ -26,5 +31,7 @@ export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
     yield* LedgerUtils.createTable(ConfirmedLedgerDB.tableName);
     yield* LedgerUtils.createTable(LatestLedgerDB.tableName);
 
-    Effect.logInfo("Connected to the PostgreSQL database");
+    yield* insertGenesisUtxos;
+
+    yield* Effect.logInfo("PostgreSQL database initialized Successfully.");
   });

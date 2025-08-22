@@ -1,25 +1,26 @@
 import { Effect } from "effect";
-import * as LedgerUtils from "@/database/utils/ledger.js";
-import * as Common from "@/database/utils/common.js"
+import * as Ledger from "@/database/utils/ledger.js";
+import { clearTable } from "@/database/utils/common.js";
 
 import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";
 
-export const insert = (entries: LedgerUtils.Entry[]) =>
-  LedgerUtils.insertEntries(tableName, entries);
+export const insert = (entries: Ledger.Entry[]) =>
+  Ledger.insertEntries(tableName, entries);
 
 export const retrieve = (): Effect.Effect<
-  readonly LedgerUtils.Entry[],
+  readonly Ledger.Entry[],
   Error,
   Database
-> => LedgerUtils.retrieveEntries(tableName);
+> => Ledger.retrieveEntries(tableName);
 
 export const retrieveByAddress = (
   address: string,
-): Effect.Effect<readonly LedgerUtils.Entry[], Error, Database> =>
-  LedgerUtils.retrieveEntriesWithAddress(tableName, address);
+): Effect.Effect<readonly Ledger.Entry[], Error, Database> =>
+  Ledger.retrieveEntriesWithAddress(tableName, address);
 
-export const clearUTxOs = (refs: Buffer[]) => LedgerUtils.delEntries(tableName, refs);
+export const clearUTxOs = (refs: Buffer[]) =>
+  Ledger.delEntries(tableName, refs);
 
-export const clear = () => Common.clearTable(tableName);
+export const clear = () => clearTable(tableName);
