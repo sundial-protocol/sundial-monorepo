@@ -31,11 +31,11 @@ export const handleSignSubmit = (
   signBuilder: TxSignBuilder,
   onSubmitFailure: (
     error: SubmitError,
-  ) => Effect.Effect<void, TransactionError>,
+  ) => Effect.Effect<void, SubmitError>,
   onConfirmFailure: (
     error: ConfirmError,
-  ) => Effect.Effect<void, TransactionError>,
-): Effect.Effect<string | void, TransactionError> =>
+  ) => Effect.Effect<void, ConfirmError>,
+): Effect.Effect<string | void, SubmitError | ConfirmError | SignError> =>
   Effect.gen(function* () {
     const txHash = yield* signSubmitHelper(lucid, signBuilder);
     yield* Effect.logInfo(`⏳ Confirming Transaction...`);
@@ -54,7 +54,7 @@ export const handleSignSubmit = (
     yield* Effect.logInfo("✅ Pause ended.");
     return txHash;
   }).pipe(
-    Effect.catchAll((e: TransactionError) => {
+    Effect.catchAll((e: SubmitError | ConfirmError | SignError): Effect.Effect<void, SubmitError | ConfirmError | SignError, never> => {
       switch (e._tag) {
         case "SubmitError":
           return onSubmitFailure(e);
@@ -81,13 +81,13 @@ export const handleSignSubmitNoConfirmation = (
   signBuilder: TxSignBuilder,
   onSubmitFailure: (
     error: SubmitError,
-  ) => Effect.Effect<void, TransactionError>,
-): Effect.Effect<string | void, TransactionError> =>
+  ) => Effect.Effect<void, SignError | SubmitError>,
+): Effect.Effect<string | void, SignError | SubmitError> =>
   Effect.gen(function* () {
     const txHash = yield* signSubmitHelper(lucid, signBuilder);
     return txHash;
   }).pipe(
-    Effect.catchAll((e: TransactionError) =>
+    Effect.catchAll((e: SignError | SubmitError) =>
       e._tag === "SubmitError"
         ? onSubmitFailure(e)
         : pipe(
@@ -198,8 +198,6 @@ export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
     outRef0.outputIndex === outRef1.outputIndex
   );
 };
-
-export type TransactionError = SignError | SubmitError | ConfirmError;
 
 export class SignError extends Data.TaggedError("SignError")<{
   readonly message: string;

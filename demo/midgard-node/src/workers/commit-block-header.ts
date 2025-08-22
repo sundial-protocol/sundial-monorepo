@@ -15,7 +15,7 @@ import {
 } from "@/database/index.js";
 import {
   handleSignSubmitNoConfirmation,
-  TransactionError,
+  SubmitError,
 } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
 import {
@@ -157,7 +157,7 @@ const wrapper = (
 
           let output: WorkerOutput | undefined = undefined;
 
-          const onSubmitFailure = (err: TransactionError) =>
+          const onSubmitFailure = (err: SubmitError) =>
             Effect.gen(function* () {
               yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err.message}`);
               yield* Effect.logError(
