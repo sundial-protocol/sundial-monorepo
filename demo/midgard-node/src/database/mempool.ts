@@ -4,12 +4,31 @@ import * as LedgerUtils from "@/database/utils/ledger.js";
 import * as Common from "@/database/utils/common.js"
 
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { Effect } from "effect";
+import { Effect, Queue } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
 import { breakDownTx } from "../utils.js";
 
 export const tableName = "mempool";
+
+const incomingQueueEffect = Queue.unbounded<string>()
+
+export const addToQueue = (txString: string) =>
+  Effect.gen(function* () {
+    const queue = yield* incomingQueueEffect
+    queue.offer(txString)
+})
+
+export const init = Effect.gen(function* () {
+  yield* TxUtils.createTable(tableName)
+  Effect.forkDaemon(
+    Effect.gen(function* () {
+      const queue = yield* incomingQueueEffect
+      const txString = yield* queue.take
+      yield* insert(txString)
+    }).pipe(Effect.forever)
+  )
+});
 
 export const insert = (
   txString: string,

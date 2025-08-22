@@ -20,7 +20,7 @@ export const initializeDb: () => Effect.Effect<void, Error, Database> = () =>
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
     yield* BlocksDB.init;
-    yield* TxUtils.createTable(MempoolDB.tableName);
+    yield* MempoolDB.init;
     yield* LedgerUtils.createTable(MempoolLedgerDB.tableName);
     yield* TxUtils.createTable(ImmutableDB.tableName);
     yield* LedgerUtils.createTable(ConfirmedLedgerDB.tableName);

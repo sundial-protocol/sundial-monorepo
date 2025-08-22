@@ -8,7 +8,7 @@ import { fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Duration, Effect, Layer, Metric, pipe, Schedule } from "effect";
+import { Duration, Effect, Layer, Metric, pipe, Queue, Schedule } from "effect";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -343,7 +343,7 @@ const getLogGlobalsHandler = Effect.gen(function* () {
 });
 
 const postSubmitHandler = Effect.gen(function* () {
-  // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
+  yield* Effect.logDebug(`◻️  Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
@@ -354,10 +354,10 @@ const postSubmitHandler = Effect.gen(function* () {
     );
   } else {
     const txString = txStringParam;
-    yield* MempoolDB.insert(txString);
+    yield* MempoolDB.addToQueue(txString);
     Effect.runSync(Metric.increment(txCounter));
     return yield* HttpServerResponse.json({
-      message: `Successfully submitted the transaction`,
+      message: `Successfully added the transaction to the queue`,
     });
   }
 }).pipe(
