@@ -430,7 +430,7 @@ const blockCommitmentAction = Effect.gen(function* () {
 });
 
 const blockConfirmationAction = Effect.gen(function* () {
-  yield* Effect.logInfo("🟤 New block confirmation process started.");
+  yield* Effect.logInfo("🔍 New block confirmation process started.");
   const worker = Effect.async<BlockConfirmationWorkerOutput, Error>(
     (resume) => {
       Effect.runSync(
@@ -484,7 +484,7 @@ const blockConfirmationAction = Effect.gen(function* () {
     case "SuccessfulConfirmationOutput": {
       global.UNCONFIRMED_SUBMITTED_BLOCK = "";
       global.AVAILABLE_CONFIRMED_BLOCK = workerOutput.blocksUTxO;
-      yield* Effect.logInfo("🟤 ☑️  Submitted block confirmed.");
+      yield* Effect.logInfo("🔍 ☑️  Submitted block confirmed.");
       break;
     }
     case "NoTxForConfirmationOutput": {
@@ -534,7 +534,7 @@ const blockCommitmentFork = (rerunDelay: number) =>
 
 const blockConfirmationFork = (rerunDelay: number) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo("🟫 Block confirmation fork started.");
+    yield* Effect.logInfo("🟤 Block confirmation fork started.");
     const action = blockConfirmationAction.pipe(
       Effect.withSpan("block-confirmation-fork"),
       Effect.catchAllCause(Effect.logWarning),

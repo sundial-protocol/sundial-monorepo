@@ -1,5 +1,6 @@
 import * as SDK from "@al-ft/midgard-sdk";
 import {
+  Address,
   Assets,
   Data,
   LucidEvolution,
@@ -14,6 +15,7 @@ import { batchProgram } from "@/utils.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
+  l1OperatorAddress: Address,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   stateQueueSpendingScript: Script,
   stateQueueMintingScript: Script,
@@ -21,7 +23,7 @@ const collectAndBurnStateQueueNodesProgram = (
 ): Effect.Effect<void, Error> =>
   Effect.gen(function* () {
     global.RESET_IN_PROGRESS = true;
-    const tx = lucid.newTx();
+    const tx = lucid.newTx().addSigner(l1OperatorAddress);
     const assetsToBurn: Assets = {};
     stateQueueUTxOs.map(({ utxo, assetName }) => {
       const unit = toUnit(fetchConfig.stateQueuePolicyId, assetName);
@@ -69,7 +71,16 @@ export const resetStateQueue = Effect.gen(function* () {
       fetchConfig,
     );
 
+  if (allStateQueueUTxOs.length <= 0) {
+    yield* Effect.logInfo(`🚧 No state queue UTxOs were found.`);
+  }
+
   lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
+
+  const l1OperatorAddr = yield* Effect.tryPromise({
+    try: () => lucid.wallet().address(),
+    catch: (e) => new Error(`${e}`),
+  });
 
   // Collect and burn 40 UTxOs and asset names at a time:
   const batchSize = 40;
@@ -83,12 +94,13 @@ export const resetStateQueue = Effect.gen(function* () {
         yield* Effect.logInfo(`🚧 Batch ${startIndex}-${endIndex}`);
         yield* collectAndBurnStateQueueNodesProgram(
           lucid,
+          l1OperatorAddr,
           fetchConfig,
           alwaysSucceeds.spendScript,
           alwaysSucceeds.mintScript,
           batch,
         );
-      }),
+      }).pipe(Effect.tapError((e) => Effect.logError(e))),
     1,
   );
   yield* Effect.logInfo(`🚧 Resetting global variables...`);
