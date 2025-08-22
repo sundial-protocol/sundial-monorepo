@@ -81,7 +81,7 @@ export const resetStateQueue = Effect.gen(function* () {
       Effect.gen(function* () {
         const batch = allStateQueueUTxOs.slice(startIndex, endIndex);
         yield* Effect.logInfo(`🚧 Batch ${startIndex}-${endIndex}`);
-        collectAndBurnStateQueueNodesProgram(
+        yield* collectAndBurnStateQueueNodesProgram(
           lucid,
           fetchConfig,
           alwaysSucceeds.spendScript,

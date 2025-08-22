@@ -16,14 +16,15 @@ export type Entry = {
   [Ledger.Columns.ADDRESS]: Address;
 };
 
-export const init: Effect.Effect<void, Error, Database> =
-  Effect.gen(function* () {
+export const init: Effect.Effect<void, Error, Database> = Effect.gen(
+  function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(Ledger.Columns.TX_ID)} BYTEA NOT NULL,
       ${sql(Ledger.Columns.ADDRESS)} TEXT NOT NULL
     );`;
-  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
+  },
+).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
 
 export const insertEntries = (
   entries: Entry[],
@@ -125,4 +126,4 @@ export const retrieve = (
     mapSqlError,
   );
 
-export const clear = clearTable(tableName)
+export const clear = clearTable(tableName);
