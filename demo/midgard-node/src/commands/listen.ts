@@ -341,7 +341,7 @@ const getLogGlobalsHandler = Effect.gen(function* () {
 });
 
 const postSubmitHandler = Effect.gen(function* () {
-  yield* Effect.logDebug(`◻️  Submit request received for transaction`);
+  yield* Effect.logInfo(`◻️  Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {

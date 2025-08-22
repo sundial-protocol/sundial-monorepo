@@ -19,10 +19,11 @@ export const addToQueue = (txString: string) =>
 
 export const init = Effect.gen(function* () {
   yield* Tx.createTable(tableName)
-  Effect.forkDaemon(
+  yield* Effect.forkDaemon(
     Effect.gen(function* () {
       const queue = yield* incomingQueueEffect
       const txString = yield* queue.take
+      yield* Effect.logInfo(`  Took data from the incomingQueueEffect`);
       yield* insert(txString)
     }).pipe(Effect.forever)
   )
