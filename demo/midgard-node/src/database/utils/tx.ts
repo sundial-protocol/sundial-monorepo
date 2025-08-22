@@ -2,12 +2,14 @@ import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import {
-  DatabaseError,
   SelectError,
   mapCreateTableError,
   mapSelectError,
   mapInsertError,
   mapDeleteError,
+  DeleteError,
+  CreateTableError,
+  InsertError,
 } from "@/database/utils/common.js";
 
 export enum Columns {
@@ -29,7 +31,7 @@ export type Entry = EntryNoTimeStamp | EntryWithTimeStamp;
 
 export const createTable = (
   tableName: string,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, CreateTableError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
@@ -46,7 +48,7 @@ export const createTable = (
 export const delMultiple = (
   tableName: string,
   tx_id: Buffer[],
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, DeleteError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(
@@ -64,7 +66,7 @@ export const delMultiple = (
 export const retrieveValue = (
   tableName: string,
   tx_id: Buffer,
-): Effect.Effect<Buffer, DatabaseError, Database> =>
+): Effect.Effect<Buffer, SelectError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
@@ -96,7 +98,7 @@ export const retrieveValue = (
 export const retrieveValues = (
   tableName: string,
   tx_ids: Buffer[] | readonly Buffer[],
-): Effect.Effect<readonly Buffer[], DatabaseError, Database> =>
+): Effect.Effect<readonly Buffer[], SelectError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
@@ -119,7 +121,7 @@ export const retrieveValues = (
 export const insertEntry = (
   tableName: string,
   txPair: Entry,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, InsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTX`);
     const sql = yield* SqlClient.SqlClient;
@@ -137,7 +139,7 @@ export const insertEntry = (
 export const insertEntries = (
   tableName: string,
   pairs: Entry[],
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, InsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTXs`);
     const sql = yield* SqlClient.SqlClient;
@@ -152,7 +154,7 @@ export const insertEntries = (
 
 export const retrieveEntries = (
   tableName: string,
-): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], SelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
     const sql = yield* SqlClient.SqlClient;
@@ -167,7 +169,7 @@ export const retrieveEntries = (
 
 export const retrieveNumberOfEntries = (
   tableName: string,
-): Effect.Effect<number, DatabaseError, Database> =>
+): Effect.Effect<number, SelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to get number of entries`);
     const sql = yield* SqlClient.SqlClient;

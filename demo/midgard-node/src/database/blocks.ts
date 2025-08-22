@@ -1,9 +1,13 @@
 import { Effect } from "effect";
-import { clearTable } from "@/database/utils/common.js";
+import {
+  clearTable,
+  DeleteError,
+  InsertError,
+  SelectError,
+} from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 import {
-  DatabaseError,
   mapCreateTableError,
   mapDeleteError,
   mapInsertError,
@@ -57,7 +61,7 @@ export const init = Effect.gen(function* () {
 export const insert = (
   headerHash: Buffer,
   txHashes: Buffer[],
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, InsertError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     if (!txHashes.length) {
@@ -82,7 +86,7 @@ export const insert = (
 
 export const retrieveTxHashesByHeaderHash = (
   headerHash: Buffer,
-): Effect.Effect<readonly Buffer[], DatabaseError, Database> =>
+): Effect.Effect<readonly Buffer[], SelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve txHashes for block ${headerHash}`,
@@ -109,7 +113,7 @@ export const retrieveTxHashesByHeaderHash = (
 
 export const retrieveHeaderHashByTxHash = (
   txHash: Buffer,
-): Effect.Effect<Buffer, DatabaseError, Database> =>
+): Effect.Effect<Buffer, SelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve headerHash for txHash ${txHash}`,
@@ -144,7 +148,7 @@ export const retrieveHeaderHashByTxHash = (
  */
 export const clearBlock = (
   headerHash: Buffer,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, DeleteError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt clear block ${headerHash}`,
@@ -169,7 +173,7 @@ export const clearBlock = (
 
 export const retrieve = (): Effect.Effect<
   readonly Entry[],
-  DatabaseError,
+  SelectError,
   Database
 > =>
   Effect.gen(function* () {
@@ -188,5 +192,5 @@ export const retrieve = (): Effect.Effect<
     mapSelectError(tableName),
   );
 
-export const clear = (): Effect.Effect<void, DatabaseError, Database> =>
+export const clear = (): Effect.Effect<void, DeleteError, Database> =>
   clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));

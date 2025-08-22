@@ -3,11 +3,14 @@ import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
 import {
-  DatabaseError,
+  CreateTableError,
+  DeleteError,
+  InsertError,
   mapCreateTableError,
   mapDeleteError,
   mapInsertError,
   mapSelectError,
+  SelectError,
 } from "@/database/utils/common.js";
 
 export enum Columns {
@@ -38,7 +41,7 @@ export type MinimalEntry = {
 
 export const createTable = (
   tableName: string,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, CreateTableError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql.withTransaction(
@@ -64,7 +67,7 @@ export const createTable = (
 export const insertEntry = (
   tableName: string,
   entry: Entry,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, InsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert Ledger UTxO`);
     const sql = yield* SqlClient.SqlClient;
@@ -81,7 +84,7 @@ export const insertEntry = (
 export const insertEntries = (
   tableName: string,
   entries: Entry[],
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, InsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert Ledger UTxOs`);
     const sql = yield* SqlClient.SqlClient;
@@ -97,7 +100,7 @@ export const insertEntries = (
 
 export const retrieveEntries = (
   tableName: string,
-): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], SelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieveEntries`);
     const sql = yield* SqlClient.SqlClient;
@@ -115,7 +118,7 @@ export const retrieveEntries = (
 export const retrieveEntriesWithAddress = (
   tableName: string,
   address: Address,
-): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], SelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve Ledger UTxOs`);
     const sql = yield* SqlClient.SqlClient;
@@ -135,7 +138,7 @@ export const retrieveEntriesWithAddress = (
 export const delEntries = (
   tableName: string,
   outrefs: Buffer[],
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, DeleteError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(

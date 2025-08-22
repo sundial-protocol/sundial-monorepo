@@ -5,7 +5,7 @@ import { SqlClient, SqlError } from "@effect/sql";
 
 export const clearTable = (
   tableName: string,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, DeleteError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to clear table`);
     const sql = yield* SqlClient.SqlClient;
@@ -20,14 +20,6 @@ export const clearTable = (
     ),
     mapDeleteError(tableName),
   );
-
-export type DatabaseError =
-  | SelectError
-  | InsertError
-  | UpdateError
-  | DeleteError
-  | CreateTableError
-  | OtherDatabaseError;
 
 export class SelectError extends Data.TaggedError("SelectError")<{
   readonly message: string;

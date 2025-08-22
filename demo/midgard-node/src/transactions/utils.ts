@@ -10,8 +10,8 @@ import { Data, Effect, pipe, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
 import { Database } from "@/services/database.js";
 import { ImmutableDB } from "@/database/index.js";
-import { DatabaseError } from "@/database/utils/common.js";
 import { SerializationError } from "@/utils.js";
+import { SelectError } from "@/database/utils/common.js";
 
 const RETRY_ATTEMPTS = 1;
 
@@ -157,7 +157,7 @@ export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
 ): Effect.Effect<
   { txs: readonly Buffer[]; headerHash: Buffer },
-  DatabaseError | SerializationError,
+  SelectError | SerializationError,
   Database
 > =>
   Effect.gen(function* () {

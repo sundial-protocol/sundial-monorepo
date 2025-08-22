@@ -12,11 +12,11 @@ import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";
-import { DatabaseError, OtherDatabaseError } from "./utils/common.js";
+import { CreateTableError, OtherDatabaseError } from "./utils/common.js";
 
 export const initializeDb: () => Effect.Effect<
   void,
-  DatabaseError,
+  CreateTableError | OtherDatabaseError,
   Database | NodeConfig
 > = () =>
   Effect.gen(function* () {

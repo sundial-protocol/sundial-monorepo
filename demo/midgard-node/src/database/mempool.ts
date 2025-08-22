@@ -2,8 +2,10 @@ import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
 import {
   clearTable,
-  DatabaseError,
+  DeleteError,
+  InsertError,
   mapSelectError,
+  SelectError,
 } from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
@@ -15,7 +17,11 @@ export const tableName = "mempool";
 
 export const insert = (
   txString: string,
-): Effect.Effect<void, DatabaseError | DeserializationError, Database> =>
+): Effect.Effect<
+  void,
+  InsertError | DeleteError | DeserializationError,
+  Database
+> =>
   Effect.gen(function* () {
     const txCborBytes = fromHex(txString);
     const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
@@ -43,7 +49,7 @@ export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
 
 export const retrieve = (): Effect.Effect<
   readonly Tx.Entry[],
-  DatabaseError,
+  SelectError,
   Database
 > =>
   Effect.gen(function* () {
@@ -64,7 +70,7 @@ export const retrieveTxCount = () => Tx.retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
   txHashes: Buffer[],
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<void, DeleteError, Database> =>
   Tx.delMultiple(tableName, txHashes);
 
 export const clear = () => clearTable(tableName);
