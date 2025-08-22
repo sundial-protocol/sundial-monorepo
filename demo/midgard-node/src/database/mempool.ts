@@ -18,7 +18,7 @@ export const addToQueue = (txString: string) =>
 })
 
 export const init = Effect.gen(function* () {
-  yield* TxUtils.createTable(tableName)
+  yield* Tx.createTable(tableName)
   Effect.forkDaemon(
     Effect.gen(function* () {
       const queue = yield* incomingQueueEffect
