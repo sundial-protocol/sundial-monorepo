@@ -26,10 +26,10 @@ export const initializeDb: () => Effect.Effect<
 
     yield* BlocksDB.init;
     yield* MempoolDB.init;
-    yield* LedgerUtils.createTable(MempoolLedgerDB.tableName);
-    yield* TxUtils.createTable(ImmutableDB.tableName);
-    yield* LedgerUtils.createTable(ConfirmedLedgerDB.tableName);
-    yield* LedgerUtils.createTable(LatestLedgerDB.tableName);
+    yield* Ledger.createTable(MempoolLedgerDB.tableName);
+    yield* Tx.createTable(ImmutableDB.tableName);
+    yield* Ledger.createTable(ConfirmedLedgerDB.tableName);
+    yield* Ledger.createTable(LatestLedgerDB.tableName);
 
     yield* insertGenesisUtxos;
 
