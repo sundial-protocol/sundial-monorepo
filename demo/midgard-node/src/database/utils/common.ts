@@ -21,138 +21,72 @@ export const clearTable = (
     mapDeleteError(tableName),
   );
 
-export class SelectError extends Data.TaggedError("SelectError")<{
+type DatabaseErrorFields = {
   readonly message: string;
   readonly table?: string;
   readonly cause?: unknown;
-}> {}
+}
 
-export class InsertError extends Data.TaggedError("InsertError")<{
-  readonly message: string;
-  readonly table?: string;
-  readonly cause?: unknown;
-}> {}
+export class SelectError extends Data.TaggedError("SelectError")<DatabaseErrorFields> {}
+export class InsertError extends Data.TaggedError("InsertError")<DatabaseErrorFields> {}
+export class UpdateError extends Data.TaggedError("UpdateError")<DatabaseErrorFields> {}
+export class DeleteError extends Data.TaggedError("DeleteError")<DatabaseErrorFields> {}
+export class CreateTableError extends Data.TaggedError("CreateTableError")<DatabaseErrorFields> {}
+export class OtherDatabaseError extends Data.TaggedError("OtherDatabaseError")<DatabaseErrorFields> {}
 
-export class UpdateError extends Data.TaggedError("UpdateError")<{
-  readonly message: string;
-  readonly table?: string;
-  readonly cause?: unknown;
-}> {}
+type DatabaseErrorConstructor<T> = new (args: DatabaseErrorFields) => T
 
-export class DeleteError extends Data.TaggedError("DeleteError")<{
-  readonly message: string;
-  readonly table?: string;
-  readonly cause?: unknown;
-}> {}
-
-export class CreateTableError extends Data.TaggedError("CreateTableError")<{
-  readonly message: string;
-  readonly table?: string;
-  readonly cause?: unknown;
-}> {}
-
-export class OtherDatabaseError extends Data.TaggedError("OtherDatabaseError")<{
-  readonly message: string;
-  readonly table?: string;
-  readonly cause?: unknown;
-}> {}
-
-/**
- * Helper function to map SQL errors to DatabaseError for createTable operations
- * @param tableName - Name of the table being created
- * @returns Effect that transforms SqlError to DatabaseError
- */
-export const mapCreateTableError = (tableName: string) =>
-  Effect.mapError((error: unknown) =>
-    error instanceof SqlError.SqlError
-      ? new CreateTableError({
-          message: `Failed to create table ${tableName}`,
-          table: tableName,
-          cause: error,
-        })
-      : new CreateTableError({
-          message: `Unknown error during table creation: ${error}`,
-          table: tableName,
-          cause: error,
-        }),
-  );
+function createMapError(
+  ErrorClass: DatabaseErrorConstructor<any>,
+  action: string,
+) {
+  return (tableName: string) =>
+    Effect.mapError((error: unknown) =>
+      error instanceof SqlError.SqlError
+        ? new ErrorClass({
+            message: `Failed to ${action}`,
+            table: tableName,
+            cause: error,
+          })
+        : new ErrorClass({
+            message: `Unknown error during ${action}`,
+            table: tableName,
+            cause: error,
+          }),
+    )
+}
 
 /**
  * Helper function to map SQL errors to DatabaseError for select operations
  * @param tableName - Name of the table being queried
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapSelectError = (tableName: string) =>
-  Effect.mapError((error: unknown) =>
-    error instanceof SqlError.SqlError
-      ? new SelectError({
-          message: `Failed to select from table ${tableName}`,
-          table: tableName,
-          cause: error,
-        })
-      : new SelectError({
-          message: `Unknown error during select: ${error}`,
-          table: tableName,
-          cause: error,
-        }),
-  );
+export const mapSelectError = createMapError(SelectError, "select from table")
 
 /**
  * Helper function to map SQL errors to DatabaseError for insert operations
  * @param tableName - Name of the table being inserted into
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapInsertError = (tableName: string) =>
-  Effect.mapError((error: unknown) =>
-    error instanceof SqlError.SqlError
-      ? new InsertError({
-          message: `Failed to insert into table ${tableName}`,
-          table: tableName,
-          cause: error,
-        })
-      : new InsertError({
-          message: `Unknown error during insert: ${error}`,
-          table: tableName,
-          cause: error,
-        }),
-  );
+export const mapInsertError = createMapError(InsertError, "insert into table")
 
 /**
  * Helper function to map SQL errors to DatabaseError for update operations
  * @param tableName - Name of the table being updated
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapUpdateError = (tableName: string) =>
-  Effect.mapError((error: unknown) =>
-    error instanceof SqlError.SqlError
-      ? new UpdateError({
-          message: `Failed to update table ${tableName}`,
-          table: tableName,
-          cause: error,
-        })
-      : new UpdateError({
-          message: `Unknown error during update: ${error}`,
-          table: tableName,
-          cause: error,
-        }),
-  );
+export const mapUpdateError = createMapError(UpdateError, "update table")
 
 /**
  * Helper function to map SQL errors to DatabaseError for delete operations
  * @param tableName - Name of the table being deleted from
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapDeleteError = (tableName: string) =>
-  Effect.mapError((error: unknown) =>
-    error instanceof SqlError.SqlError
-      ? new DeleteError({
-          message: `Failed to delete from table ${tableName}`,
-          table: tableName,
-          cause: error,
-        })
-      : new DeleteError({
-          message: `Unknown error during delete: ${error}`,
-          table: tableName,
-          cause: error,
-        }),
-  );
+export const mapDeleteError = createMapError(DeleteError, "delete from table")
+
+/**
+ * Helper function to map SQL errors to DatabaseError for createTable operations
+ * @param tableName - Name of the table being created
+ * @returns Effect that transforms SqlError to DatabaseError
+ */
+export const mapCreateTableError = createMapError(CreateTableError, "create table")
