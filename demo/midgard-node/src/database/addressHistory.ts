@@ -98,7 +98,7 @@ export const retrieve = (
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
     const result = yield* sql<Buffer>`SELECT ${sql(Tx.Columns.TX)} FROM (
       SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
-      FROM ${MempoolDB.tableName}
+      FROM ${sql(MempoolDB.tableName)}
       UNION
       SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
       FROM ${sql(ImmutableDB.tableName)}
