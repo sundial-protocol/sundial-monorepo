@@ -10,11 +10,10 @@ import { breakDownTx } from "@/utils.js";
 export const tableName = "mempool";
 
 export const init = (mempoolDBQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
-  yield* Effect.logInfo(`  Init MempoolDB`)
   yield* Tx.createTable(tableName)
   yield* Effect.forkDaemon(
     Effect.gen(function* () {
-      yield* Effect.logInfo(`  Start daemon`);
+      yield* Effect.logInfo(`  Start init MempoolDB daemon`);
       yield* Effect.forever(Effect.gen(function* () {
         const size = yield* mempoolDBQueue.size
         yield* Effect.logInfo(`  Out Queue size is ${size}`);
@@ -23,8 +22,6 @@ export const init = (mempoolDBQueue: Queue.Dequeue<string>) => Effect.gen(functi
           onNone: () => Effect.void,
           onSome: (txString) => insert(txString)
         })
-
-        yield* Effect.sleep("1 second")
       }))
     })
   )
