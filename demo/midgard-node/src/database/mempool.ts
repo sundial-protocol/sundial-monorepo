@@ -2,7 +2,7 @@ import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
 import { clearTable, mapSqlError } from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { Effect, Queue } from "effect";
+import { Effect, Option, Queue } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
 import { breakDownTx } from "@/utils.js";
@@ -18,8 +18,12 @@ export const init = (mempoolDBQueue: Queue.Dequeue<string>) => Effect.gen(functi
       yield* Effect.forever(Effect.gen(function* () {
         const size = yield* mempoolDBQueue.size
         yield* Effect.logInfo(`  Out Queue size is ${size}`);
-        const txString = yield* mempoolDBQueue.take
-        yield* insert(txString)
+        const optionTxString : Option.Option<string> = yield* Queue.poll(mempoolDBQueue)
+        yield* Option.match(optionTxString, {
+          onNone: () => Effect.void,
+          onSome: (txString) => insert(txString)
+        })
+
         yield* Effect.sleep("1 second")
       }))
     })
