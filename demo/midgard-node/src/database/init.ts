@@ -13,11 +13,11 @@ import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";
 
-export const initializeDb: (mempoolDBQueue: Queue.Queue<string>) => Effect.Effect<
+export const initializeDb: (mempoolDBQueue: Queue.Dequeue<string>) => Effect.Effect<
   void,
   Error,
   Database | NodeConfig
-> = (mempoolDBQueue: Queue.Queue<string>) =>
+> = (mempoolDBQueue: Queue.Dequeue<string>) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     // yield* sql`SET default_transaction_read_only TO 'off'`;

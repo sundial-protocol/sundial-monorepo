@@ -68,7 +68,6 @@ program.command("listen").action(async () => {
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceeds.AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
-    Effect.provide(MempoolDB.MempoolQueueLayer),
   );
 
   NodeRuntime.runMain(program);

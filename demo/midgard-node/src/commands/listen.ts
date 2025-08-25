@@ -340,7 +340,7 @@ const getLogGlobalsHandler = Effect.gen(function* () {
   });
 });
 
-const postSubmitHandler = (mempoolDBQueue: Queue.Queue<string>) => Effect.gen(function* () {
+const postSubmitHandler = (mempoolDBQueue: Queue.Enqueue<string>) => Effect.gen(function* () {
   yield* Effect.logInfo(`◻️  Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
@@ -353,6 +353,8 @@ const postSubmitHandler = (mempoolDBQueue: Queue.Queue<string>) => Effect.gen(fu
   } else {
     const txString = txStringParam;
     yield* mempoolDBQueue.offer(txString);
+    const size = yield* mempoolDBQueue.size
+            yield* Effect.logInfo(`  In Queue size is ${size}`);
     Effect.runSync(Metric.increment(txCounter));
     return yield* HttpServerResponse.json({
       message: `Successfully added the transaction to the queue`,
@@ -603,7 +605,6 @@ export const runNode = Effect.gen(function* () {
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(User.layer),
     Effect.provide(NodeConfig.layer),
-    Effect.provide(MempoolDB.MempoolQueueLayer),
   );
 
   pipe(

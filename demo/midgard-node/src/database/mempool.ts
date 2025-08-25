@@ -9,42 +9,18 @@ import { breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
-export class MempoolQueue extends Effect.Service<MempoolQueue>()("MempoolQueue", {
-  effect: Effect.gen(function* () {
-    const queue = yield* Queue.unbounded<string>();
-    const queueSize = queue.size
-    const queueOffer = (txString: string) => queue.offer(txString)
-    return {
-      queueSize,
-      queueOffer,
-    };
-  }),
-}) {}
-
-export const MempoolQueueLayer = MempoolQueue.Default
-
-export const addToQueue = (txString: string) =>
-  Effect.gen(function* () {
-    const mQueue = yield* MempoolQueue
-    yield* mQueue.queueOffer(txString)
-    const size = yield* mQueue.queueSize
-    yield* Effect.logInfo(`  In Queue size is ${size}`);
-
-})
-
-export const init = (mempoolDBQueue: Queue.Queue<string>) => Effect.gen(function* () {
+export const init = (mempoolDBQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
   yield* Effect.logInfo(`  Init MempoolDB`)
   yield* Tx.createTable(tableName)
   yield* Effect.forkDaemon(
     Effect.gen(function* () {
       yield* Effect.logInfo(`  Start daemon`);
       yield* Effect.forever(Effect.gen(function* () {
-        // yield* Effect.logInfo(`  Before taking data from the incomingQueueEffect`);
-        // const txString = yield* mQueue.queue.take
         const size = yield* mempoolDBQueue.size
         yield* Effect.logInfo(`  Out Queue size is ${size}`);
+        const txString = yield* mempoolDBQueue.take
+        yield* insert(txString)
         yield* Effect.sleep("1 second")
-        // yield* insert(txString)
       }))
     })
   )
