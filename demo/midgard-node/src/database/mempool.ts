@@ -36,7 +36,8 @@ export const init = Effect.gen(function* () {
     Effect.gen(function* () {
       yield* Effect.logInfo(`  Start daemon`);
       const mQueue = yield* MempoolQueue
-      Effect.forever(Effect.gen(function* () {
+      yield* Effect.forever(Effect.gen(function* () {
+        yield* Effect.logInfo(`  Before taking data from the incomingQueueEffect`);
         const txString = yield* mQueue.queue.take
         yield* Effect.logInfo(`  Took data from the incomingQueueEffect`);
         yield* insert(txString)
