@@ -359,6 +359,7 @@ const postSubmitHandler = Effect.gen(function* () {
     });
   }
 }).pipe(
+  Effect.provide(MempoolDB.MempoolQueue.Default),
   Effect.catchAll((e) =>
     Effect.gen(function* () {
       yield* Effect.logInfo(`▫️ L2 transaction failed: ${e}`);

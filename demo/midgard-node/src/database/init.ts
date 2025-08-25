@@ -34,4 +34,4 @@ export const initializeDb: () => Effect.Effect<
     yield* insertGenesisUtxos;
 
     yield* Effect.logInfo("PostgreSQL database initialized Successfully.");
-  });
+  }).pipe(Effect.provide(MempoolDB.MempoolQueue.Default));

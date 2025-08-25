@@ -9,23 +9,39 @@ import { breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
+
+export class MempoolQueue extends Effect.Service<MempoolQueue>()("MempoolQueue", {
+  effect: Effect.gen(function* () {
+    const queue = yield* Queue.unbounded<string>();
+
+    return {
+      queue
+    };
+  }),
+}) {}
+
+
 const incomingQueueEffect = Queue.unbounded<string>()
 
 export const addToQueue = (txString: string) =>
   Effect.gen(function* () {
-    const queue = yield* incomingQueueEffect
-    queue.offer(txString)
+    const mQueue = yield* MempoolQueue
+    mQueue.queue.offer(txString)
 })
 
 export const init = Effect.gen(function* () {
+  yield* Effect.logInfo(`  Init MempoolDB`)
   yield* Tx.createTable(tableName)
   yield* Effect.forkDaemon(
     Effect.gen(function* () {
-      const queue = yield* incomingQueueEffect
-      const txString = yield* queue.take
-      yield* Effect.logInfo(`  Took data from the incomingQueueEffect`);
-      yield* insert(txString)
-    }).pipe(Effect.forever)
+      yield* Effect.logInfo(`  Start daemon`);
+      const mQueue = yield* MempoolQueue
+      Effect.forever(Effect.gen(function* () {
+        const txString = yield* mQueue.queue.take
+        yield* Effect.logInfo(`  Took data from the incomingQueueEffect`);
+        yield* insert(txString)
+      }))
+    })
   )
 });
 
