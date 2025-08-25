@@ -9,22 +9,8 @@ import { breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
-export const init = (mempoolDBQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
+export const init = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
   yield* Tx.createTable(tableName)
-  yield* Effect.forkDaemon(
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`  Start init MempoolDB daemon`);
-      yield* Effect.forever(Effect.gen(function* () {
-        const size = yield* mempoolDBQueue.size
-        yield* Effect.logInfo(`  Out Queue size is ${size}`);
-        const optionTxString : Option.Option<string> = yield* Queue.poll(mempoolDBQueue)
-        yield* Option.match(optionTxString, {
-          onNone: () => Effect.void,
-          onSome: (txString) => insert(txString)
-        })
-      }))
-    })
-  )
 });
 
 export const insert = (

@@ -13,11 +13,11 @@ import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";
 
-export const initializeDb: (mempoolDBQueue: Queue.Dequeue<string>) => Effect.Effect<
+export const initializeDb: (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.Effect<
   void,
   Error,
   Database | NodeConfig
-> = (mempoolDBQueue: Queue.Dequeue<string>) =>
+> = (submitTransactionsQueue: Queue.Dequeue<string>) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     // yield* sql`SET default_transaction_read_only TO 'off'`;
@@ -25,7 +25,7 @@ export const initializeDb: (mempoolDBQueue: Queue.Dequeue<string>) => Effect.Eff
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
     yield* BlocksDB.init;
-    yield* MempoolDB.init(mempoolDBQueue);
+    yield* MempoolDB.init(submitTransactionsQueue);
     yield* Ledger.createTable(MempoolLedgerDB.tableName);
     yield* Tx.createTable(ImmutableDB.tableName);
     yield* Ledger.createTable(ConfirmedLedgerDB.tableName);
