@@ -8,16 +8,16 @@ import * as ProcessedMempoolDB from "./processedMempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
-import { Effect } from "effect";
+import { Effect, Queue } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";
 
-export const initializeDb: () => Effect.Effect<
+export const initializeDb: (mempoolDBQueue: Queue.Queue<string>) => Effect.Effect<
   void,
   Error,
-  Database | NodeConfig | MempoolDB.MempoolQueue
-> = () =>
+  Database | NodeConfig
+> = (mempoolDBQueue: Queue.Queue<string>) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     // yield* sql`SET default_transaction_read_only TO 'off'`;
@@ -25,7 +25,7 @@ export const initializeDb: () => Effect.Effect<
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
     yield* BlocksDB.init;
-    yield* MempoolDB.init;
+    yield* MempoolDB.init(mempoolDBQueue);
     yield* Ledger.createTable(MempoolLedgerDB.tableName);
     yield* Tx.createTable(ImmutableDB.tableName);
     yield* Ledger.createTable(ConfirmedLedgerDB.tableName);

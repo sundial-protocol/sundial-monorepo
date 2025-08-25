@@ -340,7 +340,7 @@ const getLogGlobalsHandler = Effect.gen(function* () {
   });
 });
 
-const postSubmitHandler = Effect.gen(function* () {
+const postSubmitHandler = (mempoolDBQueue: Queue.Queue<string>) => Effect.gen(function* () {
   yield* Effect.logInfo(`◻️  Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
@@ -352,7 +352,7 @@ const postSubmitHandler = Effect.gen(function* () {
     );
   } else {
     const txString = txStringParam;
-    yield* MempoolDB.addToQueue(txString);
+    yield* mempoolDBQueue.offer(txString);
     Effect.runSync(Metric.increment(txCounter));
     return yield* HttpServerResponse.json({
       message: `Successfully added the transaction to the queue`,
@@ -370,7 +370,7 @@ const postSubmitHandler = Effect.gen(function* () {
   ),
 );
 
-const router = HttpRouter.empty.pipe(
+const router = (mempoolDBQueue: Queue.Queue<string>) => HttpRouter.empty.pipe(
   HttpRouter.get("/tx", getTxHandler),
   HttpRouter.get("/utxos", getUtxosHandler),
   HttpRouter.get("/block", getBlockHandler),
@@ -381,7 +381,7 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
   HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
   HttpRouter.get("/logGlobals", getLogGlobalsHandler),
-  HttpRouter.post("/submit", postSubmitHandler),
+  HttpRouter.post("/submit", postSubmitHandler(mempoolDBQueue)),
 );
 
 const blockCommitmentAction = Effect.gen(function* () {
@@ -564,10 +564,12 @@ export const runNode = Effect.gen(function* () {
     ),
   }));
 
-  yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
+  const mempoolDBQueue = yield* Queue.unbounded<string>();
+
+  yield* InitDB.initializeDb(mempoolDBQueue).pipe(Effect.provide(Database.layer));
 
   const ListenLayer = Layer.provide(
-    HttpServer.serve(router),
+    HttpServer.serve(router(mempoolDBQueue)),
     NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
   );
 
