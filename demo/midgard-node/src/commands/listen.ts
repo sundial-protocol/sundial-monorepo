@@ -353,8 +353,6 @@ const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) => Ef
   } else {
     const txString = txStringParam;
     yield* submitTransactionsQueue.offer(txString);
-    const size = yield* submitTransactionsQueue.size
-            yield* Effect.logInfo(`  In Queue size is ${size}`);
     Effect.runSync(Metric.increment(txCounter));
     return yield* HttpServerResponse.json({
       message: `Successfully added the transaction to the queue`,
@@ -484,14 +482,17 @@ const mempoolAction = Effect.gen(function* () {
 });
 
 const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
-  const size = yield* submitTransactionsQueue.size
-  yield* Effect.logInfo(`  Out Queue size is ${size}`)
   const optionTxString : Option.Option<string> = yield* Queue.poll(submitTransactionsQueue)
   yield* Option.match(optionTxString, {
     onNone: () => Effect.void,
     onSome: (txString) => MempoolDB.insert(txString)
   })
 });
+
+const logQueueSize = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
+  const size = yield* submitTransactionsQueue.size
+  yield* Effect.logInfo(`submitTransactionsQueue size is ${size}`)
+})
 
 const blockCommitmentFork = (rerunDelay: number) =>
   Effect.gen(function* () {
@@ -562,6 +563,18 @@ const postTransactionsFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
     Effect.catchAllCause(Effect.logWarning),
   );
 
+const logQueueFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
+  pipe(
+    Effect.gen(function* () {
+      yield* Effect.logInfo("🔶 PostTransactionsLog fork started.");
+      const schedule = Schedule.addDelay(Schedule.forever, () =>
+        Duration.millis(100),
+      );
+      yield* Effect.repeat(logQueueSize(submitTransactionsQueue), schedule);
+    }),
+    Effect.catchAllCause(Effect.logWarning),
+  );
+
 export const runNode = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
 
@@ -590,7 +603,7 @@ export const runNode = Effect.gen(function* () {
 
   const submitTransactionsQueue = yield* Queue.unbounded<string>();
 
-  yield* InitDB.initializeDb(submitTransactionsQueue).pipe(Effect.provide(Database.layer));
+  yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
 
   const ListenLayer = Layer.provide(
     HttpServer.serve(router(submitTransactionsQueue)),
@@ -612,6 +625,8 @@ export const runNode = Effect.gen(function* () {
   const monitorMempoolThread = pipe(mempoolFork());
 
   const postTransactionsThread = pipe(postTransactionsFork(submitTransactionsQueue));
+  const logQueueThread = pipe(logQueueFork(submitTransactionsQueue));
+
 
   const program = Effect.all(
     [
@@ -621,6 +636,7 @@ export const runNode = Effect.gen(function* () {
       mergeThread,
       monitorMempoolThread,
       postTransactionsThread,
+      logQueueThread,
     ],
     {
       concurrency: "unbounded",

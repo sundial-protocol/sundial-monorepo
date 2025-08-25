@@ -9,10 +9,6 @@ import { breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
-export const init = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
-  yield* Tx.createTable(tableName)
-});
-
 export const insert = (
   txString: string,
 ): Effect.Effect<void, Error, Database> =>
