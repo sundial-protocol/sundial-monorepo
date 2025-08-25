@@ -341,7 +341,7 @@ const getLogGlobalsHandler = Effect.gen(function* () {
 });
 
 const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) => Effect.gen(function* () {
-  yield* Effect.logInfo(`◻️  Submit request received for transaction`);
+  // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
@@ -568,7 +568,7 @@ const logQueueFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactionsLog fork started.");
       const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(100),
+        Duration.millis(1000),
       );
       yield* Effect.repeat(logQueueSize(submitTransactionsQueue), schedule);
     }),
