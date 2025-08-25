@@ -359,7 +359,6 @@ const postSubmitHandler = Effect.gen(function* () {
     });
   }
 }).pipe(
-  Effect.provide(MempoolDB.MempoolQueue.Default),
   Effect.catchAll((e) =>
     Effect.gen(function* () {
       yield* Effect.logInfo(`▫️ L2 transaction failed: ${e}`);
@@ -602,6 +601,7 @@ export const runNode = Effect.gen(function* () {
     Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(User.layer),
     Effect.provide(NodeConfig.layer),
+    Effect.provide(MempoolDB.MempoolQueueLayer),
   );
 
   pipe(

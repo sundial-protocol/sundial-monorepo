@@ -16,7 +16,7 @@ import { NodeConfig } from "@/config.js";
 export const initializeDb: () => Effect.Effect<
   void,
   Error,
-  Database | NodeConfig
+  Database | NodeConfig | MempoolDB.MempoolQueue
 > = () =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
@@ -34,4 +34,4 @@ export const initializeDb: () => Effect.Effect<
     yield* insertGenesisUtxos;
 
     yield* Effect.logInfo("PostgreSQL database initialized Successfully.");
-  }).pipe(Effect.provide(MempoolDB.MempoolQueue.Default));
+  });

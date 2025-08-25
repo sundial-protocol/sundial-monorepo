@@ -13,20 +13,21 @@ export const tableName = "mempool";
 export class MempoolQueue extends Effect.Service<MempoolQueue>()("MempoolQueue", {
   effect: Effect.gen(function* () {
     const queue = yield* Queue.unbounded<string>();
-
+    const queueSize = queue.size
+    const queueOffer = (txString: string) => queue.offer(txString)
     return {
-      queue
+      queueSize,
+      queueOffer,
     };
   }),
 }) {}
 
-
-const incomingQueueEffect = Queue.unbounded<string>()
+export const MempoolQueueLayer = MempoolQueue.Default
 
 export const addToQueue = (txString: string) =>
   Effect.gen(function* () {
     const mQueue = yield* MempoolQueue
-    mQueue.queue.offer(txString)
+    yield* mQueue.queueOffer(txString)
 })
 
 export const init = Effect.gen(function* () {
@@ -37,10 +38,11 @@ export const init = Effect.gen(function* () {
       yield* Effect.logInfo(`  Start daemon`);
       const mQueue = yield* MempoolQueue
       yield* Effect.forever(Effect.gen(function* () {
-        yield* Effect.logInfo(`  Before taking data from the incomingQueueEffect`);
-        const txString = yield* mQueue.queue.take
-        yield* Effect.logInfo(`  Took data from the incomingQueueEffect`);
-        yield* insert(txString)
+        // yield* Effect.logInfo(`  Before taking data from the incomingQueueEffect`);
+        // const txString = yield* mQueue.queue.take
+        const size = mQueue.queueSize
+        yield* Effect.logInfo(`  Queue size is ${size}`);
+        // yield* insert(txString)
       }))
     })
   )
