@@ -4,19 +4,11 @@ import { AlwaysSucceeds } from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
-import { CML, fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
+import { fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import {
-  Duration,
-  Effect,
-  Layer,
-  Metric,
-  Option,
-  pipe,
-  Schedule,
-} from "effect";
+import { Duration, Effect, Layer, Metric, pipe, Schedule } from "effect";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -26,14 +18,17 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { findSpentAndProducedUTxOs, isHexString } from "../utils.js";
+import { bufferToHex, isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
-import { SqlClient } from "@effect/sql";
+import { insertGenesisUtxos } from "@/database/genesis.js";
+import { deleteLedgerMpt, deleteMempoolMpt } from "@/workers/utils/mpt.js";
+import { Worker } from "worker_threads";
+import { WorkerOutput as BlockConfirmationWorkerOutput } from "@/workers/utils/confirm-block-commitments.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -47,7 +42,7 @@ const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   bigint: true,
 });
 
-const handle500 = (location: string, error: Error | HttpBodyError) =>
+const handle500 = (location: string, error: Error | HttpBodyError | unknown) =>
   Effect.gen(function* () {
     yield* Effect.logInfo(
       `Something went wrong at ${location} handler: ${error}`,
@@ -72,26 +67,25 @@ const getTxHandler = Effect.gen(function* () {
       { status: 404 },
     );
   }
-  const txHashBytes = fromHex(txHashParam);
-  const retMempool = yield* MempoolDB.retrieveTxCborByHash(txHashBytes);
-  if (Option.isSome(retMempool)) {
-    yield* Effect.logInfo(
-      `GET /tx - Transaction found in mempool: ${txHashParam}`,
-    );
-    return yield* HttpServerResponse.json({ tx: retMempool.value });
-  }
-  const retImmutable = yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
-  if (Option.isSome(retImmutable)) {
-    yield* Effect.logInfo(
-      `GET /tx - Transaction found in immutable: ${txHashParam}`,
-    );
-    return yield* HttpServerResponse.json({ tx: retImmutable.value });
-  }
-  yield* Effect.logInfo(`Transaction not found: ${txHashParam}`);
-  return yield* HttpServerResponse.json(
-    { error: `Transaction not found: ${txHashParam}` },
-    { status: 404 },
+  const txHashBytes = Buffer.from(fromHex(txHashParam));
+  const foundCbor: Uint8Array = yield* MempoolDB.retrieveTxCborByHash(
+    txHashBytes,
+  ).pipe(
+    Effect.catchAll((_e) =>
+      Effect.gen(function* () {
+        const fromImmutable =
+          yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
+        yield* Effect.logInfo(
+          `GET /tx - Transaction found in ImmutableDB: ${txHashParam}`,
+        );
+        return fromImmutable;
+      }),
+    ),
   );
+  yield* Effect.logInfo(
+    `GET /tx - Transaction found in mempool: ${txHashParam}`,
+  );
+  return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
 }).pipe(Effect.catchAll((e) => handle500("getTx", e)));
 
 const getUtxosHandler = Effect.gen(function* () {
@@ -114,13 +108,20 @@ const getUtxosHandler = Effect.gen(function* () {
         { status: 400 },
       );
     }
-    const allUTxOs = yield* MempoolLedgerDB.retrieve();
-    const filtered = allUTxOs.filter(({ value }) => {
-      const cmlOutput = CML.TransactionOutput.from_cbor_bytes(value);
-      return cmlOutput.address().to_bech32() === addrDetails.address.bech32;
+
+    const utxosWithAddress = yield* MempoolLedgerDB.retrieveByAddress(
+      addrDetails.address.bech32,
+    );
+
+    const response = utxosWithAddress.map((entry) => ({
+      outref: bufferToHex(entry.outref),
+      value: bufferToHex(entry.output),
+    }));
+
+    yield* Effect.logInfo(`Found ${response.length} UTxOs for ${addr}`);
+    return yield* HttpServerResponse.json({
+      utxos: response,
     });
-    yield* Effect.logInfo(`Found ${filtered.length} UTXOs for ${addr}`);
-    return yield* HttpServerResponse.json({ utxos: filtered });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
     return yield* HttpServerResponse.json(
@@ -148,7 +149,9 @@ const getBlockHandler = Effect.gen(function* () {
       { status: 400 },
     );
   }
-  const hashes = yield* BlocksDB.retrieveTxHashesByBlockHash(fromHex(hdrHash));
+  const hashes = yield* BlocksDB.retrieveTxHashesByHeaderHash(
+    Buffer.from(fromHex(hdrHash)),
+  );
   yield* Effect.logInfo(
     `GET /block - Found ${hashes.length} txs for block: ${hdrHash}`,
   );
@@ -158,6 +161,7 @@ const getBlockHandler = Effect.gen(function* () {
 const getInitHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✨ Initialization request received`);
   const result = yield* StateQueueTx.stateQueueInit;
+  yield* insertGenesisUtxos;
   yield* Effect.logInfo(`GET /init - Initialization successful: ${result}`);
   return yield* HttpServerResponse.json({
     message: `Initiation successful: ${result}`,
@@ -227,6 +231,8 @@ const getResetHandler = Effect.gen(function* () {
       ImmutableDB.clear(),
       LatestLedgerDB.clear(),
       ConfirmedLedgerDB.clear(),
+      deleteMempoolMpt,
+      deleteLedgerMpt,
     ],
     { discard: true },
   );
@@ -261,20 +267,24 @@ const getLogStateQueueHandler = Effect.gen(function* () {
   );
   let drawn = `
 ---------------------------- STATE QUEUE ----------------------------`;
-  yield* Effect.allSuccesses(sortedUTxOs.map((u) => Effect.gen(function* () {
-    let info = "";
-    const isHead = u.datum.key === "Empty";
-    const isEnd = u.datum.next === "Empty";
-    const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
-    if (u.datum.key !== "Empty") {
-    // if (isHead) {
-      const icon = isEnd ? "  " : emoji;
-      info = `
+  yield* Effect.allSuccesses(
+    sortedUTxOs.map((u) =>
+      Effect.gen(function* () {
+        let info = "";
+        const isHead = u.datum.key === "Empty";
+        const isEnd = u.datum.next === "Empty";
+        const emoji = isHead ? "🚢" : isEnd ? "⚓" : "⛓ ";
+        if (u.datum.key !== "Empty") {
+          // if (isHead) {
+          const icon = isEnd ? "  " : emoji;
+          info = `
 ${icon} ╰─ header: ${u.datum.key.Key.key}`;
-    }
-    drawn = `${drawn}
+        }
+        drawn = `${drawn}
 ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
-  })));
+      }),
+    ),
+  );
   drawn += `
 ---------------------------------------------------------------------
 `;
@@ -286,10 +296,10 @@ ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
 
 const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
-  const allPairs = yield* BlocksDB.retrieve();
-  const keyValues: Record<string, number> = allPairs.reduce(
-    (acc: Record<string, number>, [b, _t]) => {
-      const bHex = toHex(b);
+  const allBlocksData = yield* BlocksDB.retrieve();
+  const keyValues: Record<string, number> = allBlocksData.reduce(
+    (acc: Record<string, number>, entry) => {
+      const bHex = toHex(entry.header_hash);
       if (!acc[bHex]) {
         acc[bHex] = 1;
       } else {
@@ -314,20 +324,24 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
   });
 }).pipe(Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)));
 
-const getLogSemaphoresHandler = Effect.gen(function* () {
-  yield* Effect.logInfo(`✍  Logging semaphores...`);
+const getLogGlobalsHandler = Effect.gen(function* () {
+  yield* Effect.logInfo(`✍  Logging global variables...`);
   yield* Effect.logInfo(`
-  BLOCKS_IN_QUEUE ⋅⋅⋅⋅ ${global.BLOCKS_IN_QUEUE}
-  LATEST_SYNC ⋅⋅⋅⋅⋅⋅⋅⋅ ${(new Date(global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH)).toLocaleString()}
-  RESET_IN_PROGRESS ⋅⋅ ${global.RESET_IN_PROGRESS}
+  BLOCKS_IN_QUEUE ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${global.BLOCKS_IN_QUEUE}
+  LATEST_SYNC ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${new Date(global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH).toLocaleString()}
+  RESET_IN_PROGRESS ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${global.RESET_IN_PROGRESS}
+  AVAILABLE_CONFIRMED_BLOCK ⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${global.AVAILABLE_CONFIRMED_BLOCK}
+  PROCESSED_UNSUBMITTED_TXS_COUNT ⋅⋅⋅ ${global.PROCESSED_UNSUBMITTED_TXS_COUNT}
+  PROCESSED_UNSUBMITTED_TXS_SIZE ⋅⋅⋅⋅ ${global.PROCESSED_UNSUBMITTED_TXS_SIZE}
+  UNCONFIRMED_SUBMITTED_BLOCK ⋅⋅⋅⋅⋅⋅⋅ ${global.UNCONFIRMED_SUBMITTED_BLOCK}
 `);
   return yield* HttpServerResponse.json({
-    message: `Semaphores logged!`,
+    message: `Global variables logged!`,
   });
 });
 
 const postSubmitHandler = Effect.gen(function* () {
-  // yield* Effect.logInfo(`◻️ Submit request received for transaction`);
+  // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
   const params = yield* ParsedSearchParams;
   const txStringParam = params["tx_cbor"];
   if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
@@ -338,23 +352,10 @@ const postSubmitHandler = Effect.gen(function* () {
     );
   } else {
     const txString = txStringParam;
-    const { user: lucid } = yield* User;
-    return yield* Effect.gen(function* () {
-      const sql = yield* SqlClient.SqlClient;
-      const txCBOR = fromHex(txString);
-      const tx = lucid.fromTx(txString);
-      const { spent, produced } = yield* findSpentAndProducedUTxOs(txCBOR);
-      yield* sql.withTransaction(
-        Effect.gen(function* () {
-          yield* MempoolDB.insert(fromHex(tx.toHash()), txCBOR);
-          yield* MempoolLedgerDB.clearUTxOs(spent);
-          yield* MempoolLedgerDB.insert(produced);
-        }),
-      );
-      Effect.runSync(Metric.increment(txCounter));
-      return yield* HttpServerResponse.json({
-        message: `Successfully submitted the transaction`,
-      });
+    yield* MempoolDB.insert(txString);
+    Effect.runSync(Metric.increment(txCounter));
+    return yield* HttpServerResponse.json({
+      message: `Successfully submitted the transaction`,
     });
   }
 }).pipe(
@@ -379,7 +380,7 @@ const router = HttpRouter.empty.pipe(
   HttpRouter.get("/reset", getResetHandler),
   HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
   HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
-  HttpRouter.get("/logSemaphores", getLogSemaphoresHandler),
+  HttpRouter.get("/logGlobals", getLogGlobalsHandler),
   HttpRouter.post("/submit", postSubmitHandler),
 );
 
@@ -388,6 +389,73 @@ const blockCommitmentAction = Effect.gen(function* () {
   yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
     Effect.withSpan("buildAndSubmitCommitmentBlock"),
   );
+});
+
+const blockConfirmationAction = Effect.gen(function* () {
+  yield* Effect.logInfo("🟤 New block confirmation process started.");
+  const worker = Effect.async<BlockConfirmationWorkerOutput, Error>(
+    (resume) => {
+      Effect.runSync(
+        Effect.logInfo(`🔍 Starting block confirmation worker...`),
+      );
+      const worker = new Worker(
+        new URL("./confirm-block-commitments.js", import.meta.url),
+        {
+          workerData: {
+            data: {
+              firstRun:
+                global.UNCONFIRMED_SUBMITTED_BLOCK === "" &&
+                global.AVAILABLE_CONFIRMED_BLOCK === "",
+              unconfirmedSubmittedBlock: global.UNCONFIRMED_SUBMITTED_BLOCK,
+            },
+          },
+        },
+      );
+      worker.on("message", (output: BlockConfirmationWorkerOutput) => {
+        if (output.type === "FailedConfirmationOutput") {
+          resume(
+            Effect.fail(
+              new Error(`Error in confirmation worker: ${output.error}`),
+            ),
+          );
+        } else {
+          resume(Effect.succeed(output));
+        }
+        worker.terminate();
+      });
+      worker.on("error", (e: Error) => {
+        resume(Effect.fail(new Error(`Error in confirmation worker: ${e}`)));
+        worker.terminate();
+      });
+      worker.on("exit", (code: number) => {
+        if (code !== 0) {
+          resume(
+            Effect.fail(
+              new Error(`Confirmation worker exited with code: ${code}`),
+            ),
+          );
+        }
+      });
+      return Effect.sync(() => {
+        worker.terminate();
+      });
+    },
+  );
+  const workerOutput: BlockConfirmationWorkerOutput = yield* worker;
+  switch (workerOutput.type) {
+    case "SuccessfulConfirmationOutput": {
+      global.UNCONFIRMED_SUBMITTED_BLOCK = "";
+      global.AVAILABLE_CONFIRMED_BLOCK = workerOutput.blocksUTxO;
+      yield* Effect.logInfo("🟤 ☑️  Submitted block confirmed.");
+      break;
+    }
+    case "NoTxForConfirmationOutput": {
+      break;
+    }
+    case "FailedConfirmationOutput": {
+      break;
+    }
+  }
 });
 
 const mergeAction = Effect.gen(function* () {
@@ -409,26 +477,35 @@ const mergeAction = Effect.gen(function* () {
 });
 
 const mempoolAction = Effect.gen(function* () {
-  const txList = yield* MempoolDB.retrieve();
-  const numTx = BigInt(txList.length);
-  yield* mempoolTxGauge(Effect.succeed(numTx));
+  const numTx = yield* MempoolDB.retrieveTxCount();
+  yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
 
 const blockCommitmentFork = (rerunDelay: number) =>
-  pipe(
-    Effect.gen(function* () {
-      yield* Effect.logInfo("🔵 Block commitment fork started.");
-      const action = blockCommitmentAction.pipe(
-        Effect.withSpan("block-commitment-fork"),
-        Effect.catchAllCause(Effect.logWarning),
-      );
-      const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(rerunDelay),
-      );
-      yield* Effect.repeat(action, schedule);
-    }),
-    // Effect.fork, // Forking ensures the effect keeps running
-  );
+  Effect.gen(function* () {
+    yield* Effect.logInfo("🔵 Block commitment fork started.");
+    const action = blockCommitmentAction.pipe(
+      Effect.withSpan("block-commitment-fork"),
+      Effect.catchAllCause(Effect.logWarning),
+    );
+    const schedule = Schedule.addDelay(Schedule.forever, () =>
+      Duration.millis(rerunDelay),
+    );
+    yield* Effect.repeat(action, schedule);
+  });
+
+const blockConfirmationFork = (rerunDelay: number) =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo("🟫 Block confirmation fork started.");
+    const action = blockConfirmationAction.pipe(
+      Effect.withSpan("block-confirmation-fork"),
+      Effect.catchAllCause(Effect.logWarning),
+    );
+    const schedule = Schedule.addDelay(Schedule.forever, () =>
+      Duration.millis(rerunDelay),
+    );
+    yield* Effect.repeat(action, schedule);
+  });
 
 // possible issues:
 // 1. tx-generator: large batch size & high concurrency
@@ -500,14 +577,22 @@ export const runNode = Effect.gen(function* () {
     nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENT,
   );
 
-  const mergeThread = pipe(
-    mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS),
+  const blockConfirmationThread = blockConfirmationFork(
+    nodeConfig.WAIT_BETWEEN_BLOCK_CONFIRMATION,
   );
+
+  const mergeThread = pipe(mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS));
 
   const monitorMempoolThread = pipe(mempoolFork());
 
   const program = Effect.all(
-    [appThread, blockCommitmentThread, mergeThread, monitorMempoolThread],
+    [
+      appThread,
+      blockCommitmentThread,
+      blockConfirmationThread,
+      mergeThread,
+      monitorMempoolThread,
+    ],
     {
       concurrency: "unbounded",
     },
