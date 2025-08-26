@@ -18,7 +18,7 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { bufferToHex, isHexString } from "../utils.js";
+import { breakDownTx, bufferToHex, isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
@@ -485,7 +485,11 @@ const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<s
   const optionTxString : Option.Option<string> = yield* Queue.poll(submitTransactionsQueue)
   yield* Option.match(optionTxString, {
     onNone: () => Effect.void,
-    onSome: (txString) => MempoolDB.insert(txString)
+    onSome: (txString) => Effect.gen(function* () {
+      const txCborBytes = fromHex(txString);
+      const brokeDownTx = yield* breakDownTx(txCborBytes);
+      MempoolDB.insert(brokeDownTx)
+    })
   })
 });
 

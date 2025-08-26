@@ -5,16 +5,17 @@ import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect, Option, Queue } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
-import { breakDownTx } from "@/utils.js";
+import { ProcessedTx, breakDownTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
 export const insert = (
-  txString: string,
+  brokeDownTx: ProcessedTx,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    const txCborBytes = fromHex(txString);
-    const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
+    // const txCborBytes = fromHex(txString);
+    // yield* breakDownTx(txCborBytes);
+    const { txId, txCbor, spent, produced } = brokeDownTx
     // Insert the tx itself in `MempoolDB`.
     yield* Tx.insertEntry(tableName, {
       tx_id: txId,
