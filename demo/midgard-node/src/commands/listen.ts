@@ -8,7 +8,7 @@ import { fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Duration, Effect, Layer, Metric, Option, pipe, Queue, Schedule } from "effect";
+import { Chunk, Duration, Effect, Layer, Metric, Option, pipe, Queue, Schedule } from "effect";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -482,6 +482,13 @@ const mempoolAction = Effect.gen(function* () {
 });
 
 const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
+  const txStringsChunk = yield* Queue.takeAll(submitTransactionsQueue)
+  const txStrings = Chunk.toReadonlyArray(txStringsChunk)
+  Effect.forEach(txStrings, (tx) => Effect.gen(function* () {
+    const brokenDownTx = yield* breakDownTx(fromHex(tx))
+    yield* MempoolDB.insert(brokenDownTx)
+  }))
+
   const optionTxString : Option.Option<string> = yield* Queue.poll(submitTransactionsQueue)
   yield* Option.match(optionTxString, {
     onNone: () => Effect.void,
