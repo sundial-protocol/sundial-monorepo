@@ -13,8 +13,6 @@ export const insert = (
   brokeDownTx: ProcessedTx,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    // const txCborBytes = fromHex(txString);
-    // yield* breakDownTx(txCborBytes);
     const { txId, txCbor, spent, produced } = brokeDownTx
     // Insert the tx itself in `MempoolDB`.
     yield* Tx.insertEntry(tableName, {
