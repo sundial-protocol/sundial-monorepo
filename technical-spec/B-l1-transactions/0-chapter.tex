@@ -457,13 +457,13 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/K-init-payout-accumulator.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/K-init-payout.pdf}}
 \end{center}
-\caption[Initialize payout accumulator]{Transform a confirmed withdrawal order into a payout accumulator.}
-\label{fig:tx-initialize-payout-accumulator}
+\caption[Initialize payout]{Transform a confirmed withdrawal order into a payout.}
+\label{fig:tx-initialize-payout}
 \end{figure}
 
-Transform a confirmed withdrawal into a payout accumulator via a transaction that (\cref{fig:tx-initialize-payout-accumulator}):
+Transform a confirmed withdrawal into a payout accumulator via a transaction that (\cref{fig:tx-initialize-payout}):
 \begin{enumerate}
   \item Spends the withdrawal order and burns its NFT.
   \item Produces a payout accumulator with \code{l2\_value}, \code{l1\_address}, and \code{l1\_datum} datum fields matching those of the withdrawal order.
@@ -473,7 +473,7 @@ Transform a confirmed withdrawal into a payout accumulator via a transaction tha
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
-  \item Initialize Payout Accumulator of the withdrawal order spending validator (\cref{h:withdrawal-order-spending-validator}).
+  \item Initialize Payout of the withdrawal order spending validator (\cref{h:withdrawal-order-spending-validator}).
   \item Burn Withdrawal NFT of the withdrawal order minting policy (\cref{h:withdrawal-order-minting-policy}).
   \item Burn or Mint of the witness staking script (\cref{h:witness-staking-script}).
 \end{itemize}
