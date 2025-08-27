@@ -482,9 +482,9 @@ const mempoolAction = Effect.gen(function* () {
 });
 
 const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
-  const txStringsChunk = yield* Queue.takeAll(submitTransactionsQueue)
+  const txStringsChunk : Chunk.Chunk<string> = yield* Queue.takeAll(submitTransactionsQueue)
   const txStrings = Chunk.toReadonlyArray(txStringsChunk)
-  Effect.forEach(txStrings, (tx) => Effect.gen(function* () {
+  yield* Effect.forEach(txStrings, (tx) => Effect.gen(function* () {
     const brokenDownTx = yield* breakDownTx(fromHex(tx))
     yield* MempoolDB.insert(brokenDownTx)
   }))
@@ -557,7 +557,7 @@ const postTransactionsFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactions fork started.");
       const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(10),
+        Duration.millis(100),
       );
       yield* Effect.repeat(postTransactionToMempoolAction(submitTransactionsQueue), schedule);
     }),
