@@ -488,16 +488,6 @@ const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<s
     const brokenDownTx = yield* breakDownTx(fromHex(tx))
     yield* MempoolDB.insert(brokenDownTx)
   }))
-
-  const optionTxString : Option.Option<string> = yield* Queue.poll(submitTransactionsQueue)
-  yield* Option.match(optionTxString, {
-    onNone: () => Effect.void,
-    onSome: (txString) => Effect.gen(function* () {
-      const txCborBytes = fromHex(txString);
-      const brokeDownTx = yield* breakDownTx(txCborBytes);
-      MempoolDB.insert(brokeDownTx)
-    })
-  })
 });
 
 const logQueueSize = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
