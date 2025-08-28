@@ -492,7 +492,7 @@ const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<s
 
 const logQueueSize = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
   const size = yield* submitTransactionsQueue.size
-  yield* Effect.logInfo(`submitTransactionsQueue size is ${size}`)
+  yield* Effect.logInfo(`🧳 submitTransactionsQueue size is ${size}`)
 })
 
 const blockCommitmentFork = (rerunDelay: number) =>
@@ -544,7 +544,7 @@ const mempoolFork = () =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🟢 Mempool fork started.");
-      const schedule = Schedule.spaced("1000 millis");
+      const schedule = Schedule.fixed("1000 millis");
       yield* Effect.repeat(mempoolAction, schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
@@ -554,8 +554,7 @@ const postTransactionsFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactions fork started.");
-            const schedule = Schedule.spaced("500 millis");
-
+      const schedule = Schedule.fixed("500 millis");
       yield* Effect.repeat(postTransactionToMempoolAction(submitTransactionsQueue), schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
@@ -565,7 +564,7 @@ const logQueueFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactionsLog fork started.");
-      const schedule = Schedule.spaced("1000 millis");
+      const schedule = Schedule.fixed("2900 millis");
       yield* Effect.repeat(logQueueSize(submitTransactionsQueue), schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
