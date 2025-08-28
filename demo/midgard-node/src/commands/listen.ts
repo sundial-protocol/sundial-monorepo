@@ -544,9 +544,7 @@ const mempoolFork = () =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🟢 Mempool fork started.");
-      const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(1000),
-      );
+      const schedule = Schedule.spaced("1000 millis");
       yield* Effect.repeat(mempoolAction, schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
@@ -556,9 +554,8 @@ const postTransactionsFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactions fork started.");
-      const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(100),
-      );
+            const schedule = Schedule.spaced("500 millis");
+
       yield* Effect.repeat(postTransactionToMempoolAction(submitTransactionsQueue), schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
@@ -568,9 +565,7 @@ const logQueueFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactionsLog fork started.");
-      const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(1000),
-      );
+      const schedule = Schedule.spaced("1000 millis");
       yield* Effect.repeat(logQueueSize(submitTransactionsQueue), schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
