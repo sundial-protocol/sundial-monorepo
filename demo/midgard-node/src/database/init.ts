@@ -26,6 +26,7 @@ export const initializeDb: () => Effect.Effect<
 
     yield* BlocksDB.init;
     yield* Tx.createTable(MempoolDB.tableName);
+    yield* Tx.createTable(ProcessedMempoolDB.tableName);
     yield* Ledger.createTable(MempoolLedgerDB.tableName);
     yield* Tx.createTable(ImmutableDB.tableName);
     yield* Ledger.createTable(ConfirmedLedgerDB.tableName);
