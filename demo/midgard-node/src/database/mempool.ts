@@ -13,7 +13,7 @@ export const insert = (
   brokeDownTx: ProcessedTx,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    const { txId, txCbor, spent, produced } = brokeDownTx
+    const { txId, txCbor, spent, produced } = brokeDownTx;
     // Insert the tx itself in `MempoolDB`.
     yield* Tx.insertEntry(tableName, {
       tx_id: txId,
@@ -35,17 +35,17 @@ export const insertMultiple = (
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
     if (brokeDownTxs.length === 0) {
-      return
+      return;
     }
-    const txEntries = brokeDownTxs.map(v => ({
+    const txEntries = brokeDownTxs.map((v) => ({
       tx_id: v.txId,
       tx: v.txCbor,
-    }))
+    }));
     // Insert the tx itself in `MempoolDB`.
-    yield* Tx.insertEntries(tableName, txEntries)
+    yield* Tx.insertEntries(tableName, txEntries);
 
-    const allProduced = brokeDownTxs.flatMap(v => v.produced)
-    const allSpent = brokeDownTxs.flatMap(v => v.spent)
+    const allProduced = brokeDownTxs.flatMap((v) => v.produced);
+    const allSpent = brokeDownTxs.flatMap((v) => v.spent);
 
     // Insert produced UTxOs in `MempoolLedgerDB`.
     yield* MempoolLedgerDB.insert(allProduced);

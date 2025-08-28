@@ -8,7 +8,17 @@ import { fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Chunk, Duration, Effect, Layer, Metric, Option, pipe, Queue, Schedule } from "effect";
+import {
+  Chunk,
+  Duration,
+  Effect,
+  Layer,
+  Metric,
+  Option,
+  pipe,
+  Queue,
+  Schedule,
+} from "effect";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -18,7 +28,12 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { ProcessedTx, breakDownTx, bufferToHex, isHexString } from "../utils.js";
+import {
+  ProcessedTx,
+  breakDownTx,
+  bufferToHex,
+  isHexString,
+} from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
@@ -340,49 +355,51 @@ const getLogGlobalsHandler = Effect.gen(function* () {
   });
 });
 
-const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) => Effect.gen(function* () {
-  // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
-  const params = yield* ParsedSearchParams;
-  const txStringParam = params["tx_cbor"];
-  if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
-    yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
-    return yield* HttpServerResponse.json(
-      { error: `Invalid CBOR provided` },
-      { status: 400 },
-    );
-  } else {
-    const txString = txStringParam;
-    yield* submitTransactionsQueue.offer(txString);
-    Effect.runSync(Metric.increment(txCounter));
-    return yield* HttpServerResponse.json({
-      message: `Successfully added the transaction to the queue`,
-    });
-  }
-}).pipe(
-  Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`▫️ L2 transaction failed: ${e}`);
+const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) =>
+  Effect.gen(function* () {
+    // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
+    const params = yield* ParsedSearchParams;
+    const txStringParam = params["tx_cbor"];
+    if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
+      yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
       return yield* HttpServerResponse.json(
-        { error: `Something went wrong: ${e}` },
+        { error: `Invalid CBOR provided` },
         { status: 400 },
       );
-    }),
-  ),
-);
+    } else {
+      const txString = txStringParam;
+      yield* submitTransactionsQueue.offer(txString);
+      Effect.runSync(Metric.increment(txCounter));
+      return yield* HttpServerResponse.json({
+        message: `Successfully added the transaction to the queue`,
+      });
+    }
+  }).pipe(
+    Effect.catchAll((e) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo(`▫️ L2 transaction failed: ${e}`);
+        return yield* HttpServerResponse.json(
+          { error: `Something went wrong: ${e}` },
+          { status: 400 },
+        );
+      }),
+    ),
+  );
 
-const router = (submitTransactionsQueue: Queue.Queue<string>) => HttpRouter.empty.pipe(
-  HttpRouter.get("/tx", getTxHandler),
-  HttpRouter.get("/utxos", getUtxosHandler),
-  HttpRouter.get("/block", getBlockHandler),
-  HttpRouter.get("/init", getInitHandler),
-  HttpRouter.get("/commit", getCommitEndpoint),
-  HttpRouter.get("/merge", getMergeHandler),
-  HttpRouter.get("/reset", getResetHandler),
-  HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
-  HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
-  HttpRouter.get("/logGlobals", getLogGlobalsHandler),
-  HttpRouter.post("/submit", postSubmitHandler(submitTransactionsQueue)),
-);
+const router = (submitTransactionsQueue: Queue.Queue<string>) =>
+  HttpRouter.empty.pipe(
+    HttpRouter.get("/tx", getTxHandler),
+    HttpRouter.get("/utxos", getUtxosHandler),
+    HttpRouter.get("/block", getBlockHandler),
+    HttpRouter.get("/init", getInitHandler),
+    HttpRouter.get("/commit", getCommitEndpoint),
+    HttpRouter.get("/merge", getMergeHandler),
+    HttpRouter.get("/reset", getResetHandler),
+    HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
+    HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
+    HttpRouter.get("/logGlobals", getLogGlobalsHandler),
+    HttpRouter.post("/submit", postSubmitHandler(submitTransactionsQueue)),
+  );
 
 const blockCommitmentAction = Effect.gen(function* () {
   yield* Effect.logInfo("🔹 New block commitment process started.");
@@ -481,19 +498,27 @@ const mempoolAction = Effect.gen(function* () {
   yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
 
-const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
-  const txStringsChunk : Chunk.Chunk<string> = yield* Queue.takeAll(submitTransactionsQueue)
-  const txStrings = Chunk.toReadonlyArray(txStringsChunk)
-  const brokeDownTxs : ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) => Effect.gen(function* () {
-    return yield* breakDownTx(fromHex(tx))
-  }))
-  yield* MempoolDB.insertMultiple(brokeDownTxs)
-});
+const postTransactionToMempoolAction = (
+  submitTransactionsQueue: Queue.Dequeue<string>,
+) =>
+  Effect.gen(function* () {
+    const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(
+      submitTransactionsQueue,
+    );
+    const txStrings = Chunk.toReadonlyArray(txStringsChunk);
+    const brokeDownTxs: ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) =>
+      Effect.gen(function* () {
+        return yield* breakDownTx(fromHex(tx));
+      }),
+    );
+    yield* MempoolDB.insertMultiple(brokeDownTxs);
+  });
 
-const logQueueSize = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
-  const size = yield* submitTransactionsQueue.size
-  yield* Effect.logInfo(`🧳 submitTransactionsQueue size is ${size}`)
-})
+const logQueueSize = (submitTransactionsQueue: Queue.Dequeue<string>) =>
+  Effect.gen(function* () {
+    const size = yield* submitTransactionsQueue.size;
+    yield* Effect.logInfo(`🧳 submitTransactionsQueue size is ${size}`);
+  });
 
 const blockCommitmentFork = (rerunDelay: number) =>
   Effect.gen(function* () {
@@ -555,7 +580,10 @@ const postTransactionsFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactions fork started.");
       const schedule = Schedule.fixed("500 millis");
-      yield* Effect.repeat(postTransactionToMempoolAction(submitTransactionsQueue), schedule);
+      yield* Effect.repeat(
+        postTransactionToMempoolAction(submitTransactionsQueue),
+        schedule,
+      );
     }),
     Effect.catchAllCause(Effect.logWarning),
   );
@@ -619,9 +647,10 @@ export const runNode = Effect.gen(function* () {
 
   const monitorMempoolThread = pipe(mempoolFork());
 
-  const postTransactionsThread = pipe(postTransactionsFork(submitTransactionsQueue));
+  const postTransactionsThread = pipe(
+    postTransactionsFork(submitTransactionsQueue),
+  );
   const logQueueThread = pipe(logQueueFork(submitTransactionsQueue));
-
 
   const program = Effect.all(
     [
