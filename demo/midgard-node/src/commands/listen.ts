@@ -18,7 +18,7 @@ import {
   MempoolDB,
   MempoolLedgerDB,
 } from "../database/index.js";
-import { breakDownTx, bufferToHex, isHexString } from "../utils.js";
+import { ProcessedTx, breakDownTx, bufferToHex, isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
 import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
@@ -484,10 +484,10 @@ const mempoolAction = Effect.gen(function* () {
 const postTransactionToMempoolAction = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {
   const txStringsChunk : Chunk.Chunk<string> = yield* Queue.takeAll(submitTransactionsQueue)
   const txStrings = Chunk.toReadonlyArray(txStringsChunk)
-  yield* Effect.forEach(txStrings, (tx) => Effect.gen(function* () {
-    const brokenDownTx = yield* breakDownTx(fromHex(tx))
-    yield* MempoolDB.insert(brokenDownTx)
+  const brokeDownTxs : ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) => Effect.gen(function* () {
+    return yield* breakDownTx(fromHex(tx))
   }))
+  yield* MempoolDB.insertMultiple(brokeDownTxs)
 });
 
 const logQueueSize = (submitTransactionsQueue: Queue.Dequeue<string>) => Effect.gen(function* () {

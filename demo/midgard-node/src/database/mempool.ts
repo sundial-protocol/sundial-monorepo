@@ -30,6 +30,34 @@ export const insert = (
     ),
   );
 
+export const insertMultiple = (
+  brokeDownTxs: ProcessedTx[],
+): Effect.Effect<void, Error, Database> =>
+  Effect.gen(function* () {
+    if (brokeDownTxs.length === 0) {
+      return
+    }
+    const txEntries = brokeDownTxs.map(v => ({
+      tx_id: v.txId,
+      tx: v.txCbor,
+    }))
+    // Insert the tx itself in `MempoolDB`.
+    yield* Tx.insertEntries(tableName, txEntries)
+
+    const allProduced = brokeDownTxs.flatMap(v => v.produced)
+    const allSpent = brokeDownTxs.flatMap(v => v.spent)
+
+    // Insert produced UTxOs in `MempoolLedgerDB`.
+    yield* MempoolLedgerDB.insert(allProduced);
+    // Remove spent inputs from MempoolLedgerDB.
+    yield* MempoolLedgerDB.clearUTxOs(allSpent);
+  }).pipe(
+    Effect.withLogSpan(`insert ${tableName}`),
+    Effect.tapError((e) =>
+      Effect.logError(`${tableName} db: insert: ${JSON.stringify(e)}`),
+    ),
+  );
+
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   Tx.retrieveValue(tableName, txHash);
 
