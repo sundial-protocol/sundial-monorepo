@@ -86,7 +86,7 @@ const getTxHandler = Effect.gen(function* () {
   const foundCbor: Uint8Array = yield* MempoolDB.retrieveTxCborByHash(
     txHashBytes,
   ).pipe(
-    Effect.catchAll((_e) =>
+    Effect.catchAllDefect((_e) =>
       Effect.gen(function* () {
         const fromImmutable =
           yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
