@@ -86,7 +86,7 @@ const getTxHandler = Effect.gen(function* () {
   const foundCbor: Uint8Array = yield* MempoolDB.retrieveTxCborByHash(
     txHashBytes,
   ).pipe(
-    Effect.catchAllDefect((_e) =>
+    Effect.catchAll((_e) =>
       Effect.gen(function* () {
         const fromImmutable =
           yield* ImmutableDB.retrieveTxCborByHash(txHashBytes);
@@ -101,7 +101,10 @@ const getTxHandler = Effect.gen(function* () {
     `GET /tx - Transaction found in mempool: ${txHashParam}`,
   );
   return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
-}).pipe(Effect.catchAll((e) => handle500("getTx", e)));
+}).pipe(
+  Effect.catchAll((e) => handle500("getTx", e)),
+  Effect.catchAllDefect((defect) => handle500("getTx", defect))
+);
 
 const getUtxosHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
@@ -144,7 +147,10 @@ const getUtxosHandler = Effect.gen(function* () {
       { status: 400 },
     );
   }
-}).pipe(Effect.catchAll((e) => handle500("getUtxos", e)));
+}).pipe(
+  Effect.catchAll((e) => handle500("getUtxos", e)),
+  Effect.catchAllDefect((defect) => handle500("getUtxos", defect))
+);
 
 const getBlockHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
@@ -171,7 +177,10 @@ const getBlockHandler = Effect.gen(function* () {
     `GET /block - Found ${hashes.length} txs for block: ${hdrHash}`,
   );
   return yield* HttpServerResponse.json({ hashes });
-}).pipe(Effect.catchAll((e) => handle500("getBlock", e)));
+}).pipe(
+  Effect.catchAll((e) => handle500("getBlock", e)),
+  Effect.catchAllDefect((defect) => handle500("getBlock", defect))
+);
 
 const getInitHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✨ Initialization request received`);
@@ -185,6 +194,15 @@ const getInitHandler = Effect.gen(function* () {
   Effect.catchAll((e) =>
     Effect.gen(function* () {
       yield* Effect.logInfo(`GET /init - Initialization failed: ${e}`);
+      return yield* HttpServerResponse.json(
+        { error: "Initialization failed" },
+        { status: 500 },
+      );
+    }),
+  ),
+  Effect.catchAllDefect((defect) =>
+    Effect.gen(function* () {
+      yield* Effect.logInfo(`GET /init - Initialization failed with DEFECT: ${defect}`);
       return yield* HttpServerResponse.json(
         { error: "Initialization failed" },
         { status: 500 },
@@ -210,6 +228,15 @@ const getCommitEndpoint = Effect.gen(function* () {
       );
     }),
   ),
+  Effect.catchAllDefect((defect) =>
+    Effect.gen(function* () {
+      yield* Effect.logInfo(`GET /commit - Block commitment failed with DEFECT: ${defect}`);
+      return yield* HttpServerResponse.json(
+        { error: "Block commitment failed." },
+        { status: 500 },
+      );
+    }),
+  ),
 );
 
 const getMergeHandler = Effect.gen(function* () {
@@ -226,6 +253,17 @@ const getMergeHandler = Effect.gen(function* () {
     Effect.gen(function* () {
       yield* Effect.logInfo(
         `GET /merge - Merging confirmed state failed: ${e}`,
+      );
+      return yield* HttpServerResponse.json(
+        { error: "Merging confirmed state failed." },
+        { status: 500 },
+      );
+    }),
+  ),
+  Effect.catchAllDefect((defect) =>
+    Effect.gen(function* () {
+      yield* Effect.logInfo(
+        `GET /merge - Merging confirmed state failed with DEFECT: ${defect}`,
       );
       return yield* HttpServerResponse.json(
         { error: "Merging confirmed state failed." },
@@ -266,6 +304,18 @@ const getResetHandler = Effect.gen(function* () {
       );
     }),
   ),
+  Effect.catchAllDefect((defect) =>
+    Effect.gen(function* () {
+      yield* Effect.logInfo(`Failed to collect one or more UTxOs with DEFECT: ${defect}`);
+      return yield* HttpServerResponse.json(
+        {
+          error: `Failed to collect one or more UTxOs with DEFECT: ${defect}`,
+        },
+        { status: 500 },
+      );
+    }),
+  ),
+
 );
 
 const getLogStateQueueHandler = Effect.gen(function* () {
@@ -337,7 +387,10 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
   return yield* HttpServerResponse.json({
     message: `BlocksDB drawn in server logs!`,
   });
-}).pipe(Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)));
+}).pipe(
+  Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)),
+  Effect.catchAllDefect((d) => handle500("getLogBlocksDBHandler", d))
+);
 
 const getLogGlobalsHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Logging global variables...`);
@@ -384,6 +437,15 @@ const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) =>
         );
       }),
     ),
+    Effect.catchAllDefect((defect) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo(`▫️ L2 transaction failed with DEFECT: ${defect}`);
+        return yield* HttpServerResponse.json(
+          { error: `Something went wrong: ${defect}` },
+          { status: 400 },
+        );
+      }),
+    )
   );
 
 const router = (submitTransactionsQueue: Queue.Queue<string>) =>
