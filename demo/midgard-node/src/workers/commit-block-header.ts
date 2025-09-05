@@ -96,9 +96,7 @@ const wrapper = (
           yield* Effect.logInfo(
             "🔹 No confirmed blocks available. Transferring to ProcessedMempoolDB...",
           );
-          yield* Effect.logInfo(`Before the skippedSubmissionProgram`);
           yield* skippedSubmissionProgram;
-          yield* Effect.logInfo(`After the skippedSubmissionProgram`);
           return {
             type: "SkippedSubmissionOutput",
             mempoolTxsCount,

@@ -2,18 +2,17 @@ import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
 import { clearTable, mapSqlError } from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
-import { Effect, Option, Queue } from "effect";
-import { fromHex } from "@lucid-evolution/lucid";
+import { Effect } from "effect";
 import { SqlClient } from "@effect/sql";
-import { ProcessedTx, breakDownTx } from "@/utils.js";
+import { ProcessedTx } from "@/utils.js";
 
 export const tableName = "mempool";
 
 export const insert = (
-  brokeDownTx: ProcessedTx,
+  processedTx: ProcessedTx,
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    const { txId, txCbor, spent, produced } = brokeDownTx;
+    const { txId, txCbor, spent, produced } = processedTx;
     // Insert the tx itself in `MempoolDB`.
     yield* Tx.insertEntry(tableName, {
       tx_id: txId,
@@ -31,21 +30,21 @@ export const insert = (
   );
 
 export const insertMultiple = (
-  brokeDownTxs: ProcessedTx[],
+  processedTxs: ProcessedTx[],
 ): Effect.Effect<void, Error, Database> =>
   Effect.gen(function* () {
-    if (brokeDownTxs.length === 0) {
+    if (processedTxs.length === 0) {
       return;
     }
-    const txEntries = brokeDownTxs.map((v) => ({
+    const txEntries = processedTxs.map((v) => ({
       tx_id: v.txId,
       tx: v.txCbor,
     }));
     // Insert the tx itself in `MempoolDB`.
     yield* Tx.insertEntries(tableName, txEntries);
 
-    const allProduced = brokeDownTxs.flatMap((v) => v.produced);
-    const allSpent = brokeDownTxs.flatMap((v) => v.spent);
+    const allProduced = processedTxs.flatMap((v) => v.produced);
+    const allSpent = processedTxs.flatMap((v) => v.spent);
 
     // Insert produced UTxOs in `MempoolLedgerDB`.
     yield* MempoolLedgerDB.insert(allProduced);

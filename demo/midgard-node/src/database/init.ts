@@ -8,7 +8,7 @@ import * as ProcessedMempoolDB from "./processedMempool.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
-import { Effect, Queue } from "effect";
+import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";

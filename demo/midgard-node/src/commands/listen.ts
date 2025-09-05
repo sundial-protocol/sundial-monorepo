@@ -14,7 +14,6 @@ import {
   Effect,
   Layer,
   Metric,
-  Option,
   pipe,
   Queue,
   Schedule,
