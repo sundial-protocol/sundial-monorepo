@@ -9,6 +9,7 @@ import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import {
+  Cause,
   Chunk,
   Duration,
   Effect,
@@ -56,16 +57,39 @@ const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   bigint: true,
 });
 
-const handle500 = (location: string, error: Error | HttpBodyError | unknown) =>
+const failWith500Helper = (
+  logLabel: string,
+  logMsg: string,
+  error: Error | HttpBodyError | string | unknown,
+  msgOverride?: string,
+) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(
-      `Something went wrong at ${location} handler: ${error}`,
-    );
+    yield* Effect.logInfo(`${logLabel} - ${logMsg}: ${error}`);
     return yield* HttpServerResponse.json(
-      { error: `Something went wrong` },
+      { error: msgOverride ?? "Something went wrong" },
       { status: 500 },
     );
   });
+
+const failWith500 = (
+  method: "GET" | "POST",
+  endpoint: string,
+  error: Error | HttpBodyError | string,
+  msgOverride?: string,
+) => failWith500Helper(`${method} /${endpoint}`, "failure", error, msgOverride);
+
+const failWith500FromDefect = (
+  method: "GET" | "POST",
+  endpoint: string,
+  defect: unknown,
+  msgOverride?: string,
+) =>
+  failWith500Helper(
+    `${method} /${endpoint}`,
+    "defect",
+    defect,
+    msgOverride ? `[unexpected] ${msgOverride}` : undefined,
+  );
 
 const getTxHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
@@ -101,8 +125,8 @@ const getTxHandler = Effect.gen(function* () {
   );
   return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
 }).pipe(
-  Effect.catchAll((e) => handle500("getTx", e)),
-  Effect.catchAllDefect((defect) => handle500("getTx", defect))
+  Effect.catchAll((e) => failWith500("GET /tx", "failure", e)),
+  Effect.catchAllDefect((defect) => failWith500("GET /tx", "defect", defect)),
 );
 
 const getUtxosHandler = Effect.gen(function* () {
@@ -147,8 +171,8 @@ const getUtxosHandler = Effect.gen(function* () {
     );
   }
 }).pipe(
-  Effect.catchAll((e) => handle500("getUtxos", e)),
-  Effect.catchAllDefect((defect) => handle500("getUtxos", defect))
+  Effect.catchAll((e) => failWith500("GET", "utxos", e)),
+  Effect.catchAllDefect((d) => failWith500FromDefect("GET", "utxos", d)),
 );
 
 const getBlockHandler = Effect.gen(function* () {
@@ -177,8 +201,8 @@ const getBlockHandler = Effect.gen(function* () {
   );
   return yield* HttpServerResponse.json({ hashes });
 }).pipe(
-  Effect.catchAll((e) => handle500("getBlock", e)),
-  Effect.catchAllDefect((defect) => handle500("getBlock", defect))
+  Effect.catchAll((e) => failWith500("GET", "block", e)),
+  Effect.catchAllDefect((d) => failWith500FromDefect("GET", "block", d)),
 );
 
 const getInitHandler = Effect.gen(function* () {
@@ -191,22 +215,10 @@ const getInitHandler = Effect.gen(function* () {
   });
 }).pipe(
   Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`GET /init - Initialization failed: ${e}`);
-      return yield* HttpServerResponse.json(
-        { error: "Initialization failed" },
-        { status: 500 },
-      );
-    }),
+    failWith500("GET", "init", e, "Initialization failed"),
   ),
-  Effect.catchAllDefect((defect) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`GET /init - Initialization failed with DEFECT: ${defect}`);
-      return yield* HttpServerResponse.json(
-        { error: "Initialization failed" },
-        { status: 500 },
-      );
-    }),
+  Effect.catchAllDefect((d) =>
+    failWith500FromDefect("GET", "init", d, "Initialization failed"),
   ),
 );
 
@@ -219,22 +231,10 @@ const getCommitEndpoint = Effect.gen(function* () {
   });
 }).pipe(
   Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`GET /commit - Block commitment failed: ${e}`);
-      return yield* HttpServerResponse.json(
-        { error: "Block commitment failed." },
-        { status: 500 },
-      );
-    }),
+    failWith500("GET", "commit", e, "Block commitment failed"),
   ),
-  Effect.catchAllDefect((defect) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`GET /commit - Block commitment failed with DEFECT: ${defect}`);
-      return yield* HttpServerResponse.json(
-        { error: "Block commitment failed." },
-        { status: 500 },
-      );
-    }),
+  Effect.catchAllDefect((d) =>
+    failWith500FromDefect("GET", "commit", d, "Block commitment failed"),
   ),
 );
 
@@ -249,26 +249,10 @@ const getMergeHandler = Effect.gen(function* () {
   });
 }).pipe(
   Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(
-        `GET /merge - Merging confirmed state failed: ${e}`,
-      );
-      return yield* HttpServerResponse.json(
-        { error: "Merging confirmed state failed." },
-        { status: 500 },
-      );
-    }),
+    failWith500("GET", "commit", e, "Merging confirmed state failed"),
   ),
-  Effect.catchAllDefect((defect) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(
-        `GET /merge - Merging confirmed state failed with DEFECT: ${defect}`,
-      );
-      return yield* HttpServerResponse.json(
-        { error: "Merging confirmed state failed." },
-        { status: 500 },
-      );
-    }),
+  Effect.catchAllDefect((d) =>
+    failWith500FromDefect("GET", "commit", d, "Merging confirmed state failed"),
   ),
 );
 
@@ -292,29 +276,14 @@ const getResetHandler = Effect.gen(function* () {
     message: `Collected all UTxOs successfully!`,
   });
 }).pipe(
-  Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`Failed to collect one or more UTxOs. Error: ${e}`);
-      return yield* HttpServerResponse.json(
-        {
-          error: `Failed to collect one or more UTxOs. Please try again. Error: ${e}`,
-        },
-        { status: 400 },
-      );
-    }),
+  Effect.catchAllCause((cause) =>
+    failWith500(
+      "GET",
+      "reset",
+      Cause.pretty(cause),
+      "Failed to collect one or more UTxOs",
+    ),
   ),
-  Effect.catchAllDefect((defect) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`Failed to collect one or more UTxOs with DEFECT: ${defect}`);
-      return yield* HttpServerResponse.json(
-        {
-          error: `Failed to collect one or more UTxOs with DEFECT: ${defect}`,
-        },
-        { status: 500 },
-      );
-    }),
-  ),
-
 );
 
 const getLogStateQueueHandler = Effect.gen(function* () {
@@ -387,8 +356,9 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
     message: `BlocksDB drawn in server logs!`,
   });
 }).pipe(
-  Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)),
-  Effect.catchAllDefect((d) => handle500("getLogBlocksDBHandler", d))
+  Effect.catchAllCause((cause) =>
+    failWith500("GET", "logBlocksDB", Cause.pretty(cause)),
+  ),
 );
 
 const getLogGlobalsHandler = Effect.gen(function* () {
@@ -428,39 +398,47 @@ const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) =>
     }
   }).pipe(
     Effect.catchAll((e) =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(`▫️ L2 transaction failed: ${e}`);
-        return yield* HttpServerResponse.json(
-          { error: `Something went wrong: ${e}` },
-          { status: 400 },
-        );
-      }),
+      failWith500Helper(
+        "▫️ ",
+        "L2 transaction failed",
+        e,
+        `Something went wrong: ${e}`,
+      ),
     ),
-    Effect.catchAllDefect((defect) =>
-      Effect.gen(function* () {
-        yield* Effect.logInfo(`▫️ L2 transaction failed with DEFECT: ${defect}`);
-        return yield* HttpServerResponse.json(
-          { error: `Something went wrong: ${defect}` },
-          { status: 400 },
-        );
-      }),
-    )
+    Effect.catchAllDefect((d) =>
+      failWith500Helper(
+        "▫️ ",
+        "L2 transaction failed unexpectedly",
+        d,
+        `Something went wrong: ${d}`,
+      ),
+    ),
   );
 
 const router = (submitTransactionsQueue: Queue.Queue<string>) =>
-  HttpRouter.empty.pipe(
-    HttpRouter.get("/tx", getTxHandler),
-    HttpRouter.get("/utxos", getUtxosHandler),
-    HttpRouter.get("/block", getBlockHandler),
-    HttpRouter.get("/init", getInitHandler),
-    HttpRouter.get("/commit", getCommitEndpoint),
-    HttpRouter.get("/merge", getMergeHandler),
-    HttpRouter.get("/reset", getResetHandler),
-    HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
-    HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
-    HttpRouter.get("/logGlobals", getLogGlobalsHandler),
-    HttpRouter.post("/submit", postSubmitHandler(submitTransactionsQueue)),
-  );
+  HttpRouter.empty
+    .pipe(
+      HttpRouter.get("/tx", getTxHandler),
+      HttpRouter.get("/utxos", getUtxosHandler),
+      HttpRouter.get("/block", getBlockHandler),
+      HttpRouter.get("/init", getInitHandler),
+      HttpRouter.get("/commit", getCommitEndpoint),
+      HttpRouter.get("/merge", getMergeHandler),
+      HttpRouter.get("/reset", getResetHandler),
+      HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
+      HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
+      HttpRouter.get("/logGlobals", getLogGlobalsHandler),
+      HttpRouter.post("/submit", postSubmitHandler(submitTransactionsQueue)),
+    )
+    .pipe(
+      Effect.catchAllCause((cause) =>
+        failWith500Helper(
+          "Router failure",
+          "unknown endpoint",
+          Cause.pretty(cause),
+        ),
+      ),
+    );
 
 const blockCommitmentAction = Effect.gen(function* () {
   yield* Effect.logInfo("🔹 New block commitment process started.");

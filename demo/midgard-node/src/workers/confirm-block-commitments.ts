@@ -3,7 +3,7 @@ import {
   reexportedWorkerData as workerData,
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, Schedule, pipe } from "effect";
+import { Cause, Effect, Schedule, pipe } from "effect";
 import { NodeConfig, NodeConfigDep, User } from "@/config.js";
 import {
   WorkerInput,
@@ -91,13 +91,10 @@ const program = pipe(
 
 Effect.runPromise(
   program.pipe(
-    Effect.catchAll((e) =>
+    Effect.catchAllCause((cause) =>
       Effect.succeed({
         type: "FailedConfirmationOutput",
-        error:
-          e instanceof Error
-            ? e.message
-            : "Unknown error from tx confirmation worker",
+        error: `Tx confirmation worker failure: ${Cause.pretty(cause)}`,
       }),
     ),
   ),
