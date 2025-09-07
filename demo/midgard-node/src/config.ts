@@ -7,6 +7,7 @@ import {
   walletFromSeed,
 } from "@lucid-evolution/lucid";
 import { Config, Context, Data, Effect, Layer } from "effect";
+import {GenericErrorFields} from "./utils.js";
 
 const SUPPORTED_PROVIDERS = ["kupmios", "blockfrost"] as const;
 type Provider = (typeof SUPPORTED_PROVIDERS)[number];
@@ -41,36 +42,34 @@ export type NodeConfigDep = {
 
 export const makeUserFn = (nodeConfig: NodeConfigDep) =>
   Effect.gen(function* () {
-    const user = yield* Effect.tryPromise(() => {
-      switch (nodeConfig.L1_PROVIDER) {
-        case "kupmios":
-          return Lucid(
-            new Kupmios(nodeConfig.L1_KUPO_KEY, nodeConfig.L1_OGMIOS_KEY),
-            nodeConfig.NETWORK,
-          );
-        case "blockfrost":
-          return Lucid(
-            new Blockfrost(
-              nodeConfig.L1_BLOCKFROST_API_URL,
-              nodeConfig.L1_BLOCKFROST_KEY,
-            ),
-            nodeConfig.NETWORK,
-          );
-      }
+    const user = yield* Effect.tryPromise({
+      try: () => {
+        switch (nodeConfig.L1_PROVIDER) {
+          case "kupmios":
+            return Lucid(
+              new Kupmios(nodeConfig.L1_KUPO_KEY, nodeConfig.L1_OGMIOS_KEY),
+              nodeConfig.NETWORK,
+            );
+          case "blockfrost":
+            return Lucid(
+              new Blockfrost(
+                nodeConfig.L1_BLOCKFROST_API_URL,
+                nodeConfig.L1_BLOCKFROST_KEY,
+              ),
+              nodeConfig.NETWORK,
+            );
+        }
+      },
+      catch: (e) => new ConfigError({
+        message: `An error occurred on lucid initialization`,
+        cause: e,
+      }),
     });
     user.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
     return {
       user,
     };
-  }).pipe(
-    Effect.mapError(
-      (e) =>
-        new ConfigError({
-          message: `An error occurred on lucid initialization`,
-          cause: e,
-        }),
-    ),
-  );
+  });
 
 const makeUser = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
@@ -125,11 +124,11 @@ export const makeConfig = Effect.gen(function* () {
 
   const provider = config[0].toLowerCase();
   if (!isValidProvider(provider)) {
-    throw new ConfigError({
+    yield* Effect.fail(new ConfigError({
       message: `Invalid L1 provider: ${provider}`,
       field: "L1_PROVIDER",
       value: provider,
-    });
+    }));
   }
   const network: Network = config[7];
   const seedA = config[20];
@@ -231,9 +230,7 @@ export class NodeConfig extends Context.Tag("NodeConfig")<
   static readonly layer = Layer.effect(NodeConfig, makeConfig);
 }
 
-export class ConfigError extends Data.TaggedError("ConfigurationError")<{
-  readonly message: string;
+export class ConfigError extends Data.TaggedError("ConfigurationError")<GenericErrorFields & {
   readonly field?: string;
   readonly value?: string;
-  readonly cause?: unknown;
 }> {}

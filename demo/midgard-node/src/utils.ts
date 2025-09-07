@@ -246,20 +246,20 @@ Kupmios:
 \u0009${chalk.bold("OGMIOS_URL")} \u0009 URL of your Ogmios instance
 `;
 
+export type GenericErrorFields = {
+  readonly message: string;
+  readonly cause?: unknown;
+};
+
 // General errors that doesn't have a specific domain
 export class DeserializationError extends Data.TaggedError(
   "DeserializationError",
-)<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
+)<GenericErrorFields> {}
 
-export class SerializationError extends Data.TaggedError("SerializationError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
+export class SerializationError extends Data.TaggedError(
+  "SerializationError",
+)<GenericErrorFields> {}
 
-export class LucidError extends Data.TaggedError("LucidError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
+export class LucidError extends Data.TaggedError(
+  "LucidError",
+)<GenericErrorFields> {}

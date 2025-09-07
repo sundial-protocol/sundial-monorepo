@@ -29,12 +29,8 @@ const PAUSE_DURATION = "5 seconds";
 export const handleSignSubmit = (
   lucid: LucidEvolution,
   signBuilder: TxSignBuilder,
-  onSubmitFailure: (
-    error: SubmitError,
-  ) => Effect.Effect<void, SubmitError>,
-  onConfirmFailure: (
-    error: ConfirmError,
-  ) => Effect.Effect<void, ConfirmError>,
+  onSubmitFailure: (error: SubmitError) => Effect.Effect<void, SubmitError>,
+  onConfirmFailure: (error: ConfirmError) => Effect.Effect<void, ConfirmError>,
 ): Effect.Effect<string | void, SubmitError | ConfirmError | SignError> =>
   Effect.gen(function* () {
     const txHash = yield* signSubmitHelper(lucid, signBuilder);
@@ -54,19 +50,23 @@ export const handleSignSubmit = (
     yield* Effect.logInfo("✅ Pause ended.");
     return txHash;
   }).pipe(
-    Effect.catchAll((e: SubmitError | ConfirmError | SignError): Effect.Effect<void, SubmitError | ConfirmError | SignError, never> => {
-      switch (e._tag) {
-        case "SubmitError":
-          return onSubmitFailure(e);
-        case "ConfirmError":
-          return onConfirmFailure(e);
-        case "SignError":
-          return pipe(
-            Effect.logError(`Signing tx error: ${e.message}`),
-            Effect.flatMap(() => Effect.fail(e)),
-          );
-      }
-    }),
+    Effect.catchAll(
+      (
+        e: SubmitError | ConfirmError | SignError,
+      ): Effect.Effect<void, SubmitError | ConfirmError | SignError, never> => {
+        switch (e._tag) {
+          case "SubmitError":
+            return onSubmitFailure(e);
+          case "ConfirmError":
+            return onConfirmFailure(e);
+          case "SignError":
+            return pipe(
+              Effect.logError(`Signing tx error: ${e.message}`),
+              Effect.flatMap(() => Effect.fail(e)),
+            );
+        }
+      },
+    ),
   );
 
 /**

@@ -2,10 +2,11 @@ import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { Data } from "effect";
 import { SqlClient, SqlError } from "@effect/sql";
+import { GenericErrorFields } from "@/utils.js";
 
 export const clearTable = (
   tableName: string,
-): Effect.Effect<void, DeleteError, Database> =>
+): Effect.Effect<void, DBDeleteError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to clear table`);
     const sql = yield* SqlClient.SqlClient;
@@ -21,25 +22,37 @@ export const clearTable = (
     mapDeleteError(tableName),
   );
 
-type DatabaseErrorFields = {
-  readonly message: string;
+type DBErrorFields = GenericErrorFields & {
   readonly table?: string;
-  readonly cause?: unknown;
-}
+};
 
-export class SelectError extends Data.TaggedError("SelectError")<DatabaseErrorFields> {}
-export class InsertError extends Data.TaggedError("InsertError")<DatabaseErrorFields> {}
-export class UpdateError extends Data.TaggedError("UpdateError")<DatabaseErrorFields> {}
-export class DeleteError extends Data.TaggedError("DeleteError")<DatabaseErrorFields> {}
-export class CreateTableError extends Data.TaggedError("CreateTableError")<DatabaseErrorFields> {}
-export class OtherDatabaseError extends Data.TaggedError("OtherDatabaseError")<DatabaseErrorFields> {}
+export class DBSelectError extends Data.TaggedError(
+  "DBSelectError",
+)<DBErrorFields> {}
+export class DBInsertError extends Data.TaggedError(
+  "DBInsertError",
+)<DBErrorFields> {}
+export class DBUpdateError extends Data.TaggedError(
+  "DBUpdateError",
+)<DBErrorFields> {}
+export class DBDeleteError extends Data.TaggedError(
+  "DBDeleteError",
+)<DBErrorFields> {}
+export class DBCreateError extends Data.TaggedError(
+  "DBCreateError",
+)<DBErrorFields> {}
+export class DBOtherError extends Data.TaggedError(
+  "DBOtherError",
+)<DBErrorFields> {}
 
-type DatabaseErrorConstructor<T> = new (args: DatabaseErrorFields) => T
+type DBErrorConstructor<T> = new (args: DBErrorFields) => T;
 
-function createMapError(
-  ErrorClass: DatabaseErrorConstructor<any>,
+const createMapError = <E>(
+  ErrorClass: DBErrorConstructor<E>,
   action: string,
-) {
+): ((
+  tableName: string,
+) => <A, R>(self: Effect.Effect<A, unknown, R>) => Effect.Effect<A, E, R>) => {
   return (tableName: string) =>
     Effect.mapError((error: unknown) =>
       error instanceof SqlError.SqlError
@@ -53,40 +66,52 @@ function createMapError(
             table: tableName,
             cause: error,
           }),
-    )
-}
+    );
+};
 
 /**
  * Helper function to map SQL errors to DatabaseError for select operations
  * @param tableName - Name of the table being queried
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapSelectError = createMapError(SelectError, "select from table")
+export const mapSelectError = createMapError(
+  DBSelectError,
+  "select from table",
+);
 
 /**
  * Helper function to map SQL errors to DatabaseError for insert operations
  * @param tableName - Name of the table being inserted into
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapInsertError = createMapError(InsertError, "insert into table")
+export const mapInsertError = createMapError(
+  DBInsertError,
+  "insert into table",
+);
 
 /**
  * Helper function to map SQL errors to DatabaseError for update operations
  * @param tableName - Name of the table being updated
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapUpdateError = createMapError(UpdateError, "update table")
+export const mapUpdateError = createMapError(DBUpdateError, "update table");
 
 /**
  * Helper function to map SQL errors to DatabaseError for delete operations
  * @param tableName - Name of the table being deleted from
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapDeleteError = createMapError(DeleteError, "delete from table")
+export const mapDeleteError = createMapError(
+  DBDeleteError,
+  "delete from table",
+);
 
 /**
  * Helper function to map SQL errors to DatabaseError for createTable operations
  * @param tableName - Name of the table being created
  * @returns Effect that transforms SqlError to DatabaseError
  */
-export const mapCreateTableError = createMapError(CreateTableError, "create table")
+export const mapCreateTableError = createMapError(
+  DBCreateError,
+  "create table",
+);
