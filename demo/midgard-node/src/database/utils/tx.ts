@@ -1,15 +1,15 @@
 import { Database } from "@/services/database.js";
-import { SqlClient, SqlError } from "@effect/sql";
+import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import {
-  SelectError,
-  mapCreateTableError,
-  mapSelectError,
-  mapInsertError,
-  mapDeleteError,
-  DeleteError,
-  CreateTableError,
-  InsertError,
+  DBSelectError,
+  sqlErrorToDBCreateError,
+  sqlErrorToDBSelectError,
+  sqlErrorToDBInsertError,
+  sqlErrorToDBDeleteError,
+  DBDeleteError,
+  DBCreateError,
+  DBInsertError,
 } from "@/database/utils/common.js";
 
 export enum Columns {
@@ -31,7 +31,7 @@ export type Entry = EntryNoTimeStamp | EntryWithTimeStamp;
 
 export const createTable = (
   tableName: string,
-): Effect.Effect<void, CreateTableError, Database> =>
+): Effect.Effect<void, DBCreateError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
@@ -42,13 +42,13 @@ export const createTable = (
     );`;
   }).pipe(
     Effect.withLogSpan(`creating table ${tableName}`),
-    mapCreateTableError(tableName),
+    sqlErrorToDBCreateError(tableName),
   );
 
 export const delMultiple = (
   tableName: string,
   tx_id: Buffer[],
-): Effect.Effect<void, DeleteError, Database> =>
+): Effect.Effect<void, DBDeleteError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(
@@ -60,13 +60,13 @@ export const delMultiple = (
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(
     Effect.withLogSpan(`delMutiple table ${tableName}`),
-    mapDeleteError(tableName),
+    sqlErrorToDBDeleteError(tableName),
   );
 
 export const retrieveValue = (
   tableName: string,
   tx_id: Buffer,
-): Effect.Effect<Buffer, SelectError, Database> =>
+): Effect.Effect<Buffer, DBSelectError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
@@ -75,14 +75,15 @@ export const retrieveValue = (
       tableName,
     )} WHERE ${sql(Columns.TX_ID)} = ${tx_id}`;
 
-    if (result.length <= 0) {
-      yield* Effect.fail(
-        new SelectError({
-          message: `No value found for tx_id ${tx_id.toString("hex")}`,
-          table: tableName,
-        }),
-      );
-    }
+    // We probably don't need this. SqlError should cover this already.
+    // TODO
+    // if (result.length <= 0) {
+    //   yield* 
+    //     new DBSelectError({
+    //       message: `No value found for tx_id ${tx_id.toString("hex")}`,
+    //       table: tableName,
+    //     }) ;
+    // }
 
     return result[0];
   }).pipe(
@@ -92,13 +93,13 @@ export const retrieveValue = (
         `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const retrieveValues = (
   tableName: string,
   tx_ids: Buffer[] | readonly Buffer[],
-): Effect.Effect<readonly Buffer[], SelectError, Database> =>
+): Effect.Effect<readonly Buffer[], DBSelectError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
@@ -115,13 +116,13 @@ export const retrieveValues = (
         `${tableName} db: retrieving values error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const insertEntry = (
   tableName: string,
   txPair: Entry,
-): Effect.Effect<void, InsertError, Database> =>
+): Effect.Effect<void, DBInsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTX`);
     const sql = yield* SqlClient.SqlClient;
@@ -133,13 +134,13 @@ export const insertEntry = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTX: ${JSON.stringify(e)}`),
     ),
-    mapInsertError(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const insertEntries = (
   tableName: string,
   pairs: Entry[],
-): Effect.Effect<void, InsertError, Database> =>
+): Effect.Effect<void, DBInsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTXs`);
     const sql = yield* SqlClient.SqlClient;
@@ -149,14 +150,14 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTXs: ${JSON.stringify(e)}`),
     ),
-    mapInsertError(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
-export const retrieveEntries = (
+export const retrieveAllEntries = (
   tableName: string,
-): Effect.Effect<readonly EntryWithTimeStamp[], SelectError, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], DBSelectError, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
+    yield* Effect.logDebug(`${tableName} db: attempt to retrieve all tx entries`);
     const sql = yield* SqlClient.SqlClient;
     return yield* sql<EntryWithTimeStamp>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
@@ -164,25 +165,5 @@ export const retrieveEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    mapSelectError(tableName),
-  );
-
-export const retrieveNumberOfEntries = (
-  tableName: string,
-): Effect.Effect<number, SelectError, Database> =>
-  Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to get number of entries`);
-    const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<{
-      count: number;
-    }>`SELECT COUNT(*) FROM ${sql(tableName)}`;
-    return rows[0].count ?? 0;
-  }).pipe(
-    Effect.withLogSpan(`retrieveNumberOfEntries ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieveNumberOfEntries: ${JSON.stringify(e)}`,
-      ),
-    ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
