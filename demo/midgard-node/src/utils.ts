@@ -131,12 +131,11 @@ export const findSpentAndProducedUTxOs = (
     for (let i = 0; i < inputsCount; i++) {
       yield* Effect.try({
         try: () => spent.push(Buffer.from(inputs.get(i).to_cbor_bytes())),
-        catch: (e) => {
-          throw new SerializationError({
+        catch: (e) =>
+          new SerializationError({
             message: `An error occurred on input CBOR serialization ${inputs.get(i)}`,
             cause: e,
-          });
-        },
+          }),
       });
     }
     const finalTxHash =
@@ -158,12 +157,11 @@ export const breakDownTx = (
   Effect.gen(function* () {
     const deserializedTx = yield* Effect.try({
       try: () => CML.Transaction.from_cbor_bytes(txCbor),
-      catch: (e) => {
-        throw new DeserializationError({
+      catch: (e) =>
+        new DeserializationError({
           message: `Failed to deserialize transaction: ${e}`,
           cause: e,
-        });
-      },
+        }),
     });
     const txBody = deserializedTx.body();
     const txHash = CML.hash_transaction(txBody);

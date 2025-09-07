@@ -17,6 +17,7 @@ import {
   LatestLedgerDB,
   MempoolDB,
   MempoolLedgerDB,
+  ProcessedMempoolDB,
 } from "../database/index.js";
 import { bufferToHex, isHexString } from "../utils.js";
 import { Database } from "@/services/database.js";
@@ -224,19 +225,21 @@ const getMergeHandler = Effect.gen(function* () {
 const getResetHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`🚧 Reset request received`);
   yield* StateQueueTx.resetStateQueue;
-  yield* Effect.all(
+  const dbEffects = Effect.all(
     [
-      MempoolDB.clear(),
-      MempoolLedgerDB.clear(),
-      BlocksDB.clear(),
-      ImmutableDB.clear(),
-      LatestLedgerDB.clear(),
-      ConfirmedLedgerDB.clear(),
+      MempoolDB.clear,
+      MempoolLedgerDB.clear,
+      ProcessedMempoolDB.clear,
+      BlocksDB.clear,
+      ImmutableDB.clear,
+      LatestLedgerDB.clear,
+      ConfirmedLedgerDB.clear,
       deleteMempoolMpt,
       deleteLedgerMpt,
     ],
     { discard: true },
   );
+  yield* dbEffects;
   return yield* HttpServerResponse.json({
     message: `Collected all UTxOs successfully!`,
   });
@@ -492,7 +495,7 @@ const mergeAction = Effect.gen(function* () {
 });
 
 const mempoolAction = Effect.gen(function* () {
-  const numTx = yield* MempoolDB.retrieveTxCount();
+  const numTx = yield* MempoolDB.retrieveTxCount;
   yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
 

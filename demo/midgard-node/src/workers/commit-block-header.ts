@@ -15,7 +15,7 @@ import {
 } from "@/database/index.js";
 import {
   handleSignSubmitNoConfirmation,
-  SubmitError,
+  TxSubmitError,
 } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
 import {
@@ -157,9 +157,11 @@ const wrapper = (
 
           let output: WorkerOutput | undefined = undefined;
 
-          const onSubmitFailure = (err: SubmitError) =>
+          const onSubmitFailure = (
+            err: TxSubmitError | { _tag: "TxSubmitError" },
+          ) =>
             Effect.gen(function* () {
-              yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err.message}`);
+              yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err}`);
               yield* Effect.logError(
                 "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
               );
@@ -189,7 +191,7 @@ const wrapper = (
 
           const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
 
-          const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve();
+          const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve;
 
           yield* Effect.logInfo(
             "🔹 Inserting included transactions into ImmutableDB and BlocksDB, clearing all the processed txs from MempoolDB and ProcessedMempoolDB, and deleting mempool LevelDB...",
@@ -236,7 +238,7 @@ const wrapper = (
                   );
                 },
               ),
-              ProcessedMempoolDB.clear(), // uses `TRUNCATE` so no need for batching.
+              ProcessedMempoolDB.clear, // uses `TRUNCATE` so no need for batching.
               deleteMempoolMpt,
             ],
             { concurrency: "unbounded" },
@@ -254,12 +256,6 @@ const wrapper = (
         }
       }),
     );
-  });
-
-if (parentPort === null)
-  throw new WorkerError({
-    worker: "commit-block-header",
-    message: "MPT computation must be run as a worker",
   });
 
 const inputData = workerData as WorkerInput;
