@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { AlwaysSucceeds } from "@/services/index.js";
 import { NodeConfig, User } from "@/config.js";
-import { ConfirmError, handleSignSubmit, SubmitError } from "../utils.js";
+import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
 
 export const stateQueueInit = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
@@ -15,13 +15,19 @@ export const stateQueueInit = Effect.gen(function* () {
     stateQueueMintingScript: mintScript,
   };
   lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
-  const txBuilder = yield* SDK.Endpoints.initTxProgram(lucid, initParams);
-  const onSubmitFailure = (err: SubmitError) =>
+  const txBuilderProgram = SDK.Endpoints.initTxProgram(lucid, initParams);
+  const txBuilder = yield* txBuilderProgram;
+  const onSubmitFailure = (err: TxSubmitError | { _tag: "TxSubmitError" }) =>
     Effect.gen(function* () {
       yield* Effect.logError(`Submit tx error: ${err}`);
-      yield* Effect.fail(err);
+      yield* Effect.fail(
+        new TxSubmitError({
+          message: "failed to submit the state queue initiation tx",
+          cause: err,
+        }),
+      );
     });
-  const onConfirmFailure = (err: ConfirmError) =>
+  const onConfirmFailure = (err: TxConfirmError) =>
     Effect.logError(`Confirm tx error: ${err}`);
   return yield* handleSignSubmit(
     lucid,

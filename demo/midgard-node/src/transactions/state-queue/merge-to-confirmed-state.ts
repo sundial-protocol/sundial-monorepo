@@ -17,10 +17,10 @@ import * as SDK from "@al-ft/midgard-sdk";
 import { Address, LucidEvolution, Script } from "@lucid-evolution/lucid";
 import { Effect, Metric } from "effect";
 import {
-  ConfirmError,
+  TxConfirmError,
   fetchFirstBlockTxs,
   handleSignSubmit,
-  SubmitError,
+  TxSubmitError,
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
 import { breakDownTx, LucidError } from "@/utils.js";
@@ -142,12 +142,19 @@ export const buildAndSubmitMergeTx = (
       ).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
 
       // Submit the transaction
-      const onSubmitFailure = (err: SubmitError) =>
+      const onSubmitFailure = (
+        err: TxSubmitError | { _tag: "TxSubmitError" },
+      ) =>
         Effect.gen(function* () {
           yield* Effect.logError(`Submit tx error: ${err}`);
-          yield* Effect.fail(err);
+          yield* Effect.fail(
+            new TxSubmitError({
+              message: "failed to submit the merge tx",
+              cause: err,
+            }),
+          );
         });
-      const onConfirmFailure = (err: ConfirmError) =>
+      const onConfirmFailure = (err: TxConfirmError) =>
         Effect.logError(`Confirm tx error: ${err}`);
       yield* handleSignSubmit(
         lucid,

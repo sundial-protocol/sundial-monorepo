@@ -249,7 +249,7 @@ export type GenericErrorFields = {
   readonly cause?: unknown;
 };
 
-// General errors that doesn't have a specific domain
+// General errors that don't have specific domains
 export class DeserializationError extends Data.TaggedError(
   "DeserializationError",
 )<GenericErrorFields> {}

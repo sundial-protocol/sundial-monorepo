@@ -9,7 +9,7 @@ import {
 import { AlwaysSucceeds } from "@/services/index.js";
 import { NodeConfig, User } from "@/config.js";
 import { Effect } from "effect";
-import { ConfirmError, handleSignSubmit, SubmitError } from "../utils.js";
+import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
@@ -35,12 +35,17 @@ const collectAndBurnStateQueueNodesProgram = (
       .attach.Script(stateQueueSpendingScript)
       .attach.Script(stateQueueMintingScript);
     const completed = yield* tx.completeProgram();
-    const onSubmitFailure = (err: SubmitError) =>
+    const onSubmitFailure = (err: TxSubmitError | { _tag: "TxSubmitError" }) =>
       Effect.gen(function* () {
         yield* Effect.logError(`Submit tx error: ${err}`);
-        yield* Effect.fail(err);
+        yield* Effect.fail(
+          new TxSubmitError({
+            message: "failed to submit a state queue reset tx",
+            cause: err,
+          }),
+        );
       });
-    const onConfirmFailure = (err: ConfirmError) =>
+    const onConfirmFailure = (err: TxConfirmError) =>
       Effect.logError(`Confirm tx error: ${err}`);
     const txHash = yield* handleSignSubmit(
       lucid,
