@@ -7,7 +7,8 @@ export const tableName = "immutable";
 
 export const insertTx = (
   tx: Tx.Entry,
-): Effect.Effect<void, DBInsertError, Database> => Tx.insertEntry(tableName, tx);
+): Effect.Effect<void, DBInsertError, Database> =>
+  Tx.insertEntry(tableName, tx);
 
 export const insertTxs = (
   txs: Tx.Entry[],
