@@ -219,7 +219,7 @@ export class NodeConfig extends Context.Tag("NodeConfig")<
   static readonly layer = Layer.effect(NodeConfig, makeConfig);
 }
 
-export class ConfigError extends Data.TaggedError("ConfigurationError")<
+export class ConfigError extends Data.TaggedError("ConfigError")<
   GenericErrorFields & {
     readonly field?: string;
     readonly value?: string;
