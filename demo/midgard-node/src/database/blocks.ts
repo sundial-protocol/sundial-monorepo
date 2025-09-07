@@ -1,17 +1,19 @@
 import { Effect } from "effect";
 import {
   clearTable,
+  DBCreateError,
   DBDeleteError,
   DBInsertError,
   DBSelectError,
+  DBTruncateError,
 } from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
 import {
-  mapCreateTableError,
-  mapDeleteError,
-  mapInsertError,
-  mapSelectError,
+  sqlErrorToDBCreateError,
+  sqlErrorToDBDeleteError,
+  sqlErrorToDBInsertError,
+  sqlErrorToDBSelectError,
 } from "@/database/utils/common.js";
 
 export const tableName = "blocks";
@@ -38,7 +40,7 @@ type Entry = EntryNoHeightAndTS & {
   [Columns.TIMESTAMPTZ]: Date;
 };
 
-export const init = Effect.gen(function* () {
+export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql.withTransaction(
     Effect.gen(function* () {
@@ -56,7 +58,7 @@ export const init = Effect.gen(function* () {
       )} ON ${sql(tableName)} (${sql(Columns.TX_ID)});`;
     }),
   );
-}).pipe(mapCreateTableError(tableName));
+}).pipe(sqlErrorToDBCreateError(tableName));
 
 export const insert = (
   headerHash: Buffer,
@@ -80,8 +82,7 @@ export const insert = (
       Effect.logError(`${tableName} db: inserting error: ${e}`),
     ),
     Effect.withLogSpan(`insert ${tableName}`),
-    mapInsertError(tableName),
-    Effect.asVoid,
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const retrieveTxHashesByHeaderHash = (
@@ -108,7 +109,7 @@ export const retrieveTxHashesByHeaderHash = (
         `${tableName} db: retrieving txHashes error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const retrieveHeaderHashByTxHash = (
@@ -141,11 +142,9 @@ export const retrieveHeaderHashByTxHash = (
         `${tableName} db: retrieving headerHash error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
-/** Associated inputs are also deleted.
- */
 export const clearBlock = (
   headerHash: Buffer,
 ): Effect.Effect<void, DBDeleteError, Database> =>
@@ -168,7 +167,7 @@ export const clearBlock = (
         `${tableName} db: clearing block error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapDeleteError(tableName),
+    sqlErrorToDBDeleteError(tableName),
   );
 
 export const retrieve = (): Effect.Effect<
@@ -189,8 +188,8 @@ export const retrieve = (): Effect.Effect<
         `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
-export const clear = (): Effect.Effect<void, DBDeleteError, Database> =>
+export const clear = (): Effect.Effect<void, DBTruncateError, Database> =>
   clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));
