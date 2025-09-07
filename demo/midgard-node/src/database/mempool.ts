@@ -75,4 +75,4 @@ export const clearTxs = (
 ): Effect.Effect<void, DBDeleteError, Database> =>
   Tx.delMultiple(tableName, txHashes);
 
-export const clear = () => clearTable(tableName);
+export const clear = clearTable(tableName);

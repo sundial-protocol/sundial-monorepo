@@ -40,25 +40,27 @@ type Entry = EntryNoHeightAndTS & {
   [Columns.TIMESTAMPTZ]: Date;
 };
 
-export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient;
-  yield* sql.withTransaction(
-    Effect.gen(function* () {
-      yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(
+  function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(Columns.HEIGHT)} SERIAL PRIMARY KEY,
       ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
       ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE,
       ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
     );`;
-      yield* sql`CREATE INDEX ${sql(
-        ColumnsIndices.HEADER_HASH,
-      )} ON ${sql(tableName)} (${sql(Columns.HEADER_HASH)});`;
-      yield* sql`CREATE INDEX ${sql(
-        ColumnsIndices.TX_ID,
-      )} ON ${sql(tableName)} (${sql(Columns.TX_ID)});`;
-    }),
-  );
-}).pipe(sqlErrorToDBCreateError(tableName));
+        yield* sql`CREATE INDEX ${sql(
+          ColumnsIndices.HEADER_HASH,
+        )} ON ${sql(tableName)} (${sql(Columns.HEADER_HASH)});`;
+        yield* sql`CREATE INDEX ${sql(
+          ColumnsIndices.TX_ID,
+        )} ON ${sql(tableName)} (${sql(Columns.TX_ID)});`;
+      }),
+    );
+  },
+).pipe(sqlErrorToDBCreateError(tableName));
 
 export const insert = (
   headerHash: Buffer,
@@ -191,5 +193,5 @@ export const retrieve = (): Effect.Effect<
     sqlErrorToDBSelectError(tableName),
   );
 
-export const clear = (): Effect.Effect<void, DBTruncateError, Database> =>
+export const clear: Effect.Effect<void, DBTruncateError, Database> =
   clearTable(tableName).pipe(Effect.withLogSpan(`clear ${tableName}`));

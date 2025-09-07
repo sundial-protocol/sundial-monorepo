@@ -1,16 +1,16 @@
 import { Database } from "@/services/database.js";
-import { SqlClient, SqlError } from "@effect/sql";
+import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
 import {
-  CreateTableError,
-  DeleteError,
-  InsertError,
-  mapCreateTableError,
-  mapDeleteError,
-  mapInsertError,
-  mapSelectError,
-  SelectError,
+  DBCreateError,
+  DBDeleteError,
+  DBInsertError,
+  sqlErrorToDBCreateError,
+  sqlErrorToDBDeleteError,
+  sqlErrorToDBInsertError,
+  sqlErrorToDBSelectError,
+  DBSelectError,
 } from "@/database/utils/common.js";
 
 export enum Columns {
@@ -41,7 +41,7 @@ export type MinimalEntry = {
 
 export const createTable = (
   tableName: string,
-): Effect.Effect<void, CreateTableError, Database> =>
+): Effect.Effect<void, DBCreateError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql.withTransaction(
@@ -61,13 +61,13 @@ export const createTable = (
     );
   }).pipe(
     Effect.withLogSpan(`creating table ${tableName}`),
-    mapCreateTableError(tableName),
+    sqlErrorToDBCreateError(tableName),
   );
 
 export const insertEntry = (
   tableName: string,
   entry: Entry,
-): Effect.Effect<void, InsertError, Database> =>
+): Effect.Effect<void, DBInsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert Ledger UTxO`);
     const sql = yield* SqlClient.SqlClient;
@@ -78,13 +78,13 @@ export const insertEntry = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertEntry: ${JSON.stringify(e)}`),
     ),
-    mapInsertError(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const insertEntries = (
   tableName: string,
   entries: Entry[],
-): Effect.Effect<void, InsertError, Database> =>
+): Effect.Effect<void, DBInsertError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert Ledger UTxOs`);
     const sql = yield* SqlClient.SqlClient;
@@ -95,12 +95,12 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertEntries: ${JSON.stringify(e)}`),
     ),
-    mapInsertError(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
-export const retrieveEntries = (
+export const retrieveAllEntries = (
   tableName: string,
-): Effect.Effect<readonly EntryWithTimeStamp[], SelectError, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], DBSelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieveEntries`);
     const sql = yield* SqlClient.SqlClient;
@@ -112,13 +112,13 @@ export const retrieveEntries = (
         `${tableName} db: retrieveEntries: ${JSON.stringify(double)}`,
       ),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const retrieveEntriesWithAddress = (
   tableName: string,
   address: Address,
-): Effect.Effect<readonly EntryWithTimeStamp[], SelectError, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], DBSelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve Ledger UTxOs`);
     const sql = yield* SqlClient.SqlClient;
@@ -132,16 +132,16 @@ export const retrieveEntriesWithAddress = (
         `${tableName} db: retrieveEntriesWithAddress: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const delEntries = (
   tableName: string,
   outrefs: Buffer[],
-): Effect.Effect<void, DeleteError, Database> =>
+): Effect.Effect<void, DBDeleteError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
       Columns.OUTREF,
     )} IN ${sql.in(outrefs)}`;
-  }).pipe(mapDeleteError(tableName));
+  }).pipe(sqlErrorToDBDeleteError(tableName));

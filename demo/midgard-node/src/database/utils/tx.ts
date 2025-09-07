@@ -78,7 +78,7 @@ export const retrieveValue = (
     // We probably don't need this. SqlError should cover this already.
     // TODO
     // if (result.length <= 0) {
-    //   yield* 
+    //   yield*
     //     new DBSelectError({
     //       message: `No value found for tx_id ${tx_id.toString("hex")}`,
     //       table: tableName,
@@ -157,7 +157,9 @@ export const retrieveAllEntries = (
   tableName: string,
 ): Effect.Effect<readonly EntryWithTimeStamp[], DBSelectError, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve all tx entries`);
+    yield* Effect.logDebug(
+      `${tableName} db: attempt to retrieve all tx entries`,
+    );
     const sql = yield* SqlClient.SqlClient;
     return yield* sql<EntryWithTimeStamp>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
