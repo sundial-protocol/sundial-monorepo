@@ -2,10 +2,11 @@ import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
 import {
   clearTable,
-  DeleteError,
-  InsertError,
-  mapSelectError,
-  SelectError,
+  DBDeleteError,
+  DBInsertError,
+  sqlErrorToDBSelectError,
+  DBSelectError,
+  retrieveNumberOfEntries,
 } from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
@@ -19,7 +20,7 @@ export const insert = (
   txString: string,
 ): Effect.Effect<
   void,
-  InsertError | DeleteError | DeserializationError,
+  DBInsertError | DBDeleteError | DeserializationError,
   Database
 > =>
   Effect.gen(function* () {
@@ -49,7 +50,7 @@ export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
 
 export const retrieve = (): Effect.Effect<
   readonly Tx.Entry[],
-  SelectError,
+  DBSelectError,
   Database
 > =>
   Effect.gen(function* () {
@@ -63,14 +64,15 @@ export const retrieve = (): Effect.Effect<
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    mapSelectError(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
-export const retrieveTxCount = () => Tx.retrieveNumberOfEntries(tableName);
+export const retrieveTxCount: Effect.Effect<number, DBSelectError, Database> =
+  retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
   txHashes: Buffer[],
-): Effect.Effect<void, DeleteError, Database> =>
+): Effect.Effect<void, DBDeleteError, Database> =>
   Tx.delMultiple(tableName, txHashes);
 
 export const clear = () => clearTable(tableName);
