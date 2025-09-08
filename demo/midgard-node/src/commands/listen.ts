@@ -58,6 +58,11 @@ const txCounter = Metric.counter("tx_count", {
   incremental: true,
 });
 
+const txQueueSizeGauge = Metric.gauge("tx_queue_size", {
+  description: "A tracker for the size of the incoming tx queue",
+  bigint: true,
+});
+
 const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   description:
     "A gauge for tracking the current number of transactions in the mempool",
@@ -543,7 +548,12 @@ const monitorMempoolAction = Effect.gen(function* () {
 
 const txQueueProcessorAction = (txQueue: Queue.Dequeue<string>) =>
   Effect.gen(function* () {
-    const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(txQueue);
+    const queueSize = yield* txQueue.size
+    yield* txQueueSizeGauge(Effect.succeed(BigInt(queueSize)));
+
+    const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(
+      txQueue,
+    );
     const txStrings = Chunk.toReadonlyArray(txStringsChunk);
     const brokeDownTxs: ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) =>
       Effect.gen(function* () {
