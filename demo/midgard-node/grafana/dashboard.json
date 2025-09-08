@@ -141,7 +141,7 @@
           "useBackend": false
         }
       ],
-      "title": "Incoming transaction queue size",
+      "title": "Incoming Transaction Queue Size",
       "type": "timeseries"
     },
     {
