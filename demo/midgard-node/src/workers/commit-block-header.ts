@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, pipe } from "effect";
+import { Cause, Effect, pipe } from "effect";
 import {
   WorkerInput,
   WorkerOutput,
@@ -269,14 +269,12 @@ const program = pipe(
 
 Effect.runPromise(
   program.pipe(
-    Effect.catchAll((e) => {
-      const errorMessage =
-        e instanceof Error ? e.message : "Unknown error from MPT worker";
-      return Effect.succeed({
+    Effect.catchAllCause((cause) =>
+      Effect.succeed({
         type: "FailureOutput",
-        error: errorMessage,
-      });
-    }),
+        error: `Block commitment worker failure: ${Cause.pretty(cause)}`,
+      }),
+    ),
   ),
 ).then((output) => {
   Effect.runSync(

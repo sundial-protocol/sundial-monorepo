@@ -8,7 +8,17 @@ import { fromHex, getAddressDetails, toHex } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Duration, Effect, Layer, Metric, pipe, Schedule } from "effect";
+import {
+  Cause,
+  Chunk,
+  Duration,
+  Effect,
+  Layer,
+  Metric,
+  pipe,
+  Queue,
+  Schedule,
+} from "effect";
 import {
   BlocksDB,
   ConfirmedLedgerDB,
@@ -19,9 +29,19 @@ import {
   MempoolLedgerDB,
   ProcessedMempoolDB,
 } from "../database/index.js";
-import { bufferToHex, isHexString } from "../utils.js";
+import {
+  ProcessedTx,
+  breakDownTx,
+  bufferToHex,
+  isHexString,
+} from "../utils.js";
 import { Database } from "@/services/database.js";
-import { HttpRouter, HttpServer, HttpServerResponse } from "@effect/platform";
+import {
+  HttpRouter,
+  HttpServer,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { NodeHttpServer } from "@effect/platform-node";
@@ -38,22 +58,37 @@ const txCounter = Metric.counter("tx_count", {
   incremental: true,
 });
 
+const txQueueSizeGauge = Metric.gauge("tx_queue_size", {
+  description: "A tracker for the size of the tx queue before processing",
+  bigint: true,
+});
+
 const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   description:
     "A gauge for tracking the current number of transactions in the mempool",
   bigint: true,
 });
 
-const handle500 = (location: string, error: Error | HttpBodyError | unknown) =>
+const failWith500Helper = (
+  logLabel: string,
+  logMsg: string,
+  error: any,
+  msgOverride?: string,
+) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(
-      `Something went wrong at ${location} handler: ${error}`,
-    );
+    yield* Effect.logInfo(`${logLabel} - ${logMsg}: ${error}`);
     return yield* HttpServerResponse.json(
-      { error: `Something went wrong` },
+      { error: msgOverride ?? "Something went wrong" },
       { status: 500 },
     );
   });
+
+const failWith500 = (
+  method: "GET" | "POST",
+  endpoint: string,
+  error?: Error | HttpBodyError | string | unknown,
+  msgOverride?: string,
+) => failWith500Helper(`${method} /${endpoint}`, "failure", error, msgOverride);
 
 const getTxHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
@@ -88,7 +123,12 @@ const getTxHandler = Effect.gen(function* () {
     `GET /tx - Transaction found in mempool: ${txHashParam}`,
   );
   return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
-}).pipe(Effect.catchAll((e) => handle500("getTx", e)));
+}).pipe(
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "tx", e)),
+  Effect.catchTag("DBSelectError", (e) =>
+    failWith500("GET", "tx", e.cause ?? e, "tx not found in database"),
+  ),
+);
 
 const getUtxosHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
@@ -131,7 +171,12 @@ const getUtxosHandler = Effect.gen(function* () {
       { status: 400 },
     );
   }
-}).pipe(Effect.catchAll((e) => handle500("getUtxos", e)));
+}).pipe(
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "utxos", e)),
+  Effect.catchTag("DBSelectError", (e) =>
+    failWith500("GET", "utxos", e.cause ?? e, "database error"),
+  ),
+);
 
 const getBlockHandler = Effect.gen(function* () {
   const params = yield* ParsedSearchParams;
@@ -158,7 +203,12 @@ const getBlockHandler = Effect.gen(function* () {
     `GET /block - Found ${hashes.length} txs for block: ${hdrHash}`,
   );
   return yield* HttpServerResponse.json({ hashes });
-}).pipe(Effect.catchAll((e) => handle500("getBlock", e)));
+}).pipe(
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "block", e)),
+  Effect.catchTag("DBSelectError", (e) =>
+    failWith500("GET", "block", e.cause ?? e, "database error"),
+  ),
+);
 
 const getInitHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✨ Initialization request received`);
@@ -169,15 +219,8 @@ const getInitHandler = Effect.gen(function* () {
     message: `Initiation successful: ${result}`,
   });
 }).pipe(
-  Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`GET /init - Initialization failed: ${e}`);
-      return yield* HttpServerResponse.json(
-        { error: "Initialization failed" },
-        { status: 500 },
-      );
-    }),
-  ),
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "init", e)),
+  Effect.catchAll((e) => failWith500("GET", "init", e, "sdk error")),
 );
 
 const getCommitEndpoint = Effect.gen(function* () {
@@ -188,14 +231,9 @@ const getCommitEndpoint = Effect.gen(function* () {
     message: `Block commitment successful: ${result}`,
   });
 }).pipe(
-  Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`GET /commit - Block commitment failed: ${e}`);
-      return yield* HttpServerResponse.json(
-        { error: "Block commitment failed." },
-        { status: 500 },
-      );
-    }),
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "commit", e)),
+  Effect.catchTag("WorkerError", (e) =>
+    failWith500("GET", "commit", e.cause ?? e, "failed worker"),
   ),
 );
 
@@ -209,17 +247,8 @@ const getMergeHandler = Effect.gen(function* () {
     message: `Merging confirmed state successful: ${result}`,
   });
 }).pipe(
-  Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(
-        `GET /merge - Merging confirmed state failed: ${e}`,
-      );
-      return yield* HttpServerResponse.json(
-        { error: "Merging confirmed state failed." },
-        { status: 500 },
-      );
-    }),
-  ),
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "merge", e)),
+  Effect.catchAll((e) => failWith500("GET", "merge", e, "sdk error")),
 );
 
 const getResetHandler = Effect.gen(function* () {
@@ -243,17 +272,8 @@ const getResetHandler = Effect.gen(function* () {
     message: `Collected all UTxOs successfully!`,
   });
 }).pipe(
-  Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`Failed to collect one or more UTxOs. Error: ${e}`);
-      return yield* HttpServerResponse.json(
-        {
-          error: `Failed to collect one or more UTxOs. Please try again. Error: ${e}`,
-        },
-        { status: 400 },
-      );
-    }),
-  ),
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "reset", e)),
+  Effect.catchAll((e) => failWith500("GET", "reset", e, "sdk error")),
 );
 
 const getLogStateQueueHandler = Effect.gen(function* () {
@@ -295,7 +315,12 @@ ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
   return yield* HttpServerResponse.json({
     message: `State queue drawn in server logs!`,
   });
-});
+}).pipe(
+  Effect.catchTag("HttpBodyError", (e) =>
+    failWith500("GET", "logStateQueue", e),
+  ),
+  Effect.catchAll((e) => failWith500("GET", "logStateQueue", e, "sdk error")),
+);
 
 const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
@@ -325,7 +350,12 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
   return yield* HttpServerResponse.json({
     message: `BlocksDB drawn in server logs!`,
   });
-}).pipe(Effect.catchAll((e) => handle500("getLogBlocksDBHandler", e)));
+}).pipe(
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "logBlocksDB", e)),
+  Effect.catchTag("DBSelectError", (e) =>
+    failWith500("GET", "logBlocksDB", e.cause ?? e, "database error"),
+  ),
+);
 
 const getLogGlobalsHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Logging global variables...`);
@@ -341,51 +371,69 @@ const getLogGlobalsHandler = Effect.gen(function* () {
   return yield* HttpServerResponse.json({
     message: `Global variables logged!`,
   });
-});
-
-const postSubmitHandler = Effect.gen(function* () {
-  // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
-  const params = yield* ParsedSearchParams;
-  const txStringParam = params["tx_cbor"];
-  if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
-    yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
-    return yield* HttpServerResponse.json(
-      { error: `Invalid CBOR provided` },
-      { status: 400 },
-    );
-  } else {
-    const txString = txStringParam;
-    yield* MempoolDB.insert(txString);
-    Effect.runSync(Metric.increment(txCounter));
-    return yield* HttpServerResponse.json({
-      message: `Successfully submitted the transaction`,
-    });
-  }
 }).pipe(
-  Effect.catchAll((e) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo(`▫️ L2 transaction failed: ${e}`);
+  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "logGlobals", e)),
+);
+
+const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
+  Effect.gen(function* () {
+    // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
+    const params = yield* ParsedSearchParams;
+    const txStringParam = params["tx_cbor"];
+    if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
+      yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
       return yield* HttpServerResponse.json(
-        { error: `Something went wrong: ${e}` },
+        { error: `Invalid CBOR provided` },
         { status: 400 },
       );
-    }),
-  ),
-);
+    } else {
+      const txString = txStringParam;
+      yield* txQueue.offer(txString);
+      Effect.runSync(Metric.increment(txCounter));
+      return yield* HttpServerResponse.json({
+        message: `Successfully added the transaction to the queue`,
+      });
+    }
+  }).pipe(
+    Effect.catchTag("HttpBodyError", (e) =>
+      failWith500("POST", "submit", e, "▫️ L2 transaction failed"),
+    ),
+  );
 
-const router = HttpRouter.empty.pipe(
-  HttpRouter.get("/tx", getTxHandler),
-  HttpRouter.get("/utxos", getUtxosHandler),
-  HttpRouter.get("/block", getBlockHandler),
-  HttpRouter.get("/init", getInitHandler),
-  HttpRouter.get("/commit", getCommitEndpoint),
-  HttpRouter.get("/merge", getMergeHandler),
-  HttpRouter.get("/reset", getResetHandler),
-  HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
-  HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
-  HttpRouter.get("/logGlobals", getLogGlobalsHandler),
-  HttpRouter.post("/submit", postSubmitHandler),
-);
+const router = (
+  txQueue: Queue.Queue<string>,
+): Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  HttpBodyError,
+  | Database
+  | User
+  | NodeConfig
+  | AlwaysSucceedsContract
+  | HttpServerRequest.HttpServerRequest
+> =>
+  HttpRouter.empty
+    .pipe(
+      HttpRouter.get("/tx", getTxHandler),
+      HttpRouter.get("/utxos", getUtxosHandler),
+      HttpRouter.get("/block", getBlockHandler),
+      HttpRouter.get("/init", getInitHandler),
+      HttpRouter.get("/commit", getCommitEndpoint),
+      HttpRouter.get("/merge", getMergeHandler),
+      HttpRouter.get("/reset", getResetHandler),
+      HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
+      HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
+      HttpRouter.get("/logGlobals", getLogGlobalsHandler),
+      HttpRouter.post("/submit", postSubmitHandler(txQueue)),
+    )
+    .pipe(
+      Effect.catchAllCause((cause) =>
+        failWith500Helper(
+          "Router unexpected failure",
+          "unknown endpoint",
+          Cause.pretty(cause),
+        ),
+      ),
+    );
 
 const blockCommitmentAction = Effect.gen(function* () {
   yield* Effect.logInfo("🔹 New block commitment process started.");
@@ -493,10 +541,25 @@ const mergeAction = Effect.gen(function* () {
   );
 });
 
-const mempoolAction = Effect.gen(function* () {
+const monitorMempoolAction = Effect.gen(function* () {
   const numTx = yield* MempoolDB.retrieveTxCount;
   yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
+
+const txQueueProcessorAction = (txQueue: Queue.Dequeue<string>) =>
+  Effect.gen(function* () {
+    const queueSize = yield* txQueue.size;
+    yield* txQueueSizeGauge(Effect.succeed(BigInt(queueSize)));
+
+    const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(txQueue);
+    const txStrings = Chunk.toReadonlyArray(txStringsChunk);
+    const brokeDownTxs: ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) =>
+      Effect.gen(function* () {
+        return yield* breakDownTx(fromHex(tx));
+      }),
+    );
+    yield* MempoolDB.insertMultiple(brokeDownTxs);
+  });
 
 const blockCommitmentFork = (rerunDelay: number) =>
   Effect.gen(function* () {
@@ -543,14 +606,21 @@ const mergeFork = (rerunDelay: number) =>
     // Effect.fork, // Forking ensures the effect keeps running
   );
 
-const mempoolFork = () =>
+const monitorMempoolFork = pipe(
+  Effect.gen(function* () {
+    yield* Effect.logInfo("🟢 Mempool monitor fork started.");
+    const schedule = Schedule.fixed("1000 millis");
+    yield* Effect.repeat(monitorMempoolAction, schedule);
+  }),
+  Effect.catchAllCause(Effect.logWarning),
+);
+
+const txQueueProcessorFork = (txQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
-      yield* Effect.logInfo("🟢 Mempool fork started.");
-      const schedule = Schedule.addDelay(Schedule.forever, () =>
-        Duration.millis(1000),
-      );
-      yield* Effect.repeat(mempoolAction, schedule);
+      yield* Effect.logInfo("🔶 Tx queue processor fork started.");
+      const schedule = Schedule.fixed("500 millis");
+      yield* Effect.repeat(txQueueProcessorAction(txQueue), schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
   );
@@ -581,14 +651,16 @@ export const runNode = Effect.gen(function* () {
     ),
   }));
 
+  const txQueue = yield* Queue.unbounded<string>();
+
   yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
 
-  const ListenLayer = Layer.provide(
-    HttpServer.serve(router),
-    NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
+  const appThread = Layer.launch(
+    Layer.provide(
+      HttpServer.serve(router(txQueue)),
+      NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
+    ),
   );
-
-  const appThread = pipe(Layer.launch(ListenLayer));
 
   const blockCommitmentThread = blockCommitmentFork(
     nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENT,
@@ -598,9 +670,11 @@ export const runNode = Effect.gen(function* () {
     nodeConfig.WAIT_BETWEEN_BLOCK_CONFIRMATION,
   );
 
-  const mergeThread = pipe(mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS));
+  const mergeThread = mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS);
 
-  const monitorMempoolThread = pipe(mempoolFork());
+  const monitorMempoolThread = monitorMempoolFork;
+
+  const txQueueProcessorThread = txQueueProcessorFork(txQueue);
 
   const program = Effect.all(
     [
@@ -609,6 +683,7 @@ export const runNode = Effect.gen(function* () {
       blockConfirmationThread,
       mergeThread,
       monitorMempoolThread,
+      txQueueProcessorThread,
     ],
     {
       concurrency: "unbounded",
