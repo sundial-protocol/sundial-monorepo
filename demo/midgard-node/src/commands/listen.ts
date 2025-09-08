@@ -395,7 +395,7 @@ const blockCommitmentAction = Effect.gen(function* () {
 });
 
 const blockConfirmationAction = Effect.gen(function* () {
-  yield* Effect.logInfo("🟤 New block confirmation process started.");
+  yield* Effect.logInfo("🔍 New block confirmation process started.");
   const worker = Effect.async<
     BlockConfirmationWorkerOutput,
     WorkerError,
@@ -463,7 +463,7 @@ const blockConfirmationAction = Effect.gen(function* () {
     case "SuccessfulConfirmationOutput": {
       global.UNCONFIRMED_SUBMITTED_BLOCK = "";
       global.AVAILABLE_CONFIRMED_BLOCK = workerOutput.blocksUTxO;
-      yield* Effect.logInfo("🟤 ☑️  Submitted block confirmed.");
+      yield* Effect.logInfo("🔍 ☑️  Submitted block confirmed.");
       break;
     }
     case "NoTxForConfirmationOutput": {

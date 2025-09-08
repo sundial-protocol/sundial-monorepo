@@ -114,6 +114,7 @@ const signSubmitHelper = (
       .withWallet()
       .completeProgram()
       .pipe(
+        Effect.tapError((e) => Effect.logError(e)),
         Effect.mapError(
           (e) =>
             new TxSignError({
@@ -134,6 +135,7 @@ ${signed.toCBOR()}
           Schedule.recurs(RETRY_ATTEMPTS),
         ),
       ),
+      Effect.tapError((e) => Effect.logError(e)),
       Effect.mapError(
         (e) =>
           new TxSubmitError({
