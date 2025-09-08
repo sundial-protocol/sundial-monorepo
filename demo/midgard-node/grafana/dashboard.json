@@ -141,7 +141,7 @@
           "useBackend": false
         }
       ],
-      "title": "Incoming Transaction Queue Size",
+      "title": "Midgard Transactions in Queue",
       "type": "timeseries"
     },
     {
@@ -243,7 +243,7 @@
           "useBackend": false
         }
       ],
-      "title": "Midgard Mempool Txs",
+      "title": "Mempool Transactions",
       "type": "timeseries"
     },
     {
@@ -336,7 +336,7 @@
           "refId": "A"
         }
       ],
-      "title": "Received Transaction Per Second",
+      "title": "Received Transactions Per Second",
       "type": "timeseries"
     },
     {
@@ -429,7 +429,7 @@
           "refId": "A"
         }
       ],
-      "title": "Merge Block Per Minute",
+      "title": "Merged Blocks Per Minute",
       "type": "timeseries"
     },
     {
@@ -522,7 +522,7 @@
           "refId": "A"
         }
       ],
-      "title": "Commit Block Per Minute",
+      "title": "Committed Blocks Per Minute",
       "type": "timeseries"
     },
     {
@@ -820,7 +820,7 @@
           "useBackend": false
         }
       ],
-      "title": "Received transactions",
+      "title": "Received Transactions",
       "type": "timeseries"
     },
     {
@@ -917,7 +917,7 @@
           "useBackend": false
         }
       ],
-      "title": "L1 Commit Block Tx Size",
+      "title": "L1 Block Commitment Transaction Size",
       "type": "timeseries"
     },
     {
@@ -1019,7 +1019,7 @@
           "useBackend": false
         }
       ],
-      "title": "Committed Txs",
+      "title": "Committed Transactions",
       "type": "timeseries"
     },
     {
@@ -1116,7 +1116,7 @@
           "useBackend": false
         }
       ],
-      "title": "L2 Tx Size In Commit Block",
+      "title": "Total Size of Midgard Transactions In Each Block",
       "type": "timeseries"
     },
     {
@@ -1294,7 +1294,7 @@
           "useBackend": false
         }
       ],
-      "title": "L2 Tx In Commit Block",
+      "title": "Midgard Transaction Count in Each Committed Block",
       "type": "timeseries"
     },
     {
