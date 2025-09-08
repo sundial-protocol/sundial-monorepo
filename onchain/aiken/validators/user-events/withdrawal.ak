@@ -12,13 +12,13 @@ use midgard/common/types.{ValuePairs}
 use midgard/common/utils.{plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/payout_accumulator
+use midgard/payout
 use midgard/settlement_queue
 use midgard/state_queue
 use midgard/user_events
 use midgard/user_events/withdrawal.{
   AuthenticateWithdrawal, BurnWithdrawalNFT, Datum, MintRedeemer, Refund,
-  SpendRedeemer, TransferToPayoutAccumulator,
+  SpendRedeemer, TransferToPayout,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -43,8 +43,8 @@ validator spend(hub_oracle: ScriptHash) {
     let hub.Datum {
       withdrawal: withdrawal_policy_id,
       settlement_queue: settlement_queue_policy_id,
-      payout_accum: payout_policy_id,
-      payout_accum_addr,
+      payout: payout_policy_id,
+      payout_addr,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
@@ -94,9 +94,9 @@ validator spend(hub_oracle: ScriptHash) {
         } = output
 
         when spend_purpose is {
-          TransferToPayoutAccumulator { membership_proof } -> {
+          TransferToPayout { membership_proof } -> {
             // 3. Output value must be the same as the input value, without the
-            //    withdrawal NFT, and with the payout accumulator NFT added.
+            //    withdrawal NFT, and with the payout NFT added.
             expect
               output_value == (
                 own_value
@@ -104,9 +104,9 @@ validator spend(hub_oracle: ScriptHash) {
                   |> assets.add(payout_policy_id, burn_asset_name, 1)
               )
 
-            // 4. TODO: Anticipating what the payout accumulator mint redeemer
-            //          should look like.
-            expect payout_accumulator.MintRedeemer { withdrawal_utxo_out_ref }: payout_accumulator.MintRedeemer =
+            // 4. TODO: Anticipating what the payout mint redeemer should look
+            //          like.
+            expect payout.MintRedeemer { withdrawal_utxo_out_ref }: payout.MintRedeemer =
               utils.get_redeemer_at(
                 redeemers,
                 Mint(payout_policy_id),
@@ -137,14 +137,14 @@ validator spend(hub_oracle: ScriptHash) {
             } = withdrawal_event_info
 
             let expected_output_datum: Data =
-              payout_accumulator.Datum { l2_value, l1_address, l1_datum }
+              payout.Datum { l2_value, l1_address, l1_datum }
 
             and {
               // 6. Assert proper datum is attached to the payout accumulator
               //    UTxO.
               output_datum == InlineDatum(expected_output_datum),
-              // 7. Withdrawal must go to the payout accumulator contract.
-              output_address == payout_accum_addr,
+              // 7. Withdrawal must go to the payout contract.
+              output_address == payout_addr,
             }
           }
           Refund { refund_approach } ->
