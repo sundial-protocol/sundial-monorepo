@@ -370,7 +370,7 @@ const getLogGlobalsHandler = Effect.gen(function* () {
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "logGlobals", e)),
 );
 
-const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) =>
+const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
   Effect.gen(function* () {
     // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
     const params = yield* ParsedSearchParams;
@@ -383,7 +383,7 @@ const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) =>
       );
     } else {
       const txString = txStringParam;
-      yield* submitTransactionsQueue.offer(txString);
+      yield* txQueue.offer(txString);
       Effect.runSync(Metric.increment(txCounter));
       return yield* HttpServerResponse.json({
         message: `Successfully added the transaction to the queue`,
@@ -396,7 +396,7 @@ const postSubmitHandler = (submitTransactionsQueue: Queue.Enqueue<string>) =>
   );
 
 const router = (
-  submitTransactionsQueue: Queue.Queue<string>,
+  txQueue: Queue.Queue<string>,
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   HttpBodyError,
@@ -418,7 +418,7 @@ const router = (
       HttpRouter.get("/logStateQueue", getLogStateQueueHandler),
       HttpRouter.get("/logBlocksDB", getLogBlocksDBHandler),
       HttpRouter.get("/logGlobals", getLogGlobalsHandler),
-      HttpRouter.post("/submit", postSubmitHandler(submitTransactionsQueue)),
+      HttpRouter.post("/submit", postSubmitHandler(txQueue)),
     )
     .pipe(
       Effect.catchAllCause((cause) =>
@@ -536,18 +536,14 @@ const mergeAction = Effect.gen(function* () {
   );
 });
 
-const mempoolAction = Effect.gen(function* () {
+const monitorMempoolAction = Effect.gen(function* () {
   const numTx = yield* MempoolDB.retrieveTxCount;
   yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
 });
 
-const postTransactionToMempoolAction = (
-  submitTransactionsQueue: Queue.Dequeue<string>,
-) =>
+const txQueueProcessorAction = (txQueue: Queue.Dequeue<string>) =>
   Effect.gen(function* () {
-    const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(
-      submitTransactionsQueue,
-    );
+    const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(txQueue);
     const txStrings = Chunk.toReadonlyArray(txStringsChunk);
     const brokeDownTxs: ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) =>
       Effect.gen(function* () {
@@ -557,10 +553,10 @@ const postTransactionToMempoolAction = (
     yield* MempoolDB.insertMultiple(brokeDownTxs);
   });
 
-const logQueueSize = (submitTransactionsQueue: Queue.Dequeue<string>) =>
+const logQueueSize = (txQueue: Queue.Dequeue<string>) =>
   Effect.gen(function* () {
-    const size = yield* submitTransactionsQueue.size;
-    yield* Effect.logInfo(`🧳 submitTransactionsQueue size is ${size}`);
+    const size = yield* txQueue.size;
+    yield* Effect.logInfo(`🧳 tx queue size is ${size}`);
   });
 
 const blockCommitmentFork = (rerunDelay: number) =>
@@ -608,34 +604,31 @@ const mergeFork = (rerunDelay: number) =>
     // Effect.fork, // Forking ensures the effect keeps running
   );
 
-const mempoolFork = pipe(
+const monitorMempoolFork = pipe(
   Effect.gen(function* () {
     yield* Effect.logInfo("🟢 Mempool fork started.");
     const schedule = Schedule.fixed("1000 millis");
-    yield* Effect.repeat(mempoolAction, schedule);
+    yield* Effect.repeat(monitorMempoolAction, schedule);
   }),
   Effect.catchAllCause(Effect.logWarning),
 );
 
-const postTransactionsFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
+const txQueueProcessorFork = (txQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactions fork started.");
       const schedule = Schedule.fixed("500 millis");
-      yield* Effect.repeat(
-        postTransactionToMempoolAction(submitTransactionsQueue),
-        schedule,
-      );
+      yield* Effect.repeat(txQueueProcessorAction(txQueue), schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
   );
 
-const logQueueFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
+const monitorTxQueueFork = (txQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 PostTransactionsLog fork started.");
       const schedule = Schedule.fixed("2900 millis");
-      yield* Effect.repeat(logQueueSize(submitTransactionsQueue), schedule);
+      yield* Effect.repeat(logQueueSize(txQueue), schedule);
     }),
     Effect.catchAllCause(Effect.logWarning),
   );
@@ -666,16 +659,16 @@ export const runNode = Effect.gen(function* () {
     ),
   }));
 
-  const submitTransactionsQueue = yield* Queue.unbounded<string>();
+  const txQueue = yield* Queue.unbounded<string>();
 
   yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
 
-  const ListenLayer = Layer.provide(
-    HttpServer.serve(router(submitTransactionsQueue)),
-    NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
+  const appThread = Layer.launch(
+    Layer.provide(
+      HttpServer.serve(router(txQueue)),
+      NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
+    ),
   );
-
-  const appThread = Layer.launch(ListenLayer);
 
   const blockCommitmentThread = blockCommitmentFork(
     nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENT,
@@ -687,11 +680,11 @@ export const runNode = Effect.gen(function* () {
 
   const mergeThread = mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS);
 
-  const monitorMempoolThread = mempoolFork;
+  const monitorMempoolThread = monitorMempoolFork;
 
-  const postTransactionsThread = postTransactionsFork(submitTransactionsQueue);
+  const txQueueProcessorThread = txQueueProcessorFork(txQueue);
 
-  const logQueueThread = logQueueFork(submitTransactionsQueue);
+  const monitorTxQueueThread = monitorTxQueueFork(txQueue);
 
   const program = Effect.all(
     [
@@ -700,8 +693,8 @@ export const runNode = Effect.gen(function* () {
       blockConfirmationThread,
       mergeThread,
       monitorMempoolThread,
-      postTransactionsThread,
-      logQueueThread,
+      txQueueProcessorThread,
+      monitorTxQueueThread,
     ],
     {
       concurrency: "unbounded",
