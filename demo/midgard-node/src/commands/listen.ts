@@ -563,12 +563,6 @@ const txQueueProcessorAction = (txQueue: Queue.Dequeue<string>) =>
     yield* MempoolDB.insertMultiple(brokeDownTxs);
   });
 
-const logQueueSize = (txQueue: Queue.Dequeue<string>) =>
-  Effect.gen(function* () {
-    const size = yield* txQueue.size;
-    yield* Effect.logInfo(`🧳 tx queue size is ${size}`);
-  });
-
 const blockCommitmentFork = (rerunDelay: number) =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔵 Block commitment fork started.");
@@ -633,16 +627,6 @@ const txQueueProcessorFork = (txQueue: Queue.Dequeue<string>) =>
     Effect.catchAllCause(Effect.logWarning),
   );
 
-const monitorTxQueueFork = (txQueue: Queue.Dequeue<string>) =>
-  pipe(
-    Effect.gen(function* () {
-      yield* Effect.logInfo("🔶 Tx queue monitor fork started.");
-      const schedule = Schedule.fixed("2900 millis");
-      yield* Effect.repeat(logQueueSize(txQueue), schedule);
-    }),
-    Effect.catchAllCause(Effect.logWarning),
-  );
-
 export const runNode = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
 
@@ -694,8 +678,6 @@ export const runNode = Effect.gen(function* () {
 
   const txQueueProcessorThread = txQueueProcessorFork(txQueue);
 
-  const monitorTxQueueThread = monitorTxQueueFork(txQueue);
-
   const program = Effect.all(
     [
       appThread,
@@ -704,7 +686,6 @@ export const runNode = Effect.gen(function* () {
       mergeThread,
       monitorMempoolThread,
       txQueueProcessorThread,
-      monitorTxQueueThread,
     ],
     {
       concurrency: "unbounded",
