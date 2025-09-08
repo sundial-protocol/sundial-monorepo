@@ -1,17 +1,28 @@
 import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
-import { clearTable, mapSqlError } from "@/database/utils/common.js";
+import {
+  clearTable,
+  DBDeleteError,
+  DBInsertError,
+  sqlErrorToDBSelectError,
+  DBSelectError,
+  retrieveNumberOfEntries,
+} from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
-import { breakDownTx } from "@/utils.js";
+import { breakDownTx, CmlDeserializationError } from "@/utils.js";
 
 export const tableName = "mempool";
 
 export const insert = (
   txString: string,
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<
+  void,
+  DBInsertError | DBDeleteError | CmlDeserializationError,
+  Database
+> =>
   Effect.gen(function* () {
     const txCborBytes = fromHex(txString);
     const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
@@ -39,7 +50,7 @@ export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
 
 export const retrieve = (): Effect.Effect<
   readonly Tx.Entry[],
-  Error,
+  DBSelectError,
   Database
 > =>
   Effect.gen(function* () {
@@ -53,13 +64,15 @@ export const retrieve = (): Effect.Effect<
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
+    sqlErrorToDBSelectError(tableName),
   );
 
-export const retrieveTxCount = () => Tx.retrieveNumberOfEntries(tableName);
+export const retrieveTxCount: Effect.Effect<number, DBSelectError, Database> =
+  retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
   txHashes: Buffer[],
-): Effect.Effect<void, Error, Database> => Tx.delMultiple(tableName, txHashes);
+): Effect.Effect<void, DBDeleteError, Database> =>
+  Tx.delMultiple(tableName, txHashes);
 
-export const clear = () => clearTable(tableName);
+export const clear = clearTable(tableName);
