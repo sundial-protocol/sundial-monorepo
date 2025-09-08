@@ -117,7 +117,7 @@ export const findSpentAndProducedUTxOs = (
   txHash?: Buffer,
 ): Effect.Effect<
   { spent: Buffer[]; produced: Ledger.MinimalEntry[] },
-  CmlSerializationError
+  CmlUnexpectedError
 > =>
   Effect.gen(function* () {
     const spent: Buffer[] = [];
@@ -132,8 +132,8 @@ export const findSpentAndProducedUTxOs = (
       yield* Effect.try({
         try: () => spent.push(Buffer.from(inputs.get(i).to_cbor_bytes())),
         catch: (e) =>
-          new CmlSerializationError({
-            message: `An error occurred on input CBOR serialization ${inputs.get(i)}`,
+          new CmlUnexpectedError({
+            message: `An error occurred on input CBOR serialization`,
             cause: e,
           }),
       });
@@ -159,7 +159,7 @@ export const breakDownTx = (
       try: () => CML.Transaction.from_cbor_bytes(txCbor),
       catch: (e) =>
         new CmlDeserializationError({
-          message: `Failed to deserialize transaction: ${e}`,
+          message: `Failed to deserialize transaction: ${txCbor}`,
           cause: e,
         }),
     });
@@ -251,12 +251,20 @@ export type GenericErrorFields = {
 
 // General errors that don't have specific domains
 
-export class CmlSerializationError extends Data.TaggedError(
-  "CmlSerializationError",
+export class CmlUnexpectedError extends Data.TaggedError(
+  "CmlUnexpectedError",
 )<GenericErrorFields> {}
 
 export class CmlDeserializationError extends Data.TaggedError(
   "CmlDeserializationError",
+)<GenericErrorFields> {}
+
+export class CborSerializationError extends Data.TaggedError(
+  "CborSerializationError",
+)<GenericErrorFields> {}
+
+export class CborDeserializationError extends Data.TaggedError(
+  "CborDeserializationError",
 )<GenericErrorFields> {}
 
 export class LucidError extends Data.TaggedError(

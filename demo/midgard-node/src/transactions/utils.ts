@@ -117,7 +117,7 @@ const signSubmitHelper = (
         Effect.mapError(
           (e) =>
             new TxSignError({
-              message: `Failed to sign transaction:`,
+              message: `Failed to sign transaction`,
               cause: e,
             }),
         ),
@@ -137,7 +137,7 @@ ${signed.toCBOR()}
       Effect.mapError(
         (e) =>
           new TxSubmitError({
-            message: `Failed to submit transaction:`,
+            message: `Failed to submit transaction`,
             cause: e,
           }),
       ),

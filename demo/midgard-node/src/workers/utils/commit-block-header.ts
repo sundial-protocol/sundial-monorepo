@@ -1,7 +1,11 @@
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { CML, Data, coreToUtxo, utxoToCore } from "@lucid-evolution/lucid";
-import { CmlDeserializationError, CmlSerializationError } from "@/utils.js";
+import {
+  CborDeserializationError,
+  CborSerializationError,
+  CmlUnexpectedError,
+} from "@/utils.js";
 
 export type WorkerInput = {
   data: {
@@ -49,21 +53,24 @@ export type SerializedStateQueueUTxO = Omit<
 
 export const serializeStateQueueUTxO = (
   stateQueueUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
-): Effect.Effect<SerializedStateQueueUTxO, CmlSerializationError> =>
+): Effect.Effect<
+  SerializedStateQueueUTxO,
+  CmlUnexpectedError | CborSerializationError
+> =>
   Effect.gen(function* () {
     const core = yield* Effect.try({
       try: () => utxoToCore(stateQueueUTxO.utxo),
       catch: (e) =>
-        new CmlSerializationError({
-          message: `Failed to serialize UTxO: ${e}`,
+        new CmlUnexpectedError({
+          message: `Failed to serialize UTxO`,
           cause: e,
         }),
     });
     const datumCBOR = yield* Effect.try({
       try: () => Data.to(stateQueueUTxO.datum, SDK.TxBuilder.StateQueue.Datum),
       catch: (e) =>
-        new CmlSerializationError({
-          message: `Failed to serialize datum: ${e}`,
+        new CborSerializationError({
+          message: `Failed to serialize datum`,
           cause: e,
         }),
     });
@@ -78,7 +85,7 @@ export const deserializeStateQueueUTxO = (
   stateQueueUTxO: SerializedStateQueueUTxO,
 ): Effect.Effect<
   SDK.TxBuilder.StateQueue.StateQueueUTxO,
-  CmlDeserializationError
+  CmlUnexpectedError | CborDeserializationError
 > =>
   Effect.gen(function* () {
     const u = yield* Effect.try({
@@ -87,8 +94,8 @@ export const deserializeStateQueueUTxO = (
           CML.TransactionUnspentOutput.from_cbor_hex(stateQueueUTxO.utxo),
         ),
       catch: (e) =>
-        new CmlDeserializationError({
-          message: `Failed to deserialize UTxO: ${e}`,
+        new CmlUnexpectedError({
+          message: `Failed to convert UTxO to CML: ${e}`,
           cause: e,
         }),
     });
@@ -96,7 +103,7 @@ export const deserializeStateQueueUTxO = (
       try: () =>
         Data.from(stateQueueUTxO.datum, SDK.TxBuilder.StateQueue.Datum),
       catch: (e) =>
-        new CmlDeserializationError({
+        new CborDeserializationError({
           message: `Failed to deserialize datum: ${e}`,
           cause: e,
         }),

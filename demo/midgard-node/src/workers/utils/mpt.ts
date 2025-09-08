@@ -9,7 +9,7 @@ import { NodeConfig } from "@/config.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
 import { Database } from "@/services/database.js";
-import { findSpentAndProducedUTxOs, CmlSerializationError } from "@/utils.js";
+import { CmlUnexpectedError, findSpentAndProducedUTxOs } from "@/utils.js";
 import * as FS from "fs";
 
 // Key of the row which its value is the persisted trie root.
@@ -143,7 +143,7 @@ export const processMpts = (
     mempoolTxHashes: Buffer[];
     sizeOfProcessedTxs: number;
   },
-  MptError | CmlSerializationError,
+  MptError | CmlUnexpectedError,
   Database
 > =>
   Effect.gen(function* () {

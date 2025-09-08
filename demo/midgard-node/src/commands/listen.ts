@@ -225,7 +225,7 @@ const getMergeHandler = Effect.gen(function* () {
 const getResetHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`🚧 Reset request received`);
   yield* StateQueueTx.resetStateQueue;
-  const dbEffects = Effect.all(
+  yield* Effect.all(
     [
       MempoolDB.clear,
       MempoolLedgerDB.clear,
@@ -239,7 +239,6 @@ const getResetHandler = Effect.gen(function* () {
     ],
     { discard: true },
   );
-  yield* dbEffects;
   return yield* HttpServerResponse.json({
     message: `Collected all UTxOs successfully!`,
   });
