@@ -250,12 +250,13 @@ export type GenericErrorFields = {
 };
 
 // General errors that don't have specific domains
-export class DeserializationError extends Data.TaggedError(
-  "DeserializationError",
+
+export class CmlSerializationError extends Data.TaggedError(
+  "CmlSerializationError",
 )<GenericErrorFields> {}
 
-export class SerializationError extends Data.TaggedError(
-  "SerializationError",
+export class CmlDeserializationError extends Data.TaggedError(
+  "CmlDeserializationError",
 )<GenericErrorFields> {}
 
 export class LucidError extends Data.TaggedError(

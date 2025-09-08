@@ -54,7 +54,7 @@ const wrapper = (
 
     yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
 
-    const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+    const { ledgerTrie, mempoolTrie } = yield* makeMpts;
 
     return yield* withTrieTransaction(
       ledgerTrie,

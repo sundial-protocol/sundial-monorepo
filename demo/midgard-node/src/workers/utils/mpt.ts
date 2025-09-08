@@ -9,7 +9,7 @@ import { NodeConfig } from "@/config.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
 import { Database } from "@/services/database.js";
-import { findSpentAndProducedUTxOs, SerializationError } from "@/utils.js";
+import { findSpentAndProducedUTxOs, CmlSerializationError } from "@/utils.js";
 import * as FS from "fs";
 
 // Key of the row which its value is the persisted trie root.
@@ -20,98 +20,98 @@ const LEVELDB_ENCODING_OPTS = {
   valueEncoding: ETH_UTILS.ValueEncoding.Bytes,
 };
 
-export const makeMpts = () =>
-  Effect.gen(function* () {
-    const nodeConfig = yield* NodeConfig;
-    // Since there is no way to create an MPT from txs that are already in
-    // the mempool database, we have two options here:
-    // 1. We could add txs to the MPT directly from the submit endpoint.
-    //    However, this would require sharing the MPT object between the server and
-    //    worker threads, which is not trivial. Also, exposing trie database details
-    //    to the submit endpoint does not seem like good coding practice.
-    // 2. We could use an in-memory database. Since only transaction CBORs are stored
-    //    in the mempool, this should not add any overhead compared to inserting
-    //    each tx twice (in the mempool and in the tree itself). So it shouldn't
-    //    become a bottleneck. If it does, we could reconsider the first option.
-    //
-    // ^ Old comment, we are now storing mempool's LevelDB on disk as well. This
-    //   allows us to continue a work that's been done in cases of failures.
-    const mempoolLevelDb = new Level<string, Uint8Array>(
-      nodeConfig.MEMPOOL_MPT_DB_PATH,
-      LEVELDB_ENCODING_OPTS,
-    );
-    const mempoolTrie = yield* Effect.tryPromise({
-      try: () =>
-        ETH.createMPT({
-          db: new LevelDB(mempoolLevelDb),
-          useRootPersistence: true,
-          valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
-        }),
-      catch: (e) => MptError.trieCreate("mempool", e),
-    });
-    // Ledger MPT from the other side should use a checkpoint database —
-    // its MPT building operations are paired with database ones
-    const ledgerLevelDb = new Level<string, Uint8Array>(
-      nodeConfig.LEDGER_MPT_DB_PATH,
-      LEVELDB_ENCODING_OPTS,
-    );
-    const ledgerTrie = yield* Effect.tryPromise({
-      try: () =>
-        ETH.createMPT({
-          db: new LevelDB(ledgerLevelDb),
-          useRootPersistence: true,
-          valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
-        }),
-      catch: (e) => MptError.trieCreate("ledger", e),
-    });
-    const mempoolRootBeforeMempoolTxs = yield* Effect.tryPromise({
-      try: () => mempoolTrie.get(rootKey),
-      catch: (e) => MptError.get("mempool", e),
-    }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
-    const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise({
-      try: () => ledgerTrie.get(rootKey),
-      catch: (e) => MptError.get("ledger", e),
-    }).pipe(
-      Effect.orElse(() =>
-        Effect.gen(function* () {
-          yield* Effect.sync(() => ledgerTrie.root(ledgerTrie.EMPTY_TRIE_ROOT));
-          const ops: ETH_UTILS.BatchDBOp[] = yield* Effect.forEach(
-            nodeConfig.GENESIS_UTXOS,
-            (u: UTxO) =>
-              Effect.gen(function* () {
-                const core = yield* Effect.try({
-                  try: () => utxoToCore(u),
-                  catch: (e) =>
-                    new SerializationError({
-                      message: `An error occurred on UTxO ${u} to TransactionUnspentOutput transformation`,
-                      cause: e,
-                    }),
-                });
-                const op: ETH_UTILS.BatchDBOp = {
-                  type: "put",
-                  key: Buffer.from(core.input().to_cbor_bytes()),
-                  value: Buffer.from(core.output().to_cbor_bytes()),
-                };
-                return op;
-              }),
-          );
-          yield* Effect.tryPromise({
-            try: () => ledgerTrie.batch(ops),
-            catch: (e) => MptError.batch("ledger", e),
-          });
-          const rootAfterGenesis = yield* Effect.sync(() => ledgerTrie.root());
-          return rootAfterGenesis;
-        }),
-      ),
-    );
-    // Ensuring persisted root is stored in tries' private properties
-    yield* Effect.sync(() => mempoolTrie.root(mempoolRootBeforeMempoolTxs));
-    yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
-    return {
-      ledgerTrie,
-      mempoolTrie,
-    };
+export const makeMpts: Effect.Effect<
+  { ledgerTrie: ETH.MerklePatriciaTrie; mempoolTrie: ETH.MerklePatriciaTrie },
+  MptError,
+  NodeConfig
+> = Effect.gen(function* () {
+  const nodeConfig = yield* NodeConfig;
+  // Since there is no way to create an MPT from txs that are already in
+  // the mempool database, we have two options here:
+  // 1. We could add txs to the MPT directly from the submit endpoint.
+  //    However, this would require sharing the MPT object between the server and
+  //    worker threads, which is not trivial. Also, exposing trie database details
+  //    to the submit endpoint does not seem like good coding practice.
+  // 2. We could use an in-memory database. Since only transaction CBORs are stored
+  //    in the mempool, this should not add any overhead compared to inserting
+  //    each tx twice (in the mempool and in the tree itself). So it shouldn't
+  //    become a bottleneck. If it does, we could reconsider the first option.
+  //
+  // ^ Old comment, we are now storing mempool's LevelDB on disk as well. This
+  //   allows us to continue a work that's been done in cases of failures.
+  const mempoolLevelDb = new Level<string, Uint8Array>(
+    nodeConfig.MEMPOOL_MPT_DB_PATH,
+    LEVELDB_ENCODING_OPTS,
+  );
+  const mempoolTrie = yield* Effect.tryPromise({
+    try: () =>
+      ETH.createMPT({
+        db: new LevelDB(mempoolLevelDb),
+        useRootPersistence: true,
+        valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
+      }),
+    catch: (e) => MptError.trieCreate("mempool", e),
   });
+  // Ledger MPT from the other side should use a checkpoint database —
+  // its MPT building operations are paired with database ones
+  const ledgerLevelDb = new Level<string, Uint8Array>(
+    nodeConfig.LEDGER_MPT_DB_PATH,
+    LEVELDB_ENCODING_OPTS,
+  );
+  const ledgerTrie = yield* Effect.tryPromise({
+    try: () =>
+      ETH.createMPT({
+        db: new LevelDB(ledgerLevelDb),
+        useRootPersistence: true,
+        valueEncoding: LEVELDB_ENCODING_OPTS.valueEncoding,
+      }),
+    catch: (e) => MptError.trieCreate("ledger", e),
+  });
+  const mempoolRootBeforeMempoolTxs = yield* Effect.tryPromise({
+    try: () => mempoolTrie.get(rootKey),
+    catch: (e) => MptError.get("mempool", e),
+  }).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
+  const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise({
+    try: () => ledgerTrie.get(rootKey),
+    catch: (e) => MptError.get("ledger", e),
+  }).pipe(
+    Effect.orElse(() =>
+      Effect.gen(function* () {
+        yield* Effect.sync(() => ledgerTrie.root(ledgerTrie.EMPTY_TRIE_ROOT));
+        const ops: ETH_UTILS.BatchDBOp[] = yield* Effect.allSuccesses(
+          nodeConfig.GENESIS_UTXOS.map((u: UTxO) =>
+            Effect.gen(function* () {
+              const core = yield* Effect.try(() => utxoToCore(u)).pipe(
+                Effect.tapError((e) =>
+                  Effect.logError(`IGNORED ERROR WITH GENESIS UTXOS: ${e}`),
+                ),
+              );
+              const op: ETH_UTILS.BatchDBOp = {
+                type: "put",
+                key: Buffer.from(core.input().to_cbor_bytes()),
+                value: Buffer.from(core.output().to_cbor_bytes()),
+              };
+              return op;
+            }),
+          ),
+        );
+        yield* Effect.tryPromise({
+          try: () => ledgerTrie.batch(ops),
+          catch: (e) => MptError.batch("ledger", e),
+        });
+        const rootAfterGenesis = yield* Effect.sync(() => ledgerTrie.root());
+        return rootAfterGenesis;
+      }),
+    ),
+  );
+  // Ensuring persisted root is stored in tries' private properties
+  yield* Effect.sync(() => mempoolTrie.root(mempoolRootBeforeMempoolTxs));
+  yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
+  return {
+    ledgerTrie,
+    mempoolTrie,
+  };
+});
 
 export const deleteMempoolMpt: Effect.Effect<void, MptError, NodeConfig> =
   Effect.gen(function* () {
@@ -145,7 +145,7 @@ export const processMpts = (
     mempoolTxHashes: Buffer[];
     sizeOfProcessedTxs: number;
   },
-  MptError | SerializationError,
+  MptError | CmlSerializationError,
   Database
 > =>
   Effect.gen(function* () {
