@@ -6,14 +6,10 @@ import {
   UTxO,
   walletFromSeed,
 } from "@lucid-evolution/lucid";
-import { Config, Context, Effect, Layer } from "effect";
+import { Config, Context, Data, Effect, Layer } from "effect";
+import { GenericErrorFields } from "./utils.js";
 
-const SUPPORTED_PROVIDERS = ["kupmios", "blockfrost"] as const;
-type Provider = (typeof SUPPORTED_PROVIDERS)[number];
-
-const isValidProvider = (provider: string): provider is Provider => {
-  return SUPPORTED_PROVIDERS.includes(provider.toLowerCase() as Provider);
-};
+type Provider = "Kupmios" | "Blockfrost";
 
 export type NodeConfigDep = {
   L1_PROVIDER: Provider;
@@ -41,22 +37,29 @@ export type NodeConfigDep = {
 
 export const makeUserFn = (nodeConfig: NodeConfigDep) =>
   Effect.gen(function* () {
-    const user = yield* Effect.tryPromise(() => {
-      switch (nodeConfig.L1_PROVIDER) {
-        case "kupmios":
-          return Lucid(
-            new Kupmios(nodeConfig.L1_KUPO_KEY, nodeConfig.L1_OGMIOS_KEY),
-            nodeConfig.NETWORK,
-          );
-        case "blockfrost":
-          return Lucid(
-            new Blockfrost(
-              nodeConfig.L1_BLOCKFROST_API_URL,
-              nodeConfig.L1_BLOCKFROST_KEY,
-            ),
-            nodeConfig.NETWORK,
-          );
-      }
+    const user = yield* Effect.tryPromise({
+      try: () => {
+        switch (nodeConfig.L1_PROVIDER) {
+          case "Kupmios":
+            return Lucid(
+              new Kupmios(nodeConfig.L1_KUPO_KEY, nodeConfig.L1_OGMIOS_KEY),
+              nodeConfig.NETWORK,
+            );
+          case "Blockfrost":
+            return Lucid(
+              new Blockfrost(
+                nodeConfig.L1_BLOCKFROST_API_URL,
+                nodeConfig.L1_BLOCKFROST_KEY,
+              ),
+              nodeConfig.NETWORK,
+            );
+        }
+      },
+      catch: (e) =>
+        new ConfigError({
+          message: `An error occurred on lucid initialization`,
+          cause: e,
+        }),
     });
     user.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
     return {
@@ -80,7 +83,7 @@ export const NETWORK: Network = "Preprod";
 
 export const makeConfig = Effect.gen(function* () {
   const config = yield* Config.all([
-    Config.string("L1_PROVIDER"),
+    Config.literal("Kupmios", "Blockfrost")("L1_PROVIDER"),
     Config.string("L1_BLOCKFROST_API_URL"),
     Config.string("L1_BLOCKFROST_KEY"),
     Config.string("L1_OGMIOS_KEY"),
@@ -115,12 +118,7 @@ export const makeConfig = Effect.gen(function* () {
     Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_C"),
   ]);
 
-  const provider = config[0].toLowerCase();
-  if (!isValidProvider(provider)) {
-    throw new Error(
-      `Invalid L1_PROVIDER: ${provider}. Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,
-    );
-  }
+  const provider: Provider = config[0];
   const network: Network = config[7];
   const seedA = config[20];
   const seedB = config[21];
@@ -220,3 +218,10 @@ export class NodeConfig extends Context.Tag("NodeConfig")<
 >() {
   static readonly layer = Layer.effect(NodeConfig, makeConfig);
 }
+
+export class ConfigError extends Data.TaggedError("ConfigError")<
+  GenericErrorFields & {
+    readonly field?: string;
+    readonly value?: string;
+  }
+> {}

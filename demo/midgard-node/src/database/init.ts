@@ -1,4 +1,4 @@
-import { SqlClient } from "@effect/sql";
+import { SqlClient, SqlError } from "@effect/sql";
 import * as BlocksDB from "./blocks.js";
 import * as ConfirmedLedgerDB from "./confirmedLedger.js";
 import * as ImmutableDB from "./immutable.js";
@@ -12,10 +12,11 @@ import { Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
 import { NodeConfig } from "@/config.js";
+import { DBCreateError, DBOtherError } from "./utils/common.js";
 
 export const initializeDb: () => Effect.Effect<
   void,
-  Error,
+  DBCreateError | DBOtherError,
   Database | NodeConfig
 > = () =>
   Effect.gen(function* () {
@@ -35,4 +36,16 @@ export const initializeDb: () => Effect.Effect<
     yield* insertGenesisUtxos;
 
     yield* Effect.logInfo("PostgreSQL database initialized Successfully.");
-  });
+  }).pipe(
+    Effect.mapError((error: unknown) =>
+      error instanceof SqlError.SqlError
+        ? new DBOtherError({
+            message: `Failed to initialize database`,
+            cause: error,
+          })
+        : new DBOtherError({
+            message: `Unknown error during database initialization: ${error}`,
+            cause: error,
+          }),
+    ),
+  );
