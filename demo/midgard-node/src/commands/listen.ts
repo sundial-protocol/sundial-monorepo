@@ -606,7 +606,7 @@ const mergeFork = (rerunDelay: number) =>
 
 const monitorMempoolFork = pipe(
   Effect.gen(function* () {
-    yield* Effect.logInfo("🟢 Mempool fork started.");
+    yield* Effect.logInfo("🟢 Mempool monitor fork started.");
     const schedule = Schedule.fixed("1000 millis");
     yield* Effect.repeat(monitorMempoolAction, schedule);
   }),
@@ -616,7 +616,7 @@ const monitorMempoolFork = pipe(
 const txQueueProcessorFork = (txQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
-      yield* Effect.logInfo("🔶 PostTransactions fork started.");
+      yield* Effect.logInfo("🔶 Tx queue processor fork started.");
       const schedule = Schedule.fixed("500 millis");
       yield* Effect.repeat(txQueueProcessorAction(txQueue), schedule);
     }),
@@ -626,7 +626,7 @@ const txQueueProcessorFork = (txQueue: Queue.Dequeue<string>) =>
 const monitorTxQueueFork = (txQueue: Queue.Dequeue<string>) =>
   pipe(
     Effect.gen(function* () {
-      yield* Effect.logInfo("🔶 PostTransactionsLog fork started.");
+      yield* Effect.logInfo("🔶 Tx queue monitor fork started.");
       const schedule = Schedule.fixed("2900 millis");
       yield* Effect.repeat(logQueueSize(txQueue), schedule);
     }),
