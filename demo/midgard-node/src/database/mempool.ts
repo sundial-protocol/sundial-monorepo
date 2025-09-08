@@ -17,7 +17,11 @@ export const tableName = "mempool";
 
 export const insert = (
   processedTx: ProcessedTx,
-): Effect.Effect<void, DBInsertError | DBDeleteError | CmlDeserializationError, Database> =>
+): Effect.Effect<
+  void,
+  DBInsertError | DBDeleteError | CmlDeserializationError,
+  Database
+> =>
   Effect.gen(function* () {
     const { txId, txCbor, spent, produced } = processedTx;
     // Insert the tx itself in `MempoolDB`.
@@ -59,9 +63,7 @@ export const insertMultiple = (
     yield* MempoolLedgerDB.clearUTxOs(allSpent);
   }).pipe(
     Effect.withLogSpan(`insert ${tableName}`),
-    Effect.tapError((e) =>
-      Effect.logError(`${tableName} db: insert: ${e}`),
-    ),
+    Effect.tapError((e) => Effect.logError(`${tableName} db: insert: ${e}`)),
   );
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>

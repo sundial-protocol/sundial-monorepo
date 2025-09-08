@@ -621,15 +621,14 @@ const mergeFork = (rerunDelay: number) =>
     // Effect.fork, // Forking ensures the effect keeps running
   );
 
-const mempoolFork =
-  pipe(
-    Effect.gen(function* () {
-      yield* Effect.logInfo("🟢 Mempool fork started.");
-      const schedule = Schedule.fixed("1000 millis");
-      yield* Effect.repeat(mempoolAction, schedule);
-    }),
-    Effect.catchAllCause(Effect.logWarning),
-  );
+const mempoolFork = pipe(
+  Effect.gen(function* () {
+    yield* Effect.logInfo("🟢 Mempool fork started.");
+    const schedule = Schedule.fixed("1000 millis");
+    yield* Effect.repeat(mempoolAction, schedule);
+  }),
+  Effect.catchAllCause(Effect.logWarning),
+);
 
 const postTransactionsFork = (submitTransactionsQueue: Queue.Dequeue<string>) =>
   pipe(
