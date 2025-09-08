@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Data, Effect } from "effect";
 import {
   Address,
   Assets,
@@ -99,3 +99,30 @@ export const hashHexWithBlake2b224 = (
 export const hashHexWithBlake2b256 = (
   hash: string,
 ): Effect.Effect<string, Error> => blake2bHelper(hash, 32, "Blake2b256");
+
+export type GenericErrorFields = {
+  readonly message: string;
+  readonly cause?: unknown;
+};
+
+// General errors that don't have specific domains
+
+export class CmlUnexpectedError extends Data.TaggedError(
+  "CmlUnexpectedError",
+)<GenericErrorFields> {}
+
+export class CmlDeserializationError extends Data.TaggedError(
+  "CmlDeserializationError",
+)<GenericErrorFields> {}
+
+export class CborSerializationError extends Data.TaggedError(
+  "CborSerializationError",
+)<GenericErrorFields> {}
+
+export class CborDeserializationError extends Data.TaggedError(
+  "CborDeserializationError",
+)<GenericErrorFields> {}
+
+export class LucidError extends Data.TaggedError(
+  "LucidError",
+)<GenericErrorFields> {}

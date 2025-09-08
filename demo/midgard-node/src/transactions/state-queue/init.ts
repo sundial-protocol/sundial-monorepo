@@ -2,7 +2,12 @@ import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { AlwaysSucceeds } from "@/services/index.js";
 import { NodeConfig, User } from "@/config.js";
-import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
+import {
+  TxConfirmError,
+  handleSignSubmit,
+  TxSubmitError,
+  TxSignError,
+} from "../utils.js";
 
 export const stateQueueInit = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;

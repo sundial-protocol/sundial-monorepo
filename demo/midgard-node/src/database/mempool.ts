@@ -12,7 +12,8 @@ import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
-import { breakDownTx, CmlDeserializationError } from "@/utils.js";
+import { breakDownTx } from "@/utils.js";
+import * as SDK from "@al-ft/midgard-sdk";
 
 export const tableName = "mempool";
 
@@ -20,7 +21,7 @@ export const insert = (
   txString: string,
 ): Effect.Effect<
   void,
-  DBInsertError | DBDeleteError | CmlDeserializationError,
+  DBInsertError | DBDeleteError | SDK.Utils.CmlDeserializationError,
   Database
 > =>
   Effect.gen(function* () {

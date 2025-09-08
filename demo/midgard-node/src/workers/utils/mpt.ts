@@ -9,8 +9,9 @@ import { NodeConfig } from "@/config.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
 import { Database } from "@/services/database.js";
-import { CmlUnexpectedError, findSpentAndProducedUTxOs } from "@/utils.js";
+import { findSpentAndProducedUTxOs } from "@/utils.js";
 import * as FS from "fs";
+import * as SDK from "@al-ft/midgard-sdk";
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
@@ -143,7 +144,7 @@ export const processMpts = (
     mempoolTxHashes: Buffer[];
     sizeOfProcessedTxs: number;
   },
-  MptError | CmlUnexpectedError,
+  MptError | SDK.Utils.CmlUnexpectedError,
   Database
 > =>
   Effect.gen(function* () {

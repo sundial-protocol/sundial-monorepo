@@ -23,7 +23,7 @@ import {
   TxSubmitError,
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
-import { breakDownTx, LucidError } from "@/utils.js";
+import { breakDownTx } from "@/utils.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
@@ -39,7 +39,7 @@ const MIN_QUEUE_LENGTH_FOR_MERGING: number = 8;
 const getStateQueueLength = (
   lucid: LucidEvolution,
   stateQueueAddress: Address,
-): Effect.Effect<number, LucidError> =>
+): Effect.Effect<number, SDK.Utils.LucidError> =>
   Effect.gen(function* () {
     const now_millis = Date.now();
     if (
@@ -53,7 +53,7 @@ const getStateQueueLength = (
       const stateQueueUtxos = yield* Effect.tryPromise({
         try: () => lucid.utxosAt(stateQueueAddress),
         catch: (e) =>
-          new LucidError({
+          new SDK.Utils.LucidError({
             message: `Failed to fetch UTxOs at state queue address: ${stateQueueAddress}`,
             cause: e,
           }),
