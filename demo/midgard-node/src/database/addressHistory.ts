@@ -95,7 +95,8 @@ export const retrieve = (
 ): Effect.Effect<readonly Buffer[], Error, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
+    yield* Effect.logInfo(`${tableName} db: attempt to retrieve value with address ${address}`);
+
     const result = yield* sql<Buffer>`SELECT ${sql(Tx.Columns.TX)} FROM (
       SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
       FROM ${sql(MempoolDB.tableName)}
@@ -108,13 +109,6 @@ export const retrieve = (
     )} ON tx_union.${sql(Tx.Columns.TX_ID)} = ${sql(tableName)}.${sql(Ledger.Columns.TX_ID)}
     WHERE ${sql(Ledger.Columns.ADDRESS)} = ${address};`;
 
-    if (result.length <= 0) {
-      yield* Effect.fail(
-        new SqlError.SqlError({
-          cause: `No value found for address ${address}`,
-        }),
-      );
-    }
     return result;
   }).pipe(
     Effect.withLogSpan(`retrieve value ${tableName}`),
