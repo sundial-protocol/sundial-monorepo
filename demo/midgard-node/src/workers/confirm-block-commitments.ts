@@ -3,7 +3,7 @@ import {
   reexportedWorkerData as workerData,
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, Schedule, pipe } from "effect";
+import { Cause, Effect, Schedule, pipe } from "effect";
 import { NodeConfig, NodeConfigDep, User } from "@/config.js";
 import {
   WorkerInput,
@@ -12,6 +12,7 @@ import {
 import { serializeStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
 import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { LucidEvolution } from "@lucid-evolution/lucid";
+import { TxConfirmError } from "@/transactions/utils.js";
 
 const inputData = workerData as WorkerInput;
 
@@ -56,7 +57,12 @@ const wrapper = (
       yield* Effect.retry(
         Effect.tryPromise({
           try: () => lucid.awaitTx(targetTxHash),
-          catch: (e) => new Error(`${e}`),
+          catch: (e) =>
+            new TxConfirmError({
+              message: `Failed to confirm transaction`,
+              txHash: targetTxHash,
+              cause: e,
+            }),
         }),
         Schedule.recurs(4),
       );
@@ -91,13 +97,10 @@ const program = pipe(
 
 Effect.runPromise(
   program.pipe(
-    Effect.catchAll((e) =>
+    Effect.catchAllCause((cause) =>
       Effect.succeed({
         type: "FailedConfirmationOutput",
-        error:
-          e instanceof Error
-            ? e.message
-            : "Unknown error from tx confirmation worker",
+        error: `Tx confirmation worker failure: ${Cause.pretty(cause)}`,
       }),
     ),
   ),

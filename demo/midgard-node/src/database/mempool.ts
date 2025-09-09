@@ -1,21 +1,30 @@
 import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
-import { clearTable, mapSqlError } from "@/database/utils/common.js";
+import {
+  clearTable,
+  DBDeleteError,
+  DBInsertError,
+  sqlErrorToDBSelectError,
+  DBSelectError,
+  retrieveNumberOfEntries,
+} from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
-import { fromHex } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
-import { breakDownTx } from "@/utils.js";
 import * as AddressHistoryDB from "@/database/addressHistory.js";
+import { ProcessedTx, CmlDeserializationError } from "@/utils.js";
 
 export const tableName = "mempool";
 
 export const insert = (
-  txString: string,
-): Effect.Effect<void, Error, Database> =>
+  processedTx: ProcessedTx,
+): Effect.Effect<
+  void,
+  DBInsertError | DBDeleteError | CmlDeserializationError,
+  Database
+> =>
   Effect.gen(function* () {
-    const txCborBytes = fromHex(txString);
-    const { txId, txCbor, spent, produced } = yield* breakDownTx(txCborBytes);
+    const { txId, txCbor, spent, produced } = processedTx;
     // Insert the tx itself in `MempoolDB`.
     yield* Tx.insertEntry(tableName, {
       tx_id: txId,
@@ -34,6 +43,32 @@ export const insert = (
     ),
   );
 
+export const insertMultiple = (
+  processedTxs: ProcessedTx[],
+): Effect.Effect<void, DBInsertError | DBDeleteError, Database> =>
+  Effect.gen(function* () {
+    if (processedTxs.length === 0) {
+      return;
+    }
+    const txEntries = processedTxs.map((v) => ({
+      tx_id: v.txId,
+      tx: v.txCbor,
+    }));
+    // Insert the tx itself in `MempoolDB`.
+    yield* Tx.insertEntries(tableName, txEntries);
+
+    const allProduced = processedTxs.flatMap((v) => v.produced);
+    const allSpent = processedTxs.flatMap((v) => v.spent);
+
+    // Insert produced UTxOs in `MempoolLedgerDB`.
+    yield* MempoolLedgerDB.insert(allProduced);
+    // Remove spent inputs from MempoolLedgerDB.
+    yield* MempoolLedgerDB.clearUTxOs(allSpent);
+  }).pipe(
+    Effect.withLogSpan(`insert ${tableName}`),
+    Effect.tapError((e) => Effect.logError(`${tableName} db: insert: ${e}`)),
+  );
+
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   Tx.retrieveValue(tableName, txHash);
 
@@ -42,7 +77,7 @@ export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
 
 export const retrieve = (): Effect.Effect<
   readonly Tx.Entry[],
-  Error,
+  DBSelectError,
   Database
 > =>
   Effect.gen(function* () {
@@ -56,13 +91,15 @@ export const retrieve = (): Effect.Effect<
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
+    sqlErrorToDBSelectError(tableName),
   );
 
-export const retrieveTxCount = () => Tx.retrieveNumberOfEntries(tableName);
+export const retrieveTxCount: Effect.Effect<number, DBSelectError, Database> =
+  retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
   txHashes: Buffer[],
-): Effect.Effect<void, Error, Database> => Tx.delMultiple(tableName, txHashes);
+): Effect.Effect<void, DBDeleteError, Database> =>
+  Tx.delMultiple(tableName, txHashes);
 
 export const clear = clearTable(tableName);

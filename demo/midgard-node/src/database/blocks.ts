@@ -1,7 +1,20 @@
 import { Effect } from "effect";
-import { mapSqlError, clearTable } from "@/database/utils/common.js";
+import {
+  clearTable,
+  DBCreateError,
+  DBDeleteError,
+  DBInsertError,
+  DBSelectError,
+  DBTruncateError,
+} from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import { Database } from "@/services/database.js";
+import {
+  sqlErrorToDBCreateError,
+  sqlErrorToDBDeleteError,
+  sqlErrorToDBInsertError,
+  sqlErrorToDBSelectError,
+} from "@/database/utils/common.js";
 
 export const tableName = "blocks";
 
@@ -27,30 +40,32 @@ type Entry = EntryNoHeightAndTS & {
   [Columns.TIMESTAMPTZ]: Date;
 };
 
-export const init = Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient;
-  yield* sql.withTransaction(
-    Effect.gen(function* () {
-      yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(
+  function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(Columns.HEIGHT)} SERIAL PRIMARY KEY,
       ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL,
       ${sql(Columns.TX_ID)} BYTEA NOT NULL UNIQUE,
       ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
     );`;
-      yield* sql`CREATE INDEX ${sql(
-        ColumnsIndices.HEADER_HASH,
-      )} ON ${sql(tableName)} (${sql(Columns.HEADER_HASH)});`;
-      yield* sql`CREATE INDEX ${sql(
-        ColumnsIndices.TX_ID,
-      )} ON ${sql(tableName)} (${sql(Columns.TX_ID)});`;
-    }),
-  );
-});
+        yield* sql`CREATE INDEX ${sql(
+          ColumnsIndices.HEADER_HASH,
+        )} ON ${sql(tableName)} (${sql(Columns.HEADER_HASH)});`;
+        yield* sql`CREATE INDEX ${sql(
+          ColumnsIndices.TX_ID,
+        )} ON ${sql(tableName)} (${sql(Columns.TX_ID)});`;
+      }),
+    );
+  },
+).pipe(sqlErrorToDBCreateError(tableName));
 
 export const insert = (
   headerHash: Buffer,
   txHashes: Buffer[],
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DBInsertError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     if (!txHashes.length) {
@@ -69,13 +84,12 @@ export const insert = (
       Effect.logError(`${tableName} db: inserting error: ${e}`),
     ),
     Effect.withLogSpan(`insert ${tableName}`),
-    mapSqlError,
-    Effect.asVoid,
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const retrieveTxHashesByHeaderHash = (
   headerHash: Buffer,
-): Effect.Effect<readonly Buffer[], Error, Database> =>
+): Effect.Effect<readonly Buffer[], DBSelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve txHashes for block ${headerHash}`,
@@ -97,12 +111,12 @@ export const retrieveTxHashesByHeaderHash = (
         `${tableName} db: retrieving txHashes error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSqlError,
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const retrieveHeaderHashByTxHash = (
   txHash: Buffer,
-): Effect.Effect<Buffer, Error, Database> =>
+): Effect.Effect<Buffer, DBSelectError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt retrieve headerHash for txHash ${txHash}`,
@@ -130,14 +144,12 @@ export const retrieveHeaderHashByTxHash = (
         `${tableName} db: retrieving headerHash error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSqlError,
+    sqlErrorToDBSelectError(tableName),
   );
 
-/** Associated inputs are also deleted.
- */
 export const clearBlock = (
   headerHash: Buffer,
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DBDeleteError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(
       `${tableName} db: attempt clear block ${headerHash}`,
@@ -157,10 +169,14 @@ export const clearBlock = (
         `${tableName} db: clearing block error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSqlError,
+    sqlErrorToDBDeleteError(tableName),
   );
 
-export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
+export const retrieve = (): Effect.Effect<
+  readonly Entry[],
+  DBSelectError,
+  Database
+> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
     const sql = yield* SqlClient.SqlClient;
@@ -174,7 +190,9 @@ export const retrieve = (): Effect.Effect<readonly Entry[], Error, Database> =>
         `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSqlError,
+    sqlErrorToDBSelectError(tableName),
   );
 
-export const clear = clearTable(tableName);
+export const clear: Effect.Effect<void, DBTruncateError, Database> = clearTable(
+  tableName,
+);

@@ -1,18 +1,21 @@
 import { Effect } from "effect";
 import * as Tx from "@/database/utils/tx.js";
-import { clearTable } from "@/database/utils/common.js";
+import { clearTable, DBInsertError } from "@/database/utils/common.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
 
-export const insertTx = (tx: Tx.Entry): Effect.Effect<void, Error, Database> =>
+export const insertTx = (
+  tx: Tx.Entry,
+): Effect.Effect<void, DBInsertError, Database> =>
   Tx.insertEntry(tableName, tx);
 
 export const insertTxs = (
   txs: Tx.Entry[],
-): Effect.Effect<void, Error, Database> => Tx.insertEntries(tableName, txs);
+): Effect.Effect<void, DBInsertError, Database> =>
+  Tx.insertEntries(tableName, txs);
 
-export const retrieve = () => Tx.retrieveEntries(tableName);
+export const retrieve = Tx.retrieveAllEntries(tableName);
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   Tx.retrieveValue(tableName, txHash);

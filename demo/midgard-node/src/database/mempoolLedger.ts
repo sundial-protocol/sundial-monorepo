@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import * as Ledger from "@/database/utils/ledger.js";
-import { clearTable } from "@/database/utils/common.js";
-
+import { clearTable, DBSelectError } from "@/database/utils/common.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";
@@ -9,15 +8,15 @@ export const tableName = "mempool_ledger";
 export const insert = (entries: Ledger.Entry[]) =>
   Ledger.insertEntries(tableName, entries);
 
-export const retrieve = (): Effect.Effect<
+export const retrieve: Effect.Effect<
   readonly Ledger.Entry[],
-  Error,
+  DBSelectError,
   Database
-> => Ledger.retrieveEntries(tableName);
+> = Ledger.retrieveAllEntries(tableName);
 
 export const retrieveByAddress = (
   address: string,
-): Effect.Effect<readonly Ledger.Entry[], Error, Database> =>
+): Effect.Effect<readonly Ledger.Entry[], DBSelectError, Database> =>
   Ledger.retrieveEntriesWithAddress(tableName, address);
 
 export const clearUTxOs = (refs: Buffer[]) =>

@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, pipe } from "effect";
+import { Cause, Effect, pipe } from "effect";
 import {
   WorkerInput,
   WorkerOutput,
@@ -15,7 +15,7 @@ import {
 } from "@/database/index.js";
 import {
   handleSignSubmitNoConfirmation,
-  SubmitError,
+  TxSubmitError,
 } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
 import {
@@ -28,12 +28,13 @@ import { NodeConfig, User } from "@/config.js";
 import { Database } from "@/services/database.js";
 import { batchProgram } from "@/utils.js";
 import { Columns as TxColumns } from "@/database/utils/tx.js";
+import { WorkerError } from "./utils/common.js";
 
 const BATCH_SIZE = 100;
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, Error, NodeConfig | User | Database> =>
+): Effect.Effect<WorkerOutput, WorkerError, NodeConfig | User | Database> =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
@@ -53,7 +54,7 @@ const wrapper = (
 
     yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
 
-    const { ledgerTrie, mempoolTrie } = yield* makeMpts();
+    const { ledgerTrie, mempoolTrie } = yield* makeMpts;
 
     return yield* withTrieTransaction(
       ledgerTrie,
@@ -89,7 +90,7 @@ const wrapper = (
           // The tx confirmation worker has not yet confirmed a previously
           // submitted tx, so the root we have found can not be used yet.
           // However, it is stored on disk in our LevelDB mempool. Therefore,
-          // the processed txs must be transferred to `ProccessedMempoolDB` from
+          // the processed txs must be transferred to `ProcessedMempoolDB` from
           // `MempoolDB`.
           //
           // TODO: Handle failures properly.
@@ -156,9 +157,11 @@ const wrapper = (
 
           let output: WorkerOutput | undefined = undefined;
 
-          const onSubmitFailure = (err: SubmitError) =>
+          const onSubmitFailure = (
+            err: TxSubmitError | { _tag: "TxSubmitError" },
+          ) =>
             Effect.gen(function* () {
-              yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err.err}`);
+              yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err}`);
               yield* Effect.logError(
                 "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
               );
@@ -188,7 +191,7 @@ const wrapper = (
 
           const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
 
-          const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve();
+          const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve;
 
           yield* Effect.logInfo(
             "🔹 Inserting included transactions into ImmutableDB and BlocksDB, clearing all the processed txs from MempoolDB and ProcessedMempoolDB, and deleting mempool LevelDB...",
@@ -235,7 +238,7 @@ const wrapper = (
                   );
                 },
               ),
-              ProcessedMempoolDB.clear(), // uses `TRUNCATE` so no need for batching.
+              ProcessedMempoolDB.clear, // uses `TRUNCATE` so no need for batching.
               deleteMempoolMpt,
             ],
             { concurrency: "unbounded" },
@@ -255,9 +258,6 @@ const wrapper = (
     );
   });
 
-if (parentPort === null)
-  throw new Error("MPT computation must be run as a worker");
-
 const inputData = workerData as WorkerInput;
 
 const program = pipe(
@@ -269,10 +269,10 @@ const program = pipe(
 
 Effect.runPromise(
   program.pipe(
-    Effect.catchAll((e) =>
+    Effect.catchAllCause((cause) =>
       Effect.succeed({
         type: "FailureOutput",
-        error: e instanceof Error ? e.message : "Unknown error from MPT worker",
+        error: `Block commitment worker failure: ${Cause.pretty(cause)}`,
       }),
     ),
   ),
