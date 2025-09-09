@@ -126,3 +126,7 @@ export class CborDeserializationError extends Data.TaggedError(
 export class LucidError extends Data.TaggedError(
   "LucidError",
 )<GenericErrorFields> {}
+
+export class HubOracleError extends Data.TaggedError(
+  "HubOracleError",
+)<GenericErrorFields> {}

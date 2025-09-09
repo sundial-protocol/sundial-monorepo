@@ -9,6 +9,7 @@ import {
 } from "@lucid-evolution/lucid";
 import { makeReturn } from "@/core.js";
 import { HubOracle } from "@/tx-builder/index.js";
+import { HubOracleError, LucidError } from "@/utils/common.js";
 
 export type Config = {
   hubOracleAddress: Address;
@@ -21,7 +22,10 @@ export const hubOracleAssetName = "";
 export const fetchHubOracleUTxOProgram = (
   lucid: LucidEvolution,
   config: Config,
-): Effect.Effect<{ utxo: UTxO; datum: HubOracle.Datum }, Error> =>
+): Effect.Effect<
+  { utxo: UTxO; datum: HubOracle.Datum },
+  HubOracleError | LucidError
+> =>
   Effect.gen(function* () {
     const hubOracleUTxOs = yield* Effect.tryPromise({
       try: async () => {
@@ -30,7 +34,11 @@ export const fetchHubOracleUTxOProgram = (
           toUnit(config.hubOraclePolicyId, hubOracleAssetName),
         );
       },
-      catch: (_) => new Error("Failed to fetch the hub oracle UTxO"),
+      catch: (e) =>
+        new LucidError({
+          message: "Failed to fetch the hub oracle UTxO",
+          cause: e,
+        }),
     });
     if (hubOracleUTxOs.length === 1) {
       const utxo = hubOracleUTxOs[0];
@@ -40,19 +48,25 @@ export const fetchHubOracleUTxOProgram = (
             const coerced = Data.from(utxo.datum, HubOracle.Datum);
             return coerced;
           } else {
-            throw new Error();
+            throw new HubOracleError({
+              message: "Hub oracle UTxO datum is missing",
+            });
           }
         },
-        catch: (_) => {
-          return new Error("Failed to parse the hub oracle datum");
+        catch: (e) => {
+          return new HubOracleError({
+            message: "Failed to parse the hub oracle datum",
+            cause: e,
+          });
         },
       });
       return { utxo, datum };
     } else {
       return yield* Effect.fail(
-        new Error(
-          "Exactly one hub oracle UTxO was expected, but none or more were found",
-        ),
+        new HubOracleError({
+          message:
+            "Exactly one hub oracle UTxO was expected, but none or more were found",
+        }),
       );
     }
   });
