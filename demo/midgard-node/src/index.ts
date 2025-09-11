@@ -9,6 +9,7 @@ import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
 import { AlwaysSucceeds } from "./services/index.js";
 import { NodeRuntime } from "@effect/platform-node";
+import { Globals } from "./globals.js"
 
 // Initialize global flags:
 global.BLOCKS_IN_QUEUE = 0;
@@ -27,7 +28,7 @@ const program = new Command();
 program.version(VERSION).description(
   `
   ${chalk.red(
-    `                        @#
+  `                       @#
                          @@%#
                         %@@@%#
                        %%%%%%##
@@ -67,6 +68,7 @@ program.command("listen").action(async () => {
     Effect.provide(User.layer),
     Effect.provide(AlwaysSucceeds.AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
+    Effect.provide(Globals.Default)
   );
 
   NodeRuntime.runMain(program);
