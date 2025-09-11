@@ -33,9 +33,6 @@ const commitBlockTxSizeGauge = Metric.gauge("commit_block_tx_size", {
 
 export const buildAndSubmitCommitmentBlock = () =>
   Effect.gen(function* () {
-    if (global.RESET_IN_PROGRESS) {
-      return yield* Effect.logInfo("🔹 Reset in progress...");
-    }
     const worker = Effect.async<WorkerOutput, WorkerError, never>((resume) => {
       Effect.runSync(Effect.logInfo(`👷 Starting block commitment worker...`));
       const worker = new Worker(

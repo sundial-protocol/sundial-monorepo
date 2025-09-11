@@ -436,10 +436,12 @@ const router = (
     );
 
 const blockCommitmentAction = Effect.gen(function* () {
-  yield* Effect.logInfo("🔹 New block commitment process started.");
-  yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
-    Effect.withSpan("buildAndSubmitCommitmentBlock"),
-  );
+  if (!global.RESET_IN_PROGRESS) {
+    yield* Effect.logInfo("🔹 New block commitment process started.");
+    yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
+      Effect.withSpan("buildAndSubmitCommitmentBlock"),
+    );
+  }
 });
 
 const blockConfirmationAction = Effect.gen(function* () {
