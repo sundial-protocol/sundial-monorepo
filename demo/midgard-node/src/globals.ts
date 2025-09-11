@@ -6,19 +6,19 @@ class AvailableConfirmedBlockState extends Context.Tag("AvailableConfirmedBlockS
   AvailableConfirmedBlockState,
   Ref.Ref<"" | SerializedStateQueueUTxO>
 >() {
-  static readonly layer = Layer.effect(AvailableConfirmedBlockState,
-    Effect.gen(function* () {
-      var res : Ref.Ref<"" | SerializedStateQueueUTxO> = yield* Ref.make("")
-      return res
-    })
-  );
+  static readonly layer = Layer.effect(AvailableConfirmedBlockState, Effect.gen(function* () {
+    return yield* Ref.make("" as ("" | SerializedStateQueueUTxO)) // The only way to make a ref of a union
+  }));
 }
 
 class UnconfirmedSubmittedBlockState extends Context.Tag("UnconfirmedSubmittedBlockState")<
   UnconfirmedSubmittedBlockState,
   Ref.Ref<"" | TxHash>
->() {}
-
+>() {
+    static readonly layer = Layer.effect(UnconfirmedSubmittedBlockState, Effect.gen(function* () {
+    return yield* Ref.make("" as ("" | TxHash)) // The only way to make a ref of a union
+  }));
+}
 
 export class Globals extends Effect.Service<Globals>()("Globals", {
   effect: Effect.gen(function* () {
@@ -58,7 +58,8 @@ export class Globals extends Effect.Service<Globals>()("Globals", {
     };
   }),
 
-  // dependencies: [
-  //   AvailableConfirmedBlockState.layer
-  // ],
+  dependencies: [
+    AvailableConfirmedBlockState.layer,
+    UnconfirmedSubmittedBlockState.layer,
+  ],
 }) {}
