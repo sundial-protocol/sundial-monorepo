@@ -90,7 +90,7 @@ export const retrieveValue = (
       // table: tableName,
     });
 
-    return result[0].tx;
+    return result[0][Columns.TX];
   }).pipe(
     Effect.withLogSpan(`retrieve value ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
