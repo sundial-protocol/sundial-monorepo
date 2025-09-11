@@ -1,6 +1,7 @@
 import { Store, Trie } from "@aiken-lang/merkle-patricia-forestry";
-import { Data, Effect } from "effect";
+import { Effect } from "effect";
 import { inspect } from "node:util";
+import { MptError } from "./common.js";
 
 export const mptFromUTxOs = (
   _spentUtxos: Uint8Array[],
@@ -140,39 +141,3 @@ export const mptFromList = <T>(items: T[]): Effect.Effect<Trie, never, never> =>
     const trie = yield* Effect.promise(() => Trie.fromList(data));
     return trie;
   });
-
-export class MptError extends Data.TaggedError("MptError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {
-  static get(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie get operation`,
-      cause,
-    });
-  }
-  static put(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie put operation`,
-      cause,
-    });
-  }
-  static batch(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie batch operation`,
-      cause,
-    });
-  }
-  static trieDelete(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on whole ${trie} trie delete`,
-      cause,
-    });
-  }
-  static trieCreate(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie create`,
-      cause,
-    });
-  }
-}
