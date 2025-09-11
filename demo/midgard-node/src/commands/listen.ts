@@ -324,7 +324,7 @@ ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
 
 const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
-  const allBlocksData = yield* BlocksDB.retrieve();
+  const allBlocksData = yield* BlocksDB.retrieve;
   const keyValues: Record<string, number> = allBlocksData.reduce(
     (acc: Record<string, number>, entry) => {
       const bHex = toHex(entry.header_hash);
