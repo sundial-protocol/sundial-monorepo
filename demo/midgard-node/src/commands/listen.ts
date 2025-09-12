@@ -324,7 +324,7 @@ ${emoji} ${u.utxo.txHash}#${u.utxo.outputIndex}${info}`;
 
 const getLogBlocksDBHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Querying BlocksDB...`);
-  const allBlocksData = yield* BlocksDB.retrieve();
+  const allBlocksData = yield* BlocksDB.retrieve;
   const keyValues: Record<string, number> = allBlocksData.reduce(
     (acc: Record<string, number>, entry) => {
       const bHex = toHex(entry.header_hash);
@@ -436,89 +436,95 @@ const router = (
     );
 
 const blockCommitmentAction = Effect.gen(function* () {
-  yield* Effect.logInfo("🔹 New block commitment process started.");
-  yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
-    Effect.withSpan("buildAndSubmitCommitmentBlock"),
-  );
+  if (!global.RESET_IN_PROGRESS) {
+    yield* Effect.logInfo("🔹 New block commitment process started.");
+    yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(
+      Effect.withSpan("buildAndSubmitCommitmentBlock"),
+    );
+  }
 });
 
 const blockConfirmationAction = Effect.gen(function* () {
-  yield* Effect.logInfo("🔍 New block confirmation process started.");
-  const worker = Effect.async<
-    BlockConfirmationWorkerOutput,
-    WorkerError,
-    never
-  >((resume) => {
-    Effect.runSync(Effect.logInfo(`🔍 Starting block confirmation worker...`));
-    const worker = new Worker(
-      new URL("./confirm-block-commitments.js", import.meta.url),
-      {
-        workerData: {
-          data: {
-            firstRun:
-              global.UNCONFIRMED_SUBMITTED_BLOCK === "" &&
-              global.AVAILABLE_CONFIRMED_BLOCK === "",
-            unconfirmedSubmittedBlock: global.UNCONFIRMED_SUBMITTED_BLOCK,
+  if (!global.RESET_IN_PROGRESS) {
+    yield* Effect.logInfo("🔍 New block confirmation process started.");
+    const worker = Effect.async<
+      BlockConfirmationWorkerOutput,
+      WorkerError,
+      never
+    >((resume) => {
+      Effect.runSync(
+        Effect.logInfo(`🔍 Starting block confirmation worker...`),
+      );
+      const worker = new Worker(
+        new URL("./confirm-block-commitments.js", import.meta.url),
+        {
+          workerData: {
+            data: {
+              firstRun:
+                global.UNCONFIRMED_SUBMITTED_BLOCK === "" &&
+                global.AVAILABLE_CONFIRMED_BLOCK === "",
+              unconfirmedSubmittedBlock: global.UNCONFIRMED_SUBMITTED_BLOCK,
+            },
           },
         },
-      },
-    );
-    worker.on("message", (output: BlockConfirmationWorkerOutput) => {
-      if (output.type === "FailedConfirmationOutput") {
-        resume(
-          Effect.fail(
-            new WorkerError({
-              worker: "confirm-block-commitments",
-              message: `Error in confirmation worker: ${output.error}`,
-            }),
-          ),
-        );
-      } else {
-        resume(Effect.succeed(output));
-      }
-      worker.terminate();
-    });
-    worker.on("error", (e: Error) => {
-      resume(
-        Effect.fail(
-          new WorkerError({
-            worker: "confirm-block-commitments",
-            message: `Error in confirmation worker: ${e}`,
-            cause: e,
-          }),
-        ),
       );
-      worker.terminate();
-    });
-    worker.on("exit", (code: number) => {
-      if (code !== 0) {
+      worker.on("message", (output: BlockConfirmationWorkerOutput) => {
+        if (output.type === "FailedConfirmationOutput") {
+          resume(
+            Effect.fail(
+              new WorkerError({
+                worker: "confirm-block-commitments",
+                message: `Error in confirmation worker: ${output.error}`,
+              }),
+            ),
+          );
+        } else {
+          resume(Effect.succeed(output));
+        }
+        worker.terminate();
+      });
+      worker.on("error", (e: Error) => {
         resume(
           Effect.fail(
             new WorkerError({
               worker: "confirm-block-commitments",
-              message: `Confirmation worker exited with code: ${code}`,
+              message: `Error in confirmation worker: ${e}`,
+              cause: e,
             }),
           ),
         );
+        worker.terminate();
+      });
+      worker.on("exit", (code: number) => {
+        if (code !== 0) {
+          resume(
+            Effect.fail(
+              new WorkerError({
+                worker: "confirm-block-commitments",
+                message: `Confirmation worker exited with code: ${code}`,
+              }),
+            ),
+          );
+        }
+      });
+      return Effect.sync(() => {
+        worker.terminate();
+      });
+    });
+    const workerOutput: BlockConfirmationWorkerOutput = yield* worker;
+    switch (workerOutput.type) {
+      case "SuccessfulConfirmationOutput": {
+        global.UNCONFIRMED_SUBMITTED_BLOCK = "";
+        global.AVAILABLE_CONFIRMED_BLOCK = workerOutput.blocksUTxO;
+        yield* Effect.logInfo("🔍 ☑️  Submitted block confirmed.");
+        break;
       }
-    });
-    return Effect.sync(() => {
-      worker.terminate();
-    });
-  });
-  const workerOutput: BlockConfirmationWorkerOutput = yield* worker;
-  switch (workerOutput.type) {
-    case "SuccessfulConfirmationOutput": {
-      global.UNCONFIRMED_SUBMITTED_BLOCK = "";
-      global.AVAILABLE_CONFIRMED_BLOCK = workerOutput.blocksUTxO;
-      yield* Effect.logInfo("🔍 ☑️  Submitted block confirmed.");
-      break;
-    }
-    case "NoTxForConfirmationOutput": {
-      break;
-    }
-    case "FailedConfirmationOutput": {
-      break;
+      case "NoTxForConfirmationOutput": {
+        break;
+      }
+      case "FailedConfirmationOutput": {
+        break;
+      }
     }
   }
 });

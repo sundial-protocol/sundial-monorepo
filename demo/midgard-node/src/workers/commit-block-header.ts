@@ -41,15 +41,27 @@ const wrapper = (
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
 
-    const mempoolTxs = yield* MempoolDB.retrieve();
+    const mempoolTxs = yield* MempoolDB.retrieve;
     const endTime = Date.now();
     const mempoolTxsCount = mempoolTxs.length;
 
     if (mempoolTxsCount === 0) {
-      yield* Effect.logInfo("🔹 No transactions were found in MempoolDB");
-      return {
-        type: "EmptyMempoolOutput",
-      };
+      yield* Effect.logInfo(
+        "🔹 No transactions were found in MempoolDB, checking ProcessedMempoolDB...",
+      );
+
+      const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve;
+
+      if (processedMempoolTxs.length === 0) {
+        yield* Effect.logInfo("🔹 Nothing to commit.");
+        return {
+          type: "NothingToCommitOutput",
+        };
+      }
+      // No new transactions received, but there are uncommitted transactions in
+      // the MPT. So its root must be used to submit a new block, and if
+      // successful, `ProcessedMempoolDB` must be cleared. Following functions
+      // should work fine with 0 mempool txs.
     }
 
     yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
