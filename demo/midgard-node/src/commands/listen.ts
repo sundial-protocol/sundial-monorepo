@@ -53,6 +53,7 @@ import { Worker } from "worker_threads";
 import { WorkerOutput as BlockConfirmationWorkerOutput } from "@/workers/utils/confirm-block-commitments.js";
 import { WorkerError } from "@/workers/utils/common.js";
 import { Globals } from "@/globals.js";
+import { SerializedStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -361,30 +362,20 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
 
 const getLogGlobalsHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Logging global variables...`);
-  const globals = yield* Globals;
-  const BLOCKS_IN_QUEUE = yield* Ref.get(globals.BLOCKS_IN_QUEUE);
-  const LATEST_SYNC_OF_STATE_QUEUE_LENGTH = yield* Ref.get(
-    globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH,
-  );
-  const RESET_IN_PROGRESS = yield* Ref.get(globals.RESET_IN_PROGRESS);
-  const AVAILABLE_CONFIRMED_BLOCK = yield* Ref.get(
-    globals.AVAILABLE_CONFIRMED_BLOCK,
-  );
-  const PROCESSED_UNSUBMITTED_TXS_COUNT = yield* Ref.get(
-    globals.PROCESSED_UNSUBMITTED_TXS_COUNT,
-  );
-  const PROCESSED_UNSUBMITTED_TXS_SIZE = yield* Ref.get(
-    globals.PROCESSED_UNSUBMITTED_TXS_SIZE,
-  );
-  const UNCONFIRMED_SUBMITTED_BLOCK: string = yield* Ref.get(
-    globals.UNCONFIRMED_SUBMITTED_BLOCK,
-  );
+  const globals = yield* Globals
+  const BLOCKS_IN_QUEUE : number = yield* Ref.get(globals.BLOCKS_IN_QUEUE)
+  const LATEST_SYNC_OF_STATE_QUEUE_LENGTH : number = yield* Ref.get(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH)
+  const RESET_IN_PROGRESS : boolean = yield* Ref.get(globals.RESET_IN_PROGRESS)
+  const AVAILABLE_CONFIRMED_BLOCK :  "" | SerializedStateQueueUTxO = yield* Ref.get(globals.AVAILABLE_CONFIRMED_BLOCK)
+  const PROCESSED_UNSUBMITTED_TXS_COUNT : number = yield* Ref.get(globals.PROCESSED_UNSUBMITTED_TXS_COUNT)
+  const PROCESSED_UNSUBMITTED_TXS_SIZE : number = yield* Ref.get(globals.PROCESSED_UNSUBMITTED_TXS_SIZE)
+  const UNCONFIRMED_SUBMITTED_BLOCK : string = yield* Ref.get(globals.UNCONFIRMED_SUBMITTED_BLOCK)
 
   yield* Effect.logInfo(`
   BLOCKS_IN_QUEUE ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${BLOCKS_IN_QUEUE}
   LATEST_SYNC ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${new Date(LATEST_SYNC_OF_STATE_QUEUE_LENGTH).toLocaleString()}
   RESET_IN_PROGRESS ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${RESET_IN_PROGRESS}
-  AVAILABLE_CONFIRMED_BLOCK ⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${AVAILABLE_CONFIRMED_BLOCK}
+  AVAILABLE_CONFIRMED_BLOCK ⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${JSON.stringify(AVAILABLE_CONFIRMED_BLOCK)}
   PROCESSED_UNSUBMITTED_TXS_COUNT ⋅⋅⋅ ${PROCESSED_UNSUBMITTED_TXS_COUNT}
   PROCESSED_UNSUBMITTED_TXS_SIZE ⋅⋅⋅⋅ ${PROCESSED_UNSUBMITTED_TXS_SIZE}
   UNCONFIRMED_SUBMITTED_BLOCK ⋅⋅⋅⋅⋅⋅⋅ ${UNCONFIRMED_SUBMITTED_BLOCK}
