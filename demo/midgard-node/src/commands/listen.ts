@@ -106,7 +106,7 @@ const getTxHandler = Effect.gen(function* () {
     );
   }
   const txHashBytes = Buffer.from(fromHex(txHashParam));
-  yield* Effect.logInfo("txHashBytes", txHashBytes)
+  yield* Effect.logInfo("txHashBytes", txHashBytes);
   const foundCbor: Buffer = yield* MempoolDB.retrieveTxCborByHash(
     txHashBytes,
   ).pipe(
@@ -121,7 +121,7 @@ const getTxHandler = Effect.gen(function* () {
       }),
     ),
   );
-  yield* Effect.logInfo("foundCbor", foundCbor)
+  yield* Effect.logInfo("foundCbor", foundCbor);
   yield* Effect.logInfo(
     `GET /tx - Transaction found in mempool: ${txHashParam}`,
   );
