@@ -459,7 +459,7 @@ const router = (
 
 const blockCommitmentAction = Effect.gen(function* () {
   const globals = yield* Globals;
-  const RESET_IN_PROGRESS = Ref.get(globals.RESET_IN_PROGRESS);
+  const RESET_IN_PROGRESS = yield* Ref.get(globals.RESET_IN_PROGRESS);
   if (!RESET_IN_PROGRESS) {
     yield* Effect.logInfo("🔹 New block commitment process started.");
     yield* StateQueueTx.buildAndSubmitCommitmentBlock().pipe(

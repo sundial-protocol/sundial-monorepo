@@ -38,7 +38,7 @@ export const buildAndSubmitCommitmentBlock = () =>
     const AVAILABLE_CONFIRMED_BLOCK = yield* globals.AVAILABLE_CONFIRMED_BLOCK;
     const PROCESSED_UNSUBMITTED_TXS_COUNT =
       yield* globals.PROCESSED_UNSUBMITTED_TXS_COUNT;
-    const PROCESSED_UNSUBMITTED_TXS_SIZE = yield* globals.RESET_IN_PROGRESS;
+    const PROCESSED_UNSUBMITTED_TXS_SIZE = yield* globals.PROCESSED_UNSUBMITTED_TXS_SIZE;
 
     const worker = Effect.async<WorkerOutput, WorkerError, never>((resume) => {
       Effect.runSync(Effect.logInfo(`👷 Starting block commitment worker...`));
