@@ -25,6 +25,7 @@ import {
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
 import { breakDownTx, LucidError } from "@/utils.js";
 import { Globals } from "@/globals.js";
+import { Database } from "@/services/database.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
@@ -91,8 +92,7 @@ export const buildAndSubmitMergeTx = (
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   spendScript: Script,
   mintScript: Script,
-  // ): Effect.Effect<void, Error, Database> =>
-) =>
+): Effect.Effect<void, LucidError | Error, Globals | Database> =>
   Effect.gen(function* () {
     const globals = yield* Globals;
     const currentStateQueueLength = yield* getStateQueueLength(

@@ -9,7 +9,8 @@ export class Globals extends Effect.Service<Globals>()("Globals", {
 
     // Latest moment the in-memory state queue length was synchronized with
     // on-chain state.
-    const LATEST_SYNC_OF_STATE_QUEUE_LENGTH: Ref.Ref<number> = yield* Ref.make(0);
+    const LATEST_SYNC_OF_STATE_QUEUE_LENGTH: Ref.Ref<number> =
+      yield* Ref.make(0);
 
     // Needed for development to prevent other actions triggering while spending all
     // UTxOs at state queue.
@@ -17,7 +18,8 @@ export class Globals extends Effect.Service<Globals>()("Globals", {
 
     // The state queue UTxO confirmed by the confirmation worker, unused for block
     // commitment. Using `as` since  thats the only way to make a ref of a union.
-    const AVAILABLE_CONFIRMED_BLOCK: Ref.Ref<"" | SerializedStateQueueUTxO> = yield* Ref.make("" as "" | SerializedStateQueueUTxO);
+    const AVAILABLE_CONFIRMED_BLOCK: Ref.Ref<"" | SerializedStateQueueUTxO> =
+      yield* Ref.make("" as "" | SerializedStateQueueUTxO);
 
     // Accumulator for the number of processed mempool transactions (only used in
     // metrics)
@@ -28,7 +30,9 @@ export class Globals extends Effect.Service<Globals>()("Globals", {
     const PROCESSED_UNSUBMITTED_TXS_SIZE: Ref.Ref<number> = yield* Ref.make(0);
 
     // Using `as` since  thats the only way to make a ref of a union.
-    const UNCONFIRMED_SUBMITTED_BLOCK: Ref.Ref<"" | TxHash> = yield* Ref.make("" as "" | TxHash);
+    const UNCONFIRMED_SUBMITTED_BLOCK: Ref.Ref<"" | TxHash> = yield* Ref.make(
+      "" as "" | TxHash,
+    );
 
     return {
       BLOCKS_IN_QUEUE,

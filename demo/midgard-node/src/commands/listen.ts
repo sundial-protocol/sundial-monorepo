@@ -50,7 +50,10 @@ import { HttpBodyError } from "@effect/platform/HttpBody";
 import { insertGenesisUtxos } from "@/database/genesis.js";
 import { deleteLedgerMpt, deleteMempoolMpt } from "@/workers/utils/mpt.js";
 import { Worker } from "worker_threads";
-import { WorkerOutput as BlockConfirmationWorkerOutput } from "@/workers/utils/confirm-block-commitments.js";
+import {
+  WorkerInput as BlockConfirmationWorkerInput,
+  WorkerOutput as BlockConfirmationWorkerOutput,
+} from "@/workers/utils/confirm-block-commitments.js";
 import { WorkerError } from "@/workers/utils/common.js";
 import { Globals } from "@/globals.js";
 import { SerializedStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
@@ -497,7 +500,7 @@ const blockConfirmationAction = Effect.gen(function* () {
                 AVAILABLE_CONFIRMED_BLOCK === "",
               unconfirmedSubmittedBlock: UNCONFIRMED_SUBMITTED_BLOCK,
             },
-          },
+          } as BlockConfirmationWorkerInput, // TODO: Consider other approaches to avoid type assertion here.
         },
       );
       worker.on("message", (output: BlockConfirmationWorkerOutput) => {

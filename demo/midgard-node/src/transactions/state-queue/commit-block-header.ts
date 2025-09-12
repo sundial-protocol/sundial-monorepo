@@ -1,4 +1,7 @@
-import { WorkerOutput } from "@/workers/utils/commit-block-header.js";
+import {
+  WorkerInput,
+  WorkerOutput,
+} from "@/workers/utils/commit-block-header.js";
 import { Effect, Metric, Ref } from "effect";
 import { Worker } from "worker_threads";
 import { WorkerError } from "@/workers/utils/common.js";
@@ -38,7 +41,8 @@ export const buildAndSubmitCommitmentBlock = () =>
     const AVAILABLE_CONFIRMED_BLOCK = yield* globals.AVAILABLE_CONFIRMED_BLOCK;
     const PROCESSED_UNSUBMITTED_TXS_COUNT =
       yield* globals.PROCESSED_UNSUBMITTED_TXS_COUNT;
-    const PROCESSED_UNSUBMITTED_TXS_SIZE = yield* globals.PROCESSED_UNSUBMITTED_TXS_SIZE;
+    const PROCESSED_UNSUBMITTED_TXS_SIZE =
+      yield* globals.PROCESSED_UNSUBMITTED_TXS_SIZE;
 
     const worker = Effect.async<WorkerOutput, WorkerError, never>((resume) => {
       Effect.runSync(Effect.logInfo(`👷 Starting block commitment worker...`));
@@ -51,7 +55,7 @@ export const buildAndSubmitCommitmentBlock = () =>
               mempoolTxsCountSoFar: PROCESSED_UNSUBMITTED_TXS_COUNT,
               sizeOfProcessedTxsSoFar: PROCESSED_UNSUBMITTED_TXS_SIZE,
             },
-          },
+          } as WorkerInput, // TODO: Consider other approaches to avoid type assertion here.
         },
       );
       worker.on("message", (output: WorkerOutput) => {
