@@ -362,14 +362,23 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
 
 const getLogGlobalsHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Logging global variables...`);
-  const globals = yield* Globals
-  const BLOCKS_IN_QUEUE : number = yield* Ref.get(globals.BLOCKS_IN_QUEUE)
-  const LATEST_SYNC_OF_STATE_QUEUE_LENGTH : number = yield* Ref.get(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH)
-  const RESET_IN_PROGRESS : boolean = yield* Ref.get(globals.RESET_IN_PROGRESS)
-  const AVAILABLE_CONFIRMED_BLOCK :  "" | SerializedStateQueueUTxO = yield* Ref.get(globals.AVAILABLE_CONFIRMED_BLOCK)
-  const PROCESSED_UNSUBMITTED_TXS_COUNT : number = yield* Ref.get(globals.PROCESSED_UNSUBMITTED_TXS_COUNT)
-  const PROCESSED_UNSUBMITTED_TXS_SIZE : number = yield* Ref.get(globals.PROCESSED_UNSUBMITTED_TXS_SIZE)
-  const UNCONFIRMED_SUBMITTED_BLOCK : string = yield* Ref.get(globals.UNCONFIRMED_SUBMITTED_BLOCK)
+  const globals = yield* Globals;
+  const BLOCKS_IN_QUEUE: number = yield* Ref.get(globals.BLOCKS_IN_QUEUE);
+  const LATEST_SYNC_OF_STATE_QUEUE_LENGTH: number = yield* Ref.get(
+    globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH,
+  );
+  const RESET_IN_PROGRESS: boolean = yield* Ref.get(globals.RESET_IN_PROGRESS);
+  const AVAILABLE_CONFIRMED_BLOCK: "" | SerializedStateQueueUTxO =
+    yield* Ref.get(globals.AVAILABLE_CONFIRMED_BLOCK);
+  const PROCESSED_UNSUBMITTED_TXS_COUNT: number = yield* Ref.get(
+    globals.PROCESSED_UNSUBMITTED_TXS_COUNT,
+  );
+  const PROCESSED_UNSUBMITTED_TXS_SIZE: number = yield* Ref.get(
+    globals.PROCESSED_UNSUBMITTED_TXS_SIZE,
+  );
+  const UNCONFIRMED_SUBMITTED_BLOCK: string = yield* Ref.get(
+    globals.UNCONFIRMED_SUBMITTED_BLOCK,
+  );
 
   yield* Effect.logInfo(`
   BLOCKS_IN_QUEUE ⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅⋅ ${BLOCKS_IN_QUEUE}
