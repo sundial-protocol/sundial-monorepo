@@ -34,15 +34,12 @@ const commitBlockTxSizeGauge = Metric.gauge("commit_block_tx_size", {
 
 export const buildAndSubmitCommitmentBlock = () =>
   Effect.gen(function* () {
-    const globals = yield* Globals
-    const RESET_IN_PROGRESS = yield* globals.RESET_IN_PROGRESS
-    const AVAILABLE_CONFIRMED_BLOCK = yield* globals.AVAILABLE_CONFIRMED_BLOCK
-    const PROCESSED_UNSUBMITTED_TXS_COUNT = yield* globals.PROCESSED_UNSUBMITTED_TXS_COUNT
-    const PROCESSED_UNSUBMITTED_TXS_SIZE = yield* globals.RESET_IN_PROGRESS
+    const globals = yield* Globals;
+    const AVAILABLE_CONFIRMED_BLOCK = yield* globals.AVAILABLE_CONFIRMED_BLOCK;
+    const PROCESSED_UNSUBMITTED_TXS_COUNT =
+      yield* globals.PROCESSED_UNSUBMITTED_TXS_COUNT;
+    const PROCESSED_UNSUBMITTED_TXS_SIZE = yield* globals.RESET_IN_PROGRESS;
 
-    if (RESET_IN_PROGRESS) {
-      return yield* Effect.logInfo("🔹 Reset in progress...");
-    }
     const worker = Effect.async<WorkerOutput, WorkerError, never>((resume) => {
       Effect.runSync(Effect.logInfo(`👷 Starting block commitment worker...`));
       const worker = new Worker(
@@ -105,9 +102,12 @@ export const buildAndSubmitCommitmentBlock = () =>
 
     switch (workerOutput.type) {
       case "SuccessfulSubmissionOutput": {
-        yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n + 1) ;
+        yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n + 1);
         yield* Ref.set(globals.AVAILABLE_CONFIRMED_BLOCK, "");
-        yield* Ref.set(globals.UNCONFIRMED_SUBMITTED_BLOCK, workerOutput.submittedTxHash);
+        yield* Ref.set(
+          globals.UNCONFIRMED_SUBMITTED_BLOCK,
+          workerOutput.submittedTxHash,
+        );
         yield* Ref.set(globals.PROCESSED_UNSUBMITTED_TXS_COUNT, 0);
         yield* Ref.set(globals.PROCESSED_UNSUBMITTED_TXS_SIZE, 0);
 
@@ -125,11 +125,17 @@ export const buildAndSubmitCommitmentBlock = () =>
         break;
       }
       case "SkippedSubmissionOutput": {
-        yield* Ref.update(globals.PROCESSED_UNSUBMITTED_TXS_COUNT, (n) => n + workerOutput.mempoolTxsCount);
-        yield* Ref.update(globals.PROCESSED_UNSUBMITTED_TXS_SIZE, (n) => n + workerOutput.sizeOfProcessedTxs);
+        yield* Ref.update(
+          globals.PROCESSED_UNSUBMITTED_TXS_COUNT,
+          (n) => n + workerOutput.mempoolTxsCount,
+        );
+        yield* Ref.update(
+          globals.PROCESSED_UNSUBMITTED_TXS_SIZE,
+          (n) => n + workerOutput.sizeOfProcessedTxs,
+        );
         break;
       }
-      case "EmptyMempoolOutput": {
+      case "NothingToCommitOutput": {
         break;
       }
       case "FailureOutput": {

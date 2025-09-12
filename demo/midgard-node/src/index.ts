@@ -9,7 +9,7 @@ import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
 import { AlwaysSucceeds } from "./services/index.js";
 import { NodeRuntime } from "@effect/platform-node";
-import { Globals } from "./globals.js"
+import { Globals } from "./globals.js";
 
 dotenv.config();
 const VERSION = packageJson.version;
@@ -19,7 +19,7 @@ const program = new Command();
 program.version(VERSION).description(
   `
   ${chalk.red(
-  `                       @#
+    `                       @#
                          @@%#
                         %@@@%#
                        %%%%%%##

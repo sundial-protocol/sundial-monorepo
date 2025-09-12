@@ -20,7 +20,7 @@ const collectAndBurnStateQueueNodesProgram = (
   stateQueueUTxOs: SDK.TxBuilder.StateQueue.StateQueueUTxO[],
 ): Effect.Effect<void, Error, Globals> =>
   Effect.gen(function* () {
-    const globals = yield* Globals
+    const globals = yield* Globals;
     yield* Ref.set(globals.RESET_IN_PROGRESS, true);
     const tx = lucid.newTx();
     const assetsToBurn: Assets = {};
@@ -88,8 +88,8 @@ export const resetStateQueue = Effect.gen(function* () {
       batch,
     );
   }
-  const globals = yield* Globals
+  const globals = yield* Globals;
 
-  yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now()) ;
-  yield* Ref.set(globals.BLOCKS_IN_QUEUE, 0) ;
+  yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now());
+  yield* Ref.set(globals.BLOCKS_IN_QUEUE, 0);
 });

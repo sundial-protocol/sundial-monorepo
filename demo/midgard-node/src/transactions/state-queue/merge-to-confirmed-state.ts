@@ -42,8 +42,10 @@ const getStateQueueLength = (
   stateQueueAddress: Address,
 ): Effect.Effect<number, LucidError, Globals> =>
   Effect.gen(function* () {
-    const globals = yield* Globals
-    const LATEST_SYNC_OF_STATE_QUEUE_LENGTH = yield* Ref.get(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH)
+    const globals = yield* Globals;
+    const LATEST_SYNC_OF_STATE_QUEUE_LENGTH = yield* Ref.get(
+      globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH,
+    );
     const now_millis = Date.now();
     if (
       now_millis - LATEST_SYNC_OF_STATE_QUEUE_LENGTH >
@@ -62,7 +64,10 @@ const getStateQueueLength = (
           }),
       });
 
-      yield* Ref.set(globals.BLOCKS_IN_QUEUE, Math.max(0, stateQueueUtxos.length - 1));
+      yield* Ref.set(
+        globals.BLOCKS_IN_QUEUE,
+        Math.max(0, stateQueueUtxos.length - 1),
+      );
       yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now());
 
       return stateQueueUtxos.length;
@@ -89,14 +94,14 @@ export const buildAndSubmitMergeTx = (
   // ): Effect.Effect<void, Error, Database> =>
 ) =>
   Effect.gen(function* () {
-    const globals = yield* Globals
+    const globals = yield* Globals;
     const currentStateQueueLength = yield* getStateQueueLength(
       lucid,
       fetchConfig.stateQueueAddress,
     );
     // Avoid a merge tx if the queue is too short (performing a merge with such
     // conditions has a chance of wasting the work done for root computations).
-    const RESET_IN_PROGRESS = Ref.get(globals.RESET_IN_PROGRESS)
+    const RESET_IN_PROGRESS = Ref.get(globals.RESET_IN_PROGRESS);
     if (
       currentStateQueueLength < MIN_QUEUE_LENGTH_FOR_MERGING ||
       RESET_IN_PROGRESS

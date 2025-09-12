@@ -2,22 +2,26 @@ import { TxHash } from "@lucid-evolution/lucid";
 import { SerializedStateQueueUTxO } from "./workers/utils/commit-block-header.js";
 import { Context, Effect, Layer, Ref } from "effect";
 
-class AvailableConfirmedBlockState extends Context.Tag("AvailableConfirmedBlockState")<
-  AvailableConfirmedBlockState,
-  Ref.Ref<"" | SerializedStateQueueUTxO>
->() {
-  static readonly layer = Layer.effect(AvailableConfirmedBlockState, Effect.gen(function* () {
-    return yield* Ref.make("" as ("" | SerializedStateQueueUTxO)) // The only way to make a ref of a union
-  }));
+class AvailableConfirmedBlockState extends Context.Tag(
+  "AvailableConfirmedBlockState",
+)<AvailableConfirmedBlockState, Ref.Ref<"" | SerializedStateQueueUTxO>>() {
+  static readonly layer = Layer.effect(
+    AvailableConfirmedBlockState,
+    Effect.gen(function* () {
+      return yield* Ref.make("" as "" | SerializedStateQueueUTxO); // The only way to make a ref of a union
+    }),
+  );
 }
 
-class UnconfirmedSubmittedBlockState extends Context.Tag("UnconfirmedSubmittedBlockState")<
-  UnconfirmedSubmittedBlockState,
-  Ref.Ref<"" | TxHash>
->() {
-    static readonly layer = Layer.effect(UnconfirmedSubmittedBlockState, Effect.gen(function* () {
-    return yield* Ref.make("" as ("" | TxHash)) // The only way to make a ref of a union
-  }));
+class UnconfirmedSubmittedBlockState extends Context.Tag(
+  "UnconfirmedSubmittedBlockState",
+)<UnconfirmedSubmittedBlockState, Ref.Ref<"" | TxHash>>() {
+  static readonly layer = Layer.effect(
+    UnconfirmedSubmittedBlockState,
+    Effect.gen(function* () {
+      return yield* Ref.make("" as "" | TxHash); // The only way to make a ref of a union
+    }),
+  );
 }
 
 export class Globals extends Effect.Service<Globals>()("Globals", {
@@ -35,7 +39,8 @@ export class Globals extends Effect.Service<Globals>()("Globals", {
 
     // The state queue UTxO confirmed by the confirmation worker, unused for block
     // commitment.
-    var AVAILABLE_CONFIRMED_BLOCK: Ref.Ref<"" | SerializedStateQueueUTxO> = yield* AvailableConfirmedBlockState;
+    var AVAILABLE_CONFIRMED_BLOCK: Ref.Ref<"" | SerializedStateQueueUTxO> =
+      yield* AvailableConfirmedBlockState;
 
     // Accumulator for the number of processed mempool transactions (only used in
     // metrics)
@@ -45,7 +50,8 @@ export class Globals extends Effect.Service<Globals>()("Globals", {
     // queue block.
     var PROCESSED_UNSUBMITTED_TXS_SIZE: Ref.Ref<number> = yield* Ref.make(0);
 
-    var UNCONFIRMED_SUBMITTED_BLOCK: Ref.Ref<"" | TxHash> = yield* UnconfirmedSubmittedBlockState;
+    var UNCONFIRMED_SUBMITTED_BLOCK: Ref.Ref<"" | TxHash> =
+      yield* UnconfirmedSubmittedBlockState;
 
     return {
       BLOCKS_IN_QUEUE,

@@ -172,26 +172,23 @@ export const clearBlock = (
     sqlErrorToDBDeleteError(tableName),
   );
 
-export const retrieve = (): Effect.Effect<
+export const retrieve: Effect.Effect<
   readonly Entry[],
   DBSelectError,
   Database
-> =>
-  Effect.gen(function* () {
-    yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
-    const sql = yield* SqlClient.SqlClient;
-    const result = yield* sql<Entry>`SELECT * FROM ${sql(tableName)}`;
-    yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
-    return result;
-  }).pipe(
-    Effect.withLogSpan(`retrieve ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
-      ),
-    ),
-    sqlErrorToDBSelectError(tableName),
-  );
+> = Effect.gen(function* () {
+  yield* Effect.logInfo(`${tableName} db: attempt to retrieve blocks`);
+  const sql = yield* SqlClient.SqlClient;
+  const result = yield* sql<Entry>`SELECT * FROM ${sql(tableName)}`;
+  yield* Effect.logDebug(`${tableName} db: retrieved ${result.length} rows.`);
+  return result;
+}).pipe(
+  Effect.withLogSpan(`retrieve ${tableName}`),
+  Effect.tapErrorTag("SqlError", (e) =>
+    Effect.logError(`${tableName} db: retrieving error: ${JSON.stringify(e)}`),
+  ),
+  sqlErrorToDBSelectError(tableName),
+);
 
 export const clear: Effect.Effect<void, DBTruncateError, Database> = clearTable(
   tableName,
