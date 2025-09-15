@@ -71,7 +71,9 @@ export const retrieveValue = (
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
 
-    const result = yield* sql<{[Columns.TX]: Buffer}>`SELECT ${sql(Columns.TX)} FROM ${sql(
+    const result = yield* sql<{
+      [Columns.TX]: Buffer;
+    }>`SELECT ${sql(Columns.TX)} FROM ${sql(
       tableName,
     )} WHERE ${sql(Columns.TX_ID)} = ${tx_id}`;
 
@@ -85,10 +87,11 @@ export const retrieveValue = (
     //     }) ;
     // }
 
-    if (result.length === 0) yield* new SqlError.SqlError({
-      cause: `No value found for tx_id ${tx_id.toString("hex")}`,
-      // table: tableName,
-    });
+    if (result.length === 0)
+      yield* new SqlError.SqlError({
+        cause: `No value found for tx_id ${tx_id.toString("hex")}`,
+        // table: tableName,
+      });
 
     return result[0][Columns.TX];
   }).pipe(
@@ -109,11 +112,13 @@ export const retrieveValues = (
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
 
-    const result = yield* sql<Buffer>`SELECT ${sql(Columns.TX)} FROM ${sql(
+    const rows = yield* sql<{
+      [Columns.TX]: Buffer;
+    }>`SELECT ${sql(Columns.TX)} FROM ${sql(
       tableName,
     )} WHERE ${sql.in(Columns.TX_ID, tx_ids)}`;
 
-    return result;
+    return rows.map((r) => r[Columns.TX]);
   }).pipe(
     Effect.withLogSpan(`retrieve values ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>

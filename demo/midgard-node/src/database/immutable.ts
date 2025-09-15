@@ -1,6 +1,10 @@
 import { Effect } from "effect";
 import * as Tx from "@/database/utils/tx.js";
-import { clearTable, DBInsertError } from "@/database/utils/common.js";
+import {
+  clearTable,
+  DBInsertError,
+  DBSelectError,
+} from "@/database/utils/common.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";
@@ -15,7 +19,10 @@ export const insertTxs = (
 ): Effect.Effect<void, DBInsertError, Database> =>
   Tx.insertEntries(tableName, txs);
 
-export const retrieve = Tx.retrieveAllEntries(tableName);
+export const retrieve = (
+  tableName: string,
+): Effect.Effect<readonly Tx.EntryWithTimeStamp[], DBSelectError, Database> =>
+  Tx.retrieveAllEntries(tableName);
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
   Tx.retrieveValue(tableName, txHash);
