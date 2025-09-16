@@ -28,6 +28,6 @@
     "experimentalSpecifierResolution": "node",
     "require": ["tsconfig-paths/register"]
   },
-  "include": ["src", "test"],
+  "include": ["src", "tests"],
   "exclude": ["node_modules", "dist"]
 }
