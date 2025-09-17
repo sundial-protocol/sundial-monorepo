@@ -191,9 +191,7 @@ services:
       dockerfile: ./Dockerfile
     env_file:
       - .env
-    command:
-      - pnpm
-      - test
+    command: ["sh", "-c", "yes | pnpm test"]
     volumes:
       - ./:/app
       - ./db:/app/db
@@ -202,6 +200,9 @@ services:
     networks:
       midgard_net:
     logging: *default-logging
+    environment:
+      - COREPACK_EXPERIMENTAL_SKIP_ASK=true
+
 
 networks:
   midgard_net:
