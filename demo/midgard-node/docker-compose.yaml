@@ -200,9 +200,6 @@ services:
     networks:
       midgard_net:
     logging: *default-logging
-    environment:
-      - COREPACK_EXPERIMENTAL_SKIP_ASK=true
-
 
 networks:
   midgard_net:
