@@ -25,50 +25,37 @@ import { TestServices } from "effect/TestServices";
 import { DBCreateError, DBOtherError } from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
 
-// A simple divide function that returns an Effect, failing when dividing by zero
+import dotenv from "dotenv";
+import { NodeRuntime } from "@effect/platform-node";
+dotenv.config({ path: ".env" });
+
 const divide = (a: number, b: number) : Effect.Effect<number, string, never> => {
   if (b === 0) return Effect.fail("Cannot divide by zero")
   return Effect.succeed(a / b)
 }
 
-const deb : Effect.Effect<void, string, TestServices> =
-    Effect.gen(function* () {
-        const result = yield* divide(4, 2) // Expect 4 divided by 2 to succeed
-        expect(result).toBe(2) // Assert that the result is 2
-    })
-
-// Testing a successful division
 it.effect("test success", () =>
   Effect.gen(function* () {
-    const result = yield* divide(4, 2) // Expect 4 divided by 2 to succeed
-    expect(result).toBe(2) // Assert that the result is 2
+    yield* Effect.log("Working test")
+    const result = yield* divide(4, 2)
+    expect(result).toBe(3)
   })
 )
 
-const mptsEffect : Effect.Effect<string, DBCreateError | DBOtherError | SqlError.SqlError | ConfigError.ConfigError | MptError, never> =
-      Effect.gen( function* () {
-        yield* InitDB.initializeDb();
-        const { ledgerTrie, mempoolTrie } = yield* makeMpts;
-        return ""
-      }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(User.layer),
-      Effect.provide(NodeConfig.layer),
-    )
-
-describe("CheckpointDB", () => {
-  it.effect("Checkpoints, commits and reverts", (_) =>
+describe("The makeMpts tests", () => {
+  it.effect("Trivial makeMpts", (_) =>
     Effect.gen( function* () {
-        yield* InitDB.initializeDb();
-        const { ledgerTrie, mempoolTrie } = yield* makeMpts;
-        const { utxoRoot, txRoot } = yield* processMpts(
-          ledgerTrie,
-          mempoolTrie,
-          [],
-        );
+      yield* Effect.log("Hello")
+      yield* InitDB.initializeDb();
+      const { ledgerTrie, mempoolTrie } = yield* makeMpts;
+      const { utxoRoot, txRoot } = yield* processMpts(
+        ledgerTrie,
+        mempoolTrie,
+        [],
+      );
 
-        expect(utxoRoot).toBe("")
-        expect(txRoot).toBe("")
+      expect(utxoRoot).toBe("")
+      expect(txRoot).toBe("")
     }).pipe(
       Effect.provide(Database.layer),
       Effect.provide(User.layer),
