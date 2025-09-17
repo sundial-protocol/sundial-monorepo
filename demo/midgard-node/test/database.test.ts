@@ -432,7 +432,6 @@ describe("MempoolLedgerDB", () => {
   );
 });
 
-// TODO: clearUTXOs, clearAll
 describe("ConfirmedLedgerDB", () => {
   it.effect("insert multiple, retrieve", () =>
     provideLayers(
@@ -469,44 +468,78 @@ describe("ConfirmedLedgerDB", () => {
 });
 
 describe("AddressHistoryDB", () => {
-  it.effect("insert, retrieve", () =>
+  it.effect("insert, retrieve, clears tx hash, clear all", () =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
-        const pTxId = randomBytes(32);
+        const pTxId1 = randomBytes(32);
         const pTx1 = randomBytes(64);
-        const pSpent = randomBytes(32);
+        const pSpent1 = randomBytes(32);
         const processedTx1: ProcessedTx = {
-          txId: pTxId,
+          txId: pTxId1,
           txCbor: pTx1,
-          spent: [pSpent],
+          spent: [pSpent1],
           produced: [ledgerEntry1],
         };
         const ahEntry1: AddressHistoryDB.Entry = {
-          [LedgerUtils.Columns.TX_ID]: pTxId,
+          [LedgerUtils.Columns.TX_ID]: pTxId1,
           [LedgerUtils.Columns.ADDRESS]: address1,
+        };
+        const pTxId2 = randomBytes(32);
+        const pTx2 = randomBytes(64);
+        const pSpent2 = randomBytes(32);
+        const processedTx2: ProcessedTx = {
+          txId: pTxId2,
+          txCbor: pTx2,
+          spent: [pSpent2],
+          produced: [ledgerEntry2],
+        };
+        const ahEntry2: AddressHistoryDB.Entry = {
+          [LedgerUtils.Columns.TX_ID]: pTxId2,
+          [LedgerUtils.Columns.ADDRESS]: address2,
         };
 
         // via mempool
-        yield* MempoolDB.insert(processedTx1);
-        yield* AddressHistoryDB.insertEntries([ahEntry1])
+        // insert
+        yield* MempoolDB.insertMultiple([processedTx1, processedTx2]);
+        yield* AddressHistoryDB.insertEntries([ahEntry1, ahEntry2])
+
+        // retrieve
         const expectedViaMempool = yield* AddressHistoryDB.retrieve(address1);
         expect(
           expectedViaMempool.map(t => toHex(t))
         ).toStrictEqual(
           [toHex(pTx1)]
         )
-        
-        yield* flushAll;
+
+        // clears tx hash
+        yield* AddressHistoryDB.delTxHash(pTxId1);
+        const afterClear = yield* AddressHistoryDB.retrieve(address1);
+        expect(afterClear).toStrictEqual([]);
+
+        //clears all
+        yield* AddressHistoryDB.clear;
+        const afterClearAll1 = yield* AddressHistoryDB.retrieve(address1);
+        const afterClearAll2 = yield* AddressHistoryDB.retrieve(address2);
+        expect([...afterClearAll1, ...afterClearAll2]).toStrictEqual([]);
 
         // via immutable
         const txEntry1: TxUtils.Entry = {
-          [TxUtils.Columns.TX_ID]: pTxId,
+          [TxUtils.Columns.TX_ID]: pTxId1,
           [TxUtils.Columns.TX]: pTx1,
         }
-        yield* ImmutableDB.insertTx(txEntry1);
-        yield* AddressHistoryDB.insertEntries([ahEntry1])
+        const txEntry2: TxUtils.Entry = {
+          [TxUtils.Columns.TX_ID]: pTxId2,
+          [TxUtils.Columns.TX]: pTx2,
+        }
+        yield* flushAll;
+
+        // insert
+        yield* ImmutableDB.insertTxs([txEntry1, txEntry2]);
+        yield* AddressHistoryDB.insertEntries([ahEntry1, ahEntry2])
+
+        // retrieve
         const expectedViaImmutable = yield* AddressHistoryDB.retrieve(address1);
         expect(
           expectedViaImmutable.map(t => toHex(t))
@@ -514,6 +547,16 @@ describe("AddressHistoryDB", () => {
           [toHex(pTx1)]
         )
 
+        // clears tx hash
+        yield* AddressHistoryDB.delTxHash(pTxId1);
+        const afterClearImmutable = yield* AddressHistoryDB.retrieve(address1);
+        expect(afterClearImmutable).toStrictEqual([]);
+
+        //clears all
+        yield* AddressHistoryDB.clear;
+        const afterClearAllImmutable1 = yield* AddressHistoryDB.retrieve(address1);
+        const afterClearAllImmutable2 = yield* AddressHistoryDB.retrieve(address2);
+        expect([...afterClearAllImmutable1, ...afterClearAllImmutable2]).toStrictEqual([]);
       })
     ),
   );
