@@ -143,7 +143,7 @@ describe("BlocksDB", () => {
 });
 
 describe("MempoolDB", () => {
-  it.effect("insert, retrieve single, retrieve all, retrieve cbor by hash, retrieve cbor by hashes, retrieve count, clear txs, clear all", (_) =>
+  it.effect("insert, retrieve single, retrieve all, retrieve cbor by hash, retrieve cbors by hashes, retrieve count, clear txs, clear all", (_) =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
@@ -235,24 +235,53 @@ describe("MempoolDB", () => {
   );
 });
 
-// TODO: insertTxs, clearAll
 describe("ProcessedMempoolDB", () => {
-  it.effect("insert tx, retrieve all, retrieve cbor by hash, retrieve cbor by hashes", (_) =>
+  it.effect("insert tx, insert txs, retrieve all, retrieve cbor by hash, retrieve cbors by hashes, clear all", (_) =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
-        yield* ProcessedMempoolDB.insertTx(txEntry1);
+        // insert txs
+        yield* ProcessedMempoolDB.insertTxs([txEntry1, txEntry2]);
 
+        // retrieve tx cbor by hash
         const gotOne = yield* ProcessedMempoolDB.retrieveTxCborByHash(txId1);
         expect(toHex(gotOne)).toEqual(toHex(tx1));
 
-        const gotMany = yield* ProcessedMempoolDB.retrieveTxCborsByHashes([txId1]);
-        expect(gotMany.map((r) => toHex(r))).toStrictEqual([toHex(tx1)]);
+        // retrieve tx cbors by hashes
+        const gotMany = yield* ProcessedMempoolDB.retrieveTxCborsByHashes([txId1, txId2]);
+        expect(
+          new Set(gotMany.map((r) => toHex(r)))).
+        toStrictEqual(
+          new Set([toHex(tx1), toHex(tx2)]),
+        );
 
+        // retrieve all
         const gotAll = yield* ProcessedMempoolDB.retrieve;
         expect(
-          gotAll.map(e => removeTimestampFromTxEntry(e)),
+          new Set(gotAll.map(e => removeTimestampFromTxEntry(e)))).
+        toStrictEqual(
+          new Set ([
+          {
+            [TxUtils.Columns.TX_ID]: txId1,
+            [TxUtils.Columns.TX]: tx1,
+          },
+          {
+            [TxUtils.Columns.TX_ID]: txId2,
+            [TxUtils.Columns.TX]: tx2,
+          }
+        ]));
+
+        // clear all
+        yield* ProcessedMempoolDB.clear;
+        const afterClearAll = yield* ProcessedMempoolDB.retrieve;
+        expect(afterClearAll.length).toEqual(0);
+
+        // insert single
+        yield* ProcessedMempoolDB.insertTx(txEntry1);
+        const afterInsertOne = yield* ProcessedMempoolDB.retrieve;
+        expect(
+          afterInsertOne.map(e => removeTimestampFromTxEntry(e)),
         ).toStrictEqual([
           {
             [TxUtils.Columns.TX_ID]: txId1,
