@@ -353,23 +353,37 @@ describe("ImmutableDB", () => {
   );
 });
 
-// TODO: clearUTxOs, clearAll
 describe("LatestLedgerDB", () => {
-  it.effect("insert multiple, retrieve", () =>
+  it.effect("insert multiple, retrieve, clear UTxOs, clear all", () =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
         // insert multiple
-        yield* LatestLedgerDB.insertMultiple([ledgerEntry1]);
+        yield* LatestLedgerDB.insertMultiple([ledgerEntry1, ledgerEntry2]);
 
         // retrieve all
         const all = yield* LatestLedgerDB.retrieve;
         expect(
           new Set(all.map((e) => removeTimestampFromLedgerEntry(e)))
         ).toStrictEqual(
-          new Set([ledgerEntry1])
-        )})
+          new Set([ledgerEntry1, ledgerEntry2])
+        )
+
+        // clear UTxOs
+        yield* LatestLedgerDB.clearUTxOs([ledgerEntry1[LedgerUtils.Columns.OUTREF]]);
+        const afterClear = yield* LatestLedgerDB.retrieve;
+        expect(
+          new Set(afterClear.map((e) => removeTimestampFromLedgerEntry(e)))
+        ).toStrictEqual(
+          new Set([ledgerEntry2])
+        )
+
+        // clear all
+        yield* LatestLedgerDB.clear;
+        const afterClearAll = yield* LatestLedgerDB.retrieve;
+        expect(afterClearAll.length).toEqual(0);
+      })
     ),
   );
 });
