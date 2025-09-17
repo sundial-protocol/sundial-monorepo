@@ -89,13 +89,14 @@ describe("Database: initialization and basic operations", () => {
 
 // TODO: clearBlock, clearAll
 describe("BlocksDB", () => {
-  it.effect("insert, retrieve all, retrieve by header, retrieve by tx", (_) =>
+  it.effect("insert, retrieve all, retrieve by header, retrieve by tx, clear block, clear all", (_) =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
         // insert with some txs
         yield* BlocksDB.insert(blockHeader1, [tx1, tx2]);
+        yield* BlocksDB.insert(blockHeader2, [tx3]);
 
         // retrieve tx hashes by header
         const txs = yield* BlocksDB.retrieveTxHashesByHeaderHash(blockHeader1);
@@ -116,8 +117,27 @@ describe("BlocksDB", () => {
           new Set([
             { [BlocksDB.Columns.HEADER_HASH]: blockHeader1, [BlocksDB.Columns.TX_ID]: tx1 },
             { [BlocksDB.Columns.HEADER_HASH]: blockHeader1, [BlocksDB.Columns.TX_ID]: tx2 },
+            { [BlocksDB.Columns.HEADER_HASH]: blockHeader2, [BlocksDB.Columns.TX_ID]: tx3 },
           ]),
         );
+
+        //clear block
+        yield* BlocksDB.clearBlock(blockHeader1);
+        const afterClear = yield* BlocksDB.retrieve();
+        expect(
+          new Set(
+            afterClear.map((a) => ({ [BlocksDB.Columns.HEADER_HASH]: a[BlocksDB.Columns.HEADER_HASH], [BlocksDB.Columns.TX_ID]: a[BlocksDB.Columns.TX_ID] })),
+          ),
+        ).toStrictEqual(
+          new Set([
+            { [BlocksDB.Columns.HEADER_HASH]: blockHeader2, [BlocksDB.Columns.TX_ID]: tx3 },
+          ]),
+        );
+
+        // clear all
+        yield* BlocksDB.clear;
+        const afterClearAll = yield* BlocksDB.retrieve();
+        expect(afterClearAll.length).toEqual(0);
       }),
     ),
   );
@@ -348,11 +368,13 @@ describe("AddressHistoryDB", () => {
 
 
 const blockHeader1 = randomBytes(32);
+const blockHeader2 = randomBytes(32);
 
 const txId1 = randomBytes(32);
 
 const tx1 = randomBytes(64);
 const tx2 = randomBytes(64);
+const tx3 = randomBytes(64);
 
 const outref1 = randomBytes(36);
 
@@ -387,185 +409,3 @@ const removeTimestampFromLedgerEntry = (e: LedgerUtils.EntryWithTimeStamp): Ledg
     [LedgerUtils.Columns.ADDRESS]: e[LedgerUtils.Columns.ADDRESS],
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// describe("Tx tables: mempool & immutable (via Tx utils)", () => {
-//   it.effect("insert/retrieve single and multiple, delete and clear", (_) =>
-//     provideLayers(
-//       Effect.gen(function* () {
-//         yield* flushAll;
-
-//         const tx1 = { [TxUtils.Columns.TX_ID]: randomBytes(32), [TxUtils.Columns.TX]: randomBytes(64) } as TxUtils.Entry;
-//         const tx2 = { [TxUtils.Columns.TX_ID]: randomBytes(32), [TxUtils.Columns.TX]: randomBytes(64) } as TxUtils.Entry;
-
-//         // mempool (avoid TxUtils; use MempoolDB API)
-//         const addr = "addr_test1vz9xsqexampleaddress";
-//         const processed1 = makeProcessedFromTx(tx1, addr);
-//         const processed2 = makeProcessedFromTx(tx2, addr);
-//         yield* MempoolDB.insert(processed1);
-//         yield* MempoolDB.insertMultiple([processed2]);
-
-//         const got1 = yield* MempoolDB.retrieveTxCborByHash(tx1.tx_id);
-//         const got1Hex = toHex(got1);
-//         expect(got1Hex).toEqual(toHex(tx1.tx));
-
-//         const gotBoth = yield* MempoolDB.retrieveTxCborsByHashes([tx1.tx_id, tx2.tx_id]);
-//         const gotBothHex = gotBoth.map((row: any) => toHex(row[TxUtils.Columns.TX] as Buffer));
-//         expect(new Set(gotBothHex)).toEqual(new Set([toHex(tx1.tx), toHex(tx2.tx)]));
-
-//         yield* MempoolDB.clearTxs([tx1.tx_id, tx2.tx_id]);
-//         const afterClear = yield* MempoolDB.retrieve();
-//         expect(afterClear.length).toEqual(0);
-
-//         // immutable
-//         yield* ImmutableDB.insertTxs([tx1, tx2]);
-//         const allImm = yield* ImmutableDB.retrieve;
-//         expect(allImm.length).toEqual(2);
-//         const immHex = new Set(allImm.map((r: any) => toHex(r.tx as Buffer)));
-//         expect(immHex).toEqual(new Set([toHex(tx1.tx), toHex(tx2.tx)]));
-//         yield* ImmutableDB.clear;
-//         const afterImmClear = yield* ImmutableDB.retrieve;
-//         expect(afterImmClear.length).toEqual(0);
-
-//         // mempool retrieve should include proper rows when inserted
-//         yield* MempoolDB.insertMultiple([processed1]);
-//         const mempoolRows = yield* MempoolDB.retrieve();
-//         const mempoolHex = new Set(mempoolRows.map((r: any) => toHex(r.tx as Buffer)));
-//         expect(mempoolHex).toEqual(new Set([toHex(tx1.tx)]));
-
-//         // // processed_mempool mirrors tx table selects
-//         // yield* ProcessedMempoolDB.insertTxs([tx1, tx2]);
-//         // const pmAll = yield* ProcessedMempoolDB.retrieve;
-//         // expect(pmAll.length).toEqual(2);
-//         // const pmHex = new Set(pmAll.map((r: any) => toHex(r.tx as Buffer)));
-//         // expect(pmHex).toEqual(new Set([toHex(tx1.tx), toHex(tx2.tx)]));
-//         // const pm1 = yield* ProcessedMempoolDB.retrieveTxCborByHash(tx1.tx_id);
-//         // expect(Buffer.isBuffer(pm1)).toBeTruthy();
-//         // expect(toHex(pm1)).toEqual(toHex(tx1.tx));
-//         // const pmBoth = yield* ProcessedMempoolDB.retrieveTxCborsByHashes([tx1.tx_id, tx2.tx_id]);
-//         // const pmBothHex = pmBoth.map((row: any) => toHex(row[TxUtils.Columns.TX] as Buffer));
-//         // expect(new Set(pmBothHex)).toEqual(new Set([toHex(tx1.tx), toHex(tx2.tx)]));
-
-//         // // mempool count
-//         // const count = yield* MempoolDB.retrieveTxCount;
-//         // const countNum = Number(count);
-//         // expect(Number.isFinite(countNum)).toBeTruthy();
-//         // expect(countNum).toBeGreaterThanOrEqual(2);
-//       })
-//     )
-//   );
-// });
-
-// describe("Ledger tables: mempool/latest/confirmed", () => {
-//   it.effect("insert entries, retrieve, filter by address, delete UTxOs", (_) =>
-//     provideLayers(
-//       Effect.gen(function* () {
-//         yield* flushAll;
-
-//         const addr = "addr_test1vz9xsqexampleaddress";
-//         const entryA: LedgerUtils.Entry = {
-//           [LedgerUtils.Columns.TX_ID]: randomBytes(32),
-//           [LedgerUtils.Columns.OUTREF]: randomBytes(36),
-//           [LedgerUtils.Columns.OUTPUT]: randomBytes(80),
-//           [LedgerUtils.Columns.ADDRESS]: addr,
-//         };
-//         const entryB: LedgerUtils.Entry = {
-//           [LedgerUtils.Columns.TX_ID]: randomBytes(32),
-//           [LedgerUtils.Columns.OUTREF]: randomBytes(36),
-//           [LedgerUtils.Columns.OUTPUT]: randomBytes(80),
-//           [LedgerUtils.Columns.ADDRESS]: addr,
-//         };
-
-//         // mempool_ledger
-//         yield* MempoolLedgerDB.insert([entryA, entryB]);
-//         const all = yield* MempoolLedgerDB.retrieve;
-//         expect(all.length).toEqual(2);
-//         const allHex = new Set(all.map((r: any) => toHex(r.outref as Buffer)));
-//         expect(allHex).toEqual(new Set([toHex(entryA.outref), toHex(entryB.outref)]));
-//         const byAddr = yield* MempoolLedgerDB.retrieveByAddress(addr);
-//         expect(byAddr.length).toEqual(2);
-//         const byAddrOutrefs = new Set((byAddr as any[]).map((r) => toHex(r.outref as Buffer)));
-//         expect(byAddrOutrefs).toEqual(new Set([toHex(entryA.outref), toHex(entryB.outref)]));
-//         yield* MempoolLedgerDB.clearUTxOs([entryA.outref]);
-//         const afterDel = yield* MempoolLedgerDB.retrieve;
-//         expect(afterDel.length).toEqual(1);
-
-//         // latest_ledger
-//         yield* LatestLedgerDB.insertMultiple([entryA]);
-//         const latest = yield* LatestLedgerDB.retrieve;
-//         expect(latest.length).toEqual(1);
-//         const latestHex = new Set(latest.map((r: any) => toHex(r.outref as Buffer)));
-//         expect(latestHex).toEqual(new Set([toHex(entryA.outref)]));
-//         yield* LatestLedgerDB.clearUTxOs([entryA.outref]);
-//         const latestAfter = yield* LatestLedgerDB.retrieve;
-//         expect(latestAfter.length).toEqual(0);
-
-//         // confirmed_ledger
-//         yield* ConfirmedLedgerDB.insertMultiple([entryB]);
-//         const confirmed = yield* ConfirmedLedgerDB.retrieve;
-//         expect(confirmed.length).toEqual(1);
-//         const confirmedHex = new Set(confirmed.map((r: any) => toHex(r.outref as Buffer)));
-//         expect(confirmedHex).toEqual(new Set([toHex(entryB.outref)]));
-//         yield* ConfirmedLedgerDB.clearUTxOs([entryB.outref]);
-//         const confirmedAfter = yield* ConfirmedLedgerDB.retrieve;
-//         expect(confirmedAfter.length).toEqual(0);
-//       })
-//     )
-//   );
-// });
-
-// describe("AddressHistory", () => {
-//   it.effect("join mempool/immutable txs by address", (_) =>
-//     provideLayers(
-//       Effect.gen(function* () {
-//         yield* flushAll;
-
-//         // const addr = "addr_test1vz9xsqexampleaddress";
-//         // const txId = randomBytes(32);
-//         // const txCbor = randomBytes(100);
-
-//         // // Put a tx in mempool and immutable
-//         // yield* TxUtils.insertEntry(MempoolDB.tableName, { [TxUtils.Columns.TX_ID]: txId, [TxUtils.Columns.TX]: txCbor });
-//         // yield* TxUtils.insertEntry(ImmutableDB.tableName, { [TxUtils.Columns.TX_ID]: txId, [TxUtils.Columns.TX]: txCbor });
-
-//         // // Insert address history entry linking the same txId
-//         // // AddressHistory.Entry expects keys from Ledger Columns
-//         // const ahEntry = {
-//         //   [LedgerUtils.Columns.TX_ID]: txId,
-//         //   [LedgerUtils.Columns.ADDRESS]: addr,
-//         // } as unknown as AddressHistoryDB.Entry;
-//         // yield* AddressHistoryDB.insertEntries([ahEntry]);
-
-//         // const results = yield* AddressHistoryDB.retrieve(addr);
-//         // const resultsHex = results.map((b: Buffer) => toHex(b));
-//         // // Expect the inserted tx cbor to be present at least once
-//         // const occurrences = resultsHex.filter((h) => h === toHex(txCbor)).length;
-//         // expect(occurrences).toBeGreaterThanOrEqual(1);
-
-//         // // Clean up
-//         // yield* AddressHistoryDB.delTxHash(txId);
-//         // const after = yield* AddressHistoryDB.retrieve(addr);
-//         // // After deletion, the join should no longer return this tx
-//         // expect(after.find((b) => b.equals(txCbor))).toBeUndefined();
-//       })
-//     )
-//   );
-// });
