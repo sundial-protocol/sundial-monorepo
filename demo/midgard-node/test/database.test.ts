@@ -87,7 +87,6 @@ describe("Database: initialization and basic operations", () => {
   );
 });
 
-// TODO: clearBlock, clearAll
 describe("BlocksDB", () => {
   it.effect("insert, retrieve all, retrieve by header, retrieve by tx, clear block, clear all", (_) =>
     provideLayers(
@@ -143,43 +142,81 @@ describe("BlocksDB", () => {
   );
 });
 
-// TODO: insert multiple, clearTxs, clearAll
 describe("MempoolDB", () => {
   it.effect("insert, retrieve all, retrieve cbor by hash, retrieve cbor by hashes, retrieve count", (_) =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
-        const pTxId = randomBytes(32);
+        const pTxId1 = randomBytes(32);
         const pTx1 = randomBytes(64);
-        const pSpent = randomBytes(32);
+        const pSpent1 = randomBytes(32);
         const processedTx1: ProcessedTx = {
-          txId: pTxId,
+          txId: pTxId1,
           txCbor: pTx1,
-          spent: [pSpent],
+          spent: [pSpent1],
           produced: [ledgerEntry1],
         };
+        const pTxId2 = randomBytes(32);
+        const pTx2 = randomBytes(64);
+        const pSpent2 = randomBytes(32);
+        const processedTx2: ProcessedTx = {
+          txId: pTxId2,
+          txCbor: pTx2,
+          spent: [pSpent2],
+          produced: [ledgerEntry2],
+        };
 
-        yield* MempoolDB.insert(processedTx1);
+        // insert multiple
+        yield* MempoolDB.insertMultiple([processedTx1, processedTx2]);
 
-        const gotOne = yield* MempoolDB.retrieveTxCborByHash(pTxId);
+        // retrieve tx cbor by hash
+        const gotOne = yield* MempoolDB.retrieveTxCborByHash(pTxId1);
         expect(toHex(gotOne)).toEqual(toHex(pTx1));
 
-        const gotMany = yield* MempoolDB.retrieveTxCborsByHashes([pTxId]);
-        expect(gotMany.map((r) => toHex(r))).toStrictEqual([toHex(pTx1)]);
+        // retrieve tx cbor by hashes
+        const gotMany = yield* MempoolDB.retrieveTxCborsByHashes([pTxId1, pTxId2]);
+        expect(
+          new Set(gotMany.map((r) => toHex(r)))).
+        toStrictEqual(
+          new Set([toHex(pTx1), toHex(pTx2)]),
+        );
 
+        // retrieve all
         const gotAll = yield* MempoolDB.retrieve();
         expect(
-          gotAll.map(e => removeTimestampFromTxEntry(e)),
-        ).toStrictEqual([
+          new Set(gotAll.map(e => removeTimestampFromTxEntry(e))),
+        ).toStrictEqual(new Set([
           {
-            [TxUtils.Columns.TX_ID]: pTxId,
+            [TxUtils.Columns.TX_ID]: pTxId1,
             [TxUtils.Columns.TX]: pTx1,
           },
-        ]);
+          {
+            [TxUtils.Columns.TX_ID]: pTxId2,
+            [TxUtils.Columns.TX]: pTx2,
+          },
+        ]));
 
+        // retrieve count
         const gotCount: number = yield* MempoolDB.retrieveTxCount;
-        expect(gotCount).toEqual(1);
+        expect(gotCount).toEqual(2);
+
+        // clearTxs
+        yield* MempoolDB.clearTxs([pTxId1]);
+        const afterClear = yield* MempoolDB.retrieve();
+        expect(
+          new Set(afterClear.map(e => removeTimestampFromTxEntry(e))),
+        ).toStrictEqual(new Set([
+          {
+            [TxUtils.Columns.TX_ID]: pTxId2,
+            [TxUtils.Columns.TX]: pTx2,
+          },
+        ]));
+
+        // clearAll
+        yield* MempoolDB.clear;
+        const afterClearAll = yield* MempoolDB.retrieve();
+        expect(afterClearAll.length).toEqual(0);
       }),
     ),
   );
@@ -371,16 +408,20 @@ const blockHeader1 = randomBytes(32);
 const blockHeader2 = randomBytes(32);
 
 const txId1 = randomBytes(32);
+const txId2 = randomBytes(32);
 
 const tx1 = randomBytes(64);
 const tx2 = randomBytes(64);
 const tx3 = randomBytes(64);
 
 const outref1 = randomBytes(36);
+const outref2 = randomBytes(36);
 
 const output1 = randomBytes(80);
+const output2 = randomBytes(80);
 
-const address1 = "addr_test1vz9xsqexampleaddress";
+const address1 = "addr_test1vz9xsqexampleaddress1";
+const address2 = "addr_test1vz9xsqexampleaddress2";
 
 const txEntry1: TxUtils.Entry = {
   [TxUtils.Columns.TX_ID]: txId1,
@@ -400,6 +441,14 @@ const ledgerEntry1: LedgerUtils.Entry = {
   [LedgerUtils.Columns.OUTPUT]: output1,
   [LedgerUtils.Columns.ADDRESS]: address1,
 };
+
+const ledgerEntry2: LedgerUtils.Entry = {
+  [LedgerUtils.Columns.TX_ID]: txId2,
+  [LedgerUtils.Columns.OUTREF]: outref2,
+  [LedgerUtils.Columns.OUTPUT]: output2,
+  [LedgerUtils.Columns.ADDRESS]: address2,
+};
+
 
 const removeTimestampFromLedgerEntry = (e: LedgerUtils.EntryWithTimeStamp): LedgerUtils.EntryNoTimeStamp => {
   return {
