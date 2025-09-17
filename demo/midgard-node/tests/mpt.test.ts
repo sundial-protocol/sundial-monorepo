@@ -38,14 +38,13 @@ it.effect("test success", () =>
   Effect.gen(function* () {
     yield* Effect.log("Working test")
     const result = yield* divide(4, 2)
-    expect(result).toBe(3)
+    expect(result).toBe(2)
   })
 )
 
 describe("The makeMpts tests", () => {
   it.effect("Trivial makeMpts", (_) =>
     Effect.gen( function* () {
-      yield* Effect.log("Hello")
       yield* InitDB.initializeDb();
       const { ledgerTrie, mempoolTrie } = yield* makeMpts;
       const { utxoRoot, txRoot } = yield* processMpts(
