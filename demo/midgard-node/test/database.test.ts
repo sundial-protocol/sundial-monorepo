@@ -388,15 +388,14 @@ describe("LatestLedgerDB", () => {
   );
 });
 
-// TODO: clearUTxOs, clearAll
 describe("MempoolLedgerDB", () => {
-  it.effect("insert, retrieve by address, retrieve all", () =>
+  it.effect("insert, retrieve by address, retrieve all, clearUTxOs, clearAll", () =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
         // insert
-        yield* MempoolLedgerDB.insert([ledgerEntry1]);
+        yield* MempoolLedgerDB.insert([ledgerEntry1, ledgerEntry2]);
 
         // retrieve by address
         const atAddress = yield* MempoolLedgerDB.retrieveByAddress(address1);
@@ -411,8 +410,23 @@ describe("MempoolLedgerDB", () => {
         expect(
           new Set(all.map((e) => removeTimestampFromLedgerEntry(e)))
         ).toStrictEqual(
-          new Set([ledgerEntry1])
-        )})
+          new Set([ledgerEntry1, ledgerEntry2])
+        )
+
+        // clear UTxOs
+        yield* MempoolLedgerDB.clearUTxOs([ledgerEntry1[LedgerUtils.Columns.OUTREF]]);
+        const afterClear = yield* MempoolLedgerDB.retrieve;
+        expect(
+          new Set(afterClear.map((e) => removeTimestampFromLedgerEntry(e)))
+        ).toStrictEqual(
+          new Set([ledgerEntry2])
+        )
+
+        // clear all
+        yield* MempoolLedgerDB.clear;
+        const afterClearAll = yield* MempoolLedgerDB.retrieve;
+        expect(afterClearAll.length).toEqual(0);
+      })
 
     ),
   );
