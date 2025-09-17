@@ -440,15 +440,29 @@ describe("ConfirmedLedgerDB", () => {
         yield* flushAll;
 
         // insert
-        yield* ConfirmedLedgerDB.insertMultiple([ledgerEntry1]);
+        yield* ConfirmedLedgerDB.insertMultiple([ledgerEntry1, ledgerEntry2]);
 
         // retrieve all
         const all = yield* ConfirmedLedgerDB.retrieve;
         expect(
           new Set(all.map(e => removeTimestampFromLedgerEntry(e)))
         ).toStrictEqual(
-          new Set([ledgerEntry1])
+          new Set([ledgerEntry1, ledgerEntry2])
         )
+
+        // clear UTxOs
+        yield* ConfirmedLedgerDB.clearUTxOs([ledgerEntry1[LedgerUtils.Columns.OUTREF]]);
+        const afterClear = yield* ConfirmedLedgerDB.retrieve;
+        expect(
+          new Set(afterClear.map(e => removeTimestampFromLedgerEntry(e)))
+        ).toStrictEqual(
+          new Set([ledgerEntry2])
+        )
+
+        // clear all
+        yield* ConfirmedLedgerDB.clear;
+        const afterClearAll = yield* ConfirmedLedgerDB.retrieve;
+        expect(afterClearAll.length).toEqual(0);
       })
     ),
   );
