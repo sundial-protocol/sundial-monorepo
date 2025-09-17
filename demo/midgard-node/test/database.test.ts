@@ -57,7 +57,6 @@ const flushAll = Effect.gen(function* () {
 const randomBytes = (n: number) =>
   Buffer.from(Array.from({ length: n }, () => Math.floor(Math.random() * 256)));
 
-// One-time DB init for the whole suite; drop conflicting indexes if they already exist
 beforeAll(async () => {
   await Effect.runPromise(
     provideLayers(
@@ -166,7 +165,7 @@ describe("MempoolDB", () => {
   );
 });
 
-// // TODO: insertTxs, clearAll
+// TODO: insertTxs, clearAll
 describe("ProcessedMempoolDB", () => {
   it.effect("insert tx, retrieve all, retrieve cbor by hash, retrieve cbor by hashes", (_) =>
     provideLayers(
@@ -296,18 +295,57 @@ describe("ConfirmedLedgerDB", () => {
   );
 });
 
+describe("AddressHistoryDB", () => {
+  it.effect("insert, retrieve", () =>
+    provideLayers(
+      Effect.gen(function* () {
+        yield* flushAll;
 
+        const pTxId = randomBytes(32);
+        const pTx1 = randomBytes(64);
+        const pSpent = randomBytes(32);
+        const processedTx1: ProcessedTx = {
+          txId: pTxId,
+          txCbor: pTx1,
+          spent: [pSpent],
+          produced: [ledgerEntry1],
+        };
+        const ahEntry1: AddressHistoryDB.Entry = {
+          [LedgerUtils.Columns.TX_ID]: pTxId,
+          [LedgerUtils.Columns.ADDRESS]: address1,
+        };
 
-// template for new tests
-// describe("", () => {
-//   it.effect("", () =>
-//     provideLayers(
-//       Effect.gen(function* () {
-//         yield* flushAll;
-//       })
-//     ),
-//   );
-// });
+        // via mempool
+        yield* MempoolDB.insert(processedTx1);
+        yield* AddressHistoryDB.insertEntries([ahEntry1])
+        const expectedViaMempool = yield* AddressHistoryDB.retrieve(address1);
+        expect(
+          expectedViaMempool.map(t => toHex(t))
+        ).toStrictEqual(
+          [toHex(pTx1)]
+        )
+        
+        yield* flushAll;
+
+        // via immutable
+        const txEntry1: TxUtils.Entry = {
+          [TxUtils.Columns.TX_ID]: pTxId,
+          [TxUtils.Columns.TX]: pTx1,
+        }
+        yield* ImmutableDB.insertTx(txEntry1);
+        yield* AddressHistoryDB.insertEntries([ahEntry1])
+        const expectedViaImmutable = yield* AddressHistoryDB.retrieve(address1);
+        expect(
+          expectedViaImmutable.map(t => toHex(t))
+        ).toStrictEqual(
+          [toHex(pTx1)]
+        )
+
+      })
+    ),
+  );
+});
+
 
 const blockHeader1 = randomBytes(32);
 
