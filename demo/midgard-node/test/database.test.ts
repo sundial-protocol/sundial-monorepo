@@ -198,8 +198,8 @@ describe("MempoolDB", () => {
         ]));
 
         // retrieve count
-        const gotCount: number = yield* MempoolDB.retrieveTxCount;
-        expect(gotCount).toEqual(2);
+        const gotCount: bigint = yield* MempoolDB.retrieveTxCount;
+        expect(gotCount).toEqual(2n);
 
         // clearTxs
         yield* MempoolDB.clearTxs([pTxId1]);

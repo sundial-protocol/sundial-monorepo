@@ -588,7 +588,7 @@ const mergeAction = Effect.gen(function* () {
 
 const monitorMempoolAction = Effect.gen(function* () {
   const numTx = yield* MempoolDB.retrieveTxCount;
-  yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
+  yield* mempoolTxGauge(Effect.succeed(numTx));
 });
 
 const txQueueProcessorAction = (txQueue: Queue.Dequeue<string>) =>
