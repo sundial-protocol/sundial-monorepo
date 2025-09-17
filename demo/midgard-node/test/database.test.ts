@@ -9,14 +9,23 @@ import { Database } from "../src/services/database.js";
 import { NodeConfig, User } from "../src/config.js";
 import { initializeDb } from "../src/database/init.js";
 import {
+  // Block
   BlocksDB,
+
+  // Address history
+  AddressHistoryDB,
+
+  // Tx
   ImmutableDB,
-  LatestLedgerDB,
+  ProcessedMempoolDB,
   MempoolDB,
+
+  // Ledger
+  LatestLedgerDB,
   MempoolLedgerDB,
   ConfirmedLedgerDB,
-  AddressHistoryDB,
-  ProcessedMempoolDB,
+
+  // Utils
   TxUtils,
   LedgerUtils,
 } from "../src/database/index.js";
@@ -119,7 +128,7 @@ describe("BlocksDB", () => {
 });
 
 describe("MempoolDB", () => {
-  it.effect("insert, retrieve", (_) =>
+  it.effect("insert, retrieve all, retrieve cbor by hash, retrieve cbor by hashes, retrieve count", (_) =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
@@ -171,22 +180,52 @@ describe("MempoolDB", () => {
   );
 });
 
-describe("ImmutableDB", () => {
-  it.effect("insert, retrieve", (_) =>
+describe("ProcessedMempoolDB", () => {
+  it.effect("insert tx, retrieve all, retrieve cbor by hash, retrieve cbor by hashes", (_) =>
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
         const txId1 = randomBytes(32);
         const txCbor1 = randomBytes(64);
-        // const spent1: Buffer[] = [randomBytes(32)];
-        // const produced1: LedgerUtils.Entry[] = [{
-        //   [LedgerUtils.Columns.TX_ID]: txId1,
-        //   [LedgerUtils.Columns.OUTREF]: randomBytes(36),
-        //   [LedgerUtils.Columns.OUTPUT]: randomBytes(80),
-        //   [LedgerUtils.Columns.ADDRESS]: "addr_test1vz9xsqexampleaddress",
-        // }];
+        const entry: TxUtils.Entry = {
+          [TxUtils.Columns.TX_ID]: txId1,
+          [TxUtils.Columns.TX]: txCbor1,
+        }
 
+        yield* ProcessedMempoolDB.insertTx(entry);
+
+        const gotOne = yield* ProcessedMempoolDB.retrieveTxCborByHash(txId1);
+        expect(toHex(gotOne)).toEqual(toHex(txCbor1));
+
+        const gotMany = yield* ProcessedMempoolDB.retrieveTxCborsByHashes([txId1]);
+        expect(gotMany.map((r) => toHex(r))).toEqual([toHex(txCbor1)]);
+
+        const gotAll = yield* ProcessedMempoolDB.retrieve;
+        expect(
+          gotAll.map((r: TxUtils.Entry) => ({
+            txid: toHex(r[TxUtils.Columns.TX_ID]),
+            tx: toHex(r[TxUtils.Columns.TX]),
+          })),
+        ).toEqual([
+          {
+            txid: toHex(txId1),
+            tx: toHex(txCbor1),
+          },
+        ]);
+      }),
+    ),
+  );
+});
+
+describe("ImmutableDB", () => {
+  it.effect("insert, retrieve all, retrieve cbor by hash, retrieve cbor by hashes", (_) =>
+    provideLayers(
+      Effect.gen(function* () {
+        yield* flushAll;
+
+        const txId1 = randomBytes(32);
+        const txCbor1 = randomBytes(64);
         const entry1: TxUtils.Entry = {
           [TxUtils.Columns.TX_ID]: txId1,
           [TxUtils.Columns.TX]: txCbor1,
@@ -201,17 +240,14 @@ describe("ImmutableDB", () => {
         expect(gotMany.map((r) => toHex(r))).toEqual([toHex(txCbor1)]);
 
         const gotAll: TxUtils.EntryWithTimeStamp[] =
-          yield* ImmutableDB.retrieve();
-        // expect(gotAll.map((r : TxUtils.EntryWithTimeStamp) => ({
-        //   txid: toHex(r[TxUtils.Columns.TX_ID]),
-        //   tx: toHex(r[TxUtils.Columns.TX])
-        // }))).toEqual([{
-        //   txid: toHex(txId1),
-        //   tx: toHex(txCbor1)
-        // }]);
-
-        // const gotCount: number = yield* MempoolDB.retrieveTxCount;
-        // expect(gotCount).toEqual(1);
+          yield* ImmutableDB.retrieve;
+        expect(gotAll.map((r : TxUtils.EntryWithTimeStamp) => ({
+          txid: toHex(r[TxUtils.Columns.TX_ID]),
+          tx: toHex(r[TxUtils.Columns.TX])
+        }))).toEqual([{
+          txid: toHex(txId1),
+          tx: toHex(txCbor1)
+        }]);
       }),
     ),
   );
