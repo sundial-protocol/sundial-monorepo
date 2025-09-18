@@ -1,9 +1,6 @@
 import { Effect } from "effect";
 import * as Tx from "@/database/utils/tx.js";
-import {
-  clearTable,
-  DBInsertError,
-} from "@/database/utils/common.js";
+import { clearTable, DBInsertError } from "@/database/utils/common.js";
 import { Database } from "@/services/database.js";
 
 export const tableName = "immutable";

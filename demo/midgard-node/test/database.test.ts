@@ -88,268 +88,310 @@ describe("Database: initialization and basic operations", () => {
 });
 
 describe("BlocksDB", () => {
-  it.effect("insert, retrieve all, retrieve by header, retrieve by tx, clear block, clear all", (_) =>
-    provideLayers(
-      Effect.gen(function* () {
-        yield* flushAll;
+  it.effect(
+    "insert, retrieve all, retrieve by header, retrieve by tx, clear block, clear all",
+    (_) =>
+      provideLayers(
+        Effect.gen(function* () {
+          yield* flushAll;
 
-        // insert with some txs
-        yield* BlocksDB.insert(blockHeader1, [tx1, tx2]);
-        yield* BlocksDB.insert(blockHeader2, [tx3]);
+          // insert with some txs
+          yield* BlocksDB.insert(blockHeader1, [tx1, tx2]);
+          yield* BlocksDB.insert(blockHeader2, [tx3]);
 
-        // retrieve tx hashes by header
-        const txs = yield* BlocksDB.retrieveTxHashesByHeaderHash(blockHeader1);
-        const txsHex = txs.map((row) => toHex(row));
-        expect(new Set(txsHex)).toStrictEqual(new Set([toHex(tx1), toHex(tx2)]));
+          // retrieve tx hashes by header
+          const txs =
+            yield* BlocksDB.retrieveTxHashesByHeaderHash(blockHeader1);
+          const txsHex = txs.map((row) => toHex(row));
+          expect(new Set(txsHex)).toStrictEqual(
+            new Set([toHex(tx1), toHex(tx2)]),
+          );
 
-        // retrieve header by tx hash
-        const retrievedHeader = yield* BlocksDB.retrieveHeaderHashByTxHash(tx1);
-        expect(toHex(retrievedHeader)).toEqual(toHex(blockHeader1));
+          // retrieve header by tx hash
+          const retrievedHeader =
+            yield* BlocksDB.retrieveHeaderHashByTxHash(tx1);
+          expect(toHex(retrievedHeader)).toEqual(toHex(blockHeader1));
 
-        // retrieve all
-        const all = yield* BlocksDB.retrieve();
-        expect(
-          new Set(
-            all.map((a) => ({ [BlocksDB.Columns.HEADER_HASH]: a[BlocksDB.Columns.HEADER_HASH], [BlocksDB.Columns.TX_ID]: a[BlocksDB.Columns.TX_ID] })),
-          ),
-        ).toStrictEqual(
-          new Set([
-            { [BlocksDB.Columns.HEADER_HASH]: blockHeader1, [BlocksDB.Columns.TX_ID]: tx1 },
-            { [BlocksDB.Columns.HEADER_HASH]: blockHeader1, [BlocksDB.Columns.TX_ID]: tx2 },
-            { [BlocksDB.Columns.HEADER_HASH]: blockHeader2, [BlocksDB.Columns.TX_ID]: tx3 },
-          ]),
-        );
+          // retrieve all
+          const all = yield* BlocksDB.retrieve();
+          expect(
+            new Set(
+              all.map((a) => ({
+                [BlocksDB.Columns.HEADER_HASH]: a[BlocksDB.Columns.HEADER_HASH],
+                [BlocksDB.Columns.TX_ID]: a[BlocksDB.Columns.TX_ID],
+              })),
+            ),
+          ).toStrictEqual(
+            new Set([
+              {
+                [BlocksDB.Columns.HEADER_HASH]: blockHeader1,
+                [BlocksDB.Columns.TX_ID]: tx1,
+              },
+              {
+                [BlocksDB.Columns.HEADER_HASH]: blockHeader1,
+                [BlocksDB.Columns.TX_ID]: tx2,
+              },
+              {
+                [BlocksDB.Columns.HEADER_HASH]: blockHeader2,
+                [BlocksDB.Columns.TX_ID]: tx3,
+              },
+            ]),
+          );
 
-        //clear block
-        yield* BlocksDB.clearBlock(blockHeader1);
-        const afterClear = yield* BlocksDB.retrieve();
-        expect(
-          new Set(
-            afterClear.map((a) => ({ [BlocksDB.Columns.HEADER_HASH]: a[BlocksDB.Columns.HEADER_HASH], [BlocksDB.Columns.TX_ID]: a[BlocksDB.Columns.TX_ID] })),
-          ),
-        ).toStrictEqual(
-          new Set([
-            { [BlocksDB.Columns.HEADER_HASH]: blockHeader2, [BlocksDB.Columns.TX_ID]: tx3 },
-          ]),
-        );
+          //clear block
+          yield* BlocksDB.clearBlock(blockHeader1);
+          const afterClear = yield* BlocksDB.retrieve();
+          expect(
+            new Set(
+              afterClear.map((a) => ({
+                [BlocksDB.Columns.HEADER_HASH]: a[BlocksDB.Columns.HEADER_HASH],
+                [BlocksDB.Columns.TX_ID]: a[BlocksDB.Columns.TX_ID],
+              })),
+            ),
+          ).toStrictEqual(
+            new Set([
+              {
+                [BlocksDB.Columns.HEADER_HASH]: blockHeader2,
+                [BlocksDB.Columns.TX_ID]: tx3,
+              },
+            ]),
+          );
 
-        // clear all
-        yield* BlocksDB.clear;
-        const afterClearAll = yield* BlocksDB.retrieve();
-        expect(afterClearAll.length).toEqual(0);
-      }),
-    ),
+          // clear all
+          yield* BlocksDB.clear;
+          const afterClearAll = yield* BlocksDB.retrieve();
+          expect(afterClearAll.length).toEqual(0);
+        }),
+      ),
   );
 });
 
 describe("MempoolDB", () => {
-  it.effect("insert, retrieve single, retrieve all, retrieve cbor by hash, retrieve cbors by hashes, retrieve count, clear txs, clear all", (_) =>
-    provideLayers(
-      Effect.gen(function* () {
-        yield* flushAll;
+  it.effect(
+    "insert, retrieve single, retrieve all, retrieve cbor by hash, retrieve cbors by hashes, retrieve count, clear txs, clear all",
+    (_) =>
+      provideLayers(
+        Effect.gen(function* () {
+          yield* flushAll;
 
-        const pTxId1 = randomBytes(32);
-        const pTx1 = randomBytes(64);
-        const pSpent1 = randomBytes(32);
-        const processedTx1: ProcessedTx = {
-          txId: pTxId1,
-          txCbor: pTx1,
-          spent: [pSpent1],
-          produced: [ledgerEntry1],
-        };
-        const pTxId2 = randomBytes(32);
-        const pTx2 = randomBytes(64);
-        const pSpent2 = randomBytes(32);
-        const processedTx2: ProcessedTx = {
-          txId: pTxId2,
-          txCbor: pTx2,
-          spent: [pSpent2],
-          produced: [ledgerEntry2],
-        };
+          const pTxId1 = randomBytes(32);
+          const pTx1 = randomBytes(64);
+          const pSpent1 = randomBytes(32);
+          const processedTx1: ProcessedTx = {
+            txId: pTxId1,
+            txCbor: pTx1,
+            spent: [pSpent1],
+            produced: [ledgerEntry1],
+          };
+          const pTxId2 = randomBytes(32);
+          const pTx2 = randomBytes(64);
+          const pSpent2 = randomBytes(32);
+          const processedTx2: ProcessedTx = {
+            txId: pTxId2,
+            txCbor: pTx2,
+            spent: [pSpent2],
+            produced: [ledgerEntry2],
+          };
 
-        // insert multiple
-        yield* MempoolDB.insertMultiple([processedTx1, processedTx2]);
+          // insert multiple
+          yield* MempoolDB.insertMultiple([processedTx1, processedTx2]);
 
-        // retrieve tx cbor by hash
-        const gotOne = yield* MempoolDB.retrieveTxCborByHash(pTxId1);
-        expect(toHex(gotOne)).toEqual(toHex(pTx1));
+          // retrieve tx cbor by hash
+          const gotOne = yield* MempoolDB.retrieveTxCborByHash(pTxId1);
+          expect(toHex(gotOne)).toEqual(toHex(pTx1));
 
-        // retrieve tx cbor by hashes
-        const gotMany = yield* MempoolDB.retrieveTxCborsByHashes([pTxId1, pTxId2]);
-        expect(
-          new Set(gotMany.map((r) => toHex(r)))).
-        toStrictEqual(
-          new Set([toHex(pTx1), toHex(pTx2)]),
-        );
+          // retrieve tx cbor by hashes
+          const gotMany = yield* MempoolDB.retrieveTxCborsByHashes([
+            pTxId1,
+            pTxId2,
+          ]);
+          expect(new Set(gotMany.map((r) => toHex(r)))).toStrictEqual(
+            new Set([toHex(pTx1), toHex(pTx2)]),
+          );
 
-        // retrieve all
-        const gotAll = yield* MempoolDB.retrieve();
-        expect(
-          new Set(gotAll.map(e => removeTimestampFromTxEntry(e))),
-        ).toStrictEqual(new Set([
-          {
-            [TxUtils.Columns.TX_ID]: pTxId1,
-            [TxUtils.Columns.TX]: pTx1,
-          },
-          {
-            [TxUtils.Columns.TX_ID]: pTxId2,
-            [TxUtils.Columns.TX]: pTx2,
-          },
-        ]));
+          // retrieve all
+          const gotAll = yield* MempoolDB.retrieve();
+          expect(
+            new Set(gotAll.map((e) => removeTimestampFromTxEntry(e))),
+          ).toStrictEqual(
+            new Set([
+              {
+                [TxUtils.Columns.TX_ID]: pTxId1,
+                [TxUtils.Columns.TX]: pTx1,
+              },
+              {
+                [TxUtils.Columns.TX_ID]: pTxId2,
+                [TxUtils.Columns.TX]: pTx2,
+              },
+            ]),
+          );
 
-        // retrieve count
-        const gotCount: bigint = yield* MempoolDB.retrieveTxCount;
-        expect(gotCount).toEqual(2n);
+          // retrieve count
+          const gotCount: bigint = yield* MempoolDB.retrieveTxCount;
+          expect(gotCount).toEqual(2n);
 
-        // clearTxs
-        yield* MempoolDB.clearTxs([pTxId1]);
-        const afterClear = yield* MempoolDB.retrieve();
-        expect(
-          new Set(afterClear.map(e => removeTimestampFromTxEntry(e))),
-        ).toStrictEqual(new Set([
-          {
-            [TxUtils.Columns.TX_ID]: pTxId2,
-            [TxUtils.Columns.TX]: pTx2,
-          },
-        ]));
+          // clearTxs
+          yield* MempoolDB.clearTxs([pTxId1]);
+          const afterClear = yield* MempoolDB.retrieve();
+          expect(
+            new Set(afterClear.map((e) => removeTimestampFromTxEntry(e))),
+          ).toStrictEqual(
+            new Set([
+              {
+                [TxUtils.Columns.TX_ID]: pTxId2,
+                [TxUtils.Columns.TX]: pTx2,
+              },
+            ]),
+          );
 
-        // clearAll
-        yield* MempoolDB.clear;
-        const afterClearAll = yield* MempoolDB.retrieve();
-        expect(afterClearAll.length).toEqual(0);
+          // clearAll
+          yield* MempoolDB.clear;
+          const afterClearAll = yield* MempoolDB.retrieve();
+          expect(afterClearAll.length).toEqual(0);
 
-        // insert single
-        yield* flushAll;
-        yield* MempoolDB.insert(processedTx1);
-        const afterInsertOne = yield* MempoolDB.retrieve();
-        expect(
-          afterInsertOne.map(e => removeTimestampFromTxEntry(e)),
-        ).toStrictEqual([
-          {
-            [TxUtils.Columns.TX_ID]: pTxId1,
-            [TxUtils.Columns.TX]: pTx1,
-          },
-        ]);
-      }),
-    ),
+          // insert single
+          yield* flushAll;
+          yield* MempoolDB.insert(processedTx1);
+          const afterInsertOne = yield* MempoolDB.retrieve();
+          expect(
+            afterInsertOne.map((e) => removeTimestampFromTxEntry(e)),
+          ).toStrictEqual([
+            {
+              [TxUtils.Columns.TX_ID]: pTxId1,
+              [TxUtils.Columns.TX]: pTx1,
+            },
+          ]);
+        }),
+      ),
   );
 });
 
 describe("ProcessedMempoolDB", () => {
-  it.effect("insert tx, insert txs, retrieve all, retrieve cbor by hash, retrieve cbors by hashes, clear all", (_) =>
-    provideLayers(
-      Effect.gen(function* () {
-        yield* flushAll;
+  it.effect(
+    "insert tx, insert txs, retrieve all, retrieve cbor by hash, retrieve cbors by hashes, clear all",
+    (_) =>
+      provideLayers(
+        Effect.gen(function* () {
+          yield* flushAll;
 
-        // insert txs
-        yield* ProcessedMempoolDB.insertTxs([txEntry1, txEntry2]);
+          // insert txs
+          yield* ProcessedMempoolDB.insertTxs([txEntry1, txEntry2]);
 
-        // retrieve tx cbor by hash
-        const gotOne = yield* ProcessedMempoolDB.retrieveTxCborByHash(txId1);
-        expect(toHex(gotOne)).toEqual(toHex(tx1));
+          // retrieve tx cbor by hash
+          const gotOne = yield* ProcessedMempoolDB.retrieveTxCborByHash(txId1);
+          expect(toHex(gotOne)).toEqual(toHex(tx1));
 
-        // retrieve tx cbors by hashes
-        const gotMany = yield* ProcessedMempoolDB.retrieveTxCborsByHashes([txId1, txId2]);
-        expect(
-          new Set(gotMany.map((r) => toHex(r)))).
-        toStrictEqual(
-          new Set([toHex(tx1), toHex(tx2)]),
-        );
+          // retrieve tx cbors by hashes
+          const gotMany = yield* ProcessedMempoolDB.retrieveTxCborsByHashes([
+            txId1,
+            txId2,
+          ]);
+          expect(new Set(gotMany.map((r) => toHex(r)))).toStrictEqual(
+            new Set([toHex(tx1), toHex(tx2)]),
+          );
 
-        // retrieve all
-        const gotAll = yield* ProcessedMempoolDB.retrieve;
-        expect(
-          new Set(gotAll.map(e => removeTimestampFromTxEntry(e)))).
-        toStrictEqual(
-          new Set ([
-          {
-            [TxUtils.Columns.TX_ID]: txId1,
-            [TxUtils.Columns.TX]: tx1,
-          },
-          {
-            [TxUtils.Columns.TX_ID]: txId2,
-            [TxUtils.Columns.TX]: tx2,
-          }
-        ]));
+          // retrieve all
+          const gotAll = yield* ProcessedMempoolDB.retrieve;
+          expect(
+            new Set(gotAll.map((e) => removeTimestampFromTxEntry(e))),
+          ).toStrictEqual(
+            new Set([
+              {
+                [TxUtils.Columns.TX_ID]: txId1,
+                [TxUtils.Columns.TX]: tx1,
+              },
+              {
+                [TxUtils.Columns.TX_ID]: txId2,
+                [TxUtils.Columns.TX]: tx2,
+              },
+            ]),
+          );
 
-        // clear all
-        yield* ProcessedMempoolDB.clear;
-        const afterClearAll = yield* ProcessedMempoolDB.retrieve;
-        expect(afterClearAll.length).toEqual(0);
+          // clear all
+          yield* ProcessedMempoolDB.clear;
+          const afterClearAll = yield* ProcessedMempoolDB.retrieve;
+          expect(afterClearAll.length).toEqual(0);
 
-        // insert single
-        yield* ProcessedMempoolDB.insertTx(txEntry1);
-        const afterInsertOne = yield* ProcessedMempoolDB.retrieve;
-        expect(
-          afterInsertOne.map(e => removeTimestampFromTxEntry(e)),
-        ).toStrictEqual([
-          {
-            [TxUtils.Columns.TX_ID]: txId1,
-            [TxUtils.Columns.TX]: tx1,
-          },
-        ]);
-      }),
-    ),
-  );
-});
-
-describe("ImmutableDB", () => {
-  it.effect("insert tx, insert txs, retrieve all, retrieve cbor by hash, retrieve cbor by hashes, clear all", (_) =>
-    provideLayers(
-      Effect.gen(function* () {
-        yield* flushAll;
-
-        // insert txs
-        yield* ImmutableDB.insertTxs([txEntry1, txEntry2]);
-
-        // retrieve tx cbor by hash
-        const gotOne = yield* ImmutableDB.retrieveTxCborByHash(txId1);
-        expect(toHex(gotOne)).toEqual(toHex(tx1));
-
-        // retrieve tx cbors by hashes
-        const gotMany = yield* ImmutableDB.retrieveTxCborsByHashes([txId1, txId2]);
-        expect(
-          new Set(gotMany.map((r) => toHex(r)))).
-        toStrictEqual(
-          new Set([toHex(tx1), toHex(tx2)])
-        );
-
-        // retrieve all
-        const gotAll: TxUtils.EntryWithTimeStamp[] =
-          yield* ImmutableDB.retrieve;
-        expect(
-          new Set(gotAll.map((e : TxUtils.EntryWithTimeStamp) => removeTimestampFromTxEntry(e)))).
-        toStrictEqual(
-          new Set([
+          // insert single
+          yield* ProcessedMempoolDB.insertTx(txEntry1);
+          const afterInsertOne = yield* ProcessedMempoolDB.retrieve;
+          expect(
+            afterInsertOne.map((e) => removeTimestampFromTxEntry(e)),
+          ).toStrictEqual([
             {
               [TxUtils.Columns.TX_ID]: txId1,
               [TxUtils.Columns.TX]: tx1,
             },
+          ]);
+        }),
+      ),
+  );
+});
+
+describe("ImmutableDB", () => {
+  it.effect(
+    "insert tx, insert txs, retrieve all, retrieve cbor by hash, retrieve cbor by hashes, clear all",
+    (_) =>
+      provideLayers(
+        Effect.gen(function* () {
+          yield* flushAll;
+
+          // insert txs
+          yield* ImmutableDB.insertTxs([txEntry1, txEntry2]);
+
+          // retrieve tx cbor by hash
+          const gotOne = yield* ImmutableDB.retrieveTxCborByHash(txId1);
+          expect(toHex(gotOne)).toEqual(toHex(tx1));
+
+          // retrieve tx cbors by hashes
+          const gotMany = yield* ImmutableDB.retrieveTxCborsByHashes([
+            txId1,
+            txId2,
+          ]);
+          expect(new Set(gotMany.map((r) => toHex(r)))).toStrictEqual(
+            new Set([toHex(tx1), toHex(tx2)]),
+          );
+
+          // retrieve all
+          const gotAll: TxUtils.EntryWithTimeStamp[] =
+            yield* ImmutableDB.retrieve;
+          expect(
+            new Set(
+              gotAll.map((e: TxUtils.EntryWithTimeStamp) =>
+                removeTimestampFromTxEntry(e),
+              ),
+            ),
+          ).toStrictEqual(
+            new Set([
+              {
+                [TxUtils.Columns.TX_ID]: txId1,
+                [TxUtils.Columns.TX]: tx1,
+              },
+              {
+                [TxUtils.Columns.TX_ID]: txId2,
+                [TxUtils.Columns.TX]: tx2,
+              },
+            ]),
+          );
+
+          // clear all
+          yield* ImmutableDB.clear;
+          const afterClearAll = yield* ImmutableDB.retrieve;
+          expect(afterClearAll.length).toEqual(0);
+
+          // insert single
+          yield* ImmutableDB.insertTx(txEntry1);
+          const afterInsertOne = yield* ImmutableDB.retrieve;
+          expect(
+            afterInsertOne.map((e) => removeTimestampFromTxEntry(e)),
+          ).toStrictEqual([
             {
-              [TxUtils.Columns.TX_ID]: txId2,
-              [TxUtils.Columns.TX]: tx2,
+              [TxUtils.Columns.TX_ID]: txId1,
+              [TxUtils.Columns.TX]: tx1,
             },
-          ])
-        );
-
-        // clear all
-        yield* ImmutableDB.clear;
-        const afterClearAll = yield* ImmutableDB.retrieve;
-        expect(afterClearAll.length).toEqual(0);
-
-        // insert single
-        yield* ImmutableDB.insertTx(txEntry1);
-        const afterInsertOne = yield* ImmutableDB.retrieve;
-        expect(
-          afterInsertOne.map(e => removeTimestampFromTxEntry(e)),
-        ).toStrictEqual([
-          {
-            [TxUtils.Columns.TX_ID]: txId1,
-            [TxUtils.Columns.TX]: tx1,
-          },
-        ]);
-      }),
-    ),
+          ]);
+        }),
+      ),
   );
 });
 
@@ -365,70 +407,65 @@ describe("LatestLedgerDB", () => {
         // retrieve all
         const all = yield* LatestLedgerDB.retrieve;
         expect(
-          new Set(all.map((e) => removeTimestampFromLedgerEntry(e)))
-        ).toStrictEqual(
-          new Set([ledgerEntry1, ledgerEntry2])
-        )
+          new Set(all.map((e) => removeTimestampFromLedgerEntry(e))),
+        ).toStrictEqual(new Set([ledgerEntry1, ledgerEntry2]));
 
         // clear UTxOs
-        yield* LatestLedgerDB.clearUTxOs([ledgerEntry1[LedgerUtils.Columns.OUTREF]]);
+        yield* LatestLedgerDB.clearUTxOs([
+          ledgerEntry1[LedgerUtils.Columns.OUTREF],
+        ]);
         const afterClear = yield* LatestLedgerDB.retrieve;
         expect(
-          new Set(afterClear.map((e) => removeTimestampFromLedgerEntry(e)))
-        ).toStrictEqual(
-          new Set([ledgerEntry2])
-        )
+          new Set(afterClear.map((e) => removeTimestampFromLedgerEntry(e))),
+        ).toStrictEqual(new Set([ledgerEntry2]));
 
         // clear all
         yield* LatestLedgerDB.clear;
         const afterClearAll = yield* LatestLedgerDB.retrieve;
         expect(afterClearAll.length).toEqual(0);
-      })
+      }),
     ),
   );
 });
 
 describe("MempoolLedgerDB", () => {
-  it.effect("insert, retrieve by address, retrieve all, clearUTxOs, clearAll", () =>
-    provideLayers(
-      Effect.gen(function* () {
-        yield* flushAll;
+  it.effect(
+    "insert, retrieve by address, retrieve all, clearUTxOs, clearAll",
+    () =>
+      provideLayers(
+        Effect.gen(function* () {
+          yield* flushAll;
 
-        // insert
-        yield* MempoolLedgerDB.insert([ledgerEntry1, ledgerEntry2]);
+          // insert
+          yield* MempoolLedgerDB.insert([ledgerEntry1, ledgerEntry2]);
 
-        // retrieve by address
-        const atAddress = yield* MempoolLedgerDB.retrieveByAddress(address1);
-        expect(
-          new Set(atAddress.map((e) => removeTimestampFromLedgerEntry(e)))
-        ).toStrictEqual(
-          new Set([ledgerEntry1])
-        )
+          // retrieve by address
+          const atAddress = yield* MempoolLedgerDB.retrieveByAddress(address1);
+          expect(
+            new Set(atAddress.map((e) => removeTimestampFromLedgerEntry(e))),
+          ).toStrictEqual(new Set([ledgerEntry1]));
 
-        // retrieve all
-        const all = yield* MempoolLedgerDB.retrieve;
-        expect(
-          new Set(all.map((e) => removeTimestampFromLedgerEntry(e)))
-        ).toStrictEqual(
-          new Set([ledgerEntry1, ledgerEntry2])
-        )
+          // retrieve all
+          const all = yield* MempoolLedgerDB.retrieve;
+          expect(
+            new Set(all.map((e) => removeTimestampFromLedgerEntry(e))),
+          ).toStrictEqual(new Set([ledgerEntry1, ledgerEntry2]));
 
-        // clear UTxOs
-        yield* MempoolLedgerDB.clearUTxOs([ledgerEntry1[LedgerUtils.Columns.OUTREF]]);
-        const afterClear = yield* MempoolLedgerDB.retrieve;
-        expect(
-          new Set(afterClear.map((e) => removeTimestampFromLedgerEntry(e)))
-        ).toStrictEqual(
-          new Set([ledgerEntry2])
-        )
+          // clear UTxOs
+          yield* MempoolLedgerDB.clearUTxOs([
+            ledgerEntry1[LedgerUtils.Columns.OUTREF],
+          ]);
+          const afterClear = yield* MempoolLedgerDB.retrieve;
+          expect(
+            new Set(afterClear.map((e) => removeTimestampFromLedgerEntry(e))),
+          ).toStrictEqual(new Set([ledgerEntry2]));
 
-        // clear all
-        yield* MempoolLedgerDB.clear;
-        const afterClearAll = yield* MempoolLedgerDB.retrieve;
-        expect(afterClearAll.length).toEqual(0);
-      })
-
-    ),
+          // clear all
+          yield* MempoolLedgerDB.clear;
+          const afterClearAll = yield* MempoolLedgerDB.retrieve;
+          expect(afterClearAll.length).toEqual(0);
+        }),
+      ),
   );
 });
 
@@ -444,25 +481,23 @@ describe("ConfirmedLedgerDB", () => {
         // retrieve all
         const all = yield* ConfirmedLedgerDB.retrieve;
         expect(
-          new Set(all.map(e => removeTimestampFromLedgerEntry(e)))
-        ).toStrictEqual(
-          new Set([ledgerEntry1, ledgerEntry2])
-        )
+          new Set(all.map((e) => removeTimestampFromLedgerEntry(e))),
+        ).toStrictEqual(new Set([ledgerEntry1, ledgerEntry2]));
 
         // clear UTxOs
-        yield* ConfirmedLedgerDB.clearUTxOs([ledgerEntry1[LedgerUtils.Columns.OUTREF]]);
+        yield* ConfirmedLedgerDB.clearUTxOs([
+          ledgerEntry1[LedgerUtils.Columns.OUTREF],
+        ]);
         const afterClear = yield* ConfirmedLedgerDB.retrieve;
         expect(
-          new Set(afterClear.map(e => removeTimestampFromLedgerEntry(e)))
-        ).toStrictEqual(
-          new Set([ledgerEntry2])
-        )
+          new Set(afterClear.map((e) => removeTimestampFromLedgerEntry(e))),
+        ).toStrictEqual(new Set([ledgerEntry2]));
 
         // clear all
         yield* ConfirmedLedgerDB.clear;
         const afterClearAll = yield* ConfirmedLedgerDB.retrieve;
         expect(afterClearAll.length).toEqual(0);
-      })
+      }),
     ),
   );
 });
@@ -503,15 +538,13 @@ describe("AddressHistoryDB", () => {
         // via mempool
         // insert
         yield* MempoolDB.insertMultiple([processedTx1, processedTx2]);
-        yield* AddressHistoryDB.insertEntries([ahEntry1, ahEntry2])
+        yield* AddressHistoryDB.insertEntries([ahEntry1, ahEntry2]);
 
         // retrieve
         const expectedViaMempool = yield* AddressHistoryDB.retrieve(address1);
-        expect(
-          expectedViaMempool.map(t => toHex(t))
-        ).toStrictEqual(
-          [toHex(pTx1)]
-        )
+        expect(expectedViaMempool.map((t) => toHex(t))).toStrictEqual([
+          toHex(pTx1),
+        ]);
 
         // clears tx hash
         yield* AddressHistoryDB.delTxHash(pTxId1);
@@ -528,24 +561,22 @@ describe("AddressHistoryDB", () => {
         const txEntry1: TxUtils.Entry = {
           [TxUtils.Columns.TX_ID]: pTxId1,
           [TxUtils.Columns.TX]: pTx1,
-        }
+        };
         const txEntry2: TxUtils.Entry = {
           [TxUtils.Columns.TX_ID]: pTxId2,
           [TxUtils.Columns.TX]: pTx2,
-        }
+        };
         yield* flushAll;
 
         // insert
         yield* ImmutableDB.insertTxs([txEntry1, txEntry2]);
-        yield* AddressHistoryDB.insertEntries([ahEntry1, ahEntry2])
+        yield* AddressHistoryDB.insertEntries([ahEntry1, ahEntry2]);
 
         // retrieve
         const expectedViaImmutable = yield* AddressHistoryDB.retrieve(address1);
-        expect(
-          expectedViaImmutable.map(t => toHex(t))
-        ).toStrictEqual(
-          [toHex(pTx1)]
-        )
+        expect(expectedViaImmutable.map((t) => toHex(t))).toStrictEqual([
+          toHex(pTx1),
+        ]);
 
         // clears tx hash
         yield* AddressHistoryDB.delTxHash(pTxId1);
@@ -554,14 +585,18 @@ describe("AddressHistoryDB", () => {
 
         //clears all
         yield* AddressHistoryDB.clear;
-        const afterClearAllImmutable1 = yield* AddressHistoryDB.retrieve(address1);
-        const afterClearAllImmutable2 = yield* AddressHistoryDB.retrieve(address2);
-        expect([...afterClearAllImmutable1, ...afterClearAllImmutable2]).toStrictEqual([]);
-      })
+        const afterClearAllImmutable1 =
+          yield* AddressHistoryDB.retrieve(address1);
+        const afterClearAllImmutable2 =
+          yield* AddressHistoryDB.retrieve(address2);
+        expect([
+          ...afterClearAllImmutable1,
+          ...afterClearAllImmutable2,
+        ]).toStrictEqual([]);
+      }),
     ),
   );
 });
-
 
 const blockHeader1 = randomBytes(32);
 const blockHeader2 = randomBytes(32);
@@ -585,19 +620,21 @@ const address2 = "addr_test1vz9xsqexampleaddress2";
 const txEntry1: TxUtils.Entry = {
   [TxUtils.Columns.TX_ID]: txId1,
   [TxUtils.Columns.TX]: tx1,
-}
+};
 
 const txEntry2: TxUtils.Entry = {
   [TxUtils.Columns.TX_ID]: txId2,
   [TxUtils.Columns.TX]: tx2,
-}
+};
 
-const removeTimestampFromTxEntry = (e: TxUtils.EntryWithTimeStamp): TxUtils.EntryNoTimeStamp => {
+const removeTimestampFromTxEntry = (
+  e: TxUtils.EntryWithTimeStamp,
+): TxUtils.EntryNoTimeStamp => {
   return {
     [TxUtils.Columns.TX_ID]: e[TxUtils.Columns.TX_ID],
     [TxUtils.Columns.TX]: e[TxUtils.Columns.TX],
   };
-}
+};
 
 const ledgerEntry1: LedgerUtils.Entry = {
   [LedgerUtils.Columns.TX_ID]: txId1,
@@ -613,12 +650,13 @@ const ledgerEntry2: LedgerUtils.Entry = {
   [LedgerUtils.Columns.ADDRESS]: address2,
 };
 
-
-const removeTimestampFromLedgerEntry = (e: LedgerUtils.EntryWithTimeStamp): LedgerUtils.EntryNoTimeStamp => {
+const removeTimestampFromLedgerEntry = (
+  e: LedgerUtils.EntryWithTimeStamp,
+): LedgerUtils.EntryNoTimeStamp => {
   return {
     [LedgerUtils.Columns.TX_ID]: e[LedgerUtils.Columns.TX_ID],
     [LedgerUtils.Columns.OUTREF]: e[LedgerUtils.Columns.OUTREF],
     [LedgerUtils.Columns.OUTPUT]: e[LedgerUtils.Columns.OUTPUT],
     [LedgerUtils.Columns.ADDRESS]: e[LedgerUtils.Columns.ADDRESS],
   };
-}
+};
