@@ -24,23 +24,13 @@ import { NodeConfig, User } from "../src/config.js";
 import { TestServices } from "effect/TestServices";
 import { DBCreateError, DBOtherError } from "@/database/utils/common.js";
 import { SqlClient, SqlError } from "@effect/sql";
+import { UTxO, toHex, utxoToCore } from "@lucid-evolution/lucid";
 
 import dotenv from "dotenv";
 import { NodeRuntime } from "@effect/platform-node";
 dotenv.config({ path: ".env" });
 
-const divide = (a: number, b: number) : Effect.Effect<number, string, never> => {
-  if (b === 0) return Effect.fail("Cannot divide by zero")
-  return Effect.succeed(a / b)
-}
-
-it.effect("test success", () =>
-  Effect.gen(function* () {
-    yield* Effect.log("Working test")
-    const result = yield* divide(4, 2)
-    expect(result).toBe(2)
-  })
-)
+ETH.ROOT_DB_KEY
 
 describe("The makeMpts tests", () => {
   it.effect("Trivial makeMpts", (_) =>
@@ -53,8 +43,8 @@ describe("The makeMpts tests", () => {
         [],
       );
 
-      expect(utxoRoot).toBe("")
-      expect(txRoot).toBe("")
+      expect(utxoRoot).toBe(toHex(ledgerTrie.EMPTY_TRIE_ROOT))
+      expect(txRoot).toBe(toHex(ledgerTrie.EMPTY_TRIE_ROOT))
     }).pipe(
       Effect.provide(Database.layer),
       Effect.provide(User.layer),
