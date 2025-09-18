@@ -4,14 +4,11 @@ import { describe, expect } from "vitest";
 import { it } from "@effect/vitest";
 import { InitDB } from "../src/database/index.js";
 import { makeMpts, processMpts } from "../src/workers/utils/mpt.js";
-import * as ETH from "@ethereumjs/mpt";
 import { NodeConfig, User } from "../src/config.js";
 import { toHex } from "@lucid-evolution/lucid";
 
 import dotenv from "dotenv";
 dotenv.config({ path: ".env" });
-
-ETH.ROOT_DB_KEY;
 
 describe("The makeMpts tests", () => {
   it.effect("Trivial makeMpts", (_) =>
