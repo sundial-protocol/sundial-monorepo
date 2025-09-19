@@ -96,9 +96,9 @@ export const retrieveTxHashesByHeaderHash = (
     );
     const sql = yield* SqlClient.SqlClient;
 
-    const result = yield* sql<{
-      [Columns.TX_ID]: Buffer;
-    }>`SELECT ${sql(Columns.TX_ID)} FROM ${sql(
+    const result = yield* sql<
+      Pick<Entry, Columns.TX_ID>
+    >`SELECT ${sql(Columns.TX_ID)} FROM ${sql(
       tableName,
     )} WHERE ${sql(Columns.HEADER_HASH)} = ${headerHash}`;
 

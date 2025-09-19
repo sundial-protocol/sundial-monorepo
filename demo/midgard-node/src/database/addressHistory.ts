@@ -115,9 +115,9 @@ export const retrieve = (
       `${tableName} db: attempt to retrieve value with address ${address}`,
     );
 
-    const result = yield* sql<{
-      [Tx.Columns.TX]: Buffer;
-    }>`SELECT ${sql(Tx.Columns.TX)} FROM (
+    const result = yield* sql<
+      Pick<Tx.Entry, Tx.Columns.TX>
+    >`SELECT ${sql(Tx.Columns.TX)} FROM (
       SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
       FROM ${sql(MempoolDB.tableName)}
       UNION
