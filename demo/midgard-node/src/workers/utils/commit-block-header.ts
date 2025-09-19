@@ -24,8 +24,8 @@ export type SkippedSubmissionOutput = {
   sizeOfProcessedTxs: number;
 };
 
-export type EmptyMempoolOutput = {
-  type: "EmptyMempoolOutput";
+export type NothingToCommitOutput = {
+  type: "NothingToCommitOutput";
 };
 
 export type FailureOutput = {
@@ -36,7 +36,7 @@ export type FailureOutput = {
 export type WorkerOutput =
   | SuccessfulSubmissionOutput
   | SkippedSubmissionOutput
-  | EmptyMempoolOutput
+  | NothingToCommitOutput
   | FailureOutput;
 
 // Datatype to use CBOR hex of state queue UTxOs instead of `UTxO` from LE for

@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, pipe } from "effect";
+import { Cause, Effect, pipe } from "effect";
 import {
   WorkerInput,
   WorkerOutput,
@@ -41,15 +41,27 @@ const wrapper = (
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
 
-    const mempoolTxs = yield* MempoolDB.retrieve();
+    const mempoolTxs = yield* MempoolDB.retrieve;
     const endTime = Date.now();
     const mempoolTxsCount = mempoolTxs.length;
 
     if (mempoolTxsCount === 0) {
-      yield* Effect.logInfo("🔹 No transactions were found in MempoolDB");
-      return {
-        type: "EmptyMempoolOutput",
-      };
+      yield* Effect.logInfo(
+        "🔹 No transactions were found in MempoolDB, checking ProcessedMempoolDB...",
+      );
+
+      const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve;
+
+      if (processedMempoolTxs.length === 0) {
+        yield* Effect.logInfo("🔹 Nothing to commit.");
+        return {
+          type: "NothingToCommitOutput",
+        };
+      }
+      // No new transactions received, but there are uncommitted transactions in
+      // the MPT. So its root must be used to submit a new block, and if
+      // successful, `ProcessedMempoolDB` must be cleared. Following functions
+      // should work fine with 0 mempool txs.
     }
 
     yield* Effect.logInfo(`🔹 ${mempoolTxsCount} retrieved.`);
@@ -269,14 +281,12 @@ const program = pipe(
 
 Effect.runPromise(
   program.pipe(
-    Effect.catchAll((e) => {
-      const errorMessage =
-        e instanceof Error ? e.message : "Unknown error from MPT worker";
-      return Effect.succeed({
+    Effect.catchAllCause((cause) =>
+      Effect.succeed({
         type: "FailureOutput",
-        error: errorMessage,
-      });
-    }),
+        error: `Block commitment worker failure: ${Cause.pretty(cause)}`,
+      }),
+    ),
   ),
 ).then((output) => {
   Effect.runSync(

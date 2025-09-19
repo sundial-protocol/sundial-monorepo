@@ -204,14 +204,11 @@ export const breakDownTx = (
  * @param opName - A name to make logs more readable (doesn't affect the logic)
  * @param effectMaker - A continuation that is provided with starting and ending indices for each batch.
  */
-export const batchProgram = <A, C>(
+export const batchProgram = <A, E, C>(
   batchSize: number,
   totalCount: number,
   opName: string,
-  effectMaker: (
-    startIndex: number,
-    endIndex: number,
-  ) => Effect.Effect<A, Error, C>,
+  effectMaker: (startIndex: number, endIndex: number) => Effect.Effect<A, E, C>,
 ) => {
   const batchIndices = Array.from(
     { length: Math.ceil(totalCount / batchSize) },
