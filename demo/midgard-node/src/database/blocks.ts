@@ -134,7 +134,7 @@ export const retrieveHeaderHashByTxHash = (
       yield* Effect.logDebug(msg);
       yield* Effect.fail(new SqlError.SqlError({ cause: msg }));
     }
-    const result = rows[0].header_hash;
+    const result = rows[0][Columns.HEADER_HASH];
     yield* Effect.logDebug(
       `${tableName} db: retrieved headerHash for tx ${txHash}: ${result}`,
     );
