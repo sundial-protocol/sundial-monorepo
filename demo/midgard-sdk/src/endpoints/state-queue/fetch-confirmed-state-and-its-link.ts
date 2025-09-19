@@ -7,7 +7,12 @@ import {
   findLinkStateQueueUTxO,
 } from "../../utils/state-queue.js";
 import { StateQueue } from "../../tx-builder/index.js";
-import { AssetError, LucidError, StateQueueError, utxosAtByNFTPolicyId } from "@/utils/common.js";
+import {
+  AssetError,
+  LucidError,
+  StateQueueError,
+  utxosAtByNFTPolicyId,
+} from "@/utils/common.js";
 import { StateQueueUTxO } from "@/tx-builder/state-queue/types.js";
 
 export const fetchConfirmedStateAndItsLinkProgram = (
@@ -52,7 +57,12 @@ export const fetchConfirmedStateAndItsLinkProgram = (
         link: linkUTxO,
       };
     } else {
-      return yield* Effect.fail(new StateQueueError({message: "Confirmed state not found"}));
+      return yield* Effect.fail(
+        new StateQueueError({
+          message: "Failed to fetch confirmed state and its link",
+          cause: "Confirmed state not found",
+        }),
+      );
     }
   });
 

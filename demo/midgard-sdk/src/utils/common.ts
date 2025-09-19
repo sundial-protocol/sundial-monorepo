@@ -34,7 +34,10 @@ export const getSingleAssetApartFromAda = (
       ];
     } else {
       return yield* Effect.fail(
-        new AssetError({message: "Expected exactly 1 additional asset apart from ADA"}),
+        new AssetError({
+          message: "Failed to get single asset apart from ADA",
+          cause: "Expected exactly 1 additional asset apart from ADA",
+        }),
       );
     }
   });
@@ -54,21 +57,27 @@ export const utxosAtByNFTPolicyId = (
         });
       },
     });
-    const nftEffects: Effect.Effect<UTxO, AssetError>[] = allUTxOs.map((u: UTxO) => {
-      const nftsEffect = getSingleAssetApartFromAda(u.assets);
-      return Effect.andThen(
-        nftsEffect,
-        ([sym, _tn, qty]): Effect.Effect<UTxO, AssetError> => {
-          if (sym === policyId && qty === 1n) {
-            return Effect.succeed(u);
-          } else {
-            return Effect.fail(new AssetError({
-                message: "UTxO doesn't have the expected NFT policy ID, or its quantity is not exactly 1",
-            }));
-          }
-        },
-      );
-    });
+    const nftEffects: Effect.Effect<UTxO, AssetError>[] = allUTxOs.map(
+      (u: UTxO) => {
+        const nftsEffect = getSingleAssetApartFromAda(u.assets);
+        return Effect.andThen(
+          nftsEffect,
+          ([sym, _tn, qty]): Effect.Effect<UTxO, AssetError> => {
+            if (sym === policyId && qty === 1n) {
+              return Effect.succeed(u);
+            } else {
+              return Effect.fail(
+                new AssetError({
+                  message: "Failed to get assets from fetched UTxOs",
+                  cause:
+                    "UTxO doesn't have the expected NFT policy ID, or its quantity is not exactly 1",
+                }),
+              );
+            }
+          },
+        );
+      },
+    );
     const authenticUTxOs = yield* Effect.allSuccesses(nftEffects);
     return authenticUTxOs;
   });
@@ -78,19 +87,23 @@ const blake2bHelper = (
   dkLen: number,
   functionName: string,
 ): Effect.Effect<string, HashingError> => {
+  const errorMessage = `Failed to hash using ${functionName} function`;
   if (isHexString(hash)) {
     try {
       return Effect.succeed(toHex(blake2b(fromHex(hash), { dkLen })));
     } catch (e) {
-      return Effect.fail(new HashingError({
-        message: `Failed to hash using ${functionName} function`,
-        cause: e,
-      }));
+      return Effect.fail(
+        new HashingError({
+          message: errorMessage,
+          cause: e,
+        }),
+      );
     }
   } else {
     return Effect.fail(
       new HashingError({
-        message: `Invalid hash provided for ${functionName} function`,
+        message: errorMessage,
+        cause: `Invalid hash provided`,
       }),
     );
   }
@@ -106,7 +119,7 @@ export const hashHexWithBlake2b256 = (
 
 export type GenericErrorFields = {
   readonly message: string;
-  readonly cause?: unknown;
+  readonly cause: unknown;
 };
 
 export class HubOracleError extends Data.TaggedError(
@@ -119,7 +132,7 @@ export class StateQueueError extends Data.TaggedError(
 
 export class MptError extends Data.TaggedError("MptError")<{
   readonly message: string;
-  readonly cause?: unknown;
+  readonly cause: unknown;
 }> {
   static get(trie: string, cause?: unknown) {
     return new MptError({
@@ -152,7 +165,6 @@ export class MptError extends Data.TaggedError("MptError")<{
     });
   }
 }
-
 
 // General errors that don't have specific domains
 export class CmlUnexpectedError extends Data.TaggedError(

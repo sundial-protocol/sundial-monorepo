@@ -11,7 +11,13 @@ import { StateQueue } from "../tx-builder/index.js";
 import { getNodeDatumFromUTxO } from "./linked-list.js";
 import { MerkleRoot, POSIXTime } from "../tx-builder/common.js";
 import { Datum } from "@/tx-builder/state-queue/types.js";
-import { AssetError, GenericErrorFields, getSingleAssetApartFromAda, HashingError, LucidError, StateQueueError } from "./common.js";
+import {
+  AssetError,
+  getSingleAssetApartFromAda,
+  HashingError,
+  LucidError,
+  StateQueueError,
+} from "./common.js";
 import { getHeaderFromStateQueueDatum, hashHeader } from "./ledger-state.js";
 
 type StateQueueUTxO = StateQueue.StateQueueUTxO;
@@ -24,14 +30,15 @@ export const utxoToStateQueueUTxO = (
   nftPolicy: string,
 ): Effect.Effect<StateQueueUTxO, StateQueueError | AssetError> =>
   Effect.gen(function* () {
-    const datum = yield* getNodeDatumFromUTxO(utxo)
+    const datum = yield* getNodeDatumFromUTxO(utxo);
     const [sym, assetName, _qty] = yield* getSingleAssetApartFromAda(
       utxo.assets,
-    )
+    );
     if (sym !== nftPolicy) {
       yield* Effect.fail(
         new StateQueueError({
-          message: "UTxO's NFT policy ID is not the same as the state queue's"
+          message: "Failed to convert UTxO to state queue UTxO",
+          cause: "UTxO's NFT policy ID is not the same as the state queue's",
         }),
       );
     }
@@ -57,6 +64,7 @@ export const utxosToStateQueueUTxOs = (
 export const getConfirmedStateFromStateQueueDatum = (
   nodeDatum: Datum,
 ): Effect.Effect<{ data: ConfirmedState; link: NodeKey }, StateQueueError> => {
+  const errorMessage = `Failed to get confirmed state from state queue datum`;
   try {
     if (nodeDatum.key === "Empty") {
       const confirmedState = Data.castFrom(nodeDatum.data, ConfirmedState);
@@ -65,10 +73,20 @@ export const getConfirmedStateFromStateQueueDatum = (
         link: nodeDatum.next,
       });
     } else {
-      return Effect.fail(new StateQueueError({message: "Given UTxO is not root"}));
+      return Effect.fail(
+        new StateQueueError({
+          message: errorMessage,
+          cause: `Given UTxO is not root`,
+        }),
+      );
     }
   } catch {
-    return Effect.fail(new StateQueueError({message: "Could not coerce to a node datum"}));
+    return Effect.fail(
+      new StateQueueError({
+        message: errorMessage,
+        cause: `Could not coerce to a node datum`,
+      }),
+    );
   }
 };
 
@@ -89,11 +107,15 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
   newUTxOsRoot: MerkleRoot,
   transactionsRoot: MerkleRoot,
   endTime: POSIXTime,
-): Effect.Effect<{ nodeDatum: Datum; header: Header }, StateQueueError | LucidError | HashingError> =>
+): Effect.Effect<
+  { nodeDatum: Datum; header: Header },
+  StateQueueError | LucidError | HashingError
+> =>
   Effect.gen(function* () {
     const walletAddress = yield* Effect.tryPromise({
       try: () => lucid.wallet().address(),
-      catch: (e) => new LucidError({message: `Failed to find the wallet`, cause: e}),
+      catch: (e) =>
+        new LucidError({ message: `Failed to find the wallet`, cause: e }),
     });
 
     const pubKeyHash = paymentCredentialOf(walletAddress).hash;
@@ -121,8 +143,8 @@ export const updateLatestBlocksDatumAndGetTheNewHeader = (
       };
     } else {
       const latestHeader =
-        yield* getHeaderFromStateQueueDatum(latestBlocksDatum)
-      const prevHeaderHash = yield* hashHeader(latestHeader)
+        yield* getHeaderFromStateQueueDatum(latestBlocksDatum);
+      const prevHeaderHash = yield* hashHeader(latestHeader);
       return {
         nodeDatum: {
           ...latestBlocksDatum,
@@ -146,8 +168,14 @@ export const findLinkStateQueueUTxO = (
   link: NodeKey,
   utxos: StateQueueUTxO[],
 ): Effect.Effect<StateQueueUTxO, StateQueueError> => {
+  const errorMessage = `Failed to find link state queue UTxOs`;
   if (link === "Empty") {
-    return Effect.fail(new StateQueueError({message: 'Given link is "Empty"'}));
+    return Effect.fail(
+      new StateQueueError({
+        message: errorMessage,
+        cause: `Given link is "Empty"`,
+      }),
+    );
   } else {
     const foundLink = utxos.find(
       (u: StateQueueUTxO) =>
@@ -156,7 +184,12 @@ export const findLinkStateQueueUTxO = (
     if (foundLink) {
       return Effect.succeed(foundLink);
     } else {
-      return Effect.fail(new StateQueueError({message: 'Link not found'}));
+      return Effect.fail(
+        new StateQueueError({
+          message: errorMessage,
+          cause: `Link not found`,
+        }),
+      );
     }
   }
 };
@@ -198,9 +231,11 @@ export const sortStateQueueUTxOs = (
       return sorted;
     } else {
       yield* Effect.fail(
-        new StateQueueError({message: "Confirmed state not found among state queue UTxOs."}),
+        new StateQueueError({
+          message: `Failed to sort state queue UTxOs`,
+          cause: `Confirmed state not found among state queue UTxOs`,
+        }),
       );
       return [];
     }
   });
-

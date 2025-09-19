@@ -16,6 +16,7 @@ export const fetchLatestCommittedBlockProgram = (
   config: StateQueue.FetchConfig,
 ): Effect.Effect<StateQueueUTxO, StateQueueError | LucidError | AssetError> =>
   Effect.gen(function* () {
+    const errorMessage = `Failed to fetch latest committed block`;
     const allBlocks = yield* utxosAtByNFTPolicyId(
       lucid,
       config.stateQueueAddress,
@@ -31,18 +32,24 @@ export const fetchLatestCommittedBlockProgram = (
         return Effect.andThen(stateQueueUTxOEffect, (squ: StateQueueUTxO) =>
           squ.datum.next === "Empty"
             ? Effect.succeed(squ)
-            : Effect.fail(new StateQueueError({
-                message: "Not a tail node",
-              })),
+            : Effect.fail(
+                new StateQueueError({
+                  message: errorMessage,
+                  cause: "Not a tail node",
+                }),
+              ),
         );
       }),
     );
     if (filtered.length === 1) {
       return filtered[0];
     } else {
-      return yield* Effect.fail(new StateQueueError({
-        message: "Latest block not found"
-      }));
+      return yield* Effect.fail(
+        new StateQueueError({
+          message: errorMessage,
+          cause: "Latest block not found",
+        }),
+      );
     }
   });
 

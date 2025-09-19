@@ -27,6 +27,7 @@ export const fetchHubOracleUTxOProgram = (
   HubOracleError | LucidError
 > =>
   Effect.gen(function* () {
+    const errorMessage = "Failed to fetch the hub oracle UTxO"
     const hubOracleUTxOs = yield* Effect.tryPromise({
       try: async () => {
         return await lucid.utxosAtWithUnit(
@@ -36,7 +37,7 @@ export const fetchHubOracleUTxOProgram = (
       },
       catch: (e) =>
         new LucidError({
-          message: "Failed to fetch the hub oracle UTxO",
+          message: errorMessage,
           cause: e,
         }),
     });
@@ -49,14 +50,15 @@ export const fetchHubOracleUTxOProgram = (
             return coerced;
           } else {
             throw new HubOracleError({
-              message: "Hub oracle UTxO datum is missing",
+              message: errorMessage,
+              cause: "Hub oracle UTxO datum is missing",
             });
           }
         },
         catch: (e) => {
           return new HubOracleError({
-            message: "Failed to parse the hub oracle datum",
-            cause: e,
+            message: errorMessage,
+            cause: `Failed to parse the hub oracle datum: ${e}`,
           });
         },
       });
@@ -64,7 +66,8 @@ export const fetchHubOracleUTxOProgram = (
     } else {
       return yield* Effect.fail(
         new HubOracleError({
-          message:
+          message: errorMessage,
+          cause:
             "Exactly one hub oracle UTxO was expected, but none or more were found",
         }),
       );
