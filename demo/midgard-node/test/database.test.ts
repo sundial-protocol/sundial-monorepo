@@ -55,7 +55,7 @@ const flushAll = Effect.gen(function* () {
 });
 
 const randomBytes = (n: number) =>
-  Buffer.from(Array.from({ length: n }, () => Math.floor(Math.random() * 256)));
+  Buffer.from(Array.from({ length: n }, () => Math.floor(Math.random() * 255)));
 
 beforeAll(async () => {
   await Effect.runPromise(
