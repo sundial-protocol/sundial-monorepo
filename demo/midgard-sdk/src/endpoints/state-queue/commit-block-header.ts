@@ -23,10 +23,11 @@ export const commitBlockHeaderProgram = (
           //   ActiveOperators.updateCommitmentTimeTxBuilder(lucid, aoUpdateParams)
           // )
           .complete({ localUPLCEval: false }),
-      catch: (e) => new StateQueueError({
-        message: "Failed to build commit block header transaction",
-        cause: e,
-      })
+      catch: (e) =>
+        new StateQueueError({
+          message: "Failed to build commit block header transaction",
+          cause: e,
+        }),
     });
     return completedTx;
   });

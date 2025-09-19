@@ -34,7 +34,7 @@ export const commitTxBuilder = (
   }: CommitBlockParams,
 ): Effect.Effect<TxBuilder, StateQueueError | HashingError> =>
   Effect.gen(function* () {
-    const newHeaderHash = yield* hashHeader(newHeader)
+    const newHeaderHash = yield* hashHeader(newHeader);
     // const endTime = newHeader.endTime;
 
     const assets: Assets = {

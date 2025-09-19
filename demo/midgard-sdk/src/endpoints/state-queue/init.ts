@@ -13,10 +13,11 @@ export const initTxProgram = (
     const completedTx = yield* initTxBuilder(lucid, initParams);
     return yield* Effect.tryPromise({
       try: () => completedTx.complete(),
-      catch: (e) => new StateQueueError({
-        message: `Failed to build state queue initialization transaction`,
-        cause: e,
-      }),
+      catch: (e) =>
+        new StateQueueError({
+          message: `Failed to build state queue initialization transaction`,
+          cause: e,
+        }),
     });
   });
 

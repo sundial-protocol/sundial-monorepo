@@ -17,10 +17,11 @@ export const mergeToConfirmedStateProgram = (
     );
     return yield* Effect.tryPromise({
       try: () => completedTx.complete(),
-      catch: (e) => new StateQueueError({
-        message: `Failed to merge to confirmed state`,
-        cause: e,
-      }),
+      catch: (e) =>
+        new StateQueueError({
+          message: `Failed to merge to confirmed state`,
+          cause: e,
+        }),
     });
   });
 
