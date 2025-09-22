@@ -56,11 +56,15 @@ program.version(VERSION).description(
 program.command("listen").action(async () => {
   const program: Effect.Effect<
     void,
-    DBCreateError | DBOtherError | SqlError.SqlError | ConfigError.ConfigError,
+    | DBCreateError
+    | DBOtherError
+    | SqlError.SqlError
+    | ConfigError.ConfigError
+    | Services.ConfigError,
     never
   > = pipe(
     runNode,
-    Effect.provide(Services.User.layer),
+    Effect.provide(Services.Lucid.Default),
     Effect.provide(Services.AlwaysSucceedsContract.Default),
     Effect.provide(Services.NodeConfig.layer),
     Effect.provide(Services.Globals.Default),

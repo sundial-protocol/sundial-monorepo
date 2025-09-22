@@ -9,7 +9,7 @@ import {
 import {
   Database,
   NodeConfig,
-  User,
+  Lucid,
   AlwaysSucceedsContract,
 } from "@/services/index.js";
 import {
@@ -40,11 +40,11 @@ const wrapper = (
 ): Effect.Effect<
   WorkerOutput,
   WorkerError,
-  AlwaysSucceedsContract | NodeConfig | User | Database
+  AlwaysSucceedsContract | NodeConfig | Lucid | Database
 > =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
-    const { user: lucid } = yield* User;
+    const lucid = yield* Lucid;
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
 
@@ -283,7 +283,7 @@ const program = pipe(
   wrapper(inputData),
   Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(Database.layer),
-  Effect.provide(User.layer),
+  Effect.provide(Lucid.Default),
   Effect.provide(NodeConfig.layer),
 );
 

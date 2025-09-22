@@ -10,7 +10,7 @@ import {
   AlwaysSucceedsContract,
   Globals,
   NodeConfig,
-  User,
+  Lucid,
 } from "@/services/index.js";
 import { Effect, Ref } from "effect";
 import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
@@ -64,7 +64,7 @@ const collectAndBurnStateQueueNodesProgram = (
 
 export const resetStateQueue = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
-  const { user: lucid } = yield* User;
+  const lucid = yield* Lucid;
   const alwaysSucceeds = yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,

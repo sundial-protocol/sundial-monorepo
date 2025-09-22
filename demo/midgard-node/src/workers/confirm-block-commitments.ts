@@ -4,7 +4,7 @@ import {
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Cause, Effect, Schedule, pipe } from "effect";
-import { AlwaysSucceedsContract, NodeConfig, User } from "@/services/index.js";
+import { AlwaysSucceedsContract, NodeConfig, Lucid } from "@/services/index.js";
 import {
   WorkerInput,
   WorkerOutput,
@@ -36,9 +36,9 @@ const fetchLatestBlock = (
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, Error, AlwaysSucceedsContract | User> =>
+): Effect.Effect<WorkerOutput, Error, AlwaysSucceedsContract | Lucid> =>
   Effect.gen(function* () {
-    const { user: lucid } = yield* User;
+    const lucid = yield* Lucid;
     if (workerInput.data.firstRun) {
       yield* Effect.logInfo("🔍 First run. Fetching the latest block...");
       const latestBlock = yield* fetchLatestBlock(lucid);
@@ -92,7 +92,7 @@ const wrapper = (
 const program = pipe(
   wrapper(inputData),
   Effect.provide(AlwaysSucceedsContract.Default),
-  Effect.provide(User.layer),
+  Effect.provide(Lucid.Default),
   Effect.provide(NodeConfig.layer),
 );
 

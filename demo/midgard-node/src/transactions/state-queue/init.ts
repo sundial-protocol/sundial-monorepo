@@ -1,11 +1,11 @@
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
-import { AlwaysSucceedsContract, NodeConfig, User } from "@/services/index.js";
+import { AlwaysSucceedsContract, NodeConfig, Lucid } from "@/services/index.js";
 import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
 
 export const stateQueueInit = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
-  const { user: lucid } = yield* User;
+  const lucid = yield* Lucid;
   const { spendScriptAddress, mintScript, policyId } =
     yield* AlwaysSucceedsContract;
   const initParams: SDK.TxBuilder.StateQueue.InitParams = {

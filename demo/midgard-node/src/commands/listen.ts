@@ -1,7 +1,7 @@
 import {
   Database,
   NodeConfig,
-  User,
+  Lucid,
   AlwaysSucceedsContract,
   Globals,
 } from "@/services/index.js";
@@ -286,7 +286,7 @@ const getResetHandler = Effect.gen(function* () {
 
 const getLogStateQueueHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Drawing state queue UTxOs...`);
-  const { user: lucid } = yield* User;
+  const lucid = yield* Lucid;
   const alwaysSucceeds = yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
@@ -432,7 +432,7 @@ const router = (
   HttpServerResponse.HttpServerResponse,
   HttpBodyError,
   | Database
-  | User
+  | Lucid
   | NodeConfig
   | AlwaysSucceedsContract
   | HttpServerRequest.HttpServerRequest
@@ -571,7 +571,7 @@ const blockConfirmationAction = Effect.gen(function* () {
 
 const mergeAction = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
-  const { user: lucid } = yield* User;
+  const lucid = yield* Lucid;
   const { spendScriptAddress, policyId, spendScript, mintScript } =
     yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
@@ -737,7 +737,7 @@ export const runNode = Effect.gen(function* () {
   ).pipe(
     Effect.provide(Database.layer),
     Effect.provide(AlwaysSucceedsContract.Default),
-    Effect.provide(User.layer),
+    Effect.provide(Lucid.Default),
     Effect.provide(NodeConfig.layer),
     Effect.provide(Globals.Default),
   );
