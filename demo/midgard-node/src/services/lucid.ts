@@ -48,7 +48,6 @@ const makeLucid: Effect.Effect<
     ),
   };
 });
-makeLucid;
 
 export class Lucid extends Effect.Service<Lucid>()("Lucid", {
   effect: makeLucid,
