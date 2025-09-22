@@ -4,12 +4,21 @@ import {
   applyDoubleCborEncoding,
   MintingPolicy,
   mintingPolicyToId,
+  Script,
   SpendingValidator,
   validatorToAddress,
 } from "@lucid-evolution/lucid";
 import { NodeConfig, NodeConfigDep } from "@/config.js";
 
-export const makeAlwaysSucceedsServiceFn = (nodeConfig: NodeConfigDep) =>
+export const makeAlwaysSucceedsServiceFn = (
+  nodeConfig: NodeConfigDep,
+): Effect.Effect<{
+  spendingCBOR: string;
+  spendScript: Script;
+  spendScriptAddress: string;
+  mintScript: Script;
+  policyId: string;
+}> =>
   Effect.gen(function* () {
     const spendingCBOR = yield* pipe(
       Effect.fromNullable(

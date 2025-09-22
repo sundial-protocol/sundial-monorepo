@@ -7,9 +7,9 @@ import packageJson from "../package.json" with { type: "json" };
 import { Effect, pipe } from "effect";
 import { NodeConfig, User } from "./config.js";
 import dotenv from "dotenv";
-import { AlwaysSucceeds } from "./services/index.js";
+import { AlwaysSucceedsContract } from "./services/always-succeeds.js";
 import { NodeRuntime } from "@effect/platform-node";
-import { Globals } from "./globals.js";
+import { Globals } from "./services/globals.js";
 
 dotenv.config();
 const VERSION = packageJson.version;
@@ -57,7 +57,7 @@ program.command("listen").action(async () => {
   const program = pipe(
     runNode,
     Effect.provide(User.layer),
-    Effect.provide(AlwaysSucceeds.AlwaysSucceedsContract.layer),
+    Effect.provide(AlwaysSucceedsContract.layer),
     Effect.provide(NodeConfig.layer),
     Effect.provide(Globals.Default),
   );

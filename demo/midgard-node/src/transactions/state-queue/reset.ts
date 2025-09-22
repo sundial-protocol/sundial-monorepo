@@ -6,11 +6,11 @@ import {
   Script,
   toUnit,
 } from "@lucid-evolution/lucid";
-import { AlwaysSucceeds } from "@/services/index.js";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { NodeConfig, User } from "@/config.js";
 import { Effect, Ref } from "effect";
 import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
-import { Globals } from "@/globals.js";
+import { Globals } from "@/services/globals.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
@@ -62,7 +62,7 @@ const collectAndBurnStateQueueNodesProgram = (
 export const resetStateQueue = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
   const { user: lucid } = yield* User;
-  const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
+  const alwaysSucceeds = yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,

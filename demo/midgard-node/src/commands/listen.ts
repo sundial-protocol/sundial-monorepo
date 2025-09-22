@@ -1,6 +1,6 @@
 import { NodeConfig, User } from "@/config.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
-import { AlwaysSucceeds } from "@/services/index.js";
+import { Globals } from "@/services/globals.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
@@ -55,7 +55,6 @@ import {
   WorkerOutput as BlockConfirmationWorkerOutput,
 } from "@/workers/utils/confirm-block-commitments.js";
 import { WorkerError } from "@/workers/utils/common.js";
-import { Globals } from "@/globals.js";
 import { SerializedStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
 
 const txCounter = Metric.counter("tx_count", {
@@ -285,7 +284,7 @@ const getResetHandler = Effect.gen(function* () {
 const getLogStateQueueHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✍  Drawing state queue UTxOs...`);
   const { user: lucid } = yield* User;
-  const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
+  const alwaysSucceeds = yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
@@ -571,7 +570,7 @@ const mergeAction = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
   const { user: lucid } = yield* User;
   const { spendScriptAddress, policyId, spendScript, mintScript } =
-    yield* AlwaysSucceeds.AlwaysSucceedsContract;
+    yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueueAddress: spendScriptAddress,
     stateQueuePolicyId: policyId,

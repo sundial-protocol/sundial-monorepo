@@ -5,7 +5,7 @@ import {
 import { Effect, Metric, Ref } from "effect";
 import { Worker } from "worker_threads";
 import { WorkerError } from "@/workers/utils/common.js";
-import { Globals } from "@/globals.js";
+import { Globals } from "@/services/globals.js";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
