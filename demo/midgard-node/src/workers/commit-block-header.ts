@@ -10,7 +10,7 @@ import {
   Database,
   NodeConfig,
   User,
-  makeAlwaysSucceedsServiceFn,
+  AlwaysSucceedsContract,
 } from "@/services/index.js";
 import {
   BlocksDB,
@@ -37,7 +37,11 @@ const BATCH_SIZE = 100;
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, WorkerError, NodeConfig | User | Database> =>
+): Effect.Effect<
+  WorkerOutput,
+  WorkerError,
+  AlwaysSucceedsContract | NodeConfig | User | Database
+> =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
@@ -78,7 +82,7 @@ const wrapper = (
           yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
 
         const { policyId, spendScript, spendScriptAddress, mintScript } =
-          yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+          yield* AlwaysSucceedsContract;
 
         const skippedSubmissionProgram = batchProgram(
           BATCH_SIZE,
@@ -277,6 +281,7 @@ const inputData = workerData as WorkerInput;
 
 const program = pipe(
   wrapper(inputData),
+  Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(Database.layer),
   Effect.provide(User.layer),
   Effect.provide(NodeConfig.layer),

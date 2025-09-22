@@ -61,7 +61,7 @@ program.command("listen").action(async () => {
   > = pipe(
     runNode,
     Effect.provide(Services.User.layer),
-    Effect.provide(Services.AlwaysSucceedsContract.layer),
+    Effect.provide(Services.AlwaysSucceedsContract.Default),
     Effect.provide(Services.NodeConfig.layer),
     Effect.provide(Services.Globals.Default),
   );

@@ -4,12 +4,7 @@ import {
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Cause, Effect, Schedule, pipe } from "effect";
-import {
-  makeAlwaysSucceedsServiceFn,
-  NodeConfig,
-  NodeConfigDep,
-  User,
-} from "@/services/index.js";
+import { AlwaysSucceedsContract, NodeConfig, User } from "@/services/index.js";
 import {
   WorkerInput,
   WorkerOutput,
@@ -21,12 +16,14 @@ import { TxConfirmError } from "@/transactions/utils.js";
 const inputData = workerData as WorkerInput;
 
 const fetchLatestBlock = (
-  nodeConfig: NodeConfigDep,
   lucid: LucidEvolution,
-): Effect.Effect<SDK.TxBuilder.StateQueue.StateQueueUTxO, Error> =>
+): Effect.Effect<
+  SDK.TxBuilder.StateQueue.StateQueueUTxO,
+  Error,
+  AlwaysSucceedsContract
+> =>
   Effect.gen(function* () {
-    const { policyId, spendScriptAddress } =
-      yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+    const { policyId, spendScriptAddress } = yield* AlwaysSucceedsContract;
     const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
       stateQueueAddress: spendScriptAddress,
       stateQueuePolicyId: policyId,
@@ -39,13 +36,12 @@ const fetchLatestBlock = (
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, Error, NodeConfig | User> =>
+): Effect.Effect<WorkerOutput, Error, AlwaysSucceedsContract | User> =>
   Effect.gen(function* () {
-    const nodeConfig = yield* NodeConfig;
     const { user: lucid } = yield* User;
     if (workerInput.data.firstRun) {
       yield* Effect.logInfo("🔍 First run. Fetching the latest block...");
-      const latestBlock = yield* fetchLatestBlock(nodeConfig, lucid);
+      const latestBlock = yield* fetchLatestBlock(lucid);
       const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
       return {
         type: "SuccessfulConfirmationOutput",
@@ -71,7 +67,7 @@ const wrapper = (
         Schedule.recurs(4),
       );
       yield* Effect.logInfo("🔍 Tx confirmed. Fetching the block...");
-      const latestBlock = yield* fetchLatestBlock(nodeConfig, lucid);
+      const latestBlock = yield* fetchLatestBlock(lucid);
       if (latestBlock.utxo.txHash == targetTxHash) {
         yield* Effect.logInfo("🔍 Serializing state queue UTxO...");
         const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
@@ -95,6 +91,7 @@ const wrapper = (
 
 const program = pipe(
   wrapper(inputData),
+  Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(User.layer),
   Effect.provide(NodeConfig.layer),
 );

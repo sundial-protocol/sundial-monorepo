@@ -736,7 +736,7 @@ export const runNode = Effect.gen(function* () {
     },
   ).pipe(
     Effect.provide(Database.layer),
-    Effect.provide(AlwaysSucceedsContract.layer),
+    Effect.provide(AlwaysSucceedsContract.Default),
     Effect.provide(User.layer),
     Effect.provide(NodeConfig.layer),
     Effect.provide(Globals.Default),
