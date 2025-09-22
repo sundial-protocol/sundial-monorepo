@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { ENV_VARS_GUIDE, chalk } from "./utils.js";
-import { runNode } from "./commands/index.js";
+import { ENV_VARS_GUIDE, chalk } from "@/utils.js";
+import { runNode } from "@/commands/index.js";
+import * as Services from "@/services/index.js";
 import packageJson from "../package.json" with { type: "json" };
-import { Effect, pipe } from "effect";
-import { NodeConfig, User } from "./config.js";
+import { ConfigError, Effect, pipe } from "effect";
 import dotenv from "dotenv";
-import { AlwaysSucceedsContract } from "./services/always-succeeds.js";
 import { NodeRuntime } from "@effect/platform-node";
-import { Globals } from "./services/globals.js";
+import { DBCreateError, DBOtherError } from "@/database/utils/common.js";
+import { SqlError } from "@effect/sql";
 
 dotenv.config();
 const VERSION = packageJson.version;
@@ -54,15 +54,19 @@ program.version(VERSION).description(
 );
 
 program.command("listen").action(async () => {
-  const program = pipe(
+  const program: Effect.Effect<
+    void,
+    DBCreateError | DBOtherError | SqlError.SqlError | ConfigError.ConfigError,
+    never
+  > = pipe(
     runNode,
-    Effect.provide(User.layer),
-    Effect.provide(AlwaysSucceedsContract.layer),
-    Effect.provide(NodeConfig.layer),
-    Effect.provide(Globals.Default),
+    Effect.provide(Services.User.layer),
+    Effect.provide(Services.AlwaysSucceedsContract.layer),
+    Effect.provide(Services.NodeConfig.layer),
+    Effect.provide(Services.Globals.Default),
   );
 
-  NodeRuntime.runMain(program);
+  NodeRuntime.runMain(program, { teardown: undefined });
 });
 
 program.parse(process.argv);

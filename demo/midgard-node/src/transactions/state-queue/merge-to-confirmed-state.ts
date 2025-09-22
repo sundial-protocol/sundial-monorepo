@@ -24,8 +24,7 @@ import {
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
 import { breakDownTx, LucidError } from "@/utils.js";
-import { Globals } from "@/services/globals.js";
-import { Database } from "@/services/database.js";
+import { Database, Globals } from "@/services/index.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",

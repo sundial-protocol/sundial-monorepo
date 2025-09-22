@@ -4,13 +4,17 @@ import {
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Cause, Effect, Schedule, pipe } from "effect";
-import { NodeConfig, NodeConfigDep, User } from "@/config.js";
+import {
+  makeAlwaysSucceedsServiceFn,
+  NodeConfig,
+  NodeConfigDep,
+  User,
+} from "@/services/index.js";
 import {
   WorkerInput,
   WorkerOutput,
 } from "@/workers/utils/confirm-block-commitments.js";
 import { serializeStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
-import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { LucidEvolution } from "@lucid-evolution/lucid";
 import { TxConfirmError } from "@/transactions/utils.js";
 

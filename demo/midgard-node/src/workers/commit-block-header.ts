@@ -6,7 +6,12 @@ import {
   WorkerOutput,
   deserializeStateQueueUTxO,
 } from "@/workers/utils/commit-block-header.js";
-import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
+import {
+  Database,
+  NodeConfig,
+  User,
+  makeAlwaysSucceedsServiceFn,
+} from "@/services/index.js";
 import {
   BlocksDB,
   ImmutableDB,
@@ -24,8 +29,6 @@ import {
   processMpts,
   withTrieTransaction,
 } from "@/workers/utils/mpt.js";
-import { NodeConfig, User } from "@/config.js";
-import { Database } from "@/services/database.js";
 import { batchProgram } from "@/utils.js";
 import { Columns as TxColumns } from "@/database/utils/tx.js";
 import { WorkerError } from "./utils/common.js";

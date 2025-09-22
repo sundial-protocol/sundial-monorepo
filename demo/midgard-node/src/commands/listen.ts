@@ -1,6 +1,10 @@
-import { NodeConfig, User } from "@/config.js";
-import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
-import { Globals } from "@/services/globals.js";
+import {
+  Database,
+  NodeConfig,
+  User,
+  AlwaysSucceedsContract,
+  Globals,
+} from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
@@ -36,7 +40,6 @@ import {
   bufferToHex,
   isHexString,
 } from "../utils.js";
-import { Database } from "@/services/database.js";
 import {
   HttpRouter,
   HttpServer,

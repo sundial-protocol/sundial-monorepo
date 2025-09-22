@@ -8,7 +8,7 @@ import {
   SpendingValidator,
   validatorToAddress,
 } from "@lucid-evolution/lucid";
-import { NodeConfig, NodeConfigDep } from "@/config.js";
+import { NodeConfig, NodeConfigDep } from "@/services/config.js";
 
 export const makeAlwaysSucceedsServiceFn = (
   nodeConfig: NodeConfigDep,

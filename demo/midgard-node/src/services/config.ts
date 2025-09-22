@@ -7,7 +7,7 @@ import {
   walletFromSeed,
 } from "@lucid-evolution/lucid";
 import { Config, Context, Data, Effect, Layer } from "effect";
-import { GenericErrorFields } from "./utils.js";
+import { GenericErrorFields } from "@/utils.js";
 
 type Provider = "Kupmios" | "Blockfrost";
 

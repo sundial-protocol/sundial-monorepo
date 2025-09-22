@@ -6,11 +6,14 @@ import {
   Script,
   toUnit,
 } from "@lucid-evolution/lucid";
-import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
-import { NodeConfig, User } from "@/config.js";
+import {
+  AlwaysSucceedsContract,
+  Globals,
+  NodeConfig,
+  User,
+} from "@/services/index.js";
 import { Effect, Ref } from "effect";
 import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
-import { Globals } from "@/services/globals.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
