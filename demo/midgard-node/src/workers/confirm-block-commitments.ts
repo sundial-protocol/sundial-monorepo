@@ -4,7 +4,7 @@ import {
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Cause, Effect, Schedule, pipe } from "effect";
-import { AlwaysSucceedsContract, NodeConfig, Lucid } from "@/services/index.js";
+import { AlwaysSucceedsContract, Lucid } from "@/services/index.js";
 import {
   WorkerInput,
   WorkerOutput,
@@ -41,7 +41,7 @@ const wrapper = (
     const lucid = yield* Lucid;
     if (workerInput.data.firstRun) {
       yield* Effect.logInfo("🔍 First run. Fetching the latest block...");
-      const latestBlock = yield* fetchLatestBlock(lucid);
+      const latestBlock = yield* fetchLatestBlock(lucid.api);
       const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
       return {
         type: "SuccessfulConfirmationOutput",
@@ -56,7 +56,7 @@ const wrapper = (
       yield* Effect.logInfo(`🔍 Confirming tx: ${targetTxHash}`);
       yield* Effect.retry(
         Effect.tryPromise({
-          try: () => lucid.awaitTx(targetTxHash),
+          try: () => lucid.api.awaitTx(targetTxHash),
           catch: (e) =>
             new TxConfirmError({
               message: `Failed to confirm transaction`,
@@ -67,7 +67,7 @@ const wrapper = (
         Schedule.recurs(4),
       );
       yield* Effect.logInfo("🔍 Tx confirmed. Fetching the block...");
-      const latestBlock = yield* fetchLatestBlock(lucid);
+      const latestBlock = yield* fetchLatestBlock(lucid.api);
       if (latestBlock.utxo.txHash == targetTxHash) {
         yield* Effect.logInfo("🔍 Serializing state queue UTxO...");
         const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
@@ -93,7 +93,6 @@ const program = pipe(
   wrapper(inputData),
   Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(Lucid.Default),
-  Effect.provide(NodeConfig.layer),
 );
 
 Effect.runPromise(

@@ -1,8 +1,16 @@
-import { Context, Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { ConfigError, NodeConfig } from "./config.js";
 import * as LE from "@lucid-evolution/lucid";
 
-export const makeLucid = Effect.gen(function* () {
+const makeLucid: Effect.Effect<
+  {
+    api: LE.LucidEvolution;
+    switchToOperatorsMainWallet: Effect.Effect<void>;
+    switchToOperatorsMergingWallet: Effect.Effect<void>;
+  },
+  ConfigError,
+  NodeConfig
+> = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
   const lucid = yield* Effect.tryPromise({
     try: () => {
@@ -28,9 +36,21 @@ export const makeLucid = Effect.gen(function* () {
         cause: e,
       }),
   });
-  return lucid;
+  return {
+    api: lucid,
+    switchToOperatorsMainWallet: Effect.sync(() =>
+      lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE),
+    ),
+    switchToOperatorsMergingWallet: Effect.sync(() =>
+      lucid.selectWallet.fromSeed(
+        nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX,
+      ),
+    ),
+  };
 });
+makeLucid;
 
 export class Lucid extends Effect.Service<Lucid>()("Lucid", {
   effect: makeLucid,
+  dependencies: [NodeConfig.layer],
 }) {}

@@ -1,13 +1,17 @@
-import { Duration, Effect, Layer, Redacted } from "effect";
+import { Data, Duration, Effect, Layer, Redacted } from "effect";
 import { PgClient } from "@effect/sql-pg";
-import { SqlClient, SqlError } from "@effect/sql";
-import { NodeConfig } from "@/services/config.js";
-import { ConfigError } from "effect/ConfigError";
+import { SqlClient } from "@effect/sql";
+import { ConfigError, NodeConfig } from "@/services/config.js";
+import { GenericErrorFields } from "@/utils.js";
 
-export const createPgLayerEffect = Effect.gen(function* () {
+export class DatabaseInitializationError extends Data.TaggedError(
+  "DatabaseInitializationError",
+)<GenericErrorFields> {}
+
+const createPgLayerEffect = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
   yield* Effect.logInfo("📚 Opening connection to db...");
-  return PgClient.layer({
+  const pgClientLayer = PgClient.layer({
     host: nodeConfig.POSTGRES_HOST,
     username: nodeConfig.POSTGRES_USER,
     password: Redacted.make(nodeConfig.POSTGRES_PASSWORD),
@@ -16,16 +20,30 @@ export const createPgLayerEffect = Effect.gen(function* () {
     idleTimeout: Duration.minutes(5),
     connectTimeout: Duration.seconds(2),
   });
+  return Layer.mapError(pgClientLayer, (e) => {
+    switch (e._tag) {
+      case "ConfigError":
+        return new ConfigError({
+          message: "Improper config file provided",
+          cause: e,
+        });
+      case "SqlError":
+        return new DatabaseInitializationError({
+          message: "Failed to initialize the database",
+          cause: e,
+        });
+    }
+  });
 }).pipe(Effect.orDie);
 
 const SqlClientLive: Layer.Layer<
   SqlClient.SqlClient,
-  SqlError.SqlError | ConfigError,
+  DatabaseInitializationError | ConfigError,
   NodeConfig
 > = Layer.unwrapEffect(createPgLayerEffect);
 
 export const Database = {
-  layer: SqlClientLive,
+  layer: Layer.provide(SqlClientLive, NodeConfig.layer),
 };
 
 export type Database = SqlClient.SqlClient;

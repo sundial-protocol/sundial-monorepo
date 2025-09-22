@@ -570,7 +570,6 @@ const blockConfirmationAction = Effect.gen(function* () {
 });
 
 const mergeAction = Effect.gen(function* () {
-  const nodeConfig = yield* NodeConfig;
   const lucid = yield* Lucid;
   const { spendScriptAddress, policyId, spendScript, mintScript } =
     yield* AlwaysSucceedsContract;
@@ -578,9 +577,9 @@ const mergeAction = Effect.gen(function* () {
     stateQueueAddress: spendScriptAddress,
     stateQueuePolicyId: policyId,
   };
-  lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX);
+  yield* lucid.switchToOperatorsMergingWallet;
   yield* StateQueueTx.buildAndSubmitMergeTx(
-    lucid,
+    lucid.api,
     fetchConfig,
     spendScript,
     mintScript,

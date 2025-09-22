@@ -64,5 +64,6 @@ export class AlwaysSucceedsContract extends Effect.Service<AlwaysSucceedsContrac
   "AlwaysSucceedsContract",
   {
     effect: makeAlwaysSucceedsService,
+    dependencies: [NodeConfig.layer],
   },
 ) {}

@@ -40,10 +40,9 @@ const wrapper = (
 ): Effect.Effect<
   WorkerOutput,
   WorkerError,
-  AlwaysSucceedsContract | NodeConfig | Lucid | Database
+  AlwaysSucceedsContract | Lucid | Database
 > =>
   Effect.gen(function* () {
-    const nodeConfig = yield* NodeConfig;
     const lucid = yield* Lucid;
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
@@ -134,7 +133,7 @@ const wrapper = (
           );
           const { nodeDatum: updatedNodeDatum, header: newHeader } =
             yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
-              lucid,
+              lucid.api,
               latestBlock.datum,
               utxoRoot,
               txRoot,
@@ -162,9 +161,9 @@ const wrapper = (
             stateQueueAddress: spendScriptAddress,
             stateQueuePolicyId: policyId,
           };
-          lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
+          yield* lucid.switchToOperatorsMainWallet;
           const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
-            lucid,
+            lucid.api,
             fetchConfig,
             commitBlockParams,
             aoUpdateCommitmentTimeParams,
@@ -194,7 +193,7 @@ const wrapper = (
             });
 
           const txHash = yield* handleSignSubmitNoConfirmation(
-            lucid,
+            lucid.api,
             txBuilder,
             onSubmitFailure,
           ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
@@ -284,7 +283,6 @@ const program = pipe(
   Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(Database.layer),
   Effect.provide(Lucid.Default),
-  Effect.provide(NodeConfig.layer),
 );
 
 Effect.runPromise(

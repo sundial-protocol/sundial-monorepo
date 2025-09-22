@@ -59,16 +59,10 @@ program.command("listen").action(async () => {
     | DBCreateError
     | DBOtherError
     | SqlError.SqlError
-    | ConfigError.ConfigError
-    | Services.ConfigError,
+    | Services.ConfigError
+    | Services.DatabaseInitializationError,
     never
-  > = pipe(
-    runNode,
-    Effect.provide(Services.Lucid.Default),
-    Effect.provide(Services.AlwaysSucceedsContract.Default),
-    Effect.provide(Services.NodeConfig.layer),
-    Effect.provide(Services.Globals.Default),
-  );
+  > = pipe(runNode, Effect.provide(Services.NodeConfig.layer));
 
   NodeRuntime.runMain(program, { teardown: undefined });
 });
