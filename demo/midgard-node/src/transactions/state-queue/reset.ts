@@ -6,12 +6,7 @@ import {
   Script,
   toUnit,
 } from "@lucid-evolution/lucid";
-import {
-  AlwaysSucceedsContract,
-  Globals,
-  NodeConfig,
-  Lucid,
-} from "@/services/index.js";
+import { AlwaysSucceedsContract, Globals, Lucid } from "@/services/index.js";
 import { Effect, Ref } from "effect";
 import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
 
@@ -62,8 +57,11 @@ const collectAndBurnStateQueueNodesProgram = (
     return txHash;
   });
 
-export const resetStateQueue = Effect.gen(function* () {
-  const nodeConfig = yield* NodeConfig;
+export const resetStateQueue: Effect.Effect<
+  void,
+  Error,
+  AlwaysSucceedsContract | Lucid | Globals
+> = Effect.gen(function* () {
   const lucid = yield* Lucid;
   const alwaysSucceeds = yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
@@ -73,18 +71,18 @@ export const resetStateQueue = Effect.gen(function* () {
 
   const allStateQueueUTxOs =
     yield* SDK.Endpoints.fetchUnsortedStateQueueUTxOsProgram(
-      lucid,
+      lucid.api,
       fetchConfig,
     );
 
-  lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
+  yield* lucid.switchToOperatorsMainWallet;
 
   // Collect and burn 10 UTxOs and asset names at a time:
   const batchSize = 40;
   for (let i = 0; i < allStateQueueUTxOs.length; i += batchSize) {
     const batch = allStateQueueUTxOs.slice(i, i + batchSize);
     yield* collectAndBurnStateQueueNodesProgram(
-      lucid,
+      lucid.api,
       fetchConfig,
       alwaysSucceeds.spendScript,
       alwaysSucceeds.mintScript,
