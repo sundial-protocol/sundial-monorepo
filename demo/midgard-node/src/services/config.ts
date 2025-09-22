@@ -1,17 +1,10 @@
-import {
-  Blockfrost,
-  Kupmios,
-  Lucid,
-  Network,
-  UTxO,
-  walletFromSeed,
-} from "@lucid-evolution/lucid";
+import { Network, UTxO, walletFromSeed } from "@lucid-evolution/lucid";
 import { Config, Context, Data, Effect, Layer } from "effect";
 import { GenericErrorFields } from "@/utils.js";
 
 type Provider = "Kupmios" | "Blockfrost";
 
-export type NodeConfigDep = {
+type NodeConfigDep = {
   L1_PROVIDER: Provider;
   L1_BLOCKFROST_API_URL: string;
   L1_BLOCKFROST_KEY: string;
