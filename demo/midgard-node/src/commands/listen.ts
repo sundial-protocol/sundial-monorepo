@@ -293,7 +293,7 @@ const getLogStateQueueHandler = Effect.gen(function* () {
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
   const sortedUTxOs = yield* SDK.Endpoints.fetchSortedStateQueueUTxOsProgram(
-    lucid,
+    lucid.api,
     fetchConfig,
   );
   let drawn = `
