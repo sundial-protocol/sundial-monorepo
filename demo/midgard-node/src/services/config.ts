@@ -28,7 +28,7 @@ type NodeConfigDep = {
   GENESIS_UTXOS: UTxO[];
 };
 
-export const makeConfig = Effect.gen(function* () {
+const makeConfig = Effect.gen(function* () {
   const config = yield* Config.all([
     Config.literal("Kupmios", "Blockfrost")("L1_PROVIDER"),
     Config.string("L1_BLOCKFROST_API_URL"),

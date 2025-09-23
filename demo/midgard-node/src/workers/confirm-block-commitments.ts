@@ -4,7 +4,7 @@ import {
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Cause, Effect, Schedule, pipe } from "effect";
-import { AlwaysSucceedsContract, Lucid } from "@/services/index.js";
+import { AlwaysSucceedsContract, Lucid, NodeConfig } from "@/services/index.js";
 import {
   WorkerInput,
   WorkerOutput,
@@ -20,7 +20,7 @@ const fetchLatestBlock = (
 ): Effect.Effect<
   SDK.TxBuilder.StateQueue.StateQueueUTxO,
   Error,
-  AlwaysSucceedsContract
+  AlwaysSucceedsContract | NodeConfig
 > =>
   Effect.gen(function* () {
     const { policyId, spendScriptAddress } = yield* AlwaysSucceedsContract;
@@ -36,7 +36,11 @@ const fetchLatestBlock = (
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, Error, AlwaysSucceedsContract | Lucid> =>
+): Effect.Effect<
+  WorkerOutput,
+  Error,
+  AlwaysSucceedsContract | Lucid | NodeConfig
+> =>
   Effect.gen(function* () {
     const lucid = yield* Lucid;
     if (workerInput.data.firstRun) {
@@ -93,6 +97,7 @@ const program = pipe(
   wrapper(inputData),
   Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(Lucid.Default),
+  Effect.provide(NodeConfig.layer),
 );
 
 Effect.runPromise(

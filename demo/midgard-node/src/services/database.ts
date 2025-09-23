@@ -29,7 +29,7 @@ const createPgLayerEffect = Effect.gen(function* () {
         });
       case "SqlError":
         return new DatabaseInitializationError({
-          message: "Failed to initialize the database",
+          message: `Failed to initialize the database`,
           cause: e,
         });
     }

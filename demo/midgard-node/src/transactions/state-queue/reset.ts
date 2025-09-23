@@ -68,7 +68,7 @@ export const resetStateQueue: Effect.Effect<
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
-
+  yield* lucid.switchToOperatorsMainWallet;
   const allStateQueueUTxOs =
     yield* SDK.Endpoints.fetchUnsortedStateQueueUTxOsProgram(
       lucid.api,

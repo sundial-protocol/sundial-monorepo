@@ -8,9 +8,9 @@ import {
 } from "@/workers/utils/commit-block-header.js";
 import {
   Database,
-  NodeConfig,
   Lucid,
   AlwaysSucceedsContract,
+  NodeConfig,
 } from "@/services/index.js";
 import {
   BlocksDB,
@@ -40,7 +40,7 @@ const wrapper = (
 ): Effect.Effect<
   WorkerOutput,
   WorkerError,
-  AlwaysSucceedsContract | Lucid | Database
+  AlwaysSucceedsContract | Lucid | Database | NodeConfig
 > =>
   Effect.gen(function* () {
     const lucid = yield* Lucid;
@@ -131,6 +131,9 @@ const wrapper = (
           yield* Effect.logInfo(
             "🔹 Finding updated block datum and new header...",
           );
+
+          yield* lucid.switchToOperatorsMainWallet;
+
           const { nodeDatum: updatedNodeDatum, header: newHeader } =
             yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
               lucid.api,
@@ -283,6 +286,7 @@ const program = pipe(
   Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(Database.layer),
   Effect.provide(Lucid.Default),
+  Effect.provide(NodeConfig.layer),
 );
 
 Effect.runPromise(
