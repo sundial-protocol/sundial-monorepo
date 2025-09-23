@@ -1,9 +1,8 @@
 import { Effect } from "effect";
-import { Database } from "@/services/database.js";
+import { Database, NodeConfig } from "@/services/index.js";
 import { Columns as LedgerColumns } from "./utils/ledger.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { UTxO, utxoToCore } from "@lucid-evolution/lucid";
-import { NodeConfig } from "@/config.js";
 import { DBInsertError } from "./utils/common.js";
 
 /**

@@ -9,9 +9,8 @@ import * as MempoolLedgerDB from "./mempoolLedger.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
 import { Effect } from "effect";
-import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
-import { NodeConfig } from "@/config.js";
+import { Database, NodeConfig } from "@/services/index.js";
 import { DBCreateError, DBOtherError } from "./utils/common.js";
 
 export const initializeDb: () => Effect.Effect<

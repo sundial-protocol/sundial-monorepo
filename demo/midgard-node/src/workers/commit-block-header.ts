@@ -6,7 +6,12 @@ import {
   WorkerOutput,
   deserializeStateQueueUTxO,
 } from "@/workers/utils/commit-block-header.js";
-import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
+import {
+  Database,
+  Lucid,
+  AlwaysSucceedsContract,
+  NodeConfig,
+} from "@/services/index.js";
 import {
   BlocksDB,
   ImmutableDB,
@@ -24,8 +29,6 @@ import {
   processMpts,
   withTrieTransaction,
 } from "@/workers/utils/mpt.js";
-import { NodeConfig, User } from "@/config.js";
-import { Database } from "@/services/database.js";
 import { batchProgram } from "@/utils.js";
 import { Columns as TxColumns } from "@/database/utils/tx.js";
 import { WorkerError } from "./utils/common.js";
@@ -34,10 +37,13 @@ const BATCH_SIZE = 100;
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, WorkerError, NodeConfig | User | Database> =>
+): Effect.Effect<
+  WorkerOutput,
+  WorkerError,
+  AlwaysSucceedsContract | Lucid | Database | NodeConfig
+> =>
   Effect.gen(function* () {
-    const nodeConfig = yield* NodeConfig;
-    const { user: lucid } = yield* User;
+    const lucid = yield* Lucid;
 
     yield* Effect.logInfo("🔹 Retrieving all mempool transactions...");
 
@@ -75,7 +81,7 @@ const wrapper = (
           yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
 
         const { policyId, spendScript, spendScriptAddress, mintScript } =
-          yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+          yield* AlwaysSucceedsContract;
 
         const skippedSubmissionProgram = batchProgram(
           BATCH_SIZE,
@@ -125,9 +131,12 @@ const wrapper = (
           yield* Effect.logInfo(
             "🔹 Finding updated block datum and new header...",
           );
+
+          yield* lucid.switchToOperatorsMainWallet;
+
           const { nodeDatum: updatedNodeDatum, header: newHeader } =
             yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
-              lucid,
+              lucid.api,
               latestBlock.datum,
               utxoRoot,
               txRoot,
@@ -155,9 +164,9 @@ const wrapper = (
             stateQueueAddress: spendScriptAddress,
             stateQueuePolicyId: policyId,
           };
-          lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
+          yield* lucid.switchToOperatorsMainWallet;
           const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
-            lucid,
+            lucid.api,
             fetchConfig,
             commitBlockParams,
             aoUpdateCommitmentTimeParams,
@@ -187,7 +196,7 @@ const wrapper = (
             });
 
           const txHash = yield* handleSignSubmitNoConfirmation(
-            lucid,
+            lucid.api,
             txBuilder,
             onSubmitFailure,
           ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
@@ -274,8 +283,9 @@ const inputData = workerData as WorkerInput;
 
 const program = pipe(
   wrapper(inputData),
+  Effect.provide(AlwaysSucceedsContract.Default),
   Effect.provide(Database.layer),
-  Effect.provide(User.layer),
+  Effect.provide(Lucid.Default),
   Effect.provide(NodeConfig.layer),
 );
 
