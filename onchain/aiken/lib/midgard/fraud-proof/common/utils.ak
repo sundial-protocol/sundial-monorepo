@@ -6,6 +6,7 @@ use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script, VerificationKey}
 use cardano/assets.{PolicyId, lovelace_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
+use midgard/common/constants.{state_queue_policy}
 use midgard/common/utils.{get_singleton_asset_with_policy} as get_singleton_asset_with_policy
 use midgard/common/utils.{get_authentic_input_with_policy_at} as get_authentic_input_with_policy_at
 use midgard/computation_thread.{StepDatum, Success}
@@ -34,10 +35,26 @@ use midgard/ledger_state.{Header}
 pub fn get_tx_root_validate_block_hash(
   tx: Transaction,
   state_queue_node_ref_input_index: Int,
-  state_queue_policy: PolicyId,
   ct_token_asset_name: ByteArray,
 ) -> ByteArray {
   // Reference input with block_hash 
+  let state_queue_datum_data =
+    get_confirmed_datum(tx, state_queue_node_ref_input_index)
+  expect state_queue_node_datum: unordered.NodeDatum = state_queue_datum_data
+  expect parsed_state_queue_datum: Header = state_queue_node_datum.data
+  expect unordered.Key { key: block_hash } = state_queue_node_datum.key
+  let extracted_tx_root = parsed_state_queue_datum.transactions_root
+
+  // Get CT token and check match with the block hash
+  expect drop(ct_token_asset_name, n: 4) == block_hash
+
+  extracted_tx_root
+}
+
+pub fn get_confirmed_datum(
+  tx: Transaction,
+  state_queue_node_ref_input_index: Int,
+) {
   let state_queue_node_input =
     get_authentic_input_with_policy_at(
       tx.reference_inputs,
@@ -48,15 +65,17 @@ pub fn get_tx_root_validate_block_hash(
   // Extract tx_root via the state queue block hash
   expect InlineDatum(state_queue_datum_data) =
     state_queue_node_input.output.datum
-  expect state_queue_node_datum: unordered.NodeDatum = state_queue_datum_data
-  expect parsed_state_queue_datum: Header = state_queue_node_datum.data
-  expect unordered.Key { key: block_hash } = state_queue_node_datum.key
-  let extracted_tx_root = parsed_state_queue_datum.transactions_root
+  state_queue_datum_data
+}
 
-  // Get CT token and check match with the block hash
-  expect drop(ct_token_asset_name, n: 4) == block_hash
+pub fn get_block_datum(tx: Transaction, state_queue_node_ref_input_index: Int) {
+  expect Some(state_queue_node_input) =
+    list.at(tx.reference_inputs, state_queue_node_ref_input_index)
 
-  extracted_tx_root
+  expect InlineDatum(state_queue_datum_data) =
+    state_queue_node_input.output.datum
+
+  state_queue_datum_data
 }
 
 // Relevant to (1): tx_root provided by fraud prover in redeemer matches block_hash from the state queue block from the reference input
