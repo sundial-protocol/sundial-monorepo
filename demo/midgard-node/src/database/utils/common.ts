@@ -43,7 +43,7 @@ export const clearTable = (
   );
 
 type DBErrorFields = SDK.Utils.GenericErrorFields & {
-  readonly table?: string;
+  readonly table: string;
 };
 
 export class DBSelectError extends Data.TaggedError(
@@ -66,7 +66,7 @@ export class DBCreateError extends Data.TaggedError(
 )<DBErrorFields> {}
 export class DBOtherError extends Data.TaggedError(
   "DBOtherError",
-)<DBErrorFields> {}
+)<SDK.Utils.GenericErrorFields> {}
 
 type DBErrorConstructor<T> = new (args: DBErrorFields) => T;
 

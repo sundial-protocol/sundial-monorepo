@@ -59,6 +59,15 @@ import {
 } from "@/workers/utils/confirm-block-commitments.js";
 import { WorkerError } from "@/workers/utils/common.js";
 import { SerializedStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
+import {
+  DBCreateError,
+  DBDeleteError,
+  DBInsertError,
+  DBOtherError,
+  DBSelectError,
+  DBTruncateError,
+  DBUpdateError,
+} from "@/database/utils/common.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
@@ -94,7 +103,7 @@ const failWith500Helper = (
 const failWith500 = (
   method: "GET" | "POST",
   endpoint: string,
-  error?: Error | HttpBodyError | string | unknown,
+  error: Error | HttpBodyError | string | unknown,
   msgOverride?: string,
 ) => failWith500Helper(`${method} /${endpoint}`, "failure", error, msgOverride);
 
@@ -134,7 +143,7 @@ const getTxHandler = Effect.gen(function* () {
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "tx", e)),
   Effect.catchTag("DBSelectError", (e) =>
-    failWith500("GET", "tx", e.cause ?? e, "tx not found in database"),
+    failWith500("GET", "tx", e.cause, `tx not found in table ${e.table}`),
   ),
 );
 
@@ -182,7 +191,12 @@ const getUtxosHandler = Effect.gen(function* () {
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "utxos", e)),
   Effect.catchTag("DBSelectError", (e) =>
-    failWith500("GET", "utxos", e.cause ?? e, "database error"),
+    failWith500(
+      "GET",
+      "utxos",
+      e.cause,
+      `database error with table ${e.table}`,
+    ),
   ),
 );
 
@@ -214,7 +228,12 @@ const getBlockHandler = Effect.gen(function* () {
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "block", e)),
   Effect.catchTag("DBSelectError", (e) =>
-    failWith500("GET", "block", e.cause ?? e, "database error"),
+    failWith500(
+      "GET",
+      "block",
+      e.cause,
+      `database error with table ${e.table}`,
+    ),
   ),
 );
 
@@ -361,7 +380,12 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "logBlocksDB", e)),
   Effect.catchTag("DBSelectError", (e) =>
-    failWith500("GET", "logBlocksDB", e.cause ?? e, "database error"),
+    failWith500(
+      "GET",
+      "logBlocksDB",
+      e.cause,
+      `database error with table ${e.table}`,
+    ),
   ),
 );
 
