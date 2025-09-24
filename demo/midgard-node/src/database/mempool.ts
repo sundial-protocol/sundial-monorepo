@@ -14,7 +14,6 @@ import { SqlClient } from "@effect/sql";
 import * as SDK from "@al-ft/midgard-sdk";
 import { ProcessedTx } from "@/utils.js";
 
-
 export const tableName = "mempool";
 
 export const insert = (

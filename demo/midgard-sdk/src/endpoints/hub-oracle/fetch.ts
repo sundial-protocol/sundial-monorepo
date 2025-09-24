@@ -27,7 +27,7 @@ export const fetchHubOracleUTxOProgram = (
   HubOracleError | LucidError
 > =>
   Effect.gen(function* () {
-    const errorMessage = "Failed to fetch the hub oracle UTxO"
+    const errorMessage = "Failed to fetch the hub oracle UTxO";
     const hubOracleUTxOs = yield* Effect.tryPromise({
       try: async () => {
         return await lucid.utxosAtWithUnit(

@@ -15,7 +15,7 @@
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Address, LucidEvolution, Script } from "@lucid-evolution/lucid";
-import { Effect, Metric } from "effect";
+import { Effect, Metric, Ref } from "effect";
 import {
   TxConfirmError,
   fetchFirstBlockTxs,
@@ -24,13 +24,13 @@ import {
   TxSignError,
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
-import { breakDownTx } from "@/utils.js";
-import { Database } from "@/services/database.js";
 import {
   DBDeleteError,
   DBInsertError,
   DBSelectError,
 } from "@/database/utils/common.js";
+import { breakDownTx } from "@/utils.js";
+import { Database, Globals } from "@/services/index.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
   description: "A counter for tracking merged blocks",
@@ -46,11 +46,15 @@ const MIN_QUEUE_LENGTH_FOR_MERGING: number = 8;
 const getStateQueueLength = (
   lucid: LucidEvolution,
   stateQueueAddress: Address,
-): Effect.Effect<number, SDK.Utils.LucidError> =>
+): Effect.Effect<number, SDK.Utils.LucidError, Globals> =>
   Effect.gen(function* () {
+    const globals = yield* Globals;
+    const LATEST_SYNC_OF_STATE_QUEUE_LENGTH = yield* Ref.get(
+      globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH,
+    );
     const now_millis = Date.now();
     if (
-      now_millis - global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH >
+      now_millis - LATEST_SYNC_OF_STATE_QUEUE_LENGTH >
       MAX_LIFE_OF_LOCAL_SYNC
     ) {
       // We consider in-memory state queue length stale.
@@ -66,13 +70,15 @@ const getStateQueueLength = (
           }),
       });
 
-      global.BLOCKS_IN_QUEUE = Math.max(0, stateQueueUtxos.length - 1);
-
-      global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH = Date.now();
+      yield* Ref.set(
+        globals.BLOCKS_IN_QUEUE,
+        Math.max(0, stateQueueUtxos.length - 1),
+      );
+      yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now());
 
       return stateQueueUtxos.length;
     } else {
-      return global.BLOCKS_IN_QUEUE;
+      return yield* Ref.get(globals.BLOCKS_IN_QUEUE);
     }
   });
 
@@ -106,15 +112,17 @@ export const buildAndSubmitMergeTx = (
   Database
 > =>
   Effect.gen(function* () {
+    const globals = yield* Globals;
     const currentStateQueueLength = yield* getStateQueueLength(
       lucid,
       fetchConfig.stateQueueAddress,
     );
     // Avoid a merge tx if the queue is too short (performing a merge with such
     // conditions has a chance of wasting the work done for root computations).
+    const RESET_IN_PROGRESS = Ref.get(globals.RESET_IN_PROGRESS);
     if (
       currentStateQueueLength < MIN_QUEUE_LENGTH_FOR_MERGING ||
-      global.RESET_IN_PROGRESS
+      RESET_IN_PROGRESS
     ) {
       // yield* Effect.logInfo(
       //   "🔸 There are too few blocks in queue.
@@ -230,10 +238,10 @@ export const buildAndSubmitMergeTx = (
         Effect.withSpan("increment-merge-block-counter"),
       );
 
-      global.BLOCKS_IN_QUEUE -= 1;
+      yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n - 1);
     } else {
-      global.BLOCKS_IN_QUEUE = 0;
-      global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH = Date.now();
+      yield* Ref.set(globals.BLOCKS_IN_QUEUE, 0);
+      yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now());
       yield* Effect.logInfo("🔸 No blocks found in queue.");
       return;
     }
