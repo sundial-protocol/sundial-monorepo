@@ -57,7 +57,7 @@ export const serializeStateQueueUTxO = (
       try: () => utxoToCore(stateQueueUTxO.utxo),
       catch: (e) =>
         new SDK.Utils.CmlUnexpectedError({
-          message: `Failed to serialize UTxO`,
+          message: `Failed to serialize state queue UTxO: ${e}`,
           cause: e,
         }),
     });
@@ -65,7 +65,7 @@ export const serializeStateQueueUTxO = (
       try: () => Data.to(stateQueueUTxO.datum, SDK.TxBuilder.StateQueue.Datum),
       catch: (e) =>
         new SDK.Utils.CborSerializationError({
-          message: `Failed to serialize datum`,
+          message: `Failed to serialize state queue datum: ${e}`,
           cause: e,
         }),
     });
@@ -90,7 +90,7 @@ export const deserializeStateQueueUTxO = (
         ),
       catch: (e) =>
         new SDK.Utils.CmlUnexpectedError({
-          message: `Failed to convert UTxO to CML: ${e}`,
+          message: `Failed to convert state queue UTxO to CML: ${e}`,
           cause: e,
         }),
     });

@@ -109,7 +109,7 @@ export const buildAndSubmitMergeTx = (
   | SDK.Utils.CmlDeserializationError
   | DBDeleteError
   | DBInsertError,
-  Database
+  Database | Globals
 > =>
   Effect.gen(function* () {
     const globals = yield* Globals;

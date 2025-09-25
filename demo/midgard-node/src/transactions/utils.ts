@@ -108,7 +108,7 @@ const signSubmitHelper = (
     const walletAddr = yield* Effect.tryPromise(() =>
       lucid.wallet().address(),
     ).pipe(Effect.catchAll((_e) => Effect.succeed("<unknown>")));
-    yield* Effect.logInfo(`✍  Signing tx with ${walletAddr}...`);
+    yield* Effect.logInfo(`✍  Signing tx with ${walletAddr}`);
     const signedProgram = signBuilder.sign
       .withWallet()
       .completeProgram()

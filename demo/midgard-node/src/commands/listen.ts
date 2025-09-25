@@ -535,7 +535,8 @@ const blockConfirmationAction = Effect.gen(function* () {
             Effect.fail(
               new WorkerError({
                 worker: "confirm-block-commitments",
-                message: `Error in confirmation worker: ${output.error}`,
+                message: `Confirmation worker failed.`,
+                cause: output.error,
               }),
             ),
           );
@@ -563,6 +564,7 @@ const blockConfirmationAction = Effect.gen(function* () {
               new WorkerError({
                 worker: "confirm-block-commitments",
                 message: `Confirmation worker exited with code: ${code}`,
+                cause: `exit code ${code}`,
               }),
             ),
           );

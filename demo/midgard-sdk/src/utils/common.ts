@@ -10,7 +10,7 @@ import {
   fromUnit,
   toHex,
 } from "@lucid-evolution/lucid";
-import { blake2b } from "@noble/hashes/blake2b";
+import { blake2b } from "@noble/hashes/blake2.js";
 
 export const isHexString = (str: string): boolean => {
   const hexRegex = /^[0-9A-Fa-f]+$/;
@@ -103,7 +103,7 @@ const blake2bHelper = (
     return Effect.fail(
       new HashingError({
         message: errorMessage,
-        cause: `Invalid hash provided`,
+        cause: `Invalid message provided`,
       }),
     );
   }
@@ -130,10 +130,7 @@ export class StateQueueError extends Data.TaggedError(
   "StateQueueError",
 )<GenericErrorFields> {}
 
-export class MptError extends Data.TaggedError("MptError")<{
-  readonly message: string;
-  readonly cause: unknown;
-}> {
+export class MptError extends Data.TaggedError("MptError")<GenericErrorFields> {
   static get(trie: string, cause?: unknown) {
     return new MptError({
       message: `An error occurred on ${trie} trie get operation`,
@@ -181,6 +178,10 @@ export class CborSerializationError extends Data.TaggedError(
 
 export class CborDeserializationError extends Data.TaggedError(
   "CborDeserializationError",
+)<GenericErrorFields> {}
+
+export class DataCoercionError extends Data.TaggedError(
+  "DataCoercionError",
 )<GenericErrorFields> {}
 
 export class LucidError extends Data.TaggedError(
