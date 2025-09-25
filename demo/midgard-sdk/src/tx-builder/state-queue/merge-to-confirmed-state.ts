@@ -14,7 +14,11 @@ import {
 import { NodeDatum } from "../linked-list.js";
 import { Redeemer, FetchConfig, MergeParams } from "./types.js";
 import { getConfirmedStateFromStateQueueDatum } from "@/utils/state-queue.js";
-import { HashingError, StateQueueError } from "@/utils/common.js";
+import {
+  DataCoercionError,
+  HashingError,
+  StateQueueError,
+} from "@/utils/common.js";
 
 /**
  * Merge
@@ -32,7 +36,10 @@ export const mergeTxBuilder = (
     stateQueueSpendingScript,
     stateQueueMintingScript,
   }: MergeParams,
-): Effect.Effect<TxBuilder, StateQueueError | HashingError> =>
+): Effect.Effect<
+  TxBuilder,
+  StateQueueError | HashingError | DataCoercionError
+> =>
   Effect.gen(function* () {
     const { data: currentConfirmedState } =
       yield* getConfirmedStateFromStateQueueDatum(confirmedUTxO.datum);

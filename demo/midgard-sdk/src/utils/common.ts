@@ -42,11 +42,45 @@ export const getSingleAssetApartFromAda = (
     }
   });
 
+/**
+ * Similar to `getSingleAssetApartFromAda`, with the additional requirement for
+ * the quantity to be exactly 1.
+ */
+export const getBeaconToken = (
+  assets: Assets,
+): Effect.Effect<[PolicyId, string], UnauthenticUtxoError> =>
+  Effect.gen(function* () {
+    const errorMessage = "Failed to get the beacon token from assets";
+    const [policyId, assetName, qty] = yield* getSingleAssetApartFromAda(
+      assets,
+    ).pipe(
+      Effect.mapError(
+        (e) =>
+          new UnauthenticUtxoError({
+            message: errorMessage,
+            cause: e,
+          }),
+      ),
+    );
+    if (qty !== 1n) {
+      yield* Effect.fail(
+        new UnauthenticUtxoError({
+          message: errorMessage,
+          cause: `The quantity of the beacon token was expected to be exactly 1, but it was ${qty}`,
+        }),
+      );
+    }
+    return [policyId, assetName];
+  });
+
+/**
+ * Silently drops the UTxOs without proper authentication NFTs.
+ */
 export const utxosAtByNFTPolicyId = (
   lucid: LucidEvolution,
   addressOrCred: Address | Credential,
   policyId: PolicyId,
-): Effect.Effect<UTxO[], LucidError | AssetError> =>
+): Effect.Effect<UTxO[], LucidError> =>
   Effect.gen(function* () {
     const allUTxOs = yield* Effect.tryPromise({
       try: () => lucid.utxosAt(addressOrCred),
@@ -57,27 +91,25 @@ export const utxosAtByNFTPolicyId = (
         });
       },
     });
-    const nftEffects: Effect.Effect<UTxO, AssetError>[] = allUTxOs.map(
-      (u: UTxO) => {
-        const nftsEffect = getSingleAssetApartFromAda(u.assets);
+    const nftEffects: Effect.Effect<UTxO, UnauthenticUtxoError>[] =
+      allUTxOs.map((u: UTxO) => {
+        const nftsEffect = getBeaconToken(u.assets);
         return Effect.andThen(
           nftsEffect,
-          ([sym, _tn, qty]): Effect.Effect<UTxO, AssetError> => {
-            if (sym === policyId && qty === 1n) {
+          ([sym, _tn]): Effect.Effect<UTxO, UnauthenticUtxoError> => {
+            if (sym === policyId) {
               return Effect.succeed(u);
             } else {
               return Effect.fail(
-                new AssetError({
+                new UnauthenticUtxoError({
                   message: "Failed to get assets from fetched UTxOs",
-                  cause:
-                    "UTxO doesn't have the expected NFT policy ID, or its quantity is not exactly 1",
+                  cause: "UTxO doesn't have the expected NFT policy ID",
                 }),
               );
             }
           },
         );
-      },
-    );
+      });
     const authenticUTxOs = yield* Effect.allSuccesses(nftEffects);
     return authenticUTxOs;
   });
@@ -119,7 +151,7 @@ export const hashHexWithBlake2b256 = (
 
 export type GenericErrorFields = {
   readonly message: string;
-  readonly cause: unknown;
+  readonly cause: any;
 };
 
 export class HubOracleError extends Data.TaggedError(
@@ -182,6 +214,14 @@ export class CborDeserializationError extends Data.TaggedError(
 
 export class DataCoercionError extends Data.TaggedError(
   "DataCoercionError",
+)<GenericErrorFields> {}
+
+export class UnauthenticUtxoError extends Data.TaggedError(
+  "UnauthenticUtxoError",
+)<GenericErrorFields> {}
+
+export class MissingDatumError extends Data.TaggedError(
+  "MissingDatumError",
 )<GenericErrorFields> {}
 
 export class LucidError extends Data.TaggedError(
