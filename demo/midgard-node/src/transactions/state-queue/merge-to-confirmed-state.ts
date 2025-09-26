@@ -99,16 +99,17 @@ export const buildAndSubmitMergeTx = (
   mintScript: Script,
 ): Effect.Effect<
   void,
+  | SDK.Utils.CmlDeserializationError
+  | SDK.Utils.DataCoercionError
+  | SDK.Utils.HashingError
+  | SDK.Utils.LinkedListError
   | SDK.Utils.LucidError
   | SDK.Utils.StateQueueError
-  | SDK.Utils.AssetError
   | DBSelectError
-  | SDK.Utils.HashingError
-  | TxSubmitError
-  | TxSignError
-  | SDK.Utils.CmlDeserializationError
   | DBDeleteError
-  | DBInsertError,
+  | DBInsertError
+  | TxSubmitError
+  | TxSignError,
   Database | Globals
 > =>
   Effect.gen(function* () {

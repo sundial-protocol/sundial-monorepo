@@ -10,7 +10,7 @@ import {
 
 export const stateQueueInit: Effect.Effect<
   string | void,
-  TxSubmitError | TxSignError | SDK.Utils.StateQueueError,
+  TxSubmitError | TxSignError | SDK.Utils.LucidError,
   Lucid | NodeConfig | AlwaysSucceedsContract
 > = Effect.gen(function* () {
   const lucid = yield* Lucid;
@@ -29,7 +29,7 @@ export const stateQueueInit: Effect.Effect<
       yield* Effect.logError(`Submit tx error: ${err}`);
       yield* Effect.fail(
         new TxSubmitError({
-          message: "failed to submit the state queue initiation tx",
+          message: "Failed to submit the state queue initiation tx",
           cause: err,
         }),
       );

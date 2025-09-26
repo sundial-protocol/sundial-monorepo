@@ -19,7 +19,7 @@ const fetchLatestBlock = (
   lucid: LucidEvolution,
 ): Effect.Effect<
   SDK.TxBuilder.StateQueue.StateQueueUTxO,
-  SDK.Utils.StateQueueError | SDK.Utils.LucidError | SDK.Utils.AssetError,
+  SDK.Utils.StateQueueError | SDK.Utils.LucidError,
   AlwaysSucceedsContract | NodeConfig
 > =>
   Effect.gen(function* () {

@@ -59,15 +59,6 @@ import {
 } from "@/workers/utils/confirm-block-commitments.js";
 import { WorkerError } from "@/workers/utils/common.js";
 import { SerializedStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
-import {
-  DBCreateError,
-  DBDeleteError,
-  DBInsertError,
-  DBOtherError,
-  DBSelectError,
-  DBTruncateError,
-  DBUpdateError,
-} from "@/database/utils/common.js";
 
 const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",

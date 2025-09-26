@@ -160,7 +160,7 @@ export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
 ): Effect.Effect<
   { txs: readonly Buffer[]; headerHash: Buffer },
-  DBSelectError | SDK.Utils.StateQueueError | SDK.Utils.HashingError,
+  SDK.Utils.HashingError | SDK.Utils.DataCoercionError | DBSelectError,
   Database
 > =>
   Effect.gen(function* () {
