@@ -73,7 +73,7 @@ export const insertMultiple = (
     // Remove spent inputs from MempoolLedgerDB.
     yield* MempoolLedgerDB.clearUTxOs(allSpent);
     // Update AddressHistoryDB
-    yield* AddressHistoryDB.insertMultiple(allSpent, allProduced);
+    yield* AddressHistoryDB.insert(allSpent, allProduced);
   }).pipe(
     Effect.withLogSpan(`insert ${tableName}`),
     Effect.tapError((e) => Effect.logError(`${tableName} db: insert: ${e}`)),

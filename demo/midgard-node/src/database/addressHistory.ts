@@ -72,39 +72,13 @@ export const insert = (
       [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
     }));
 
-    yield* insertEntries([...inputEntries, ...outputEntries]);
+    yield* insertEntries([...new Set([...inputEntries, ...outputEntries])]);
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
     ),
     sqlErrorToDBInsertError(tableName),
-  );
-
-export const insertMultiple = (
-  spent: Buffer[],
-  produced: Ledger.Entry[],
-): Effect.Effect<void, DBInsertError, Database> =>
-  Effect.gen(function* () {
-    yield* Effect.logInfo(
-      `${tableName} db: attempt to insert multiple entries`,
-    );
-    const sql = yield* SqlClient.SqlClient;
-    const inputEntries =
-      yield* sql<Entry>`SELECT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)})
-    FROM ${sql(MempoolLedgerDB.tableName)}
-    WHERE ${sql(Ledger.Columns.TX_ID)} IN ${sql.in(spent)}`;
-    const outputEntries = produced.map((e) => ({
-      [Ledger.Columns.TX_ID]: e[Ledger.Columns.TX_ID],
-      [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
-    }));
-    insertEntries([...inputEntries, ...outputEntries]);
-  }).pipe(
-    Effect.withLogSpan(`entries ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
-    ),
-    sqlErrorToDBInsertError<never>(tableName),
   );
 
 export const delTxHash = (
