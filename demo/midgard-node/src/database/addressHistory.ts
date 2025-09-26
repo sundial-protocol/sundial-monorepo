@@ -63,7 +63,7 @@ export const insert = (
     const sql = yield* SqlClient.SqlClient;
 
     const inputEntries =
-      yield* sql<Entry>`SELECT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)})
+      yield* sql<Entry>`SELECT ${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)}
     FROM ${sql(MempoolLedgerDB.tableName)}
     WHERE ${sql(Ledger.Columns.TX_ID)} IN ${sql.in(spent)}`;
 
