@@ -72,59 +72,98 @@ export class DBOtherError extends Data.TaggedError(
 function makeSqlErrorMapper<
   DbE extends new (fields: DBErrorFields) => any,
   Es = never,
->(
-  ErrorClass: DbE,
-  action: string,
-  tableName: string,
-) {
+>(ErrorClass: DbE, action: string, tableName: string) {
   return <A, R = SqlClient.SqlClient>(
-    eff: Effect.Effect<A, SqlError.SqlError | Es, R>
-  ): Effect.Effect<A, Exclude<SqlError.SqlError | Es, SqlError.SqlError> | InstanceType<DbE>, R> =>
-    Effect.catchTag(eff, "SqlError", error =>
-      Effect.fail(new ErrorClass({
-        message: `Failed to ${action} table ${tableName}`,
-        table: tableName,
-        cause: error,
-      })),
+    eff: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ): Effect.Effect<
+    A,
+    Exclude<SqlError.SqlError | Es, SqlError.SqlError> | InstanceType<DbE>,
+    R
+  > =>
+    Effect.catchTag(eff, "SqlError", (error) =>
+      Effect.fail(
+        new ErrorClass({
+          message: `Failed to ${action} table ${tableName}`,
+          table: tableName,
+          cause: error,
+        }),
+      ),
     );
 }
 
-export const sqlErrorToDBSelectError = <Es = never>(
-  tableName: string
-) => <A, R = SqlClient.SqlClient>(self: Effect.Effect<A, SqlError.SqlError | Es, R>) => makeSqlErrorMapper<typeof DBSelectError, Es>(DBSelectError, "select from", tableName)(self);
+export const sqlErrorToDBSelectError =
+  <Es = never>(tableName: string) =>
+  <A, R = SqlClient.SqlClient>(
+    self: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ) =>
+    makeSqlErrorMapper<typeof DBSelectError, Es>(
+      DBSelectError,
+      "select from",
+      tableName,
+    )(self);
 
-export const sqlErrorToDBInsertError = <Es = never>(
-  tableName: string
-) => <A, R = SqlClient.SqlClient>(
-  self: Effect.Effect<A, SqlError.SqlError | Es, R>
-) => makeSqlErrorMapper<typeof DBInsertError, Es>(DBInsertError, "insert into", tableName)(self);
+export const sqlErrorToDBInsertError =
+  <Es = never>(tableName: string) =>
+  <A, R = SqlClient.SqlClient>(
+    self: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ) =>
+    makeSqlErrorMapper<typeof DBInsertError, Es>(
+      DBInsertError,
+      "insert into",
+      tableName,
+    )(self);
 
-export const sqlErrorToDBUpdateError = <Es = never>(
-  tableName: string
-) => <A, R = SqlClient.SqlClient>(
-  self: Effect.Effect<A, SqlError.SqlError | Es, R>
-) => makeSqlErrorMapper<typeof DBUpdateError, Es>(DBUpdateError, "update", tableName)(self);
+export const sqlErrorToDBUpdateError =
+  <Es = never>(tableName: string) =>
+  <A, R = SqlClient.SqlClient>(
+    self: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ) =>
+    makeSqlErrorMapper<typeof DBUpdateError, Es>(
+      DBUpdateError,
+      "update",
+      tableName,
+    )(self);
 
-export const sqlErrorToDBDeleteError = <Es = never>(
-  tableName: string
-) => <A, R = SqlClient.SqlClient>(
-  self: Effect.Effect<A, SqlError.SqlError | Es, R>
-) => makeSqlErrorMapper<typeof DBDeleteError, Es>(DBDeleteError, "delete from", tableName)(self);
+export const sqlErrorToDBDeleteError =
+  <Es = never>(tableName: string) =>
+  <A, R = SqlClient.SqlClient>(
+    self: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ) =>
+    makeSqlErrorMapper<typeof DBDeleteError, Es>(
+      DBDeleteError,
+      "delete from",
+      tableName,
+    )(self);
 
-export const sqlErrorToDBTruncateError = <Es = never>(
-  tableName: string
-) => <A, R = SqlClient.SqlClient>(
-  self: Effect.Effect<A, SqlError.SqlError | Es, R>
-) => makeSqlErrorMapper<typeof DBTruncateError, Es>(DBTruncateError, "truncate", tableName)(self);
+export const sqlErrorToDBTruncateError =
+  <Es = never>(tableName: string) =>
+  <A, R = SqlClient.SqlClient>(
+    self: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ) =>
+    makeSqlErrorMapper<typeof DBTruncateError, Es>(
+      DBTruncateError,
+      "truncate",
+      tableName,
+    )(self);
 
-export const sqlErrorToDBCreateError = <Es = never>(
-  tableName: string
-) => <A, R = SqlClient.SqlClient>(
-  self: Effect.Effect<A, SqlError.SqlError | Es, R>
-) => makeSqlErrorMapper<typeof DBCreateError, Es>(DBCreateError, "create", tableName)(self);
+export const sqlErrorToDBCreateError =
+  <Es = never>(tableName: string) =>
+  <A, R = SqlClient.SqlClient>(
+    self: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ) =>
+    makeSqlErrorMapper<typeof DBCreateError, Es>(
+      DBCreateError,
+      "create",
+      tableName,
+    )(self);
 
-export const sqlErrorToDBOtherError = <Es = never>(
-  tableName: string
-) => <A, R = SqlClient.SqlClient>(
-  self: Effect.Effect<A, SqlError.SqlError | Es, R>
-) => makeSqlErrorMapper<typeof DBOtherError, Es>(DBOtherError, "other operation", tableName)(self);
+export const sqlErrorToDBOtherError =
+  <Es = never>(tableName: string) =>
+  <A, R = SqlClient.SqlClient>(
+    self: Effect.Effect<A, SqlError.SqlError | Es, R>,
+  ) =>
+    makeSqlErrorMapper<typeof DBOtherError, Es>(
+      DBOtherError,
+      "other operation",
+      tableName,
+    )(self);
