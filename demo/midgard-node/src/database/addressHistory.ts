@@ -45,10 +45,7 @@ export const insertEntries = (
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
-    const c = yield* sql<{
-      count: string;
-    }>`INSERT INTO ${sql(tableName)} ${sql.insert(entries)} RETURNING COUNT(*)`;
-    yield* Effect.logInfo(`${tableName} db: inserted ${c[0].count} rows`);
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}`;
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
