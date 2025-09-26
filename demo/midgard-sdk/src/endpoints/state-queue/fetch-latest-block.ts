@@ -1,20 +1,15 @@
 import { Effect } from "effect";
 import { LucidEvolution, UTxO } from "@lucid-evolution/lucid";
-import {
-  AssetError,
-  LucidError,
-  StateQueueError,
-  utxosAtByNFTPolicyId,
-  utxoToStateQueueUTxO,
-} from "../../utils/index.js";
-import { makeReturn } from "../../core.js";
-import { StateQueue } from "../../tx-builder/index.js";
+import { LucidError, utxosAtByNFTPolicyId } from "@/utils/common.js";
+import { StateQueueError, utxoToStateQueueUTxO } from "@/utils/state-queue.js";
+import { makeReturn } from "@/core.js";
+import { StateQueue } from "@/tx-builder/index.js";
 import { StateQueueUTxO } from "@/tx-builder/state-queue/types.js";
 
 export const fetchLatestCommittedBlockProgram = (
   lucid: LucidEvolution,
   config: StateQueue.FetchConfig,
-): Effect.Effect<StateQueueUTxO, StateQueueError | LucidError | AssetError> =>
+): Effect.Effect<StateQueueUTxO, StateQueueError | LucidError> =>
   Effect.gen(function* () {
     const errorMessage = `Failed to fetch latest committed block`;
     const allBlocks = yield* utxosAtByNFTPolicyId(

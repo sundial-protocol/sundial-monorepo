@@ -1,23 +1,19 @@
 import { LucidEvolution } from "@lucid-evolution/lucid";
 import { StateQueue } from "@/tx-builder/index.js";
 import { Effect } from "effect";
-import {
-  AssetError,
-  LucidError,
-  StateQueueError,
-  utxosAtByNFTPolicyId,
-} from "@/utils/common.js";
+import { LucidError, utxosAtByNFTPolicyId } from "@/utils/common.js";
 import { makeReturn } from "@/core.js";
 import {
   sortStateQueueUTxOs,
   utxosToStateQueueUTxOs,
 } from "@/utils/state-queue.js";
 import { StateQueueUTxO } from "@/tx-builder/state-queue/types.js";
+import { LinkedListError } from "@/utils/linked-list.js";
 
 export const fetchSortedStateQueueUTxOsProgram = (
   lucid: LucidEvolution,
   config: StateQueue.FetchConfig,
-): Effect.Effect<StateQueueUTxO[], StateQueueError | LucidError | AssetError> =>
+): Effect.Effect<StateQueueUTxO[], LucidError | LinkedListError> =>
   Effect.gen(function* () {
     const allUTxOs = yield* utxosAtByNFTPolicyId(
       lucid,
@@ -34,7 +30,7 @@ export const fetchSortedStateQueueUTxOsProgram = (
 export const fetchUnsortedStateQueueUTxOsProgram = (
   lucid: LucidEvolution,
   config: StateQueue.FetchConfig,
-): Effect.Effect<StateQueueUTxO[], LucidError | AssetError> =>
+): Effect.Effect<StateQueueUTxO[], LucidError> =>
   Effect.gen(function* () {
     const allUTxOs = yield* utxosAtByNFTPolicyId(
       lucid,

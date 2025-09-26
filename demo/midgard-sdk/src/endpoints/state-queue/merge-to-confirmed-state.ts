@@ -2,27 +2,32 @@ import { makeReturn } from "@/core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue } from "@/tx-builder/index.js";
 import { Effect } from "effect";
-import { HashingError, StateQueueError } from "@/utils/common.js";
+import { DataCoercionError, HashingError, LucidError } from "@/utils/common.js";
 
 export const mergeToConfirmedStateProgram = (
   lucid: LucidEvolution,
   fetchConfig: StateQueue.FetchConfig,
   mergeParams: StateQueue.MergeParams,
-): Effect.Effect<TxSignBuilder, StateQueueError | HashingError> =>
+): Effect.Effect<
+  TxSignBuilder,
+  DataCoercionError | LucidError | HashingError
+> =>
   Effect.gen(function* () {
     const completedTx = yield* StateQueue.mergeTxBuilder(
       lucid,
       fetchConfig,
       mergeParams,
     );
-    return yield* Effect.tryPromise({
-      try: () => completedTx.complete(),
-      catch: (e) =>
-        new StateQueueError({
-          message: `Failed to merge to confirmed state`,
-          cause: e,
-        }),
-    });
+    return yield* completedTx.completeProgram().pipe(
+      Effect.mapError(
+        (e) =>
+          new LucidError({
+            message:
+              "Failed to finalize the transaction for merging oldest block into confirmed state",
+            cause: e,
+          }),
+      ),
+    );
   });
 
 /**
@@ -31,6 +36,7 @@ export const mergeToConfirmedStateProgram = (
  *
  * @param lucid - The `LucidEvolution` API object.
  * @param fetchConfig - Configuration values required to know where to look for which NFT.
+ * @param mergeParams - Parameters needed for building the merge transaction.
  * @returns A promise that resolves to a `TxSignBuilder` instance.
  */
 export const mergeToConfirmedState = (

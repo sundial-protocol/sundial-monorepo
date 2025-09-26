@@ -2,7 +2,8 @@ import { makeReturn } from "@/core.js";
 import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { StateQueue, ActiveOperators } from "@/tx-builder/index.js";
 import { Effect } from "effect";
-import { HashingError, StateQueueError } from "@/utils/common.js";
+import { HashingError } from "@/utils/common.js";
+import { StateQueueError } from "@/utils/state-queue.js";
 
 export const commitBlockHeaderProgram = (
   lucid: LucidEvolution,

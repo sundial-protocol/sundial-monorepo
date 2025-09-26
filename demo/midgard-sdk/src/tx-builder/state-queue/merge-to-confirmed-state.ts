@@ -14,17 +14,14 @@ import {
 import { NodeDatum } from "../linked-list.js";
 import { Redeemer, FetchConfig, MergeParams } from "./types.js";
 import { getConfirmedStateFromStateQueueDatum } from "@/utils/state-queue.js";
-import {
-  DataCoercionError,
-  HashingError,
-  StateQueueError,
-} from "@/utils/common.js";
+import { DataCoercionError, HashingError } from "@/utils/common.js";
 
 /**
  * Merge
  *
  * @param lucid - The `LucidEvolution` API object.
  * @param fetchConfig - Configuration values required to know where to look for which NFT.
+ * @param mergeParams - Parameters needed for building the merge transaction.
  * @returns {TxBuilder} A TxBuilder instance that can be used to build the transaction.
  */
 export const mergeTxBuilder = (
@@ -36,10 +33,7 @@ export const mergeTxBuilder = (
     stateQueueSpendingScript,
     stateQueueMintingScript,
   }: MergeParams,
-): Effect.Effect<
-  TxBuilder,
-  StateQueueError | HashingError | DataCoercionError
-> =>
+): Effect.Effect<TxBuilder, HashingError | DataCoercionError> =>
   Effect.gen(function* () {
     const { data: currentConfirmedState } =
       yield* getConfirmedStateFromStateQueueDatum(confirmedUTxO.datum);

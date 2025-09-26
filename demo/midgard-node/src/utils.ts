@@ -11,7 +11,7 @@ import {
   Provider,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Data, Effect, pipe } from "effect";
+import { Effect, pipe } from "effect";
 import * as Ledger from "@/database/utils/ledger.js";
 import * as SDK from "@al-ft/midgard-sdk";
 

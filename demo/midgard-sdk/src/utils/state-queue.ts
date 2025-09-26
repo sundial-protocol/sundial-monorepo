@@ -6,23 +6,27 @@ import {
   paymentCredentialOf,
 } from "@lucid-evolution/lucid";
 import { NodeKey } from "../tx-builder/linked-list.js";
-import { Effect } from "effect";
+import { Data as EffectData, Effect } from "effect";
 import { StateQueue } from "../tx-builder/index.js";
 import { LinkedListError, getNodeDatumFromUTxO } from "./linked-list.js";
 import { MerkleRoot, POSIXTime } from "../tx-builder/common.js";
 import { Datum } from "@/tx-builder/state-queue/types.js";
 import {
   DataCoercionError,
+  GenericErrorFields,
   getBeaconToken,
   HashingError,
   LucidError,
   MissingDatumError,
-  StateQueueError,
   UnauthenticUtxoError,
 } from "./common.js";
 import { getHeaderFromStateQueueDatum, hashHeader } from "./ledger-state.js";
 
 type StateQueueUTxO = StateQueue.StateQueueUTxO;
+
+export class StateQueueError extends EffectData.TaggedError(
+  "StateQueueError",
+)<GenericErrorFields> {}
 
 /**
  * Validates correctness of datum, and having a single NFT.

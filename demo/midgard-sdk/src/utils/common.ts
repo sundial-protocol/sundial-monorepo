@@ -158,10 +158,6 @@ export class HubOracleError extends Data.TaggedError(
   "HubOracleError",
 )<GenericErrorFields> {}
 
-export class StateQueueError extends Data.TaggedError(
-  "StateQueueError",
-)<GenericErrorFields> {}
-
 export class MptError extends Data.TaggedError("MptError")<GenericErrorFields> {
   static get(trie: string, cause?: unknown) {
     return new MptError({

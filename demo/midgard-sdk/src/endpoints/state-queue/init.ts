@@ -3,22 +3,23 @@ import { LucidEvolution, TxSignBuilder } from "@lucid-evolution/lucid";
 import { initTxBuilder } from "@/tx-builder/state-queue/init.js";
 import { Effect } from "effect";
 import { StateQueue } from "@/tx-builder/index.js";
-import { StateQueueError } from "@/utils/common.js";
+import { LucidError } from "@/utils/common.js";
 
 export const initTxProgram = (
   lucid: LucidEvolution,
   initParams: StateQueue.InitParams,
-): Effect.Effect<TxSignBuilder, StateQueueError> =>
+): Effect.Effect<TxSignBuilder, LucidError> =>
   Effect.gen(function* () {
     const completedTx = yield* initTxBuilder(lucid, initParams);
-    return yield* Effect.tryPromise({
-      try: () => completedTx.complete(),
-      catch: (e) =>
-        new StateQueueError({
-          message: `Failed to build state queue initialization transaction`,
-          cause: e,
-        }),
-    });
+    return yield* completedTx.completeProgram().pipe(
+      Effect.mapError(
+        (e) =>
+          new LucidError({
+            message: "Failed to build state queue initialization transaction",
+            cause: e,
+          }),
+      ),
+    );
   });
 
 /**
@@ -28,7 +29,6 @@ export const initTxProgram = (
  * @param initParams - Parameters for minting the initialization NFT.
  * @returns A promise that resolves to a `TxSignBuilder` instance.
  */
-
 export const initTx = (
   lucid: LucidEvolution,
   initParams: StateQueue.InitParams,
