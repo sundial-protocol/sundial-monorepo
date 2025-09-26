@@ -61,7 +61,7 @@ export const createTable = (
     );
   }).pipe(
     Effect.withLogSpan(`creating table ${tableName}`),
-    sqlErrorToDBCreateError(tableName),
+    sqlErrorToDBCreateError<never>(tableName),
   );
 
 export const insertEntry = (
@@ -78,7 +78,7 @@ export const insertEntry = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertEntry: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError(tableName),
+    sqlErrorToDBInsertError<never>(tableName),
   );
 
 export const insertEntries = (
@@ -95,7 +95,7 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertEntries: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError(tableName),
+    sqlErrorToDBInsertError<never>(tableName),
   );
 
 export const retrieveAllEntries = (
@@ -112,7 +112,7 @@ export const retrieveAllEntries = (
         `${tableName} db: retrieveEntries: ${JSON.stringify(double)}`,
       ),
     ),
-    sqlErrorToDBSelectError(tableName),
+    sqlErrorToDBSelectError<never>(tableName),
   );
 
 export const retrieveEntriesWithAddress = (
@@ -132,7 +132,7 @@ export const retrieveEntriesWithAddress = (
         `${tableName} db: retrieveEntriesWithAddress: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError(tableName),
+    sqlErrorToDBSelectError<never>(tableName),
   );
 
 export const delEntries = (
@@ -144,4 +144,4 @@ export const delEntries = (
     yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
       Columns.OUTREF,
     )} IN ${sql.in(outrefs)}`;
-  }).pipe(sqlErrorToDBDeleteError(tableName));
+  }).pipe(sqlErrorToDBDeleteError<never>(tableName));
