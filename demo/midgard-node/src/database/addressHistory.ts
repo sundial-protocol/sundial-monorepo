@@ -1,5 +1,5 @@
 import { Database } from "@/services/database.js";
-import { SqlClient } from "@effect/sql";
+import { SqlClient, SqlError } from "@effect/sql";
 import { Effect } from "effect";
 import {
   DBCreateError,
@@ -36,7 +36,7 @@ export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(
   },
 ).pipe(
   Effect.withLogSpan(`creating table ${tableName}`),
-  sqlErrorToDBCreateError<never>(tableName),
+  sqlErrorToDBCreateError(tableName),
 );
 
 export const insertEntries = (
@@ -51,7 +51,7 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError<never>(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const insert = (
@@ -95,7 +95,7 @@ export const delTxHash = (
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(
     Effect.withLogSpan(`delTxHash table ${tableName}`),
-    sqlErrorToDBDeleteError<never>(tableName),
+    sqlErrorToDBDeleteError(tableName),
   );
 
 /**
@@ -137,7 +137,7 @@ export const retrieve = (
         `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const clear = clearTable(tableName);

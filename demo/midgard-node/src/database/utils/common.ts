@@ -22,7 +22,7 @@ export const retrieveNumberOfEntries = (
         `${tableName} db: retrieveNumberOfEntries: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const clearTable = (
@@ -40,7 +40,7 @@ export const clearTable = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: truncate error: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBTruncateError<never>(tableName),
+    sqlErrorToDBTruncateError(tableName),
   );
 
 type DBErrorFields = GenericErrorFields & {
@@ -69,24 +69,17 @@ export class DBOtherError extends Data.TaggedError(
   "DBOtherError",
 )<DBErrorFields> {}
 
-// type DBErrorConstructor<T> = new (args: DBErrorFields) => T;
-
-// type SqlErrorMapper<E, Es = never> = <A, R>(
-//   self: Effect.Effect<A, SqlError.SqlError | Es, R>,
-// ) => Effect.Effect<A, E | Exclude<Es, SqlError.SqlError>, R>;
-
-
 function makeSqlErrorMapper<
-C extends new (fields: DBErrorFields) => any,
-Es = never,
+  DbE extends new (fields: DBErrorFields) => any,
+  Es = never,
 >(
-  ErrorClass: C,
+  ErrorClass: DbE,
   action: string,
   tableName: string,
 ) {
   return <A, R = SqlClient.SqlClient>(
     eff: Effect.Effect<A, SqlError.SqlError | Es, R>
-  ): Effect.Effect<A, InstanceType<C> | Es, R> =>
+  ): Effect.Effect<A, Exclude<SqlError.SqlError | Es, SqlError.SqlError> | InstanceType<DbE>, R> =>
     Effect.catchTag(eff, "SqlError", error =>
       Effect.fail(new ErrorClass({
         message: `Failed to ${action} table ${tableName}`,
@@ -95,6 +88,7 @@ Es = never,
       })),
     );
 }
+
 export const sqlErrorToDBSelectError = <Es = never>(
   tableName: string
 ) => <A, R = SqlClient.SqlClient>(self: Effect.Effect<A, SqlError.SqlError | Es, R>) => makeSqlErrorMapper<typeof DBSelectError, Es>(DBSelectError, "select from", tableName)(self);

@@ -60,7 +60,7 @@ export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(
       }),
     );
   },
-).pipe(sqlErrorToDBCreateError<never>(tableName));
+).pipe(sqlErrorToDBCreateError(tableName));
 
 export const insert = (
   headerHash: Buffer,
@@ -84,7 +84,7 @@ export const insert = (
       Effect.logError(`${tableName} db: inserting error: ${e}`),
     ),
     Effect.withLogSpan(`insert ${tableName}`),
-    sqlErrorToDBInsertError<never>(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const retrieveTxHashesByHeaderHash = (
@@ -113,7 +113,7 @@ export const retrieveTxHashesByHeaderHash = (
         `${tableName} db: retrieving txHashes error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const retrieveHeaderHashByTxHash = (
@@ -146,7 +146,7 @@ export const retrieveHeaderHashByTxHash = (
         `${tableName} db: retrieving headerHash error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const clearBlock = (
@@ -171,7 +171,7 @@ export const clearBlock = (
         `${tableName} db: clearing block error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBDeleteError<never>(tableName),
+    sqlErrorToDBDeleteError(tableName),
   );
 
 export const retrieve = (): Effect.Effect<
@@ -192,7 +192,7 @@ export const retrieve = (): Effect.Effect<
         `${tableName} db: retrieving error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const clear: Effect.Effect<void, DBTruncateError, Database> =

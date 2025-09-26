@@ -101,7 +101,7 @@ export const retrieve = (): Effect.Effect<
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const retrieveTxCount: Effect.Effect<bigint, DBSelectError, Database> =

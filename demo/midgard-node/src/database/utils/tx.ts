@@ -42,7 +42,7 @@ export const createTable = (
     );`;
   }).pipe(
     Effect.withLogSpan(`creating table ${tableName}`),
-    sqlErrorToDBCreateError<never>(tableName),
+    sqlErrorToDBCreateError(tableName),
   );
 
 export const delMultiple = (
@@ -60,7 +60,7 @@ export const delMultiple = (
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(
     Effect.withLogSpan(`delMutiple table ${tableName}`),
-    sqlErrorToDBDeleteError<never>(tableName),
+    sqlErrorToDBDeleteError(tableName),
   );
 
 export const retrieveValue = (
@@ -101,7 +101,7 @@ export const retrieveValue = (
         `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const retrieveValues = (
@@ -126,7 +126,7 @@ export const retrieveValues = (
         `${tableName} db: retrieving values error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
 
 export const insertEntry = (
@@ -144,7 +144,7 @@ export const insertEntry = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTX: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError<never>(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const insertEntries = (
@@ -160,7 +160,7 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTXs: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError<never>(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const retrieveAllEntries = (
@@ -177,5 +177,5 @@ export const retrieveAllEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBSelectError<never>(tableName),
+    sqlErrorToDBSelectError(tableName),
   );
