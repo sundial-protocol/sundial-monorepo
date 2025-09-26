@@ -72,13 +72,13 @@ export const insert = (
       [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
     }));
 
-    insertEntries([...inputEntries, ...outputEntries]);
+    yield* insertEntries([...inputEntries, ...outputEntries]);
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError<never>(tableName),
+    sqlErrorToDBInsertError(tableName),
   );
 
 export const insertMultiple = (
