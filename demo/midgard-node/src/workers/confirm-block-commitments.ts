@@ -38,7 +38,11 @@ const wrapper = (
   workerInput: WorkerInput,
 ): Effect.Effect<
   WorkerOutput,
-  Error,
+  | SDK.Utils.CborSerializationError
+  | SDK.Utils.CmlUnexpectedError
+  | SDK.Utils.LucidError
+  | SDK.Utils.StateQueueError
+  | TxConfirmError,
   AlwaysSucceedsContract | Lucid | NodeConfig
 > =>
   Effect.gen(function* () {
