@@ -154,11 +154,6 @@ export type GenericErrorFields = {
   readonly cause: any;
 };
 
-export class HubOracleError extends Data.TaggedError(
-  "HubOracleError",
-)<GenericErrorFields> {}
-
-// General errors that don't have specific domains
 export class CmlUnexpectedError extends Data.TaggedError(
   "CmlUnexpectedError",
 )<GenericErrorFields> {}

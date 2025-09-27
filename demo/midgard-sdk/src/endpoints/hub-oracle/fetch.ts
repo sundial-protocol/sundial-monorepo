@@ -9,7 +9,8 @@ import {
 } from "@lucid-evolution/lucid";
 import { makeReturn } from "@/core.js";
 import { HubOracle } from "@/tx-builder/index.js";
-import { HubOracleError, LucidError } from "@/utils/common.js";
+import { LucidError } from "@/utils/common.js";
+import { HubOracleError } from "@/utils/hub-oracle.js";
 
 export type Config = {
   hubOracleAddress: Address;

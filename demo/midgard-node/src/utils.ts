@@ -11,7 +11,7 @@ import {
   Provider,
 } from "@lucid-evolution/lucid";
 import * as chalk_ from "chalk";
-import { Effect, pipe } from "effect";
+import { Data, Effect, pipe } from "effect";
 import * as Ledger from "@/database/utils/ledger.js";
 import * as SDK from "@al-ft/midgard-sdk";
 
@@ -241,3 +241,7 @@ Kupmios:
 \u0009${chalk.bold("KUPO_URL")}   \u0009 URL of your Kupo instance
 \u0009${chalk.bold("OGMIOS_URL")} \u0009 URL of your Ogmios instance
 `;
+
+export class FileSystemError extends Data.TaggedError(
+  "FileSystemError",
+)<SDK.Utils.GenericErrorFields> {}

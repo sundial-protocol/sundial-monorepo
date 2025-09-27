@@ -19,7 +19,7 @@ import {
   LucidError,
   MissingDatumError,
   UnauthenticUtxoError,
-} from "./common.js";
+} from "@/utils/common.js";
 import { getHeaderFromStateQueueDatum, hashHeader } from "./ledger-state.js";
 
 type StateQueueUTxO = StateQueue.StateQueueUTxO;

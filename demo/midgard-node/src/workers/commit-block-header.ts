@@ -7,10 +7,12 @@ import {
   deserializeStateQueueUTxO,
 } from "@/workers/utils/commit-block-header.js";
 import {
+  ConfigError,
   Database,
   Lucid,
   AlwaysSucceedsContract,
   NodeConfig,
+  DatabaseInitializationError,
 } from "@/services/index.js";
 import {
   BlocksDB,
@@ -20,26 +22,44 @@ import {
 } from "@/database/index.js";
 import {
   handleSignSubmitNoConfirmation,
+  TxSignError,
   TxSubmitError,
 } from "@/transactions/utils.js";
 import { fromHex } from "@lucid-evolution/lucid";
 import {
+  MptError,
   deleteMempoolMpt,
   makeMpts,
   processMpts,
   withTrieTransaction,
 } from "@/workers/utils/mpt.js";
-import { batchProgram } from "@/utils.js";
+import { FileSystemError, batchProgram } from "@/utils.js";
 import { Columns as TxColumns } from "@/database/utils/tx.js";
 import { WorkerError } from "./utils/common.js";
+import {DBDeleteError, DBInsertError, DBOtherError, DBSelectError, DBTruncateError} from "@/database/utils/common.js";
 
 const BATCH_SIZE = 100;
 
 const wrapper = (
   workerInput: WorkerInput,
 ): Effect.Effect<
-  WorkerOutput,
-  WorkerError,
+  WorkerOutput | undefined,
+  | SDK.Utils.CborDeserializationError
+  | SDK.Utils.CmlUnexpectedError
+  | SDK.Utils.DataCoercionError
+  | SDK.Utils.HashingError
+  | SDK.Utils.LucidError
+  | SDK.Utils.StateQueueError
+  | ConfigError
+  | DatabaseInitializationError
+  | DBInsertError
+  | DBDeleteError
+  | DBSelectError
+  | DBTruncateError
+  | DBOtherError
+  | FileSystemError
+  | TxSignError
+  | MptError,
   AlwaysSucceedsContract | Lucid | Database | NodeConfig
 > =>
   Effect.gen(function* () {
@@ -62,7 +82,7 @@ const wrapper = (
         yield* Effect.logInfo("🔹 Nothing to commit.");
         return {
           type: "NothingToCommitOutput",
-        };
+        } as WorkerOutput;
       }
       // No new transactions received, but there are uncommitted transactions in
       // the MPT. So its root must be used to submit a new block, and if
@@ -74,8 +94,7 @@ const wrapper = (
 
     const { ledgerTrie, mempoolTrie } = yield* makeMpts;
 
-    return yield* withTrieTransaction(
-      ledgerTrie,
+    const databaseOperationsProgram =
       Effect.gen(function* () {
         const { utxoRoot, txRoot, mempoolTxHashes, sizeOfProcessedTxs } =
           yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
@@ -265,7 +284,7 @@ const wrapper = (
             { concurrency: "unbounded" },
           );
 
-          return {
+          const finalOutput: WorkerOutput = {
             type: "SuccessfulSubmissionOutput",
             submittedTxHash: txHash,
             txSize,
@@ -274,9 +293,19 @@ const wrapper = (
             sizeOfBlocksTxs:
               sizeOfProcessedTxs + workerInput.data.sizeOfProcessedTxsSoFar,
           };
+          return finalOutput;
         }
       }),
+
+    const result: void | WorkerOutput = yield* withTrieTransaction(
+      ledgerTrie,
+      databaseOperationsProgram,
     );
+    if (result) {
+      return result;
+    } else {
+      return undefined;
+    }
   });
 
 const inputData = workerData as WorkerInput;
