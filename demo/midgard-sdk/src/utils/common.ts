@@ -158,39 +158,6 @@ export class HubOracleError extends Data.TaggedError(
   "HubOracleError",
 )<GenericErrorFields> {}
 
-export class MptError extends Data.TaggedError("MptError")<GenericErrorFields> {
-  static get(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie get operation`,
-      cause,
-    });
-  }
-  static put(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie put operation`,
-      cause,
-    });
-  }
-  static batch(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie batch operation`,
-      cause,
-    });
-  }
-  static trieDelete(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on whole ${trie} trie delete`,
-      cause,
-    });
-  }
-  static trieCreate(trie: string, cause?: unknown) {
-    return new MptError({
-      message: `An error occurred on ${trie} trie create`,
-      cause,
-    });
-  }
-}
-
 // General errors that don't have specific domains
 export class CmlUnexpectedError extends Data.TaggedError(
   "CmlUnexpectedError",
