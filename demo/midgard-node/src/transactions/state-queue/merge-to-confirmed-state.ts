@@ -178,12 +178,11 @@ export const buildAndSubmitMergeTx = (
         });
       const onConfirmFailure = (err: TxConfirmError) =>
         Effect.logError(`Confirm tx error: ${err}`);
-      yield* handleSignSubmit(
-        lucid,
-        txBuilder,
-        onSubmitFailure,
-        onConfirmFailure,
-      ).pipe(Effect.withSpan("handleSignSubmit-merge-tx"));
+      yield* handleSignSubmit(lucid, txBuilder).pipe(
+        Effect.catchTag("TxSubmitError", onSubmitFailure),
+        Effect.catchTag("TxConfirmError", onConfirmFailure),
+        Effect.withSpan("handleSignSubmit-merge-tx"),
+      );
       yield* Effect.logInfo(
         "🔸 Merge transaction submitted, updating the db...",
       );

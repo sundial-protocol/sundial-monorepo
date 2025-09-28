@@ -36,10 +36,8 @@ export const stateQueueInit: Effect.Effect<
     });
   const onConfirmFailure = (err: TxConfirmError) =>
     Effect.logError(`Confirm tx error: ${err}`);
-  return yield* handleSignSubmit(
-    lucid.api,
-    txBuilder,
-    onSubmitFailure,
-    onConfirmFailure,
+  return yield* handleSignSubmit(lucid.api, txBuilder).pipe(
+    Effect.catchTag("TxSubmitError", onSubmitFailure),
+    Effect.catchTag("TxConfirmError", onConfirmFailure),
   );
 });

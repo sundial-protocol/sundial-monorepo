@@ -64,11 +64,9 @@ const collectAndBurnStateQueueNodesProgram = (
       });
     const onConfirmFailure = (err: TxConfirmError) =>
       Effect.logError(`Confirm tx error: ${err}`);
-    const txHash = yield* handleSignSubmit(
-      lucid,
-      completed,
-      onSubmitFailure,
-      onConfirmFailure,
+    const txHash = yield* handleSignSubmit(lucid, completed).pipe(
+      Effect.catchTag("TxSubmitError", onSubmitFailure),
+      Effect.catchTag("TxConfirmError", onConfirmFailure),
     );
     yield* Ref.set(globals.RESET_IN_PROGRESS, false);
     return txHash;
