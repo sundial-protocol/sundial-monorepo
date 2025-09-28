@@ -64,14 +64,7 @@ import {
 } from "@/workers/utils/confirm-block-commitments.js";
 import { WorkerError } from "@/workers/utils/common.js";
 import { SerializedStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
-import {
-  DBCreateError,
-  DBDeleteError,
-  DBInsertError,
-  DBSelectError,
-  DBTruncateError,
-  DBUpdateError,
-} from "@/database/utils/common.js";
+import { DatabaseError } from "@/database/utils/common.js";
 import { TxConfirmError, TxSignError } from "@/transactions/utils.js";
 
 const TX_ENDPOINT: string = "tx";
@@ -121,16 +114,8 @@ const failWith500 = (
   msgOverride?: string,
 ) => failWith500Helper(`${method} /${endpoint}`, "failure", error, msgOverride);
 
-const handleDBGetFailure = (
-  endpoint: string,
-  e:
-    | DBSelectError
-    | DBCreateError
-    | DBInsertError
-    | DBDeleteError
-    | DBTruncateError
-    | DBUpdateError,
-) => failWith500("GET", endpoint, e.cause, `db failure with table ${e.table}`);
+const handleDBGetFailure = (endpoint: string, e: DatabaseError) =>
+  failWith500("GET", endpoint, e.cause, `db failure with table ${e.table}`);
 
 const handleTxGetFailure = (
   endpoint: string,
@@ -177,7 +162,7 @@ const getTxHandler = Effect.gen(function* () {
   return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", TX_ENDPOINT, e)),
-  Effect.catchTag("DBSelectError", (e) => handleDBGetFailure(TX_ENDPOINT, e)),
+  Effect.catchTag("DatabaseError", (e) => handleDBGetFailure(TX_ENDPOINT, e)),
 );
 
 const getUtxosHandler = Effect.gen(function* () {
@@ -227,7 +212,7 @@ const getUtxosHandler = Effect.gen(function* () {
   Effect.catchTag("HttpBodyError", (e) =>
     failWith500("GET", UTXOS_ENDPOINT, e),
   ),
-  Effect.catchTag("DBSelectError", (e) =>
+  Effect.catchTag("DatabaseError", (e) =>
     handleDBGetFailure(UTXOS_ENDPOINT, e),
   ),
 );
@@ -263,7 +248,7 @@ const getBlockHandler = Effect.gen(function* () {
   Effect.catchTag("HttpBodyError", (e) =>
     failWith500("GET", BLOCK_ENDPOINT, e),
   ),
-  Effect.catchTag("DBSelectError", (e) =>
+  Effect.catchTag("DatabaseError", (e) =>
     handleDBGetFailure(BLOCK_ENDPOINT, e),
   ),
 );
@@ -283,7 +268,7 @@ const getInitHandler = Effect.gen(function* () {
   Effect.catchTag("LucidError", (e) =>
     handleGenericGetFailure(INIT_ENDPOINT, e),
   ),
-  Effect.catchTag("DBInsertError", (e) => handleDBGetFailure(INIT_ENDPOINT, e)),
+  Effect.catchTag("DatabaseError", (e) => handleDBGetFailure(INIT_ENDPOINT, e)),
   Effect.catchTag("TxSubmitError", (e) => handleTxGetFailure(INIT_ENDPOINT, e)),
   Effect.catchTag("TxSignError", (e) => handleTxGetFailure(INIT_ENDPOINT, e)),
 );
@@ -321,13 +306,7 @@ const getMergeHandler = Effect.gen(function* () {
   Effect.catchTag("HttpBodyError", (e) =>
     failWith500("GET", MERGE_ENDPOINT, e),
   ),
-  Effect.catchTag("DBSelectError", (e) =>
-    handleDBGetFailure(MERGE_ENDPOINT, e),
-  ),
-  Effect.catchTag("DBDeleteError", (e) =>
-    handleDBGetFailure(MERGE_ENDPOINT, e),
-  ),
-  Effect.catchTag("DBInsertError", (e) =>
+  Effect.catchTag("DatabaseError", (e) =>
     handleDBGetFailure(MERGE_ENDPOINT, e),
   ),
   Effect.catchTag("TxSubmitError", (e) =>
@@ -376,16 +355,13 @@ const getResetHandler = Effect.gen(function* () {
   });
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "reset", e)),
-  Effect.catchTag("DBTruncateError", (e) =>
+  Effect.catchTag("DatabaseError", (e) =>
     handleDBGetFailure(RESET_ENDPOINT, e),
   ),
   Effect.catchTag("TxSubmitError", (e) =>
     handleTxGetFailure(RESET_ENDPOINT, e),
   ),
   Effect.catchTag("TxSignError", (e) => handleTxGetFailure(RESET_ENDPOINT, e)),
-  Effect.catchTag("MptError", (e) =>
-    handleGenericGetFailure(RESET_ENDPOINT, e),
-  ),
   Effect.catchTag("LucidError", (e) =>
     handleGenericGetFailure(RESET_ENDPOINT, e),
   ),
@@ -472,7 +448,7 @@ ${bHex} -──▶ ${keyValues[bHex]} tx(s)`;
   });
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "logBlocksDB", e)),
-  Effect.catchTag("DBSelectError", (e) => handleDBGetFailure("logBlocksDB", e)),
+  Effect.catchTag("DatabaseError", (e) => handleDBGetFailure("logBlocksDB", e)),
 );
 
 const getLogGlobalsHandler = Effect.gen(function* () {

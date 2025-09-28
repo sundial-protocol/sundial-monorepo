@@ -10,7 +10,7 @@ import { Data, Effect, Schedule } from "effect";
 import * as BlocksDB from "../database/blocks.js";
 import { Database } from "@/services/index.js";
 import { ImmutableDB } from "@/database/index.js";
-import { DBSelectError } from "@/database/utils/common.js";
+import { DatabaseError } from "@/database/utils/common.js";
 import { UnknownException } from "effect/Cause";
 
 const RETRY_ATTEMPTS = 1;
@@ -160,7 +160,7 @@ export const fetchFirstBlockTxs = (
   firstBlockUTxO: SDK.TxBuilder.StateQueue.StateQueueUTxO,
 ): Effect.Effect<
   { txs: readonly Buffer[]; headerHash: Buffer },
-  SDK.Utils.HashingError | SDK.Utils.DataCoercionError | DBSelectError,
+  SDK.Utils.HashingError | SDK.Utils.DataCoercionError | DatabaseError,
   Database
 > =>
   Effect.gen(function* () {

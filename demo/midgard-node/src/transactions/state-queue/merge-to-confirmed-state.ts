@@ -24,11 +24,7 @@ import {
   TxSignError,
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
-import {
-  DBDeleteError,
-  DBInsertError,
-  DBSelectError,
-} from "@/database/utils/common.js";
+import { DatabaseError } from "@/database/utils/common.js";
 import { breakDownTx } from "@/utils.js";
 import { Database, Globals } from "@/services/index.js";
 
@@ -105,9 +101,7 @@ export const buildAndSubmitMergeTx = (
   | SDK.Utils.LinkedListError
   | SDK.Utils.LucidError
   | SDK.Utils.StateQueueError
-  | DBSelectError
-  | DBDeleteError
-  | DBInsertError
+  | DatabaseError
   | TxSubmitError
   | TxSignError,
   Database | Globals

@@ -11,7 +11,7 @@ import * as Ledger from "@/database/utils/ledger.js";
 import { FileSystemError, findSpentAndProducedUTxOs } from "@/utils.js";
 import * as FS from "fs";
 import * as SDK from "@al-ft/midgard-sdk";
-import {DBOtherError} from "@/database/utils/common.js";
+import { DatabaseError } from "@/database/utils/common.js";
 
 // Key of the row which its value is the persisted trie root.
 const rootKey = ETH.ROOT_DB_KEY;
@@ -97,18 +97,22 @@ export const makeMpts: Effect.Effect<
   };
 });
 
-export const deleteMempoolMpt: Effect.Effect<void, FileSystemError, NodeConfig> =
-  Effect.gen(function* () {
-    const config = yield* NodeConfig;
-    yield* Effect.try({
-      try: () =>
-        FS.rmSync(config.MEMPOOL_MPT_DB_PATH, { recursive: true, force: true }),
-      catch: (e) => new FileSystemError({
-        message:"Failed to delete mempool's LevelDB file from disk",
+export const deleteMempoolMpt: Effect.Effect<
+  void,
+  FileSystemError,
+  NodeConfig
+> = Effect.gen(function* () {
+  const config = yield* NodeConfig;
+  yield* Effect.try({
+    try: () =>
+      FS.rmSync(config.MEMPOOL_MPT_DB_PATH, { recursive: true, force: true }),
+    catch: (e) =>
+      new FileSystemError({
+        message: "Failed to delete mempool's LevelDB file from disk",
         cause: e,
       }),
-    });
-  }).pipe(Effect.withLogSpan("Delete mempool MPT"));
+  });
+}).pipe(Effect.withLogSpan("Delete mempool MPT"));
 
 export const deleteLedgerMpt: Effect.Effect<void, FileSystemError, NodeConfig> =
   Effect.gen(function* () {
@@ -116,10 +120,11 @@ export const deleteLedgerMpt: Effect.Effect<void, FileSystemError, NodeConfig> =
     yield* Effect.try({
       try: () =>
         FS.rmSync(config.LEDGER_MPT_DB_PATH, { recursive: true, force: true }),
-      catch: (e) => new FileSystemError({
-        message:"Failed to delete ledger's LevelDB file from disk",
-        cause: e,
-      }),
+      catch: (e) =>
+        new FileSystemError({
+          message: "Failed to delete ledger's LevelDB file from disk",
+          cause: e,
+        }),
     });
   }).pipe(Effect.withLogSpan("Delete ledger MPT"));
 
@@ -208,16 +213,21 @@ export const processMpts = (
 export const withTrieTransaction = <A, E, R>(
   trie: ETH.MerklePatriciaTrie,
   eff: Effect.Effect<A, E, R>,
-): Effect.Effect<void | A, E | DBOtherError | MptError, Database | R> =>
+): Effect.Effect<void | A, E | DatabaseError | MptError, Database | R> =>
   Effect.gen(function* () {
     yield* Effect.sync(() => trie.checkpoint());
     const sql = yield* SqlClient.SqlClient;
-    const x = sql.withTransaction(eff).pipe(Effect.catchTag("SqlError", (e) => Effect.fail(
-      new DBOtherError({
-        message: "The effect ran within an SQL transaction failed",
-        cause: e,
-      }),
-    )));
+    const x = sql.withTransaction(eff).pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(
+          new DatabaseError({
+            message: "The effect executed within an SQL transaction failed",
+            table: "<unknown>",
+            cause: e,
+          }),
+        ),
+      ),
+    );
     const res = yield* x;
     yield* Effect.sync(() => trie.commit());
     return res;
@@ -226,10 +236,11 @@ export const withTrieTransaction = <A, E, R>(
       Effect.gen(function* () {
         yield* Effect.tryPromise({
           try: () => trie.revert(),
-          catch: (e) => new MptError({
-            message: "Failed to revert operations performed on an MPT",
-            cause: e,
-          }),
+          catch: (e) =>
+            new MptError({
+              message: "Failed to revert operations performed on an MPT",
+              cause: e,
+            }),
         });
         yield* Effect.fail(e);
       }),

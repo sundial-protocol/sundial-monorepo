@@ -36,7 +36,7 @@ import {
 import { FileSystemError, batchProgram } from "@/utils.js";
 import { Columns as TxColumns } from "@/database/utils/tx.js";
 import { WorkerError } from "./utils/common.js";
-import {DBDeleteError, DBInsertError, DBOtherError, DBSelectError, DBTruncateError} from "@/database/utils/common.js";
+import { DatabaseError } from "@/database/utils/common.js";
 
 const BATCH_SIZE = 100;
 
@@ -52,11 +52,7 @@ const wrapper = (
   | SDK.Utils.StateQueueError
   | ConfigError
   | DatabaseInitializationError
-  | DBInsertError
-  | DBDeleteError
-  | DBSelectError
-  | DBTruncateError
-  | DBOtherError
+  | DatabaseError
   | FileSystemError
   | TxSignError
   | MptError,
@@ -94,208 +90,203 @@ const wrapper = (
 
     const { ledgerTrie, mempoolTrie } = yield* makeMpts;
 
-    const databaseOperationsProgram =
-      Effect.gen(function* () {
-        const { utxoRoot, txRoot, mempoolTxHashes, sizeOfProcessedTxs } =
-          yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
+    const databaseOperationsProgram = Effect.gen(function* () {
+      const { utxoRoot, txRoot, mempoolTxHashes, sizeOfProcessedTxs } =
+        yield* processMpts(ledgerTrie, mempoolTrie, mempoolTxs);
 
-        const { policyId, spendScript, spendScriptAddress, mintScript } =
-          yield* AlwaysSucceedsContract;
+      const { policyId, spendScript, spendScriptAddress, mintScript } =
+        yield* AlwaysSucceedsContract;
 
-        const skippedSubmissionProgram = batchProgram(
-          BATCH_SIZE,
-          mempoolTxsCount,
-          "skipped-submission-db-transfer",
-          (startIndex: number, endIndex: number) => {
-            const batchTxs = mempoolTxs.slice(startIndex, endIndex);
-            const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
-            return Effect.all(
-              [
-                ProcessedMempoolDB.insertTxs(batchTxs).pipe(
-                  Effect.withSpan(`processed-mempool-db-insert-${startIndex}`),
-                ),
-                MempoolDB.clearTxs(batchHashes).pipe(
-                  Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
-                ),
-              ],
-              { concurrency: "unbounded" },
-            );
-          },
-        );
-
-        if (workerInput.data.availableConfirmedBlock === "") {
-          // The tx confirmation worker has not yet confirmed a previously
-          // submitted tx, so the root we have found can not be used yet.
-          // However, it is stored on disk in our LevelDB mempool. Therefore,
-          // the processed txs must be transferred to `ProcessedMempoolDB` from
-          // `MempoolDB`.
-          //
-          // TODO: Handle failures properly.
-          yield* Effect.logInfo(
-            "🔹 No confirmed blocks available. Transferring to ProcessedMempoolDB...",
-          );
-          yield* skippedSubmissionProgram;
-          return {
-            type: "SkippedSubmissionOutput",
-            mempoolTxsCount,
-            sizeOfProcessedTxs,
-          };
-        } else {
-          yield* Effect.logInfo(
-            "🔹 Previous submitted block is now confirmed, deserializing...",
-          );
-          const latestBlock = yield* deserializeStateQueueUTxO(
-            workerInput.data.availableConfirmedBlock,
-          );
-          yield* Effect.logInfo(
-            "🔹 Finding updated block datum and new header...",
-          );
-
-          yield* lucid.switchToOperatorsMainWallet;
-
-          const { nodeDatum: updatedNodeDatum, header: newHeader } =
-            yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
-              lucid.api,
-              latestBlock.datum,
-              utxoRoot,
-              txRoot,
-              BigInt(endTime),
-            );
-
-          const newHeaderHash = yield* SDK.Utils.hashHeader(newHeader);
-          yield* Effect.logInfo(`🔹 New header hash is: ${newHeaderHash}`);
-
-          // Build commitment block
-          const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams =
-            {
-              anchorUTxO: latestBlock,
-              updatedAnchorDatum: updatedNodeDatum,
-              newHeader: newHeader,
-              stateQueueSpendingScript: spendScript,
-              policyId,
-              stateQueueMintingScript: mintScript,
-            };
-
-          const aoUpdateCommitmentTimeParams = {};
-
-          yield* Effect.logInfo("🔹 Building block commitment transaction...");
-          const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
-            stateQueueAddress: spendScriptAddress,
-            stateQueuePolicyId: policyId,
-          };
-          yield* lucid.switchToOperatorsMainWallet;
-          const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
-            lucid.api,
-            fetchConfig,
-            commitBlockParams,
-            aoUpdateCommitmentTimeParams,
-          );
-          const txSize = txBuilder.toCBOR().length / 2;
-          yield* Effect.logInfo(
-            `🔹 Transaction built successfully. Size: ${txSize}`,
-          );
-
-          let output: WorkerOutput | undefined = undefined;
-
-          const onSubmitFailure = (
-            err: TxSubmitError | { _tag: "TxSubmitError" },
-          ) =>
-            Effect.gen(function* () {
-              yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err}`);
-              yield* Effect.logError(
-                "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
-              );
-              yield* Effect.logInfo("🔹 Mempool Trie stats:");
-              console.dir(mempoolTrie.database()._stats, { depth: null });
-              output = {
-                type: "SkippedSubmissionOutput",
-                mempoolTxsCount,
-                sizeOfProcessedTxs,
-              };
-            });
-
-          const txHash = yield* handleSignSubmitNoConfirmation(
-            lucid.api,
-            txBuilder,
-            onSubmitFailure,
-          ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
-
-          if (!txHash && output !== undefined) {
-            // With a failed tx submission, we need to carry out the same db
-            // logic as the case where no confirmed blocks are available.
-            //
-            // TODO: Handle failures properly.
-            yield* skippedSubmissionProgram;
-            return output;
-          }
-
-          const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
-
-          const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve;
-
-          yield* Effect.logInfo(
-            "🔹 Inserting included transactions into ImmutableDB and BlocksDB, clearing all the processed txs from MempoolDB and ProcessedMempoolDB, and deleting mempool LevelDB...",
-          );
-          yield* Effect.all(
+      const skippedSubmissionProgram = batchProgram(
+        BATCH_SIZE,
+        mempoolTxsCount,
+        "skipped-submission-db-transfer",
+        (startIndex: number, endIndex: number) => {
+          const batchTxs = mempoolTxs.slice(startIndex, endIndex);
+          const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
+          return Effect.all(
             [
-              batchProgram(
-                Math.floor(BATCH_SIZE / 2),
-                mempoolTxsCount,
-                "successful-commit",
-                (startIndex: number, endIndex: number) => {
-                  const batchTxs = mempoolTxs.slice(startIndex, endIndex);
-                  const batchHashes = mempoolTxHashes.slice(
-                    startIndex,
-                    endIndex,
-                  );
-                  const batchHashesForBlocks = [...batchHashes];
-
-                  const batchProcessedTxs = processedMempoolTxs.slice(
-                    startIndex,
-                    endIndex,
-                  );
-
-                  for (let i = 0; i < batchProcessedTxs.length; i++) {
-                    const txPair = batchProcessedTxs[i];
-                    batchTxs.push(txPair);
-                    batchHashesForBlocks.push(txPair[TxColumns.TX_ID]);
-                  }
-
-                  return Effect.all(
-                    [
-                      ImmutableDB.insertTxs(batchTxs).pipe(
-                        Effect.withSpan(`immutable-db-insert-${startIndex}`),
-                      ),
-                      BlocksDB.insert(
-                        newHeaderHashBuffer,
-                        batchHashesForBlocks,
-                      ).pipe(Effect.withSpan(`blocks-db-insert-${startIndex}`)),
-                      MempoolDB.clearTxs(batchHashes).pipe(
-                        Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
-                      ),
-                    ],
-                    { concurrency: "unbounded" },
-                  );
-                },
+              ProcessedMempoolDB.insertTxs(batchTxs).pipe(
+                Effect.withSpan(`processed-mempool-db-insert-${startIndex}`),
               ),
-              ProcessedMempoolDB.clear, // uses `TRUNCATE` so no need for batching.
-              deleteMempoolMpt,
+              MempoolDB.clearTxs(batchHashes).pipe(
+                Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
+              ),
             ],
             { concurrency: "unbounded" },
           );
+        },
+      );
 
-          const finalOutput: WorkerOutput = {
-            type: "SuccessfulSubmissionOutput",
-            submittedTxHash: txHash,
-            txSize,
-            mempoolTxsCount:
-              mempoolTxsCount + workerInput.data.mempoolTxsCountSoFar,
-            sizeOfBlocksTxs:
-              sizeOfProcessedTxs + workerInput.data.sizeOfProcessedTxsSoFar,
-          };
-          return finalOutput;
+      if (workerInput.data.availableConfirmedBlock === "") {
+        // The tx confirmation worker has not yet confirmed a previously
+        // submitted tx, so the root we have found can not be used yet.
+        // However, it is stored on disk in our LevelDB mempool. Therefore,
+        // the processed txs must be transferred to `ProcessedMempoolDB` from
+        // `MempoolDB`.
+        //
+        // TODO: Handle failures properly.
+        yield* Effect.logInfo(
+          "🔹 No confirmed blocks available. Transferring to ProcessedMempoolDB...",
+        );
+        yield* skippedSubmissionProgram;
+        return {
+          type: "SkippedSubmissionOutput",
+          mempoolTxsCount,
+          sizeOfProcessedTxs,
+        };
+      } else {
+        yield* Effect.logInfo(
+          "🔹 Previous submitted block is now confirmed, deserializing...",
+        );
+        const latestBlock = yield* deserializeStateQueueUTxO(
+          workerInput.data.availableConfirmedBlock,
+        );
+        yield* Effect.logInfo(
+          "🔹 Finding updated block datum and new header...",
+        );
+
+        yield* lucid.switchToOperatorsMainWallet;
+
+        const { nodeDatum: updatedNodeDatum, header: newHeader } =
+          yield* SDK.Utils.updateLatestBlocksDatumAndGetTheNewHeader(
+            lucid.api,
+            latestBlock.datum,
+            utxoRoot,
+            txRoot,
+            BigInt(endTime),
+          );
+
+        const newHeaderHash = yield* SDK.Utils.hashHeader(newHeader);
+        yield* Effect.logInfo(`🔹 New header hash is: ${newHeaderHash}`);
+
+        // Build commitment block
+        const commitBlockParams: SDK.TxBuilder.StateQueue.CommitBlockParams = {
+          anchorUTxO: latestBlock,
+          updatedAnchorDatum: updatedNodeDatum,
+          newHeader: newHeader,
+          stateQueueSpendingScript: spendScript,
+          policyId,
+          stateQueueMintingScript: mintScript,
+        };
+
+        const aoUpdateCommitmentTimeParams = {};
+
+        yield* Effect.logInfo("🔹 Building block commitment transaction...");
+        const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
+          stateQueueAddress: spendScriptAddress,
+          stateQueuePolicyId: policyId,
+        };
+        yield* lucid.switchToOperatorsMainWallet;
+        const txBuilder = yield* SDK.Endpoints.commitBlockHeaderProgram(
+          lucid.api,
+          fetchConfig,
+          commitBlockParams,
+          aoUpdateCommitmentTimeParams,
+        );
+        const txSize = txBuilder.toCBOR().length / 2;
+        yield* Effect.logInfo(
+          `🔹 Transaction built successfully. Size: ${txSize}`,
+        );
+
+        let output: WorkerOutput | undefined = undefined;
+
+        const onSubmitFailure = (
+          err: TxSubmitError | { _tag: "TxSubmitError" },
+        ) =>
+          Effect.gen(function* () {
+            yield* Effect.logError(`🔹 ⚠️  Tx submit failed: ${err}`);
+            yield* Effect.logError(
+              "🔹 ⚠️  Mempool trie will be preserved, but db will be cleared.",
+            );
+            yield* Effect.logInfo("🔹 Mempool Trie stats:");
+            console.dir(mempoolTrie.database()._stats, { depth: null });
+            output = {
+              type: "SkippedSubmissionOutput",
+              mempoolTxsCount,
+              sizeOfProcessedTxs,
+            };
+          });
+
+        const txHash = yield* handleSignSubmitNoConfirmation(
+          lucid.api,
+          txBuilder,
+          onSubmitFailure,
+        ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
+
+        if (!txHash && output !== undefined) {
+          // With a failed tx submission, we need to carry out the same db
+          // logic as the case where no confirmed blocks are available.
+          //
+          // TODO: Handle failures properly.
+          yield* skippedSubmissionProgram;
+          return output;
         }
-      }),
+
+        const newHeaderHashBuffer = Buffer.from(fromHex(newHeaderHash));
+
+        const processedMempoolTxs = yield* ProcessedMempoolDB.retrieve;
+
+        yield* Effect.logInfo(
+          "🔹 Inserting included transactions into ImmutableDB and BlocksDB, clearing all the processed txs from MempoolDB and ProcessedMempoolDB, and deleting mempool LevelDB...",
+        );
+        yield* Effect.all(
+          [
+            batchProgram(
+              Math.floor(BATCH_SIZE / 2),
+              mempoolTxsCount,
+              "successful-commit",
+              (startIndex: number, endIndex: number) => {
+                const batchTxs = mempoolTxs.slice(startIndex, endIndex);
+                const batchHashes = mempoolTxHashes.slice(startIndex, endIndex);
+                const batchHashesForBlocks = [...batchHashes];
+
+                const batchProcessedTxs = processedMempoolTxs.slice(
+                  startIndex,
+                  endIndex,
+                );
+
+                for (let i = 0; i < batchProcessedTxs.length; i++) {
+                  const txPair = batchProcessedTxs[i];
+                  batchTxs.push(txPair);
+                  batchHashesForBlocks.push(txPair[TxColumns.TX_ID]);
+                }
+
+                return Effect.all(
+                  [
+                    ImmutableDB.insertTxs(batchTxs).pipe(
+                      Effect.withSpan(`immutable-db-insert-${startIndex}`),
+                    ),
+                    BlocksDB.insert(
+                      newHeaderHashBuffer,
+                      batchHashesForBlocks,
+                    ).pipe(Effect.withSpan(`blocks-db-insert-${startIndex}`)),
+                    MempoolDB.clearTxs(batchHashes).pipe(
+                      Effect.withSpan(`mempool-db-clear-txs-${startIndex}`),
+                    ),
+                  ],
+                  { concurrency: "unbounded" },
+                );
+              },
+            ),
+            ProcessedMempoolDB.clear, // uses `TRUNCATE` so no need for batching.
+            deleteMempoolMpt,
+          ],
+          { concurrency: "unbounded" },
+        );
+
+        const finalOutput: WorkerOutput = {
+          type: "SuccessfulSubmissionOutput",
+          submittedTxHash: txHash,
+          txSize,
+          mempoolTxsCount:
+            mempoolTxsCount + workerInput.data.mempoolTxsCountSoFar,
+          sizeOfBlocksTxs:
+            sizeOfProcessedTxs + workerInput.data.sizeOfProcessedTxsSoFar,
+        };
+        return finalOutput;
+      }
+    });
 
     const result: void | WorkerOutput = yield* withTrieTransaction(
       ledgerTrie,
