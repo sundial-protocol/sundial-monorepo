@@ -31,7 +31,8 @@ export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
       ${sql(Ledger.Columns.TX_ID)} BYTEA NOT NULL,
-      ${sql(Ledger.Columns.ADDRESS)} TEXT NOT NULL
+      ${sql(Ledger.Columns.ADDRESS)} TEXT NOT NULL,
+      UNIQUE (tx_id, address)
     );`;
   },
 ).pipe(
@@ -45,7 +46,8 @@ export const insertEntries = (
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
-    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}`;
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}
+      ON CONFLICT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)}) DO NOTHING`;
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
@@ -72,7 +74,7 @@ export const insert = (
       [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
     }));
 
-    yield* insertEntries([...new Set([...inputEntries, ...outputEntries])]);
+    yield* insertEntries([...inputEntries, ...outputEntries]);
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
