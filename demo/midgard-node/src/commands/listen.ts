@@ -124,7 +124,7 @@ const handleTxGetFailure = (
 
 const handleGenericGetFailure = (
   endpoint: string,
-  e: { message: string; cause: any },
+  e: SDK.Utils.GenericErrorFields,
 ) => failWith500("GET", endpoint, e.cause, e.message);
 
 const getTxHandler = Effect.gen(function* () {

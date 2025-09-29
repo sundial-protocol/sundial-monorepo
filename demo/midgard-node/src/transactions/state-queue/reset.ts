@@ -4,6 +4,7 @@ import {
   Data,
   LucidEvolution,
   Script,
+  TxSignBuilder,
   toUnit,
 } from "@lucid-evolution/lucid";
 import { AlwaysSucceedsContract, Globals, Lucid } from "@/services/index.js";
@@ -43,7 +44,7 @@ const collectAndBurnStateQueueNodesProgram = (
     tx.mintAssets(assetsToBurn, Data.void())
       .attach.Script(stateQueueSpendingScript)
       .attach.Script(stateQueueMintingScript);
-    const completed = yield* tx.completeProgram().pipe(
+    const completed: TxSignBuilder = yield* tx.completeProgram().pipe(
       Effect.mapError(
         (e) =>
           new SDK.Utils.LucidError({
@@ -59,6 +60,7 @@ const collectAndBurnStateQueueNodesProgram = (
           new TxSubmitError({
             message: "failed to submit a state queue reset tx",
             cause: err,
+            txHash: completed.toHash(),
           }),
         );
       });

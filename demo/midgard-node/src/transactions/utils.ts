@@ -3,6 +3,7 @@ import {
   LucidEvolution,
   OutRef,
   TxSignBuilder,
+  TxSigned,
   UTxO,
   fromHex,
 } from "@lucid-evolution/lucid";
@@ -83,6 +84,7 @@ const signSubmitHelper = (
       lucid.wallet().address(),
     ).pipe(Effect.catchAll((_e) => Effect.succeed("<unknown>")));
     yield* Effect.logInfo(`✍  Signing tx with ${walletAddr}`);
+    const txHash = signBuilder.toHash();
     const signedProgram = signBuilder.sign
       .withWallet()
       .completeProgram()
@@ -93,6 +95,7 @@ const signSubmitHelper = (
             new TxSignError({
               message: `Failed to sign transaction`,
               cause: e,
+              txHash,
             }),
         ),
       );
@@ -101,7 +104,7 @@ const signSubmitHelper = (
 ${signed.toCBOR()}
 `);
     yield* Effect.logInfo("✉️  Submitting transaction...");
-    const txHash = yield* signed.submitProgram().pipe(
+    yield* signed.submitProgram().pipe(
       Effect.retry(
         Schedule.compose(
           Schedule.exponential(INIT_RETRY_AFTER_MILLIS),
@@ -114,6 +117,7 @@ ${signed.toCBOR()}
           new TxSubmitError({
             message: `Failed to submit transaction`,
             cause: e,
+            txHash,
           }),
       ),
     );
@@ -161,18 +165,18 @@ export const outRefsAreEqual = (outRef0: OutRef, outRef1: OutRef): boolean => {
 
 export class TxSignError extends Data.TaggedError("TxSignError")<
   SDK.Utils.GenericErrorFields & {
-    readonly txHash?: string;
+    readonly txHash: string;
   }
 > {}
 
 export class TxSubmitError extends Data.TaggedError("TxSubmitError")<
   SDK.Utils.GenericErrorFields & {
-    readonly txHash?: string;
+    readonly txHash: string;
   }
 > {}
 
 export class TxConfirmError extends Data.TaggedError("TxConfirmError")<
   SDK.Utils.GenericErrorFields & {
-    readonly txHash?: string;
+    readonly txHash: string;
   }
 > {}
