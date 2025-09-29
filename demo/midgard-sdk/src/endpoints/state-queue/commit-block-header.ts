@@ -26,7 +26,7 @@ export const commitBlockHeaderProgram = (
           .complete({ localUPLCEval: false }),
       catch: (e) =>
         new StateQueueError({
-          message: "Failed to build commit block header transaction",
+          message: "Failed to build block header commitment transaction",
           cause: e,
         }),
     });

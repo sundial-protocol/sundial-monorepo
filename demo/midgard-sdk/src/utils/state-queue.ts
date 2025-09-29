@@ -177,7 +177,7 @@ export const findLinkStateQueueUTxO = (
   link: NodeKey,
   utxos: StateQueueUTxO[],
 ): Effect.Effect<StateQueueUTxO, LinkedListError> => {
-  const errorMessage = `Failed to find link state queue UTxOs`;
+  const errorMessage = `Failed to find link state queue UTxO`;
   if (link === "Empty") {
     return Effect.fail(
       new LinkedListError({
@@ -196,7 +196,7 @@ export const findLinkStateQueueUTxO = (
       return Effect.fail(
         new LinkedListError({
           message: errorMessage,
-          cause: `Link not found`,
+          cause: `Link not found among given state queue UTxOs`,
         }),
       );
     }

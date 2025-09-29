@@ -66,7 +66,7 @@ export const getBeaconToken = (
       yield* Effect.fail(
         new UnauthenticUtxoError({
           message: errorMessage,
-          cause: `The quantity of the beacon token was expected to be exactly 1, but it was ${qty}`,
+          cause: `The quantity of the beacon token was expected to be exactly 1, but it was ${qty.toString()}`,
         }),
       );
     }
@@ -115,14 +115,14 @@ export const utxosAtByNFTPolicyId = (
   });
 
 const blake2bHelper = (
-  hash: string,
+  msg: string,
   dkLen: number,
   functionName: string,
 ): Effect.Effect<string, HashingError> => {
   const errorMessage = `Failed to hash using ${functionName} function`;
-  if (isHexString(hash)) {
+  if (isHexString(msg)) {
     try {
-      return Effect.succeed(toHex(blake2b(fromHex(hash), { dkLen })));
+      return Effect.succeed(toHex(blake2b(fromHex(msg), { dkLen })));
     } catch (e) {
       return Effect.fail(
         new HashingError({
@@ -142,12 +142,12 @@ const blake2bHelper = (
 };
 
 export const hashHexWithBlake2b224 = (
-  hash: string,
-): Effect.Effect<string, HashingError> => blake2bHelper(hash, 28, "Blake2b224");
+  msg: string,
+): Effect.Effect<string, HashingError> => blake2bHelper(msg, 28, "Blake2b224");
 
 export const hashHexWithBlake2b256 = (
-  hash: string,
-): Effect.Effect<string, HashingError> => blake2bHelper(hash, 32, "Blake2b256");
+  msg: string,
+): Effect.Effect<string, HashingError> => blake2bHelper(msg, 32, "Blake2b256");
 
 export type GenericErrorFields = {
   readonly message: string;
