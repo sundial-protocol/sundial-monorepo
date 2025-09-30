@@ -1,6 +1,6 @@
 import { parentPort, workerData } from "worker_threads";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Cause, Effect, pipe } from "effect";
+import { Cause, Effect, Match, pipe } from "effect";
 import {
   WorkerInput,
   WorkerOutput,
@@ -301,24 +301,24 @@ const wrapper = (
         ).pipe(Effect.withSpan("handleSignSubmit-commit-block"));
 
         return yield* Effect.matchEffect(signAndSubmitProgram, {
-          onFailure: (e) =>
-            Effect.gen(function* () {
-              switch (e._tag) {
-                case "TxSignError":
-                  const failureOutput: WorkerOutput = {
-                    type: "FailureOutput",
-                    error: "Something went wrong at signing the transaction",
-                  };
-                  return failureOutput;
-                case "TxSubmitError":
-                  // With a failed tx submission, we need to carry out the same db
-                  // logic as the case where no confirmed blocks are available.
-                  //
-                  // TODO: Handle failures properly.
-                  yield* skippedSubmissionProgram;
-                  return yield* failedSubmissionProgram(e);
-              }
-            }),
+          onFailure: Match.valueTags({
+            TxSignError: (_) => {
+              const failureOutput: WorkerOutput = {
+                type: "FailureOutput",
+                error: "Something went wrong at signing the transaction",
+              };
+              return Effect.succeed(failureOutput);
+            },
+            TxSubmitError: (e) =>
+              Effect.gen(function* () {
+                // With a failed tx submission, we need to carry out the same db
+                // logic as the case where no confirmed blocks are available.
+                //
+                // TODO: Handle failures properly.
+                yield* skippedSubmissionProgram;
+                return yield* failedSubmissionProgram(e);
+              }),
+          }),
           onSuccess: successfulSubmissionProgram,
         });
       }
