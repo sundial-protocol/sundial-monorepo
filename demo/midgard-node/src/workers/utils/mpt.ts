@@ -53,11 +53,11 @@ export const makeMpts: Effect.Effect<
       }),
     catch: (e) => MptError.trieCreate("ledger", e),
   });
-  const mempoolRootBeforeMempoolTxs = yield* Effect.tryPromise(() =>
-    mempoolTrie.get(rootKey),
+  const mempoolRootBeforeMempoolTxs = yield* Effect.tryPromise(async () =>
+    mempoolTrie.root(),
   ).pipe(Effect.orElse(() => Effect.succeed(ledgerTrie.EMPTY_TRIE_ROOT)));
-  const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise(() =>
-    ledgerTrie.get(rootKey),
+  const ledgerRootBeforeMempoolTxs = yield* Effect.tryPromise(async () =>
+    ledgerTrie.root(),
   ).pipe(
     Effect.orElse(() =>
       Effect.gen(function* () {
