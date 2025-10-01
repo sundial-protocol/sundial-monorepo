@@ -22,7 +22,7 @@ const LEVELDB_ENCODING_OPTS = {
 };
 
 export const makeMpts: Effect.Effect<
-  { ledgerTrie: ETH.MerklePatriciaTrie; mempoolTrie: ETH.MerklePatriciaTrie },
+  { ledgerTrie: ETH.MerklePatriciaTrie; ledgerDB: Level<string, Uint8Array>; mempoolTrie: ETH.MerklePatriciaTrie; mempoolDB: Level<string, Uint8Array> },
   MptError,
   NodeConfig
 > = Effect.gen(function* () {
@@ -93,7 +93,9 @@ export const makeMpts: Effect.Effect<
   yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
   return {
     ledgerTrie,
+    ledgerDB: ledgerLevelDb,
     mempoolTrie,
+    mempoolDB: mempoolLevelDb,
   };
 });
 
