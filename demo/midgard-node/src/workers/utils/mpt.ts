@@ -13,9 +13,6 @@ import * as FS from "fs";
 import * as SDK from "@al-ft/midgard-sdk";
 import { DatabaseError } from "@/database/utils/common.js";
 
-// Key of the row which its value is the persisted trie root.
-const rootKey = ETH.ROOT_DB_KEY;
-
 const LEVELDB_ENCODING_OPTS = {
   keyEncoding: ETH_UTILS.KeyEncoding.Bytes,
   valueEncoding: ETH_UTILS.ValueEncoding.Bytes,
@@ -24,9 +21,7 @@ const LEVELDB_ENCODING_OPTS = {
 export const makeMpts: Effect.Effect<
   {
     ledgerTrie: ETH.MerklePatriciaTrie;
-    ledgerDB: Level<string, Uint8Array>;
     mempoolTrie: ETH.MerklePatriciaTrie;
-    mempoolDB: Level<string, Uint8Array>;
   },
   MptError,
   NodeConfig
@@ -103,9 +98,7 @@ export const makeMpts: Effect.Effect<
   yield* Effect.sync(() => ledgerTrie.root(ledgerRootBeforeMempoolTxs));
   return {
     ledgerTrie,
-    ledgerDB: ledgerLevelDb,
     mempoolTrie,
-    mempoolDB: mempoolLevelDb,
   };
 });
 
