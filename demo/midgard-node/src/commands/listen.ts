@@ -69,6 +69,7 @@ import { DatabaseError } from "@/database/utils/common.js";
 import { TxConfirmError, TxSignError } from "@/transactions/utils.js";
 
 const TX_ENDPOINT: string = "tx";
+const ADDRESS_HISTORY_ENDPOINT: string = "txs";
 const MERGE_ENDPOINT: string = "merge";
 const UTXOS_ENDPOINT: string = "utxos";
 const BLOCK_ENDPOINT: string = "block";
@@ -374,7 +375,9 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
   const addr = params["address"];
 
   if (typeof addr !== "string") {
-    yield* Effect.logInfo(`GET /txs - Invalid address type: ${addr}`);
+    yield* Effect.logInfo(
+      `GET /${ADDRESS_HISTORY_ENDPOINT} - Invalid address type: ${addr}`,
+    );
     return yield* HttpServerResponse.json(
       { error: `Invalid address type: ${addr}` },
       { status: 400 },
@@ -404,8 +407,8 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
   }
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "txs", e)),
-  Effect.catchTag("DBSelectError", (e) =>
-    failWith500("GET", "txs", e.cause ?? e, "database error"),
+  Effect.catchTag("DatabaseError", (e) =>
+    handleDBGetFailure(ADDRESS_HISTORY_ENDPOINT, e),
   ),
 );
 
@@ -569,6 +572,7 @@ const router = (
   HttpRouter.empty
     .pipe(
       HttpRouter.get(`/${TX_ENDPOINT}`, getTxHandler),
+      HttpRouter.get(`/${ADDRESS_HISTORY_ENDPOINT}`, getTxsOfAddressHandler),
       HttpRouter.get(`/${UTXOS_ENDPOINT}`, getUtxosHandler),
       HttpRouter.get(`/${BLOCK_ENDPOINT}`, getBlockHandler),
       HttpRouter.get(`/${INIT_ENDPOINT}`, getInitHandler),
