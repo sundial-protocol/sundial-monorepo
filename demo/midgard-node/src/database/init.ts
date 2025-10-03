@@ -10,14 +10,13 @@ import * as Tx from "@/database/utils/tx.js";
 import * as Ledger from "@/database/utils/ledger.js";
 import * as AddressHistory from "@/database/addressHistory.js";
 import { Effect } from "effect";
-import { Database } from "@/services/database.js";
 import { insertGenesisUtxos } from "./genesis.js";
-import { NodeConfig } from "@/config.js";
-import { DBCreateError, DBOtherError } from "./utils/common.js";
+import { Database, NodeConfig } from "@/services/index.js";
+import { DatabaseError } from "./utils/common.js";
 
 export const initializeDb: () => Effect.Effect<
   void,
-  DBCreateError | DBOtherError,
+  DatabaseError,
   Database | NodeConfig
 > = () =>
   Effect.gen(function* () {
@@ -40,13 +39,15 @@ export const initializeDb: () => Effect.Effect<
   }).pipe(
     Effect.mapError((error: unknown) =>
       error instanceof SqlError.SqlError
-        ? new DBOtherError({
+        ? new DatabaseError({
             message: `Failed to initialize database`,
             cause: error,
+            table: "<n/a>",
           })
-        : new DBOtherError({
+        : new DatabaseError({
             message: `Unknown error during database initialization: ${error}`,
             cause: error,
+            table: "<n/a>",
           }),
     ),
   );

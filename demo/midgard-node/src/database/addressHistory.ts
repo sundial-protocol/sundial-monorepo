@@ -1,7 +1,11 @@
 import { Database } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
-import { DBCreateError, DBDeleteError, DBInsertError, DBSelectError, clearTable, sqlErrorToDBCreateError, sqlErrorToDBDeleteError, sqlErrorToDBInsertError, sqlErrorToDBSelectError } from "@/database/utils/common.js";
+import {
+  DatabaseError,
+  clearTable,
+  sqlErrorToDatabaseError,
+} from "@/database/utils/common.js";
 import { Address } from "@lucid-evolution/lucid";
 import * as MempoolDB from "@/database/mempool.js";
 import * as ImmutableDB from "@/database/immutable.js";
@@ -16,7 +20,7 @@ export type Entry = {
   [Ledger.Columns.ADDRESS]: Address;
 };
 
-export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(
+export const init: Effect.Effect<void, DatabaseError, Database> = Effect.gen(
   function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
@@ -26,12 +30,12 @@ export const init: Effect.Effect<void, DBCreateError, Database> = Effect.gen(
   },
 ).pipe(
   Effect.withLogSpan(`creating table ${tableName}`),
-  sqlErrorToDBCreateError(tableName),
+  sqlErrorToDatabaseError(tableName, "Failed to create the table"),
 );
 
 export const insertEntries = (
   entries: Entry[],
-): Effect.Effect<void, DBInsertError, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
@@ -41,13 +45,13 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError(tableName),
+    sqlErrorToDatabaseError(tableName, "Failed to insert given entries"),
   );
 
 export const insert = (
   spent: Buffer[],
   produced: Ledger.Entry[],
-): Effect.Effect<void, DBInsertError, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
@@ -68,12 +72,15 @@ export const insert = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
     ),
-    sqlErrorToDBInsertError(tableName),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to insert the given entries from spent and produced UTxOs",
+    ),
   );
 
 export const delTxHash = (
   tx_hash: Buffer,
-): Effect.Effect<void, DBDeleteError, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(
@@ -83,22 +90,29 @@ export const delTxHash = (
       Ledger.Columns.TX_ID,
     )} = ${tx_hash}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
-  }).pipe(Effect.withLogSpan(`delTxHash table ${tableName}`), sqlErrorToDBDeleteError(tableName));
+  }).pipe(
+    Effect.withLogSpan(`delTxHash table ${tableName}`),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to delete entries with the given tx hash",
+    ),
+  );
 
 /**
- * Retreives all cbors from MempoolDB and ImmutableDB
- * which mention provided address.
+ * Retreives all cbors from MempoolDB and ImmutableDB which mention provided
+ * address.
  *
- * Works by doing an inner join with tables
- * [tx_id | address] and [tx_id | tx],
- * getting [address | tx] as a result.
+ * Works by performing an inner join with tables [tx_id | address] and
+ * [tx_id | tx], getting [address | tx] as a result.
  */
 export const retrieve = (
   address: Address,
-): Effect.Effect<readonly Buffer[], DBSelectError, Database> =>
+): Effect.Effect<readonly Buffer[], DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    yield* Effect.logInfo(`${tableName} db: attempt to retrieve value with address ${address}`);
+    yield* Effect.logInfo(
+      `${tableName} db: attempt to retrieve value with address ${address}`,
+    );
 
     const result = yield* sql<Buffer>`SELECT ${sql(Tx.Columns.TX)} FROM (
       SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
@@ -120,7 +134,10 @@ export const retrieve = (
         `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
       ),
     ),
-    sqlErrorToDBSelectError(tableName),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to retrieve entries of the given address",
+    ),
   );
 
 export const clear = clearTable(tableName);

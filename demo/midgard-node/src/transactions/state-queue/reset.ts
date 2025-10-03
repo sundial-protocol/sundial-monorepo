@@ -1,29 +1,37 @@
 import * as SDK from "@al-ft/midgard-sdk";
 import {
-  Address,
   Assets,
   Data,
   LucidEvolution,
   Script,
+  TxSignBuilder,
   toUnit,
 } from "@lucid-evolution/lucid";
-import { AlwaysSucceeds } from "@/services/index.js";
-import { NodeConfig, User } from "@/config.js";
-import { Effect } from "effect";
-import { TxConfirmError, handleSignSubmit, TxSubmitError } from "../utils.js";
+import { AlwaysSucceedsContract, Globals, Lucid } from "@/services/index.js";
+import { Effect, Ref } from "effect";
+import {
+  TxConfirmError,
+  handleSignSubmit,
+  TxSubmitError,
+  TxSignError,
+} from "@/transactions/utils.js";
 import { batchProgram } from "@/utils.js";
 
 const collectAndBurnStateQueueNodesProgram = (
   lucid: LucidEvolution,
-  l1OperatorAddress: Address,
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   stateQueueSpendingScript: Script,
   stateQueueMintingScript: Script,
   stateQueueUTxOs: SDK.TxBuilder.StateQueue.StateQueueUTxO[],
-): Effect.Effect<void, Error> =>
+): Effect.Effect<
+  void,
+  SDK.Utils.LucidError | TxSignError | TxSubmitError,
+  Globals
+> =>
   Effect.gen(function* () {
-    global.RESET_IN_PROGRESS = true;
-    const tx = lucid.newTx().addSigner(l1OperatorAddress);
+    const globals = yield* Globals;
+    yield* Ref.set(globals.RESET_IN_PROGRESS, true);
+    const tx = lucid.newTx();
     const assetsToBurn: Assets = {};
     stateQueueUTxOs.map(({ utxo, assetName }) => {
       const unit = toUnit(fetchConfig.stateQueuePolicyId, assetName);
@@ -37,42 +45,55 @@ const collectAndBurnStateQueueNodesProgram = (
     tx.mintAssets(assetsToBurn, Data.void())
       .attach.Script(stateQueueSpendingScript)
       .attach.Script(stateQueueMintingScript);
-    const completed = yield* tx.completeProgram();
-    const onSubmitFailure = (err: TxSubmitError | { _tag: "TxSubmitError" }) =>
+    const completed: TxSignBuilder = yield* tx.completeProgram().pipe(
+      Effect.mapError(
+        (e) =>
+          new SDK.Utils.LucidError({
+            message: "Failed to finalize the reset transaction",
+            cause: e,
+          }),
+      ),
+    );
+    const onSubmitFailure = (err: TxSubmitError) =>
       Effect.gen(function* () {
         yield* Effect.logError(`Submit tx error: ${err}`);
         yield* Effect.fail(
           new TxSubmitError({
             message: "failed to submit a state queue reset tx",
             cause: err,
+            txHash: completed.toHash(),
           }),
         );
       });
     const onConfirmFailure = (err: TxConfirmError) =>
       Effect.logError(`Confirm tx error: ${err}`);
-    const txHash = yield* handleSignSubmit(
-      lucid,
-      completed,
-      onSubmitFailure,
-      onConfirmFailure,
+    const txHash = yield* handleSignSubmit(lucid, completed).pipe(
+      Effect.catchTag("TxSubmitError", onSubmitFailure),
+      Effect.catchTag("TxConfirmError", onConfirmFailure),
     );
-    global.RESET_IN_PROGRESS = false;
+    yield* Ref.set(globals.RESET_IN_PROGRESS, false);
     return txHash;
   });
 
-export const resetStateQueue = Effect.gen(function* () {
-  const nodeConfig = yield* NodeConfig;
-  const { user: lucid } = yield* User;
-  const alwaysSucceeds = yield* AlwaysSucceeds.AlwaysSucceedsContract;
+export const resetStateQueue: Effect.Effect<
+  void,
+  SDK.Utils.LucidError | TxSubmitError | TxSignError,
+  AlwaysSucceedsContract | Lucid | Globals
+> = Effect.gen(function* () {
+  const lucid = yield* Lucid;
+  const alwaysSucceeds = yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
     stateQueuePolicyId: alwaysSucceeds.policyId,
     stateQueueAddress: alwaysSucceeds.spendScriptAddress,
   };
 
+  yield* lucid.switchToOperatorsMainWallet;
+
   yield* Effect.logInfo("🚧 Fetching state queue UTxOs...");
+
   const allStateQueueUTxOs =
     yield* SDK.Endpoints.fetchUnsortedStateQueueUTxOsProgram(
-      lucid,
+      lucid.api,
       fetchConfig,
     );
 
@@ -80,12 +101,7 @@ export const resetStateQueue = Effect.gen(function* () {
     yield* Effect.logInfo(`🚧 No state queue UTxOs were found.`);
   }
 
-  lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
-
-  const l1OperatorAddr = yield* Effect.tryPromise({
-    try: () => lucid.wallet().address(),
-    catch: (e) => new Error(`${e}`),
-  });
+  yield* lucid.switchToOperatorsMainWallet;
 
   // Collect and burn 40 UTxOs and asset names at a time:
   const batchSize = 40;
@@ -98,8 +114,7 @@ export const resetStateQueue = Effect.gen(function* () {
         const batch = allStateQueueUTxOs.slice(startIndex, endIndex);
         yield* Effect.logInfo(`🚧 Batch ${startIndex}-${endIndex}`);
         yield* collectAndBurnStateQueueNodesProgram(
-          lucid,
-          l1OperatorAddr,
+          lucid.api,
           fetchConfig,
           alwaysSucceeds.spendScript,
           alwaysSucceeds.mintScript,
@@ -109,7 +124,9 @@ export const resetStateQueue = Effect.gen(function* () {
     1,
   );
   yield* Effect.logInfo(`🚧 Resetting global variables...`);
-  global.LATEST_SYNC_OF_STATE_QUEUE_LENGTH = Date.now();
-  global.BLOCKS_IN_QUEUE = 0;
+  const globals = yield* Globals;
+  yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now());
+  yield* Ref.set(globals.BLOCKS_IN_QUEUE, 0);
+  yield* Ref.set(globals.AVAILABLE_CONFIRMED_BLOCK, "");
   yield* Effect.logInfo(`🚧 Done.`);
 });
