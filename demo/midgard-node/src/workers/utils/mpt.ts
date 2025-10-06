@@ -75,7 +75,6 @@ export const makeMpts: Effect.Effect<
   ).pipe(
     Effect.orElse(() =>
       Effect.gen(function* () {
-        yield* Effect.logInfo("123 INSERTING GENESIS UTXOS INTO LEDGER TRIE")
         yield* Effect.sync(() => ledgerTrie.root(ledgerTrie.EMPTY_TRIE_ROOT));
         const ops: ETH_UTILS.BatchDBOp[] = yield* Effect.allSuccesses(
           nodeConfig.GENESIS_UTXOS.map((u: UTxO) =>

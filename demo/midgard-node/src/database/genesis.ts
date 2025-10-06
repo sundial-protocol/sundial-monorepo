@@ -40,7 +40,7 @@ export const insertGenesisUtxos: Effect.Effect<
     `🟣 Debug: Inserting ${ledgerEntries.length} UTxOs into MempoolLedgerDB...`,
   );
 
-  // yield* MempoolLedgerDB.insert(ledgerEntries);
+  yield* MempoolLedgerDB.insert(ledgerEntries);
 
   yield* Effect.logInfo(
     `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs. Funded addresses are:

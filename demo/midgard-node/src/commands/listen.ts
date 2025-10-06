@@ -160,7 +160,7 @@ const getUtxosHandler = Effect.gen(function* () {
 
     const response = utxosWithAddress.map((entry) => ({
       outref: bufferToHex(entry.outref),
-      output: bufferToHex(entry.output),
+      value: bufferToHex(entry.output),
     }));
 
     yield* Effect.logInfo(`Found ${response.length} UTxOs for ${addr}`);
@@ -421,7 +421,7 @@ const getLogGlobalsHandler = Effect.gen(function* () {
 
 const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(`◻️  Submit request received for transaction`);
+    // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
     const params = yield* ParsedSearchParams;
     const txStringParam = params["tx_cbor"];
     if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
