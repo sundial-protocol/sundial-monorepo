@@ -208,7 +208,7 @@ export const makeConfig = Effect.gen(function* () {
     POSTGRES_USER: config[17],
     LEDGER_MPT_DB_PATH: config[18],
     MEMPOOL_MPT_DB_PATH: config[19],
-    GENESIS_UTXOS: network === "Mainnet" ? [] : genesisUtxos,
+    GENESIS_UTXOS: network === "Mainnet" ? [] : [],
   };
 }).pipe(Effect.orDie);
 
