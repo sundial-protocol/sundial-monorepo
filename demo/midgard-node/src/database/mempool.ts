@@ -87,7 +87,7 @@ export const retrieve: Effect.Effect<
   sqlErrorToDatabaseError(tableName, "Failed to retrieve given transactions"),
 );
 
-export const retrieveTxCount: Effect.Effect<number, DatabaseError, Database> =
+export const retrieveTxCount: Effect.Effect<bigint, DatabaseError, Database> =
   retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
