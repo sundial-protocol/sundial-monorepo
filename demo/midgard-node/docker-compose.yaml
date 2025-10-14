@@ -34,7 +34,7 @@ services:
     networks:
       midgard_net:
     # restart: always
-  
+
   postgres:
     image: postgres:15-alpine
     restart: always
@@ -89,7 +89,7 @@ services:
     logging: *default-logging
     networks:
       midgard_net:
-    
+
   loki:
     container_name: loki
     image: grafana/loki:3.4.1
@@ -102,7 +102,7 @@ services:
     logging: *default-logging
     networks:
       midgard_net:
-  
+
   promtail:
     image: grafana/promtail:2.7.1
     container_name: promtail
@@ -205,7 +205,7 @@ services:
 
 networks:
   midgard_net:
-  
+
 volumes:
   postgres-data:
     driver: local
