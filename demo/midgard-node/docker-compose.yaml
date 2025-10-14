@@ -184,15 +184,14 @@ services:
       midgard_net:
 
   midgard-node-tests:
-    profiles: ["test"]  # Only start this service when explicitly requested
     build:
       context: .
       additional_contexts:
         - sdk=../midgard-sdk
       dockerfile: ./Dockerfile
-    env_file:
-      - .env
     command: ["sh", "-c", "yes | pnpm test"]
+    profiles:
+      - test
     volumes:
       - ./:/app
       - ./db:/app/db
@@ -201,6 +200,8 @@ services:
     networks:
       midgard_net:
     logging: *default-logging
+    environment:
+      - COREPACK_EXPERIMENTAL_SKIP_ASK=true=
 
 networks:
   midgard_net:
