@@ -11,6 +11,7 @@ import { Effect } from "effect";
 import { SqlClient } from "@effect/sql";
 import * as AddressHistoryDB from "@/database/addressHistory.js";
 import { ProcessedTx } from "@/utils.js";
+import { LedgerUtils } from "./index.js";
 
 export const tableName = "mempool";
 

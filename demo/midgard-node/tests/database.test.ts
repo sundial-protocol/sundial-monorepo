@@ -6,7 +6,8 @@ import { it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "@effect/sql";
 import { Database } from "../src/services/database.js";
-import { NodeConfig, User } from "../src/config.js";
+import { NodeConfig } from "../src/services/config.js";
+import { Lucid } from "../src/services/lucid.js";
 import { initializeDb } from "../src/database/init.js";
 import {
   // Block
@@ -34,7 +35,7 @@ import { breakDownTx, ProcessedTx } from "../src/utils.js";
 const provideLayers = <A, E, R>(eff: Effect.Effect<A, E, R>) =>
   eff.pipe(
     Effect.provide(Database.layer),
-    Effect.provide(User.layer),
+    Effect.provide(Lucid.Default),
     Effect.provide(NodeConfig.layer),
   );
 
@@ -113,7 +114,7 @@ describe("BlocksDB", () => {
           expect(toHex(retrievedHeader)).toEqual(toHex(blockHeader1));
 
           // retrieve all
-          const all = yield* BlocksDB.retrieve();
+          const all = yield* BlocksDB.retrieve;
           expect(
             new Set(
               all.map((a) => ({
@@ -140,7 +141,7 @@ describe("BlocksDB", () => {
 
           //clear block
           yield* BlocksDB.clearBlock(blockHeader1);
-          const afterClear = yield* BlocksDB.retrieve();
+          const afterClear = yield* BlocksDB.retrieve;
           expect(
             new Set(
               afterClear.map((a) => ({
@@ -159,7 +160,7 @@ describe("BlocksDB", () => {
 
           // clear all
           yield* BlocksDB.clear;
-          const afterClearAll = yield* BlocksDB.retrieve();
+          const afterClearAll = yield* BlocksDB.retrieve;
           expect(afterClearAll.length).toEqual(0);
         }),
       ),
@@ -210,7 +211,7 @@ describe("MempoolDB", () => {
           );
 
           // retrieve all
-          const gotAll = yield* MempoolDB.retrieve();
+          const gotAll = yield* MempoolDB.retrieve;
           expect(
             new Set(gotAll.map((e) => removeTimestampFromTxEntry(e))),
           ).toStrictEqual(
@@ -232,7 +233,7 @@ describe("MempoolDB", () => {
 
           // clearTxs
           yield* MempoolDB.clearTxs([pTxId1]);
-          const afterClear = yield* MempoolDB.retrieve();
+          const afterClear = yield* MempoolDB.retrieve;
           expect(
             new Set(afterClear.map((e) => removeTimestampFromTxEntry(e))),
           ).toStrictEqual(
@@ -246,13 +247,13 @@ describe("MempoolDB", () => {
 
           // clearAll
           yield* MempoolDB.clear;
-          const afterClearAll = yield* MempoolDB.retrieve();
+          const afterClearAll = yield* MempoolDB.retrieve;
           expect(afterClearAll.length).toEqual(0);
 
           // insert single
           yield* flushAll;
           yield* MempoolDB.insert(processedTx1);
-          const afterInsertOne = yield* MempoolDB.retrieve();
+          const afterInsertOne = yield* MempoolDB.retrieve;
           expect(
             afterInsertOne.map((e) => removeTimestampFromTxEntry(e)),
           ).toStrictEqual([
@@ -353,7 +354,7 @@ describe("ImmutableDB", () => {
           );
 
           // retrieve all
-          const gotAll: TxUtils.EntryWithTimeStamp[] =
+          const gotAll: readonly TxUtils.EntryWithTimeStamp[] =
             yield* ImmutableDB.retrieve;
           expect(
             new Set(
@@ -601,13 +602,14 @@ describe("AddressHistoryDB", () => {
     provideLayers(
       Effect.gen(function* () {
         yield* flushAll;
-        const { user: lucid } = yield* User;
+        const lucid = yield* Lucid;
+        yield* lucid.switchToOperatorsMainWallet;
         const thisWalletAddress = yield* Effect.tryPromise(() =>
-          lucid.wallet().address(),
+          lucid.api.wallet().address(),
         );
         // send funds to other wallet
         const tx1 = yield* Effect.tryPromise(() =>
-          lucid
+          lucid.api
             .newTx()
             .pay.ToAddress(address1, { lovelace: 5000000n })
             .complete(),
@@ -628,7 +630,7 @@ describe("AddressHistoryDB", () => {
         // send funds to same wallet
         yield* flushAll;
         const tx2 = yield* Effect.tryPromise(() =>
-          lucid
+          lucid.api
             .newTx()
             .pay.ToAddress(thisWalletAddress, { lovelace: 5000000n })
             .complete(),
@@ -681,7 +683,7 @@ const txEntry2: TxUtils.Entry = {
 };
 
 const removeTimestampFromTxEntry = (
-  e: TxUtils.EntryWithTimeStamp,
+  e: TxUtils.Entry,
 ): TxUtils.EntryNoTimeStamp => {
   return {
     [TxUtils.Columns.TX_ID]: e[TxUtils.Columns.TX_ID],
@@ -704,7 +706,7 @@ const ledgerEntry2: LedgerUtils.Entry = {
 };
 
 const removeTimestampFromLedgerEntry = (
-  e: LedgerUtils.EntryWithTimeStamp,
+  e: LedgerUtils.Entry
 ): LedgerUtils.EntryNoTimeStamp => {
   return {
     [LedgerUtils.Columns.TX_ID]: e[LedgerUtils.Columns.TX_ID],
