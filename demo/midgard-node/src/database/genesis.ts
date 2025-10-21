@@ -21,6 +21,19 @@ export const insertGenesisUtxos: Effect.Effect<
     return;
   }
 
+  const addresses = Array.from(
+    new Set(config.GENESIS_UTXOS.map((u) => u.address)),
+  );
+  const nestedUtxos = yield* Effect.all(
+    addresses.map(MempoolLedgerDB.retrieveByAddress),
+  );
+  if (nestedUtxos.some((arr) => arr.length > 0)) {
+    yield* Effect.logInfo(
+      `🟣 Some UTxOs already exists on genesis addresses. Skipping insertion.`,
+    );
+    return;
+  }
+
   const ledgerEntries = config.GENESIS_UTXOS.map((utxo: UTxO) => {
     const core = utxoToCore(utxo);
     return {
@@ -43,6 +56,6 @@ export const insertGenesisUtxos: Effect.Effect<
 
   yield* Effect.logInfo(
     `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs. Funded addresses are:
-${Array.from(new Set(config.GENESIS_UTXOS.map((u) => u.address))).join("\n")}`,
+${addresses.join("\n")}`,
   );
 });
