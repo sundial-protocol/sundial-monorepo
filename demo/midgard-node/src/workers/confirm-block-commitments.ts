@@ -3,25 +3,27 @@ import {
   reexportedWorkerData as workerData,
 } from "@/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, Schedule, pipe } from "effect";
-import { NodeConfig, NodeConfigDep, User } from "@/config.js";
+import { Cause, Effect, Schedule, pipe } from "effect";
+import { AlwaysSucceedsContract, Lucid, NodeConfig } from "@/services/index.js";
 import {
   WorkerInput,
   WorkerOutput,
 } from "@/workers/utils/confirm-block-commitments.js";
 import { serializeStateQueueUTxO } from "@/workers/utils/commit-block-header.js";
-import { makeAlwaysSucceedsServiceFn } from "@/services/always-succeeds.js";
 import { LucidEvolution } from "@lucid-evolution/lucid";
+import { TxConfirmError } from "@/transactions/utils.js";
 
 const inputData = workerData as WorkerInput;
 
 const fetchLatestBlock = (
-  nodeConfig: NodeConfigDep,
   lucid: LucidEvolution,
-): Effect.Effect<SDK.TxBuilder.StateQueue.StateQueueUTxO, Error> =>
+): Effect.Effect<
+  SDK.TxBuilder.StateQueue.StateQueueUTxO,
+  SDK.Utils.StateQueueError | SDK.Utils.LucidError,
+  AlwaysSucceedsContract | NodeConfig
+> =>
   Effect.gen(function* () {
-    const { policyId, spendScriptAddress } =
-      yield* makeAlwaysSucceedsServiceFn(nodeConfig);
+    const { policyId, spendScriptAddress } = yield* AlwaysSucceedsContract;
     const fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig = {
       stateQueueAddress: spendScriptAddress,
       stateQueuePolicyId: policyId,
@@ -34,13 +36,20 @@ const fetchLatestBlock = (
 
 const wrapper = (
   workerInput: WorkerInput,
-): Effect.Effect<WorkerOutput, Error, NodeConfig | User> =>
+): Effect.Effect<
+  WorkerOutput,
+  | SDK.Utils.CborSerializationError
+  | SDK.Utils.CmlUnexpectedError
+  | SDK.Utils.LucidError
+  | SDK.Utils.StateQueueError
+  | TxConfirmError,
+  AlwaysSucceedsContract | Lucid | NodeConfig
+> =>
   Effect.gen(function* () {
-    const nodeConfig = yield* NodeConfig;
-    const { user: lucid } = yield* User;
+    const lucid = yield* Lucid;
     if (workerInput.data.firstRun) {
-      yield* Effect.logInfo("🟤 First run. Fetching the latest block...");
-      const latestBlock = yield* fetchLatestBlock(nodeConfig, lucid);
+      yield* Effect.logInfo("🔍 First run. Fetching the latest block...");
+      const latestBlock = yield* fetchLatestBlock(lucid.api);
       const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
       return {
         type: "SuccessfulConfirmationOutput",
@@ -52,27 +61,32 @@ const wrapper = (
       };
     } else {
       const targetTxHash = workerInput.data.unconfirmedSubmittedBlock;
-      yield* Effect.logInfo(`🟤 Confirming tx: ${targetTxHash}`);
+      yield* Effect.logInfo(`🔍 Confirming tx: ${targetTxHash}`);
       yield* Effect.retry(
         Effect.tryPromise({
-          try: () => lucid.awaitTx(targetTxHash),
-          catch: (e) => new Error(`${e}`),
+          try: () => lucid.api.awaitTx(targetTxHash),
+          catch: (e) =>
+            new TxConfirmError({
+              message: `Failed to confirm transaction`,
+              txHash: targetTxHash,
+              cause: e,
+            }),
         }),
         Schedule.recurs(4),
       );
-      yield* Effect.logInfo("🟤 Tx confirmed. Fetching the block...");
-      const latestBlock = yield* fetchLatestBlock(nodeConfig, lucid);
+      yield* Effect.logInfo("🔍 Tx confirmed. Fetching the block...");
+      const latestBlock = yield* fetchLatestBlock(lucid.api);
       if (latestBlock.utxo.txHash == targetTxHash) {
-        yield* Effect.logInfo("🟤 Serializing state queue UTxO...");
+        yield* Effect.logInfo("🔍 Serializing state queue UTxO...");
         const serializedUTxO = yield* serializeStateQueueUTxO(latestBlock);
-        yield* Effect.logInfo("🟤 Done.");
+        yield* Effect.logInfo("🔍 Done.");
         return {
           type: "SuccessfulConfirmationOutput",
           blocksUTxO: serializedUTxO,
         };
       } else {
         yield* Effect.logInfo(
-          "🟤 ⚠️  Latest block's txHash doesn't match the confirmed tx.",
+          "🔍 ⚠️  Latest block's txHash doesn't match the confirmed tx.",
         );
         return {
           type: "FailedConfirmationOutput",
@@ -85,19 +99,17 @@ const wrapper = (
 
 const program = pipe(
   wrapper(inputData),
-  Effect.provide(User.layer),
+  Effect.provide(AlwaysSucceedsContract.Default),
+  Effect.provide(Lucid.Default),
   Effect.provide(NodeConfig.layer),
 );
 
 Effect.runPromise(
   program.pipe(
-    Effect.catchAll((e) =>
+    Effect.catchAllCause((cause) =>
       Effect.succeed({
         type: "FailedConfirmationOutput",
-        error:
-          e instanceof Error
-            ? e.message
-            : "Unknown error from tx confirmation worker",
+        error: `Tx confirmation worker failure: ${Cause.pretty(cause)}`,
       }),
     ),
   ),

@@ -2,7 +2,10 @@ import { Database } from "@/services/database.js";
 import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import { Address } from "@lucid-evolution/lucid";
-import { mapSqlError } from "@/database/utils/common.js";
+import {
+  sqlErrorToDatabaseError,
+  DatabaseError,
+} from "@/database/utils/common.js";
 
 export enum Columns {
   TX_ID = "tx_id",
@@ -32,7 +35,7 @@ export type MinimalEntry = {
 
 export const createTable = (
   tableName: string,
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql.withTransaction(
@@ -50,12 +53,15 @@ export const createTable = (
         )} ON ${sql(tableName)} (${sql(Columns.ADDRESS)});`;
       }),
     );
-  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
+  }).pipe(
+    Effect.withLogSpan(`creating table ${tableName}`),
+    sqlErrorToDatabaseError(tableName, "Failed to create the table"),
+  );
 
 export const insertEntry = (
   tableName: string,
   entry: Entry,
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert Ledger UTxO`);
     const sql = yield* SqlClient.SqlClient;
@@ -66,13 +72,13 @@ export const insertEntry = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertEntry: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(tableName, "Failed to insert the given UTxO"),
   );
 
 export const insertEntries = (
   tableName: string,
   entries: Entry[],
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insert Ledger UTxOs`);
     const sql = yield* SqlClient.SqlClient;
@@ -83,28 +89,30 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertEntries: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(tableName, "Failed to insert given UTxOs"),
   );
 
-export const retrieveEntries = (
+export const retrieveAllEntries = (
   tableName: string,
-): Effect.Effect<readonly EntryWithTimeStamp[], Error, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieveEntries`);
     const sql = yield* SqlClient.SqlClient;
     return yield* sql<EntryWithTimeStamp>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
     Effect.withLogSpan(`retrieveEntries ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: retrieveEntries: ${JSON.stringify(e)}`),
+    Effect.tapErrorTag("SqlError", (double) =>
+      Effect.logError(
+        `${tableName} db: retrieveEntries: ${JSON.stringify(double)}`,
+      ),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(tableName, "Failed to retrieve the whole ledger"),
   );
 
 export const retrieveEntriesWithAddress = (
   tableName: string,
   address: Address,
-): Effect.Effect<readonly EntryWithTimeStamp[], Error, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve Ledger UTxOs`);
     const sql = yield* SqlClient.SqlClient;
@@ -118,16 +126,19 @@ export const retrieveEntriesWithAddress = (
         `${tableName} db: retrieveEntriesWithAddress: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(
+      tableName,
+      `Failed to retrieve UTxOs of address: ${address}`,
+    ),
   );
 
 export const delEntries = (
   tableName: string,
   outrefs: Buffer[],
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`DELETE FROM ${sql(tableName)} WHERE ${sql(
       Columns.OUTREF,
     )} IN ${sql.in(outrefs)}`;
-  });
+  }).pipe(sqlErrorToDatabaseError(tableName, "Failed to delete given UTxOs"));

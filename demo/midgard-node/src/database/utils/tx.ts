@@ -1,7 +1,10 @@
 import { Database } from "@/services/database.js";
-import { SqlClient, SqlError } from "@effect/sql";
+import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
-import { mapSqlError } from "@/database/utils/common.js";
+import {
+  DatabaseError,
+  sqlErrorToDatabaseError,
+} from "@/database/utils/common.js";
 
 export enum Columns {
   TX_ID = "tx_id",
@@ -22,7 +25,7 @@ export type Entry = EntryNoTimeStamp | EntryWithTimeStamp;
 
 export const createTable = (
   tableName: string,
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
@@ -31,12 +34,15 @@ export const createTable = (
       ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
       PRIMARY KEY (${sql(Columns.TX_ID)})
     );`;
-  }).pipe(Effect.withLogSpan(`creating table ${tableName}`), mapSqlError);
+  }).pipe(
+    Effect.withLogSpan(`creating table ${tableName}`),
+    sqlErrorToDatabaseError(tableName, "Failed to create the table"),
+  );
 
 export const delMultiple = (
   tableName: string,
   tx_id: Buffer[],
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(
@@ -46,12 +52,18 @@ export const delMultiple = (
       Columns.TX_ID,
     )} IN ${sql.in(tx_id)} RETURNING ${sql(Columns.TX_ID)}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
-  }).pipe(Effect.withLogSpan(`delMutiple table ${tableName}`), mapSqlError);
+  }).pipe(
+    Effect.withLogSpan(`delMutiple table ${tableName}`),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to remove the given transactions",
+    ),
+  );
 
 export const retrieveValue = (
   tableName: string,
   tx_id: Buffer,
-): Effect.Effect<Buffer, Error, Database> =>
+): Effect.Effect<Buffer, DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
@@ -60,11 +72,15 @@ export const retrieveValue = (
       tableName,
     )} WHERE ${sql(Columns.TX_ID)} = ${tx_id}`;
 
-    if (result.length <= 0) {
-      yield* Effect.fail(
-        new SqlError.SqlError({ cause: `No value found for tx_id ${tx_id}` }),
-      );
-    }
+    // We probably don't need this. SqlError should cover this already.
+    // TODO
+    // if (result.length <= 0) {
+    //   yield*
+    //     new DatabaseError({
+    //       message: `No value found for tx_id ${tx_id.toString("hex")}`,
+    //       table: tableName,
+    //     }) ;
+    // }
 
     return result[0];
   }).pipe(
@@ -74,13 +90,16 @@ export const retrieveValue = (
         `${tableName} db: retrieving value error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to retrieve the given transaction",
+    ),
   );
 
 export const retrieveValues = (
   tableName: string,
   tx_ids: Buffer[] | readonly Buffer[],
-): Effect.Effect<readonly Buffer[], Error, Database> =>
+): Effect.Effect<readonly Buffer[], DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
@@ -97,13 +116,16 @@ export const retrieveValues = (
         `${tableName} db: retrieving values error: ${JSON.stringify(e)}`,
       ),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to retrieve the given transactions",
+    ),
   );
 
 export const insertEntry = (
   tableName: string,
   txPair: Entry,
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTX`);
     const sql = yield* SqlClient.SqlClient;
@@ -115,13 +137,16 @@ export const insertEntry = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTX: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to insert the given transaction",
+    ),
   );
 
 export const insertEntries = (
   tableName: string,
   pairs: Entry[],
-): Effect.Effect<void, Error, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logDebug(`${tableName} db: attempt to insertTXs`);
     const sql = yield* SqlClient.SqlClient;
@@ -131,14 +156,19 @@ export const insertEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insertTXs: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to insert the given transactions",
+    ),
   );
 
-export const retrieveEntries = (
+export const retrieveAllEntries = (
   tableName: string,
-): Effect.Effect<readonly EntryWithTimeStamp[], Error, Database> =>
+): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
+    yield* Effect.logDebug(
+      `${tableName} db: attempt to retrieve all tx entries`,
+    );
     const sql = yield* SqlClient.SqlClient;
     return yield* sql<EntryWithTimeStamp>`SELECT * FROM ${sql(tableName)}`;
   }).pipe(
@@ -146,25 +176,5 @@ export const retrieveEntries = (
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
     ),
-    mapSqlError,
-  );
-
-export const retrieveNumberOfEntries = (
-  tableName: string,
-): Effect.Effect<number, Error, Database> =>
-  Effect.gen(function* () {
-    yield* Effect.logDebug(`${tableName} db: attempt to get number of entries`);
-    const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<{
-      count: number;
-    }>`SELECT COUNT(*) FROM ${sql(tableName)}`;
-    return rows[0].count ?? 0;
-  }).pipe(
-    Effect.withLogSpan(`retrieveNumberOfEntries ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(
-        `${tableName} db: retrieveNumberOfEntries: ${JSON.stringify(e)}`,
-      ),
-    ),
-    mapSqlError,
+    sqlErrorToDatabaseError(tableName, "Failed to retrieve the whole table"),
   );
