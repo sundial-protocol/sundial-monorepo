@@ -3,19 +3,14 @@ use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{InlineDatum, Input, Output}
-use midgard/common/types.{PosixTime}
+use midgard/common/types.{MerkleRoot, PosixTime}
 use midgard/common/utils
 use midgard/registered_operators.{OperatorStatus}
 
-pub type Datum =
-  NodeDatum
-
-pub type NodeData {
-  deposits_root: ByteArray,
-  withdrawals_root: ByteArray,
-  tx_orders_root: ByteArray,
-  start_time: PosixTime,
-  end_time: PosixTime,
+pub type Datum {
+  deposits_root: MerkleRoot,
+  withdrawals_root: MerkleRoot,
+  transactions_root: MerkleRoot,
   resolution_claim: Option<ResolutionClaim>,
 }
 
@@ -25,10 +20,9 @@ pub type ResolutionClaim {
 }
 
 pub type SpendRedeemer {
-  ListStateTransition
   AttachResolutionClaim {
-    node_input_index: Int,
-    node_output_index: Int,
+    settlement_input_index: Int,
+    settlement_output_index: Int,
     hub_ref_input_index: Int,
     active_operators_node_input_index: Int,
     active_operators_redeemer_index: Int,
@@ -36,8 +30,8 @@ pub type SpendRedeemer {
     scheduler_ref_input_index: Int,
   }
   DisproveResolutionClaim {
-    node_input_index: Int,
-    node_output_index: Int,
+    settlement_input_index: Int,
+    settlement_output_index: Int,
     hub_ref_input_index: Int,
     operators_redeemer_index: Int,
     operator: VerificationKeyHash,
@@ -56,16 +50,14 @@ pub type EventType {
 }
 
 pub type MintRedeemer {
-  Init
-  Deinit
-  AppendSettlementNode {
+  Spawn {
     key_to_add: ByteArray,
     anchor_node_output_index: Int,
     node_output_index: Int,
     state_queue_merge_redeemer_index: Int,
     hub_ref_input_index: Int,
   }
-  RemoveSettlementNode {
+  Conclude {
     key_to_remove: ByteArray,
     removed_node_input_index: Int,
     anchor_node_input_index: Int,

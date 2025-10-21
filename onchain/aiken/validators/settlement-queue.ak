@@ -1,9 +1,6 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite, Interval}
-use aiken_design_patterns/linked_list/unordered.{
-  Key, NodeDatum, get_node_inputs, get_node_outputs, list_state_transition,
-}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
@@ -15,10 +12,10 @@ use midgard/ledger_state
 use midgard/registered_operators
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
-use midgard/settlement_queue.{
-  AppendSettlementNode, AttachResolutionClaim, Datum, Deinit,
-  DisproveResolutionClaim, Init, ListStateTransition, MintRedeemer, NodeData,
-  RemoveSettlementNode, ResolutionClaim, SpendRedeemer,
+use midgard/settlement.{
+  Spawn, AttachResolutionClaim, Datum,
+  DisproveResolutionClaim, MintRedeemer,
+  Conclude, ResolutionClaim, SpendRedeemer,
 }
 use midgard/state_queue
 
@@ -29,75 +26,85 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    expect Some(node_datum) = m_datum
+    expect Some(datum) = m_datum
 
-    expect NodeData {
+    let Datum {
       deposits_root,
       withdrawals_root,
-      tx_orders_root,
+      transactions_root,
       resolution_claim,
       ..
-    } as input_node_data = node_datum.data
+    } = datum
 
     when redeemer is {
-      ListStateTransition ->
-        list_state_transition(assets.tokens(tx.mint, settlement_policy_id))
       AttachResolutionClaim {
-        node_input_index,
-        node_output_index,
+        settlement_input_index,
+        settlement_output_index,
         hub_ref_input_index,
         active_operators_node_input_index,
         active_operators_redeemer_index,
         operator,
         scheduler_ref_input_index,
       } -> {
-        // 1. The spent input must be a settlement node without a resolution claim.
+        let Transaction {
+          inputs,
+          reference_inputs,
+          output,
+          extra_signatories,
+          redeemers,
+          ..
+        } = tx
+
+        // 1. The spent input must not have a resolution claim.
         expect resolution_claim == None
 
-        // 2. The spent input must be reproduced as a settlement node with a resolution claim.
+        // 2. The spent input must be reproduced as a settlement UTxO with a
+        //    resolution claim.
         let Output { address: input_address, value: input_value, .. } =
-          utils.get_own_input_at(tx.inputs, own_out_ref, node_input_index)
+          utils.get_own_input_at(inputs, own_out_ref, settlement_input_index)
         //
         expect Some(Output {
           address: cont_output_address,
           value: cont_output_value,
-          datum: InlineDatum(cont_output_datum),
-          ..
-        }) = tx.outputs |> list.at(node_output_index)
+          datum: InlineDatum(cont_output_datum_data),
+          reference_script: None,
+        }) = outputs |> list.at(settlement_output_index)
         //
-        expect NodeData {
+        expect Datum {
           resolution_claim: Some(ResolutionClaim {
             resolution_time,
             operator: resolution_operator,
           }) as output_resolution_claim,
           ..
-        } as output_node_data = cont_output_datum
+        } as cont_output_datum = cont_output_datum_data
         //
         expect input_address == cont_output_address
         expect input_value == cont_output_value
         // TODO: inefficient but implicitly safe
         expect
-          output_node_data == NodeData {
-            ..input_node_data,
+          cont_output_datum == Datum {
+            ..datum,
             resolution_claim: output_resolution_claim,
           }
 
         // 3. The transaction must be signed by the resolution claim's operator.
         expect operator == resolution_operator
-        expect operator |> utils.has_signed(tx.extra_signatories)
+        expect operator |> utils.has_signed(extra_signatories)
 
-        // 4. The transaction must include the Midgard hub oracle NFT in a reference input.
+        // 4. The transaction must include the Midgard hub oracle NFT in a
+        //    reference input.
         // 5. hub_oracle.{active_operators, scheduler}
         let hub.Datum { active_operators_addr, scheduler, .. } =
-          hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
+          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-        // 6. The transaction must include an input (`operator_node`), spent via the Update Bond
-        //    Hold New Settlement redeemer, of an `active_operators` node with a key matching
-        //    the resolution claim's operator.
+        // 6. The transaction must include an input (`operator_node`), spent via
+        //    the Update Bond Hold New Settlement redeemer, of an
+        //    `active_operators` node with a key matching the resolution claim's
+        //    operator.
         expect Some(
           Pair(Spend(active_operators_spend_purpose_out_ref),
           active_operators_spend_redeemer_data),
-        ) = list.at(tx.redeemers, active_operators_redeemer_index)
+        ) = list.at(redeemers, active_operators_redeemer_index)
         //
         expect active_operators.UpdateBondHoldNewSettlement {
           new_bond_unlock_time,
@@ -107,25 +114,26 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         expect Some(Input {
           output: Output { address: active_operators_node_address, .. },
           output_reference: active_operators_out_ref,
-        }) = list.at(tx.inputs, active_operators_node_input_index)
+        }) = list.at(inputs, active_operators_node_input_index)
         //
         expect and {
             active_operators_out_ref == active_operators_spend_purpose_out_ref,
             active_operators_node_address == active_operators_addr,
           }
 
-        // 7. The `bond_unlock_time` of the `operator_node` must match the `resolution_time`
-        //    of the resolution claim.
+        // 7. The `bond_unlock_time` of the `operator_node` must match the
+        //    `resolution_time` of the resolution claim.
         expect resolution_time == new_bond_unlock_time
 
-        // 8. The transaction must include the `scheduler` utxo as a reference input,
-        //    indicating that the current operator matches the resolution claim's operator.
+        // 8. The transaction must include the `scheduler` utxo as a reference
+        //    input, indicating that the current operator matches the resolution
+        //    claim's operator.
         expect Input {
           output: Output { datum: InlineDatum(scheduler_state_datum), .. },
           ..
         } =
           utils.get_authentic_input_with_nft_at(
-            tx.reference_inputs,
+            reference_inputs,
             scheduler,
             scheduler_asset_name,
             scheduler_ref_input_index,
@@ -138,8 +146,8 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         True
       }
       DisproveResolutionClaim {
-        node_input_index,
-        node_output_index,
+        settlement_input_index,
+        settlement_output_index,
         hub_ref_input_index,
         operators_redeemer_index,
         operator,
@@ -149,32 +157,40 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         event_type,
         membership_proof,
       } -> {
-        // 1. The spent input must be a settlement node with a resolution claim.
+        let Transaction {
+          inputs,
+          reference_inputs,
+          output,
+          validity_range,
+          redeemers,
+          ..
+        } = tx
+
+        // 1. The spent input must have a resolution claim.
         expect Some(ResolutionClaim {
           resolution_time,
           operator: resolution_operator,
         }) = resolution_claim
         expect operator == resolution_operator
 
-        // 2. The spent input must be reproduced as a settlement node without a resolution claim.
+        // 2. The spent input must be reproduced as a settlement UTxO without a
+        //    resolution claim.
         let Output { address: input_address, value: input_value, .. } =
-          utils.get_own_input_at(tx.inputs, own_out_ref, node_input_index)
+          utils.get_own_input_at(inputs, own_out_ref, settlement_input_index)
         //
         expect Some(Output {
           address: cont_output_address,
           value: cont_output_value,
-          datum: InlineDatum(cont_output_datum),
-          ..
-        }) = tx.outputs |> list.at(node_output_index)
-        //
-        expect NodeData { .. } as output_node_data = cont_output_datum
+          datum: InlineDatum(cont_output_datum_data),
+          reference_script: None,
+        }) = outputs |> list.at(settlement_output_index)
         //
         expect input_address == cont_output_address
         expect input_value == cont_output_value
         // TODO: inefficient but implicitly safe
         expect
-          output_node_data == NodeData {
-            ..input_node_data,
+          cont_output_datum_data == Datum {
+            ..datum,
             resolution_claim: None,
           }
 
@@ -187,24 +203,24 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
           tx_order: tx_order_script_hash,
           retired_operators,
           ..
-        } = hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
+        } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         // 5. The transaction must include either a deposit, a withdrawal order,
         //    or an L2 transaction order as a reference input. Let that
         //    reference input be `unprocessed_event`.
         let (event_script, events_root) =
           when event_type is {
-            settlement_queue.Deposit -> (deposit_script_hash, deposits_root)
-            settlement_queue.Withdrawal ->
+            settlement.Deposit -> (deposit_script_hash, deposits_root)
+            settlement.Withdrawal ->
               (withdrawal_script_hash, withdrawals_root)
-            settlement_queue.TxOrder -> (tx_order_script_hash, tx_orders_root)
+            settlement.TxOrder -> (tx_order_script_hash, tx_orders_root)
           }
         expect Input {
           output: Output { datum: InlineDatum(event_datum_data), .. },
           ..
         } =
           utils.get_authentic_input_with_nft_at(
-            tx.reference_inputs,
+            reference_inputs,
             event_script,
             unresolved_event_asset_name,
             unresolved_event_ref_input_index,
@@ -222,12 +238,12 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             key: event_key,
             value: event_value,
             membership_proof: membership_proof,
-            redeemers: tx.redeemers,
+            redeemers: redeemers,
           )
 
         // 7. The transaction's time-validity upper bound must be earlier than
         //    the resolution claim's resolution time.
-        expect Finite(valid_to) = tx.validity_range.upper_bound.bound_type
+        expect Finite(valid_to) = validity_range.upper_bound.bound_type
         expect valid_to < resolution_time
 
         // 8. Let `operator_status` be a redeemer argument indicating whether `operator`
@@ -240,7 +256,7 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             expect Some(
               Pair(Mint(active_operators_mint_purpose_policy_id),
               active_operators_mint_redeemer_data),
-            ) = list.at(tx.redeemers, operators_redeemer_index)
+            ) = list.at(redeemers, operators_redeemer_index)
             //
             expect active_operators_mint_purpose_policy_id == active_operators
             //
@@ -260,7 +276,7 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             expect Some(
               Pair(Mint(retired_operators_mint_purpose_policy_id),
               retired_operators_mint_redeemer_data),
-            ) = list.at(tx.redeemers, operators_redeemer_index)
+            ) = list.at(redeemers, operators_redeemer_index)
             //
             expect retired_operators_mint_purpose_policy_id == retired_operators
             //
@@ -399,8 +415,8 @@ validator mint(hub_oracle: ScriptHash) {
         removed_node_input_index,
         anchor_node_input_index,
       } -> {
-        // 1. The transaction must Remove a node from the `settlement_queue`.
-        //    Let `removed_settlement_node` be that node.
+        // 1. The transaction must Remove a node from the `settlement`. Let
+        //    `removed_settlement_node` be that node.
         expect
           unordered.remove(
             Key(key_to_remove),
