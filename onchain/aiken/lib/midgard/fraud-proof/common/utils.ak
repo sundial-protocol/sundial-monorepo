@@ -6,7 +6,6 @@ use aiken_design_patterns/merkelized_validator
 use cardano/address.{Script, VerificationKey}
 use cardano/assets.{PolicyId, lovelace_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use midgard/common/constants.{state_queue_policy}
 use midgard/common/utils.{get_singleton_asset_with_policy} as get_singleton_asset_with_policy
 use midgard/common/utils.{get_authentic_input_with_policy_at} as get_authentic_input_with_policy_at
 use midgard/computation_thread.{StepDatum, Success}
@@ -36,10 +35,15 @@ pub fn get_tx_root_validate_block_hash(
   tx: Transaction,
   state_queue_node_ref_input_index: Int,
   ct_token_asset_name: ByteArray,
+  state_queue_policy: ByteArray,
 ) -> ByteArray {
   // Reference input with block_hash 
   let state_queue_datum_data =
-    get_confirmed_datum(tx, state_queue_node_ref_input_index)
+    get_confirmed_datum(
+      tx,
+      state_queue_policy,
+      state_queue_node_ref_input_index,
+    )
   expect state_queue_node_datum: unordered.NodeDatum = state_queue_datum_data
   expect parsed_state_queue_datum: Header = state_queue_node_datum.data
   expect unordered.Key { key: block_hash } = state_queue_node_datum.key
@@ -53,6 +57,7 @@ pub fn get_tx_root_validate_block_hash(
 
 pub fn get_confirmed_datum(
   tx: Transaction,
+  state_queue_policy: ByteArray,
   state_queue_node_ref_input_index: Int,
 ) {
   let state_queue_node_input =
