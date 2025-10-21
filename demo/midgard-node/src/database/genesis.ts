@@ -46,8 +46,8 @@ export const insertGenesisUtxos: Effect.Effect<
 ${Array.from(new Set(config.GENESIS_UTXOS.map((u) => u.address))).join("\n")}`,
   );
 }).pipe(
-  Effect.catchTag("DatabaseError", (e) =>
-    Effect.logInfo(`🟣 Genesis UTxOs already exists. Skipping insertion.`),
+  Effect.catchTag("DatabaseError", (_e) =>
+    Effect.logInfo(`🟣 Genesis UTxOs already exist. Skipping insertion.`),
   ),
   Effect.andThen(Effect.succeed(Effect.void)),
 );
