@@ -706,7 +706,7 @@ const ledgerEntry2: LedgerUtils.Entry = {
 };
 
 const removeTimestampFromLedgerEntry = (
-  e: LedgerUtils.Entry
+  e: LedgerUtils.Entry,
 ): LedgerUtils.EntryNoTimeStamp => {
   return {
     [LedgerUtils.Columns.TX_ID]: e[LedgerUtils.Columns.TX_ID],

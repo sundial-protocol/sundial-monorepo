@@ -68,9 +68,9 @@ export const retrieveValue = (
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve value`);
 
-    const result = yield* sql<{
-      [Columns.TX]: Buffer;
-    }>`SELECT ${sql(Columns.TX)} FROM ${sql(
+    const result = yield* sql<
+      Pick<Entry, Columns.TX>
+    >`SELECT ${sql(Columns.TX)} FROM ${sql(
       tableName,
     )} WHERE ${sql(Columns.TX_ID)} = ${tx_id}`;
 
@@ -112,9 +112,9 @@ export const retrieveValues = (
     const sql = yield* SqlClient.SqlClient;
     yield* Effect.logDebug(`${tableName} db: attempt to retrieve values`);
 
-    const rows = yield* sql<{
-      [Columns.TX]: Buffer;
-    }>`SELECT ${sql(Columns.TX)} FROM ${sql(
+    const rows = yield* sql<
+      Pick<Entry, Columns.TX>
+    >`SELECT ${sql(Columns.TX)} FROM ${sql(
       tableName,
     )} WHERE ${sql.in(Columns.TX_ID, tx_ids)}`;
 

@@ -116,7 +116,7 @@ export const retrieveHeaderHashByTxHash = (
     );
     const sql = yield* SqlClient.SqlClient;
 
-    const rows = yield* sql<{ [Columns.HEADER_HASH]: Buffer }>`SELECT ${sql(
+    const rows = yield* sql<Pick<Entry, Columns.HEADER_HASH>>`SELECT ${sql(
       Columns.HEADER_HASH,
     )} FROM ${sql(tableName)} WHERE ${sql(Columns.TX_ID)} = ${txHash} LIMIT 1`;
 
