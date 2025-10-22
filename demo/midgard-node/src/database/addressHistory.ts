@@ -34,20 +34,15 @@ export const init: Effect.Effect<void, DatabaseError, Database> = Effect.gen(
   sqlErrorToDatabaseError(tableName, "Failed to create the table"),
 );
 
-const insertEntriesUnhandledErrors = (
+export const insertEntries = (
   entries: Entry[],
-): Effect.Effect<void, SqlError.SqlError, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}
       ON CONFLICT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)}) DO NOTHING`;
-  });
-
-export const insertEntries = (
-  entries: Entry[],
-): Effect.Effect<void, DatabaseError, Database> =>
-  insertEntriesUnhandledErrors(entries).pipe(
+  }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
       Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),

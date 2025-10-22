@@ -1,6 +1,5 @@
-import { Effect } from "effect";
+import { Data, Effect, Match } from "effect";
 import { Database } from "@/services/database.js";
-import { Data } from "effect";
 import { SqlClient, SqlError } from "@effect/sql";
 import * as SDK from "@al-ft/midgard-sdk";
 
@@ -48,18 +47,19 @@ export class DatabaseError extends Data.TaggedError("DatabaseError")<
 > {}
 
 type SqlErrorToDatabaseError = <A, R>(
-  error: Effect.Effect<A, SqlError.SqlError, R>,
+  error: Effect.Effect<A, SqlError.SqlError | DatabaseError, R>,
 ) => Effect.Effect<A, DatabaseError, R>;
 
 export const sqlErrorToDatabaseError = (
   tableName: string,
   message: string,
 ): SqlErrorToDatabaseError =>
-  Effect.mapError(
-    (error: SqlError.SqlError) =>
-      new DatabaseError({
-        message,
-        table: tableName,
-        cause: error,
-      }),
+  Effect.mapError((error: SqlError.SqlError | DatabaseError) =>
+    error._tag === "SqlError"
+      ? new DatabaseError({
+          message,
+          table: tableName,
+          cause: error,
+        })
+      : error,
   );
