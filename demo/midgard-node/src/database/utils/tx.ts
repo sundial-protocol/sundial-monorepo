@@ -53,7 +53,7 @@ export const delMultiple = (
     )} IN ${sql.in(tx_ids)} RETURNING ${sql(Columns.TX_ID)}`;
     yield* Effect.logDebug(`${tableName} db: deleted ${result.length} rows`);
   }).pipe(
-    Effect.withLogSpan(`delMutiple table ${tableName}`),
+    Effect.withLogSpan(`delMultiple table ${tableName}`),
     sqlErrorToDatabaseError(
       tableName,
       "Failed to remove the given transactions",
