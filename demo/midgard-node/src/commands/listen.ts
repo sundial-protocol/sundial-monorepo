@@ -135,7 +135,7 @@ const getTxHandler = Effect.gen(function* () {
   if (
     typeof txHashParam !== "string" ||
     !isHexString(txHashParam) ||
-    txHashParam.length !== 32
+    txHashParam.length !== 64
   ) {
     // yield* Effect.logInfo(`Invalid transaction hash: ${txHashParam}`);
     return yield* HttpServerResponse.json(
@@ -144,7 +144,8 @@ const getTxHandler = Effect.gen(function* () {
     );
   }
   const txHashBytes = Buffer.from(fromHex(txHashParam));
-  const foundCbor: Uint8Array = yield* MempoolDB.retrieveTxCborByHash(
+  yield* Effect.logInfo("txHashBytes", txHashBytes);
+  const foundCbor: Buffer = yield* MempoolDB.retrieveTxCborByHash(
     txHashBytes,
   ).pipe(
     Effect.catchAll((_e) =>
@@ -161,7 +162,8 @@ const getTxHandler = Effect.gen(function* () {
   yield* Effect.logInfo(
     `GET /${TX_ENDPOINT} - Transaction found in mempool: ${txHashParam}`,
   );
-  return yield* HttpServerResponse.json({ tx: toHex(foundCbor) });
+  yield* Effect.logInfo("foundCbor", foundCbor);
+  return yield* HttpServerResponse.json({ tx: bufferToHex(foundCbor) });
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", TX_ENDPOINT, e)),
   Effect.catchTag("DatabaseError", (e) => handleDBGetFailure(TX_ENDPOINT, e)),
@@ -396,7 +398,7 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
     const cbors = yield* AddressHistoryDB.retrieve(addrDetails.address.bech32);
     yield* Effect.logInfo(`Found ${cbors.length} CBORs with ${addr}`);
     return yield* HttpServerResponse.json({
-      cbors: cbors,
+      txs: cbors.map(bufferToHex),
     });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
@@ -722,7 +724,7 @@ const mergeAction = Effect.gen(function* () {
 
 const monitorMempoolAction = Effect.gen(function* () {
   const numTx = yield* MempoolDB.retrieveTxCount;
-  yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
+  yield* mempoolTxGauge(Effect.succeed(numTx));
 });
 
 const txQueueProcessorAction = (txQueue: Queue.Dequeue<string>) =>
