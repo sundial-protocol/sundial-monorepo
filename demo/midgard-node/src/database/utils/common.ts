@@ -1,4 +1,4 @@
-import { Data, Effect, Match } from "effect";
+import { Data, Effect } from "effect";
 import { Database } from "@/services/database.js";
 import { SqlClient, SqlError } from "@effect/sql";
 import * as SDK from "@al-ft/midgard-sdk";

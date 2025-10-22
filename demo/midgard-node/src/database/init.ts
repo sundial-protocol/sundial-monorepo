@@ -25,14 +25,15 @@ export const initializeDb: () => Effect.Effect<
     yield* sql`SET client_min_messages = 'error'`;
     yield* sql`SET default_transaction_isolation TO 'serializable'`;
 
+    yield* AddressHistory.init;
     yield* BlocksDB.init;
-    yield* Tx.createTable(MempoolDB.tableName);
-    yield* Tx.createTable(ProcessedMempoolDB.tableName);
-    yield* Ledger.createTable(MempoolLedgerDB.tableName);
-    yield* Tx.createTable(ImmutableDB.tableName);
     yield* Ledger.createTable(ConfirmedLedgerDB.tableName);
     yield* Ledger.createTable(LatestLedgerDB.tableName);
-    yield* AddressHistory.init;
+    yield* Ledger.createTable(MempoolLedgerDB.tableName);
+    yield* Tx.createTable(ImmutableDB.tableName);
+    yield* Tx.createTable(MempoolDB.tableName);
+    yield* Tx.createTable(ProcessedMempoolDB.tableName);
+
     yield* insertGenesisUtxos;
 
     yield* Effect.logInfo("PostgreSQL database initialized Successfully.");
