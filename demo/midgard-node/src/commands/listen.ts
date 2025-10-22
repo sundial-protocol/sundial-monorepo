@@ -159,10 +159,10 @@ const getTxHandler = Effect.gen(function* () {
       }),
     ),
   );
-  yield* Effect.logInfo("foundCbor", foundCbor);
   yield* Effect.logInfo(
     `GET /${TX_ENDPOINT} - Transaction found in mempool: ${txHashParam}`,
   );
+  yield* Effect.logInfo("foundCbor", foundCbor);
   return yield* HttpServerResponse.json({ tx: bufferToHex(foundCbor) });
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", TX_ENDPOINT, e)),
@@ -398,7 +398,7 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
     const cbors = yield* AddressHistoryDB.retrieve(addrDetails.address.bech32);
     yield* Effect.logInfo(`Found ${cbors.length} CBORs with ${addr}`);
     return yield* HttpServerResponse.json({
-      cbors: cbors.map(toHex),
+      txs: cbors.map(bufferToHex),
     });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);

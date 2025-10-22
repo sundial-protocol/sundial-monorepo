@@ -11,7 +11,7 @@ export const retrieveNumberOfEntries = (
     yield* Effect.logDebug(`${tableName} db: attempt to get number of entries`);
     const sql = yield* SqlClient.SqlClient;
     const rows = yield* sql<{
-      // sql threats COUNT(*) as a string, even if with number type in that field
+      // sql treats COUNT(*) as a `string`, regardless of any type annotations.
       count: string;
     }>`SELECT COUNT(*) FROM ${sql(tableName)}`;
     return BigInt(rows[0].count) ?? 0;

@@ -74,20 +74,9 @@ export const retrieveValue = (
       tableName,
     )} WHERE ${sql(Columns.TX_ID)} = ${tx_id}`;
 
-    // We probably don't need this. SqlError should cover this already.
-    // TODO
-    // if (result.length <= 0) {
-    //   yield*
-    //     new DatabaseError({
-    //       message: `No value found for tx_id ${tx_id.toString("hex")}`,
-    //       table: tableName,
-    //     }) ;
-    // }
-
     if (result.length === 0)
       yield* new SqlError.SqlError({
         cause: `No value found for tx_id ${tx_id.toString("hex")}`,
-        // table: tableName,
       });
 
     return result[0][Columns.TX];
