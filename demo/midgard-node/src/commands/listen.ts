@@ -398,7 +398,7 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
     const cbors = yield* AddressHistoryDB.retrieve(addrDetails.address.bech32);
     yield* Effect.logInfo(`Found ${cbors.length} CBORs with ${addr}`);
     return yield* HttpServerResponse.json({
-      cbors: cbors,
+      cbors: cbors.map(toHex),
     });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
