@@ -137,7 +137,7 @@ const getTxHandler = Effect.gen(function* () {
     !isHexString(txHashParam) ||
     txHashParam.length !== 64
   ) {
-    // yield* Effect.logInfo(`Invalid transaction hash: ${txHashParam}`);
+    yield* Effect.logInfo(`Invalid transaction hash: ${txHashParam}`);
     return yield* HttpServerResponse.json(
       { error: `Invalid transaction hash: ${txHashParam}` },
       { status: 404 },
@@ -231,7 +231,7 @@ const getBlockHandler = Effect.gen(function* () {
   if (
     typeof hdrHash !== "string" ||
     !isHexString(hdrHash) ||
-    hdrHash.length !== 32
+    hdrHash.length !== 64
   ) {
     yield* Effect.logInfo(
       `GET /${BLOCK_ENDPOINT} - Invalid block hash: ${hdrHash}`,
