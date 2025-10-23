@@ -68,7 +68,7 @@ export const insert = (
       [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
     }));
 
-    yield* insertEntriesUnhandledErrors([...inputEntries, ...outputEntries]);
+    yield* insertEntries([...inputEntries, ...outputEntries]);
   }).pipe(
     Effect.withLogSpan(`entries ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
