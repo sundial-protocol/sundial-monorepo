@@ -5,7 +5,6 @@ use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{InlineDatum, Input, Output}
 use midgard/common/types.{MerkleRoot, PosixTime}
 use midgard/common/utils
-use midgard/registered_operators.{OperatorStatus}
 
 pub type Datum {
   deposits_root: MerkleRoot,
@@ -47,6 +46,11 @@ pub type EventType {
   Deposit
   Withdrawal
   TxOrder
+}
+
+pub type OperatorStatus {
+  ActiveOperator
+  RetiredOperator
 }
 
 pub type MintRedeemer {
