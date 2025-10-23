@@ -734,10 +734,9 @@ const txQueueProcessorAction = (txQueue: Queue.Dequeue<string>) =>
 
     const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(txQueue);
     const txStrings = Chunk.toReadonlyArray(txStringsChunk);
-    const processedTxs: ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) =>
-      Effect.gen(function* () {
-        return yield* breakDownTx(fromHex(tx));
-      }),
+    const processedTxs: ProcessedTx[] = yield* Effect.forEach(
+      txStrings,
+      (tx) => breakDownTx(fromHex(tx)),
     );
     yield* MempoolDB.insertMultiple(processedTxs);
   });
