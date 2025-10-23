@@ -38,7 +38,6 @@ export const insertEntries = (
   entries: Entry[],
 ): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
     yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(entries)}
       ON CONFLICT (${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)}) DO NOTHING`;
@@ -55,30 +54,24 @@ export const insert = (
   produced: Ledger.Entry[],
 ): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
-    yield* Effect.logInfo(`${tableName} db: attempt to insert entries`);
     const sql = yield* SqlClient.SqlClient;
 
-    const inputEntries =
-      yield* sql<Entry>`SELECT ${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)}
+    const inputEntriesProgram = sql<Entry>`SELECT ${sql(Ledger.Columns.TX_ID)}, ${sql(Ledger.Columns.ADDRESS)}
     FROM ${sql(MempoolLedgerDB.tableName)}
     WHERE ${sql(Ledger.Columns.TX_ID)} IN ${sql.in(spent)}`;
 
+    const inputEntries = yield* inputEntriesProgram.pipe(
+      Effect.catchAllCause((_) => Effect.succeed([] as Entry[])),
+    );
+
+    inputEntries;
     const outputEntries: Entry[] = produced.map((e) => ({
       [Ledger.Columns.TX_ID]: e[Ledger.Columns.TX_ID],
       [Ledger.Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
     }));
 
     yield* insertEntries([...inputEntries, ...outputEntries]);
-  }).pipe(
-    Effect.withLogSpan(`entries ${tableName}`),
-    Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insert entries: ${JSON.stringify(e)}`),
-    ),
-    sqlErrorToDatabaseError(
-      tableName,
-      "Failed to insert the given entries from spent and produced UTxOs",
-    ),
-  );
+  }).pipe(Effect.withLogSpan(`entries ${tableName}`));
 
 export const delTxHash = (
   tx_hash: Buffer,
