@@ -137,7 +137,7 @@ const getTxHandler = Effect.gen(function* () {
     !isHexString(txHashParam) ||
     txHashParam.length !== 64
   ) {
-    yield* Effect.logInfo(`Invalid transaction hash: ${txHashParam}`);
+    yield* Effect.logInfo(`GET /${TX_ENDPOINT} - Invalid transaction hash: ${txHashParam}`);
     return yield* HttpServerResponse.json(
       { error: `Invalid transaction hash: ${txHashParam}` },
       { status: 404 },
