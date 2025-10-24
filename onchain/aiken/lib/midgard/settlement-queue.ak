@@ -2,7 +2,9 @@ use aiken/crypto.{VerificationKeyHash}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName, PolicyId}
-use cardano/transaction.{InlineDatum, Input, Output}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
+}
 use midgard/common/types.{MerkleRoot, PosixTime}
 use midgard/common/utils
 
@@ -85,4 +87,125 @@ pub fn get_datum(
   expect parsed_settlement_datum: Datum = settlement_datum_data
 
   parsed_settlement_datum
+}
+
+pub fn valid_event_inclusion(
+  event_type: EventType,
+  deposit_script_hash: ScriptHash,
+  withdrawal_script_hash: ScriptHash,
+  tx_order_script_hash: ScriptHash,
+  deposits_root: MerkleRoot,
+  withdrawals_root: MerkleRoot,
+  transactions_root: MerkleRoot,
+  membership_proof: mpf.Proof,
+  unresolved_event_asset_name: AssetName,
+  unresolved_event_ref_input_index: Int,
+  reference_inputs: List<Input>,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+) {
+  when event_type is {
+    settlement.Deposit -> {
+      // 1. The transaction must include a deposit event utxo as a reference
+      //    input. Let that reference input be `unprocessed_deposit`.
+      expect Input {
+        output: Output { datum: InlineDatum(deposit_datum_data), .. },
+        ..
+      } =
+        utils.get_authentic_input_with_nft_at(
+          reference_inputs,
+          deposit_script_hash,
+          unresolved_event_asset_name,
+          unresolved_event_ref_input_index,
+        )
+      // Unsafe coercion is fine here as we have already validated the
+      // authenticity of the utxo.
+      let Pair(deposit_key, deposit_value) =
+        ledger_state.unsafe_event_to_key_value_pair(deposit_datum_data)
+
+      // 2. A valid membership proof must be provided, proving that
+      //    `unprocessed_deposit` is a member of the deposits tree in the
+      //    settlement utxo.
+      utils.plutarch_phas(
+        mpf_root: deposits_root,
+        key: deposit_key,
+        value: deposit_value,
+        membership_proof: membership_proof,
+        redeemers: redeemers,
+      )
+    }
+    settlement.Withdrawal { validity_override } -> {
+      // 1. The transaction must include a withdrawal order as a reference
+      //    input. Let that reference input be `unprocessed_withdrawal`.
+      expect Input {
+        output: Output { datum: InlineDatum(withdrawal_datum_data), .. },
+        ..
+      } =
+        utils.get_authentic_input_with_nft_at(
+          reference_inputs,
+          withdrawal_script_hash,
+          unresolved_event_asset_name,
+          unresolved_event_ref_input_index,
+        )
+
+      let Pair(withdrawal_key, withdrawal_info_data) =
+        ledger_state.unsafe_event_to_key_value_pair(withdrawal_datum_data)
+
+      // `validity` of `unprocessed_withdrawal` must be set via the redeemer.
+      expect withdrawal_info: ledger_state.WithdrawalInfo = withdrawal_info_data
+      //
+      let overridden_withdrawal_info: Data =
+        ledger_state.WithdrawalInfo {
+          ..withdrawal_info,
+          validity: validity_override,
+        }
+
+      // 2. A valid membership proof must be provided, proving that
+      //    `unprocessed_withdrawal` with overridden `validity` is a member of
+      //    the withdrawals tree in the settlement utxo.
+      utils.plutarch_phas(
+        mpf_root: withdrawals_root,
+        key: withdrawal_key,
+        value: overridden_withdrawal_info,
+        membership_proof: membership_proof,
+        redeemers: redeemers,
+      )
+    }
+    settlement.TxOrder { validity_override } -> {
+      // 1. The transaction must include an L2 transaction order as a reference
+      //    input. Let that reference input be `unprocessed_tx_order`.
+      expect Input {
+        output: Output { datum: InlineDatum(tx_order_datum_data), .. },
+        ..
+      } =
+        utils.get_authentic_input_with_nft_at(
+          reference_inputs,
+          tx_order_script_hash,
+          unresolved_event_asset_name,
+          unresolved_event_ref_input_index,
+        )
+
+      let Pair(tx_order_key, tx_order_tx_data) =
+        ledger_state.unsafe_event_to_key_value_pair(tx_order_datum_data)
+
+      // `validity` of `unprocessed_tx_order` must be set via the redeemer.
+      expect tx_order_tx: ledger_state.MidgardTxCompact = tx_order_tx_data
+      //
+      let overridden_tx_order_tx: Data =
+        ledger_state.MidgardTxCompact {
+          ..tx_order_tx,
+          validity: validity_override,
+        }
+
+      // 2. A valid membership proof must be provided, proving that
+      //    `unprocessed_tx_order` with overridden `validity` is a member of the
+      //    withdrawals tree in the settlement utxo.
+      utils.plutarch_phas(
+        mpf_root: transactions_root,
+        key: tx_order_key,
+        value: overridden_tx_order_tx,
+        membership_proof: membership_proof,
+        redeemers: redeemers,
+      )
+    }
+  }
 }

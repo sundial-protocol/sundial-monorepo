@@ -204,51 +204,37 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         // 5. The transaction must include either a deposit, a withdrawal order,
-        //    or an L2 transaction order as a reference input. Let that
-        //    reference input be `unprocessed_event`.
-        let (event_script, events_root) =
-          when event_type is {
-            settlement.Deposit -> (deposit_script_hash, deposits_root)
-            settlement.Withdrawal -> (withdrawal_script_hash, withdrawals_root)
-            settlement.TxOrder -> (tx_order_script_hash, txs_root)
-          }
-        expect Input {
-          output: Output { datum: InlineDatum(event_datum_data), .. },
-          ..
-        } =
-          utils.get_authentic_input_with_nft_at(
-            reference_inputs,
-            event_script,
+        //    or an L2 transaction order as a reference input. The validity of
+        //    withdrawal or transaction order in the corresponding tree root can
+        //    be different than the one coming from the reference input.
+        //    Inclusion of the event in the tree is checked using the validity
+        //    provided via the redeemer.
+        expect
+          settlement.valid_event_inclusion(
+            event_type,
+            deposit_script_hash,
+            withdrawal_script_hash,
+            tx_order_script_hash,
+            deposits_root,
+            withdrawals_root,
+            transactions_root,
+            membership_proof,
             unresolved_event_asset_name,
             unresolved_event_ref_input_index,
-          )
-        // Unsafe coercion is fine here as we have already validated the
-        // authenticity of the utxo.
-        let Pair(event_key, event_value) =
-          ledger_state.unsafe_event_to_key_value_pair(event_datum_data)
-
-        // 6. A valid membership proof must be provided, proving that
-        //    `unprocessed_event` is a member of the corresponding tree in the
-        //    settlement utxo.
-        expect
-          utils.plutarch_phas(
-            mpf_root: events_root,
-            key: event_key,
-            value: event_value,
-            membership_proof: membership_proof,
-            redeemers: redeemers,
+            reference_inputs,
+            redeemers,
           )
 
-        // 7. The transaction's time-validity upper bound must be earlier than
+        // 6. The transaction's time-validity upper bound must be earlier than
         //    the resolution claim's resolution time.
         expect Finite(valid_to) = validity_range.upper_bound.bound_type
         expect valid_to < resolution_time
 
-        // 8. Let `operator_status` be a redeemer argument indicating whether
+        // 7. Let `operator_status` be a redeemer argument indicating whether
         //    `operator` is active or retired.
         when operator_status is {
           ActiveOperator -> {
-            // 9. The transaction must remove a node from the active operators list
+            // 8. The transaction must remove a node from the active operators list
             //    via the Remove Operator Bad Settlement redeemer.
             let active_operators_mint_redeemer_data =
               utils.get_redeemer_at(
@@ -268,8 +254,8 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             True
           }
           RetiredOperator -> {
-            // 10. The transaction must remove a node from the retired operators
-            //     list via the Remove Operator Bad Settlement redeemer.
+            // 9. The transaction must remove a node from the retired operators
+            //    list via the Remove Operator Bad Settlement redeemer.
             let retired_operators_mint_redeemer_data =
               redeemers
                 |> utils.get_redeemer_at(
