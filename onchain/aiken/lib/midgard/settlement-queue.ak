@@ -44,8 +44,8 @@ pub type SpendRedeemer {
 
 pub type EventType {
   Deposit
-  Withdrawal
-  TxOrder
+  Withdrawal { validity_override: ledger_state.WithdrawalValidity }
+  TxOrder { validity_override: ledger_state.MidgardTxValidity }
 }
 
 pub type OperatorStatus {
@@ -55,14 +55,13 @@ pub type OperatorStatus {
 
 pub type MintRedeemer {
   Spawn {
-    key_to_add: ByteArray,
-    anchor_node_output_index: Int,
-    node_output_index: Int,
+    settlement_id: ByteArray,
+    output_index: Int,
     state_queue_merge_redeemer_index: Int,
     hub_ref_input_index: Int,
   }
   Conclude {
-    key_to_remove: ByteArray,
+    settlement_id: ByteArray,
     removed_node_input_index: Int,
     anchor_node_input_index: Int,
   }
@@ -70,20 +69,20 @@ pub type MintRedeemer {
 
 pub fn get_datum(
   reference_inputs: List<Input>,
-  settlement_queue_policy_id: PolicyId,
+  settlement_policy_id: PolicyId,
   settlement_ref_input_index: Int,
 ) -> Datum {
   expect Input {
-    output: Output { datum: InlineDatum(settlement_node_datum_data), .. },
+    output: Output { datum: InlineDatum(settlement_datum_data), .. },
     ..
   } =
     reference_inputs
       |> utils.get_authentic_input_with_policy_at(
-          settlement_queue_policy_id,
+          settlement_policy_id,
           settlement_ref_input_index,
         )
 
-  expect parsed_settlement_node_datum: Datum = settlement_node_datum_data
+  expect parsed_settlement_datum: Datum = settlement_datum_data
 
-  parsed_settlement_node_datum
+  parsed_settlement_datum
 }

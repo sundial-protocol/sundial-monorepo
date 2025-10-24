@@ -102,11 +102,11 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         //    `active_operators` node with a key matching the resolution claim's
         //    operator.
         let active_operators_spend_redeemer_data =
-          utils.get_redeemer_at(
-            redeemers,
-            Spend(active_operators_out_ref),
-            active_operators_redeemer_index,
-          )
+          redeemers
+            |> utils.get_redeemer_at(
+                Spend(active_operators_out_ref),
+                active_operators_redeemer_index,
+              )
         //
         expect active_operators.UpdateBondHoldNewSettlement {
           new_bond_unlock_time,
@@ -271,11 +271,11 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             // 10. The transaction must remove a node from the retired operators
             //     list via the Remove Operator Bad Settlement redeemer.
             let retired_operators_mint_redeemer_data =
-              utils.get_redeemer_at(
-                redeemers,
-                Mint(retired_operators),
-                operators_redeemer_index,
-              )
+              redeemers
+                |> utils.get_redeemer_at(
+                    Mint(retired_operators),
+                    operators_redeemer_index,
+                  )
             //
             expect retired_operators.RemoveOperatorBadSettlement {
               slashed_retired_operator_key,
@@ -310,49 +310,42 @@ validator mint(hub_oracle: ScriptHash) {
       ..
     } = tx
 
-    let node_in_outputs = get_node_inputs(inputs, own_policy)
-    let node_outputs = get_node_outputs(outputs, own_policy)
-    let node_mint = assets.tokens(mint, own_policy)
-
     when redeemer is {
-      Init -> and {
-          assets.quantity_of(mint, hub_oracle, hub.asset_name) == 1,
-          unordered.init(node_outputs, node_mint, own_policy),
-        }
-      Deinit -> and {
-          assets.quantity_of(mint, hub_oracle, hub.asset_name) == -1,
-          unordered.deinit(node_in_outputs, node_mint, own_policy),
-        }
-      AppendSettlementNode {
-        key_to_add,
-        anchor_node_output_index,
-        node_output_index,
+      Spawn {
+        settlement_id,
+        output_index,
         state_queue_merge_redeemer_index,
         hub_ref_input_index,
       } -> {
-        // 1. The transaction must include the Midgard hub oracle NFT in a reference input.
+        // 1. The transaction must include the Midgard hub oracle NFT in a
+        //    reference input.
         // 2. hub_oracle.{state_queue}
         let hub.Datum { state_queue, .. } =
           hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-        // 3. The transaction must Remove a `state_queue` node via the Merge To Confirmed
-        //    State redeemer. Let `merged_block` be the block being merged to the confirmed
-        //    state, and let `header_hash` be its header-hash key.
+        // 3. The transaction must Remove a `state_queue` node via the Merge To
+        //    Confirmed State redeemer. Let `merged_block` be the block being
+        //    merged to the confirmed state, and let `header_hash` be its
+        //    header-hash key.
         //
         // Note: we trust the redeemer arguments provided to state_queue
         // because we expect it to check them.
-        expect Some(state_queue_redeemer_pair) =
-          redeemers |> list.at(state_queue_merge_redeemer_index)
-        expect state_queue_redeemer_pair.1st == Mint(state_queue)
+        let state_queue_redeemer_data =
+          redeemers
+            |> utils.get_redeemer_at(
+                Mint(state_queue),
+                state_queue_merge_redeemer_index,
+              )
+        //
         expect state_queue.MergeToConfirmedState {
           header_node_key,
           header_node_input_index,
           ..
-        }: state_queue.MintRedeemer = state_queue_redeemer_pair.2nd
+        }: state_queue.MintRedeemer = state_queue_redeemer_data
         // We verify this redeemer argument so that other scripts can use it:
-        expect header_node_key == key_to_add
+        expect header_node_key == settlement_id
         //
-        expect Some(merged_block) = list.at(tx.inputs, header_node_input_index)
+        expect Some(merged_block) = list.at(inputs, header_node_input_index)
         expect Input {
           output: Output { datum: InlineDatum(block_datum_data), .. },
           ..
@@ -362,52 +355,40 @@ validator mint(hub_oracle: ScriptHash) {
         expect ledger_state.Header {
           deposits_root,
           withdrawals_root,
-          txs_root,
+          transactions_root,
           start_time,
           end_time,
           ..
         } = block_datum.data
 
-        // 4. The transaction must Append a node to the settlement queue with a key matching
-        // `header_hash`. Let `new_settlement_node` be the node being appended.
-        expect
-          unordered.append_unsafe(
-            Key(key_to_add),
-            node_output_index,
-            anchor_node_output_index,
-            node_in_outputs,
-            node_outputs,
-            node_mint,
-          )
-        //
+        // 4. The transaction must produce a settlement utxo with an nft which
+        //    its asset name matches `header_hash`. Let `new_settlement` be the
+        //    new settlement utxo.
         expect Some(Output {
           datum: InlineDatum(settlement_output_datum_data),
           ..
-        }) = list.at(node_outputs, node_output_index)
+        }) = list.at(outputs, output_index)
 
-        // 5. `merged_block` and `new_settlement_node` must match on all these fields:
-        //    `deposits_root`, `withdrawals_root`, `txs_root`, `start_time`,
-        //    `end_time`.
-        // 6. The `resolution_claim` of `new_settlement_node` must be empty.
+        // 5. `merged_block` and `new_settlement` must match on all these
+        //    fields: `deposits_root`, `withdrawals_root`, `txs_root`.
+        // 6. The `resolution_claim` of `new_settlement` must be empty.
         expect parsed_settlement_output_datum: Datum =
           settlement_output_datum_data
-        let expected_produced_node_data: Data =
-          NodeData {
+        let expected_produced_settlement_datum: Data =
+          Datum {
             deposits_root,
             withdrawals_root,
-            txs_root,
-            start_time,
-            end_time,
+            transactions_root,
             resolution_claim: None,
           }
         expect
-          parsed_settlement_output_datum.data == expected_produced_node_data
+          parsed_settlement_output_datum.data == expected_produced_settlement_datum
 
         // Done.
         True
       }
-      RemoveSettlementNode {
-        key_to_remove,
+      Conclude {
+        settlement_id,
         removed_node_input_index,
         anchor_node_input_index,
       } -> {
@@ -415,12 +396,11 @@ validator mint(hub_oracle: ScriptHash) {
         //    `removed_settlement_node` be that node.
         expect
           unordered.remove(
-            Key(key_to_remove),
+            Key(settlement_id),
             removed_node_input_index,
             anchor_node_input_index,
             node_in_outputs,
-            node_outputs,
-            node_mint,
+            outputs,
           )
         //
         expect Some(Output { datum: InlineDatum(removed_node_datum_data), .. }) =
