@@ -104,7 +104,7 @@ pub fn valid_event_inclusion(
   redeemers: Pairs<ScriptPurpose, Redeemer>,
 ) {
   when event_type is {
-    settlement.Deposit -> {
+    Deposit -> {
       // 1. The transaction must include a deposit event utxo as a reference
       //    input. Let that reference input be `unprocessed_deposit`.
       expect Input {
@@ -133,7 +133,7 @@ pub fn valid_event_inclusion(
         redeemers: redeemers,
       )
     }
-    settlement.Withdrawal { validity_override } -> {
+    Withdrawal { validity_override } -> {
       // 1. The transaction must include a withdrawal order as a reference
       //    input. Let that reference input be `unprocessed_withdrawal`.
       expect Input {
@@ -170,7 +170,7 @@ pub fn valid_event_inclusion(
         redeemers: redeemers,
       )
     }
-    settlement.TxOrder { validity_override } -> {
+    TxOrder { validity_override } -> {
       // 1. The transaction must include an L2 transaction order as a reference
       //    input. Let that reference input be `unprocessed_tx_order`.
       expect Input {
