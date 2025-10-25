@@ -11,7 +11,7 @@ use aiken_design_patterns/merkelized_validator
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
-  Input, Output, OutputReference, Redeemer, ScriptPurpose,
+  Datum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
 }
 use env
 use midgard/common/constants.{posix_time_none}
@@ -202,6 +202,53 @@ pub fn get_authentic_input_of(
     }
 
   found_ref_input
+}
+
+/// Helper useful for spending validators. Also ensures no reference scripts are
+/// attached.
+pub fn get_continued_output_datum_at(
+  outputs: List<Output>,
+  expected_address: Address,
+  expected_value: Value,
+  output_index: Int,
+) -> Datum {
+  expect Some(Output {
+    address: output_address,
+    value: output_value,
+    datum: InlineDatum(output_datum_data),
+    reference_script: None,
+  }) = list.at(outputs, output_index)
+
+  expect output_address == expected_address
+  expect output_value == expected_value
+
+  output_datum_data
+}
+
+/// Helper useful for minting/withdrawal validators. Also ensures no reference
+/// scripts are attached.
+pub fn get_authentic_output_datum_at_address_with_nft_at(
+  outputs: List<Output>,
+  expected_address: Address,
+  nft_policy_id: PolicyId,
+  nft_asset_name: AssetName,
+  output_index: Int,
+) -> Datum {
+  expect Some(Output {
+    address: output_address,
+    value: output_value,
+    datum: InlineDatum(output_datum_data),
+    reference_script: None,
+  }) = list.at(outputs, output_index)
+
+  expect expected_address == address
+
+  let output_nft_triplet =
+    get_single_asset_from_value_apart_from_ada(output_value)
+
+  expect input_nft_triplet == (nft_policy_id, nft_asset_name, 1)
+
+  output_datum_data
 }
 
 // Used to retrieve asset name from a value with a specific policy id

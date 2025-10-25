@@ -7,6 +7,7 @@ use cardano/transaction.{
 }
 use midgard/common/types.{MerkleRoot, PosixTime}
 use midgard/common/utils
+use midgard/ledger_state
 
 pub type Datum {
   deposits_root: MerkleRoot,
@@ -62,11 +63,7 @@ pub type MintRedeemer {
     state_queue_merge_redeemer_index: Int,
     hub_ref_input_index: Int,
   }
-  Conclude {
-    settlement_id: ByteArray,
-    removed_node_input_index: Int,
-    anchor_node_input_index: Int,
-  }
+  Conclude { settlement_id: ByteArray, input_index: Int }
 }
 
 pub fn get_datum(

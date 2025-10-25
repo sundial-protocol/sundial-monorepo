@@ -63,12 +63,13 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         let Output { address: input_address, value: input_value, .. } =
           utils.get_own_input_at(inputs, own_out_ref, settlement_input_index)
         //
-        expect Some(Output {
-          address: cont_output_address,
-          value: cont_output_value,
-          datum: InlineDatum(cont_output_datum_data),
-          reference_script: None,
-        }) = outputs |> list.at(settlement_output_index)
+        let cont_output_datum_data =
+          output
+            |> utils.get_continued_output_datum_at(
+                expected_address: input_address,
+                expected_value: input_value,
+                output_index: settlement_output_index,
+              )
         //
         expect Datum {
           resolution_claim: Some(ResolutionClaim {
@@ -101,6 +102,12 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         //    the Update Bond Hold New Settlement redeemer, of an
         //    `active_operators` node with a key matching the resolution claim's
         //    operator.
+        expect Some(Input {
+          output: Output { address: active_operators_node_address, .. },
+          output_reference: active_operators_out_ref,
+        }) = list.at(inputs, active_operators_node_input_index)
+        utils.get_authentic_input
+        //
         let active_operators_spend_redeemer_data =
           redeemers
             |> utils.get_redeemer_at(
@@ -112,11 +119,6 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
           new_bond_unlock_time,
           ..
         }: active_operators.SpendRedeemer = active_operators_spend_redeemer_data
-        //
-        expect Some(Input {
-          output: Output { address: active_operators_node_address, .. },
-          output_reference: active_operators_out_ref,
-        }) = list.at(inputs, active_operators_node_input_index)
         //
         expect active_operators_node_address == active_operators_addr
 
@@ -306,7 +308,7 @@ validator mint(hub_oracle: ScriptHash) {
         // 1. The transaction must include the Midgard hub oracle NFT in a
         //    reference input.
         // 2. hub_oracle.{state_queue}
-        let hub.Datum { state_queue, .. } =
+        let hub.Datum { state_queue, settlement_addr, .. } =
           hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
         // 3. The transaction must Remove a `state_queue` node via the Merge To
@@ -347,13 +349,17 @@ validator mint(hub_oracle: ScriptHash) {
           ..
         } = block_datum.data
 
-        // 4. The transaction must produce a settlement utxo with an nft which
-        //    its asset name matches `header_hash`. Let `new_settlement` be the
-        //    new settlement utxo.
-        expect Some(Output {
-          datum: InlineDatum(settlement_output_datum_data),
-          ..
-        }) = list.at(outputs, output_index)
+        // 4. The transaction must produce an authentic settlement utxo with an
+        //    NFT which its asset name matches `header_hash`. Let
+        //    `new_settlement` be the new settlement utxo.
+        expect settlement_output_datum_data =
+          outputs
+            |> utils.get_authentic_output_datum_at_address_with_nft_at(
+                expected_address: settlement_addr,
+                nft_policy_id: own_policy,
+                nft_asset_name: settlement_id,
+                output_index: output_index,
+              )
 
         // 5. `merged_block` and `new_settlement` must match on all these
         //    fields: `deposits_root`, `withdrawals_root`, `txs_root`.
@@ -370,45 +376,46 @@ validator mint(hub_oracle: ScriptHash) {
         expect
           parsed_settlement_output_datum.data == expected_produced_settlement_datum
 
+        // 7. Only 1 of the new NFT must be minted.
+        expect quantity_of(mint, own_policy, settlement_id) == 1
+
         // Done.
         True
       }
-      Conclude {
-        settlement_id,
-        removed_node_input_index,
-        anchor_node_input_index,
-      } -> {
-        // 1. The transaction must Remove a node from the `settlement`. Let
-        //    `removed_settlement_node` be that node.
-        expect
-          unordered.remove(
-            Key(settlement_id),
-            removed_node_input_index,
-            anchor_node_input_index,
-            node_in_outputs,
-            outputs,
-          )
-        //
-        expect Some(Output { datum: InlineDatum(removed_node_datum_data), .. }) =
-          node_in_outputs |> list.at(removed_node_input_index)
+      Conclude { settlement_id, input_index } -> {
+        // 1. The transaction must spend the specified settlement utxo. Let
+        //    `removed_settlement` be that utxo.
+        expect Input {
+          output: Output { datum: InlineDatum(input_datum_data), .. },
+          ..
+        } =
+          inputs
+            |> utils.get_authentic_input_with_nft_at(
+                own_policy,
+                settlement_id,
+                input_index,
+              )
 
-        // 2. The `resolution_claim` of `removed_settlement_node` must not be empty.
-        expect parsed_removed_node_datum: Datum = removed_node_datum_data
-        expect NodeData {
+        // 2. The `resolution_claim` of `removed_settlement` must not be empty.
+        expect Datum {
           resolution_claim: Some(ResolutionClaim {
             resolution_time: unwrapped_time_of_claimed_as_resolved,
             operator: operator_vkey,
           }),
           ..
-        }: NodeData = parsed_removed_node_datum.data
+        } = input_datum_data
 
-        // 3. The transaction must be signed by the `operator` of `resolution_claim`.
+        // 3. The transaction must be signed by the `operator` of
+        //    `resolution_claim`.
         expect operator_vkey |> utils.has_signed(extra_signatories)
 
-        // 4. The transaction's time-validity lower bound must match or exceed the
-        //    `resolution_time` of the `resolution_claim`.
+        // 4. The transaction's time-validity lower bound must match or exceed
+        //    the `resolution_time` of the `resolution_claim`.
         expect Finite(valid_from) = validity_range.lower_bound.bound_type
         expect unwrapped_time_of_claimed_as_resolved <= valid_from
+
+        // 5. `removed_settlement`'s NFT must be burnt.
+        expect quantity_of(mint, own_policy, settlement_id) == -1
 
         // Done.
         True
