@@ -13,7 +13,7 @@ use midgard/registered_operators
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/settlement.{
-  ActiveOperator, AttachResolutionClaim, Close, Conclude, Datum,
+  ActiveOperator, AttachResolutionClaim, Remove, Conclude, Datum,
   DisproveResolutionClaim, MintRedeemer, ResolutionClaim, RetiredOperator, Spawn,
   SpendRedeemer,
 }
@@ -277,15 +277,9 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
           }
         }
       }
-      Close { settlement_id, hub_ref_input_index } -> {
-        // 1. The transaction must include the Midgard hub oracle NFT in a
-        //    reference input.
-        // 2. hub_oracle.{active_operators, scheduler}
-        let hub.Datum { settlement, .. } =
-          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
-
-        // 3. The specified settlement NFT must be burnt.
-        expect assets.quantity_of(mint, settlement, settlement_id) == -1
+      Conclude { settlement_id } -> {
+        // 1. The specified settlement NFT must be burnt.
+        expect assets.quantity_of(mint, settlement_policy_id, settlement_id) == -1
 
         // Done.
         True
@@ -357,8 +351,6 @@ validator mint(hub_oracle: ScriptHash) {
           deposits_root,
           withdrawals_root,
           transactions_root,
-          start_time,
-          end_time,
           ..
         } = block_datum.data
 
@@ -375,7 +367,7 @@ validator mint(hub_oracle: ScriptHash) {
               )
 
         // 5. `merged_block` and `new_settlement` must match on all these
-        //    fields: `deposits_root`, `withdrawals_root`, `txs_root`.
+        //    fields: `deposits_root`, `withdrawals_root`, `transactions_root`.
         // 6. The `resolution_claim` of `new_settlement` must be empty.
         expect parsed_settlement_output_datum: Datum =
           settlement_output_datum_data
@@ -395,7 +387,7 @@ validator mint(hub_oracle: ScriptHash) {
         // Done.
         True
       }
-      Conclude { settlement_id, input_index, spend_redeemer_index } -> {
+      Remove { settlement_id, input_index, spend_redeemer_index } -> {
         // 1. The transaction must spend the specified settlement utxo. Let
         //    `removed_settlement` be that utxo.
         expect Input {
@@ -414,9 +406,11 @@ validator mint(hub_oracle: ScriptHash) {
             |> utils.get_redeemer_at(Spend(input_outref), spend_redeemer_index)
 
         // 2. The redeemer used for spending the `removed_settlement` must be
-        //    `Close`. This also validates the specified NFT is getting burnt.
-        expect Close { settlement_id: settlement_id_from_spend_redeemer, .. }: SpendRedeemer =
-          settlement_spending_redeemer_data
+        //    `Conclude`. This also validates the specified NFT is getting burnt.
+        expect Conclude {
+          settlement_id: settlement_id_from_spend_redeemer,
+          ..
+        }: SpendRedeemer = settlement_spending_redeemer_data
 
         // 3. The `settlement_id` included in the spending redeemer must match
         //    the ID provided in the burning redeemer.
