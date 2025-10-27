@@ -62,16 +62,11 @@ It's responsible for authenticating spawned utxos at the \code{settlement\_addr}
 The spending validator of \code{settlement\_addr} is statically parametrized on the \code{settlement} and \code{hub\_oracle} minting policy.
 Conditions:
 \begin{description}
-  \item[List State Transition.] Forward to minting policy.
+  \item[Attach Resolution Claim.] The current operator attaches a resolution claim to a settlement utxo.
     Conditions:
       \begin{enumerate}
-          \item The transaction must mint or burn tokens of the \code{settlement\_queue} minting policy.
-      \end{enumerate}
-  \item[Attach Resolution Claim.] The current operator attaches a resolution claim to a settlement node.
-    Conditions:
-      \begin{enumerate}
-        \item The spent input must be a settlement node without a resolution claim.
-        \item The spent input must be reproduced as a settlement node with a resolution claim.
+        \item The spent input must not have a resolution claim.
+        \item The spent input must be reproduced with a resolution claim.
         \item The transaction must be signed by the resolution claim's operator.
         \item The transaction must include the Midgard hub oracle NFT in a reference input.
         \item Let \code{active\_operators} and \code{scheduler} be the corresponding policy IDs in the Midgard hub oracle.
@@ -79,17 +74,18 @@ Conditions:
         \item The \code{bond\_unlock\_time} of the \code{operator\_node} must match the \code{resolution\_time} of the resolution claim.
         \item The transaction must include the \code{scheduler} utxo as a reference input, indicating that the current operator matches the resolution claim's operator.
       \end{enumerate}
-  \item[Disprove Resolution Claim.] Disprove and detach a settlement node's resolution claim, slashing the claimant operator.
+  \item[Disprove Resolution Claim.] Disprove and detach a settlement utxo's resolution claim, slashing the claimant operator.
     Conditions:
       \begin{enumerate}
-        \item The spent input must be a settlement node with a resolution claim.
+        \item The spent input must have a resolution claim.
           Let \code{operator} be the operator of that claim.
-        \item The spent input must be reproduced as a settlement node without a resolution claim.
+        \item The spent input must be reproduced without a resolution claim.
         \item The transaction must include the Midgard hub oracle NFT in a reference input.
         \item Let \code{active\_operators}, \code{deposit}, \code{withdrawal}, and \code{tx\_order} be the corresponding policy IDs in the Midgard hub oracle.
         \item The transaction must include either a deposit, a withdrawal, or an transaction order as a reference input.
           Let that reference input be \code{unprocessed\_event}.
-        \item A valid membership proof must be provided, proving that \code{unprocessed\_event} is a member of the corresponding tree in the settlement node.
+        \item A valid membership proof must be provided, proving that \code{unprocessed\_event} is a member of the corresponding tree in the settlement.
+          Note that the validity flag for optimistic events (i.e. withdrawals and transaction orders) must be provided via the redeemer.
         \item The transaction's time-validity upper bound must be earlier than the resolution claim's \code{resolution\_time}.
         \item Let \code{operator\_status} be a redeemer argument indicating whether \code{operator} is active or retired.
         \item If \code{operator\_status} is active:
@@ -102,6 +98,11 @@ Conditions:
                 \item The transaction must Remove a node from the \code{retired\_operators} set via the Remove Operator Bad Settlement redeemer.
                   The \code{slashed\_operator} argument provided to that redeemer must match \code{operator}.
             \end{enumerate}
+      \end{enumerate}
+  \item[Conclude.] Allows expenditure of settlement utxos for burning their state NFTs.
+    Conditions:
+      \begin{enumerate}
+        \item An NFT with policy ID \code{settlement} and asset name \code{settlement\_id} (provided via the redeemer) must be burnt.
       \end{enumerate}
 \end{description}
 

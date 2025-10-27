@@ -11,7 +11,7 @@ use aiken_design_patterns/merkelized_validator
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
-  Datum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
+  Datum, InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
 }
 use env
 use midgard/common/constants.{posix_time_none}
@@ -211,7 +211,7 @@ pub fn get_continued_output_datum_at(
   expected_address: Address,
   expected_value: Value,
   output_index: Int,
-) -> Datum {
+) -> Data {
   expect Some(Output {
     address: output_address,
     value: output_value,

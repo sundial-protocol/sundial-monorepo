@@ -13,9 +13,9 @@ use midgard/registered_operators
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/settlement.{
-  ActiveOperator, AttachResolutionClaim, Remove, Conclude, Datum,
-  DisproveResolutionClaim, MintRedeemer, ResolutionClaim, RetiredOperator, Spawn,
-  SpendRedeemer,
+  ActiveOperator, AttachResolutionClaim, Conclude, Datum,
+  DisproveResolutionClaim, MintRedeemer, Remove, ResolutionClaim,
+  RetiredOperator, Spawn, SpendRedeemer,
 }
 use midgard/state_queue
 
@@ -58,8 +58,7 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         // 1. The spent input must not have a resolution claim.
         expect resolution_claim == None
 
-        // 2. The spent input must be reproduced as a settlement utxo with a
-        //    resolution claim.
+        // 2. The spent input must be reproduced with a resolution claim.
         let Output { address: input_address, value: input_value, .. } =
           utils.get_own_input_at(inputs, own_out_ref, settlement_input_index)
         //
@@ -70,26 +69,10 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
                 expected_value: input_value,
                 output_index: settlement_output_index,
               )
-        //
-        expect Datum {
-          resolution_claim: Some(ResolutionClaim {
-            resolution_time,
-            operator: resolution_operator,
-          }) as output_resolution_claim,
-          ..
-        } as cont_output_datum = cont_output_datum_data
-        //
-        expect input_address == cont_output_address
-        expect input_value == cont_output_value
-        // TODO: inefficient but implicitly safe
-        expect
-          cont_output_datum == Datum {
-            ..datum,
-            resolution_claim: output_resolution_claim,
-          }
 
+        //
+        // Equality check performed under 7.
         // 3. The transaction must be signed by the resolution claim's operator.
-        expect operator == resolution_operator
         expect operator |> utils.has_signed(extra_signatories)
 
         // 4. The transaction must include the Midgard hub oracle NFT in a
@@ -125,7 +108,18 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         // 7. The `bond_unlock_time` of the `operator_node` must match the
         //    `resolution_time` of the resolution claim, which lies in the
         //    future by `maturity_duration` milliseconds.
-        expect resolution_time == new_bond_unlock_time
+        let expected_output_datum_data: Data =
+          Datum {
+            ..datum,
+            resolution_claim: Some(
+              ResolutionClaim {
+                resolution_time: new_bond_unlock_time,
+                operator,
+              },
+            ),
+          }
+        //
+        expect cont_output_datum_data == expected_output_datum_data
 
         // 8. The transaction must include the `scheduler` utxo as a reference
         //    input, indicating that the current operator matches the resolution
@@ -175,21 +169,19 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
         }) = resolution_claim
         expect operator == resolution_operator
 
-        // 2. The spent input must be reproduced as a settlement utxo without a
-        //    resolution claim.
+        // 2. The spent input must be reproduced without a resolution claim.
         let Output { address: input_address, value: input_value, .. } =
           utils.get_own_input_at(inputs, own_out_ref, settlement_input_index)
         //
-        expect Some(Output {
-          address: cont_output_address,
-          value: cont_output_value,
-          datum: InlineDatum(cont_output_datum_data),
-          reference_script: None,
-        }) = outputs |> list.at(settlement_output_index)
+        let cont_output_datum_data =
+          output
+            |> utils.get_continued_output_datum_at(
+                expected_address: input_address,
+                expected_value: input_value,
+                output_index: settlement_output_index,
+              )
         //
-        expect input_address == cont_output_address
-        expect input_value == cont_output_value
-        // TODO: inefficient but implicitly safe
+        // TODO: Can this be done more efficiently?
         expect
           cont_output_datum_data == Datum { ..datum, resolution_claim: None }
 
@@ -256,7 +248,7 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             True
           }
           RetiredOperator -> {
-            // 9. The transaction must remove a node from the retired operators
+            // 8. The transaction must remove a node from the retired operators
             //    list via the Remove Operator Bad Settlement redeemer.
             let retired_operators_mint_redeemer_data =
               redeemers
@@ -279,7 +271,8 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
       }
       Conclude { settlement_id } -> {
         // 1. The specified settlement NFT must be burnt.
-        expect assets.quantity_of(mint, settlement_policy_id, settlement_id) == -1
+        expect
+          assets.quantity_of(mint, settlement_policy_id, settlement_id) == -1
 
         // Done.
         True
@@ -407,10 +400,8 @@ validator mint(hub_oracle: ScriptHash) {
 
         // 2. The redeemer used for spending the `removed_settlement` must be
         //    `Conclude`. This also validates the specified NFT is getting burnt.
-        expect Conclude {
-          settlement_id: settlement_id_from_spend_redeemer,
-          ..
-        }: SpendRedeemer = settlement_spending_redeemer_data
+        expect Conclude { settlement_id: settlement_id_from_spend_redeemer, .. }: SpendRedeemer =
+          settlement_spending_redeemer_data
 
         // 3. The `settlement_id` included in the spending redeemer must match
         //    the ID provided in the burning redeemer.
