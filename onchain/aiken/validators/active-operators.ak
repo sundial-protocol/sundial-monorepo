@@ -375,19 +375,20 @@ fn get_settlement_spending_redeemer_data(
   reference_inputs: List<Input>,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
 ) -> Data {
-  let hub.Datum { settlement, .. } =
+  let hub.Datum { settlement_addr, .. } =
     hub.get_datum(
       reference_inputs,
       hub_oracle_script_hash,
       hub_oracle_ref_input_index,
     )
   //
-  expect Input { output_reference: settlement_input_outref, .. } =
-    inputs
-      |> utils.get_authentic_input_with_policy_at(
-          settlement,
-          settlement_input_index,
-        )
+  expect Input {
+    output_reference: settlement_input_outref,
+    output: Output { address: settlement_input_address, .. },
+  } = inputs |> list.at(settlement_input_index)
+  //
+  expect
+    settlement_input_address.payment_credential == settlement_add.payment_credential
   //
   redeemers
     |> utils.get_redeemer_at(
