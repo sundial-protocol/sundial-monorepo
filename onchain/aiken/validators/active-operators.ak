@@ -364,34 +364,3 @@ validator mint(
 fn no_active_operators_minted(mint: Value, policy_id: PolicyId) {
   utils.quantity_of_policy_id(mint, policy_id) == 0
 }
-
-fn get_settlement_spending_redeemer_data(
-  hub_oracle_script_hash: ScriptHash,
-  hub_oracle_ref_input_index: Int,
-  settlement_input_index: Int,
-  settlement_redeemer_index: Int,
-  inputs: List<Input>,
-  reference_inputs: List<Input>,
-  redeemers: Pairs<ScriptPurpose, Redeemer>,
-) -> Data {
-  let hub.Datum { settlement_addr, .. } =
-    hub.get_datum(
-      reference_inputs,
-      hub_oracle_script_hash,
-      hub_oracle_ref_input_index,
-    )
-  //
-  expect Input {
-    output_reference: settlement_input_outref,
-    output: Output { address: settlement_input_address, .. },
-  } = inputs |> list.at(settlement_input_index)
-  //
-  expect
-    settlement_input_address.payment_credential == settlement_add.payment_credential
-  //
-  redeemers
-    |> utils.get_redeemer_at(
-        Spend(settlement_input_outref),
-        settlement_redeemer_index,
-      )
-}
