@@ -137,7 +137,7 @@ pub fn get_single_asset_from_value_apart_from_ada(
   (sym, tn, qty)
 }
 
-/// For beacon UTxOs with specific policy IDs. Note that the address is not
+/// For state UTxOs with specific policy IDs. Note that the address is not
 /// checked.
 pub fn get_authentic_input_with_policy_at(
   inputs: List<Input>,
@@ -156,7 +156,7 @@ pub fn get_authentic_input_with_policy_at(
   found_input
 }
 
-/// For beacon UTxOs with specific NFTs. Note that the address is not checked.
+/// For state UTxOs with specific NFTs. Note that the address is not checked.
 pub fn get_authentic_input_with_nft_at(
   inputs: List<Input>,
   nft_policy_id: PolicyId,
@@ -175,7 +175,7 @@ pub fn get_authentic_input_with_nft_at(
   found_input
 }
 
-/// For beacon UTxOs of validators which their NFTs have policy IDs equal to
+/// For state UTxOs of validators which their NFTs have policy IDs equal to
 /// their payment credentials.
 pub fn get_authentic_input_of(
   inputs: List<Input>,
