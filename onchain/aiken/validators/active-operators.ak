@@ -5,8 +5,7 @@ use aiken_design_patterns/linked_list/ordered.{
 }
 use cardano/assets.{PolicyId, Value, quantity_of, tokens}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptPurpose,
-  Spend, Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
 }
 use midgard/active_operators.{
   ActivateOperator, Datum, Deinit, Init, ListStateTransition, MintRedeemer,
@@ -130,7 +129,7 @@ validator spend(
           parsed_active_node_output_datum.data
         //
         let settlement_spending_redeemer_data =
-          get_settlement_spending_redeemer_data(
+          settlement.get_spending_redeemer_data(
             hub_oracle_script_hash,
             hub_oracle_ref_input_index,
             settlement_input_index,
@@ -276,7 +275,7 @@ validator mint(
         let Transaction { inputs, reference_inputs, redeemers, fee, .. } = self
         //
         let settlement_spending_redeemer_data =
-          get_settlement_spending_redeemer_data(
+          settlement.get_spending_redeemer_data(
             hub_oracle_script_hash,
             hub_oracle_ref_input_index,
             settlement_input_index,
