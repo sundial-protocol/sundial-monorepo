@@ -13,7 +13,7 @@ use midgard/registered_operators
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/settlement.{
-  ActiveOperator, AttachResolutionClaim, Conclude, Datum,
+  ActiveOperator, AttachResolutionClaim, Close, Conclude, Datum,
   DisproveResolutionClaim, MintRedeemer, ResolutionClaim, RetiredOperator, Spawn,
   SpendRedeemer,
 }
@@ -239,11 +239,11 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             // 8. The transaction must remove a node from the active operators list
             //    via the Remove Operator Bad Settlement redeemer.
             let active_operators_mint_redeemer_data =
-              utils.get_redeemer_at(
-                redeemers,
-                Mint(active_operators),
-                operators_redeemer_index,
-              )
+              redeemers
+                |> utils.get_redeemer_at(
+                    Mint(active_operators),
+                    operators_redeemer_index,
+                  )
             //
             expect active_operators.RemoveOperatorBadSettlement {
               slashed_active_operator_key,
@@ -276,6 +276,19 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
             True
           }
         }
+      }
+      Close { settlement_id, hub_ref_input_index } -> {
+        // 1. The transaction must include the Midgard hub oracle NFT in a
+        //    reference input.
+        // 2. hub_oracle.{active_operators, scheduler}
+        let hub.Datum { settlement, .. } =
+          hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+
+        // 3. The specified settlement NFT must be burnt.
+        expect assets.quantity_of(mint, settlement, settlement_id) == -1
+
+        // Done.
+        True
       }
     }
   }
@@ -382,12 +395,12 @@ validator mint(hub_oracle: ScriptHash) {
         // Done.
         True
       }
-      Conclude { settlement_id, input_index } -> {
+      Conclude { settlement_id, input_index, spend_redeemer_index } -> {
         // 1. The transaction must spend the specified settlement utxo. Let
         //    `removed_settlement` be that utxo.
         expect Input {
           output: Output { datum: InlineDatum(input_datum_data), .. },
-          ..
+          output_reference: input_outref,
         } =
           inputs
             |> utils.get_authentic_input_with_nft_at(
@@ -396,7 +409,20 @@ validator mint(hub_oracle: ScriptHash) {
                 input_index,
               )
 
-        // 2. The `resolution_claim` of `removed_settlement` must not be empty.
+        let settlement_spending_redeemer_data =
+          redeemers
+            |> utils.get_redeemer_at(Spend(input_outref), spend_redeemer_index)
+
+        // 2. The redeemer used for spending the `removed_settlement` must be
+        //    `Close`. This also validates the specified NFT is getting burnt.
+        expect Close { settlement_id: settlement_id_from_spend_redeemer, .. }: SpendRedeemer =
+          settlement_spending_redeemer_data
+
+        // 3. The `settlement_id` included in the spending redeemer must match
+        //    the ID provided in the burning redeemer.
+        expect settlement_id == settlement_id_from_spend_redeemer
+
+        // 4. The `resolution_claim` of `removed_settlement` must not be empty.
         expect Datum {
           resolution_claim: Some(ResolutionClaim {
             resolution_time: unwrapped_time_of_claimed_as_resolved,
@@ -405,17 +431,14 @@ validator mint(hub_oracle: ScriptHash) {
           ..
         } = input_datum_data
 
-        // 3. The transaction must be signed by the `operator` of
+        // 5. The transaction must be signed by the `operator` of
         //    `resolution_claim`.
         expect operator_vkey |> utils.has_signed(extra_signatories)
 
-        // 4. The transaction's time-validity lower bound must match or exceed
+        // 6. The transaction's time-validity lower bound must match or exceed
         //    the `resolution_time` of the `resolution_claim`.
         expect Finite(valid_from) = validity_range.lower_bound.bound_type
         expect unwrapped_time_of_claimed_as_resolved <= valid_from
-
-        // 5. `removed_settlement`'s NFT must be burnt.
-        expect quantity_of(mint, own_policy, settlement_id) == -1
 
         // Done.
         True

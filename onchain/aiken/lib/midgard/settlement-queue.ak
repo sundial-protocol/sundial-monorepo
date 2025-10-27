@@ -43,6 +43,7 @@ pub type SpendRedeemer {
     event_type: EventType,
     membership_proof: mpf.Proof,
   }
+  Close { settlement_id: ByteArray, hub_ref_input_index: Int }
 }
 
 pub type EventType {
@@ -63,7 +64,11 @@ pub type MintRedeemer {
     state_queue_merge_redeemer_index: Int,
     hub_ref_input_index: Int,
   }
-  Conclude { settlement_id: ByteArray, input_index: Int }
+  Conclude {
+    settlement_id: ByteArray,
+    input_index: Int,
+    spend_redeemer_index: Int,
+  }
 }
 
 pub fn get_datum(
