@@ -3,7 +3,7 @@ use midgard/ledger_state
 use midgard/user_events
 
 pub type Datum =
-  user_events.Datum<ledger_state.WithdrawalEvent>
+  user_events.OptimisticDatum<ledger_state.WithdrawalEvent>
 
 pub type SpendPurpose {
   InitializePayout

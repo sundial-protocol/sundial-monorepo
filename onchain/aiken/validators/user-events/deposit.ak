@@ -31,36 +31,23 @@ validator spend(hub_oracle: ScriptHash) {
       hub_ref_input_index,
       settlement_ref_input_index,
       mint_redeemer_index,
-      purpose,
+      membership_proof,
     } = redeemer
+
+    let settlement.Datum { deposits_root, .. } = 
+      reference_inputs |> settlement.get_datum(settlement_policy_id, settlement_ref_input_index)
 
     let hub.Datum {
       deposit: deposit_policy_id,
-      settlement_queue: settlement_queue_policy_id,
+      settlement: settlement_policy_id,
       reserve_addr,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-    let parsed_settlement_node_datum =
-      settlement_queue.get_datum(
-        reference_inputs,
-        settlement_queue_policy_id,
-        settlement_ref_input_index,
-      )
-
-    expect settlement_queue.NodeData {
-      deposits_root,
-      start_time: settlement_start_time,
-      end_time: settlement_end_time,
-      ..
-    } = parsed_settlement_node_datum.data
-
     expect Some(deposit_datum) = datum
-    let user_events.Datum {
+    let Datum {
       event: deposit_event,
       inclusion_time,
-      refund_address,
-      refund_datum,
       ..
     } = deposit_datum
 
@@ -86,62 +73,34 @@ validator spend(hub_oracle: ScriptHash) {
           reference_script: None,
         } = output
 
-        when spend_purpose is {
-          TransferToReserve { membership_proof } -> {
-            // 3. Output value must be the same as the input value, except for
-            //    the deposit NFT.
-            //    TODO: Reserve contract might end up requiring an NFT.
-            //    TODO: Fees must be deduced whenever we have a clear plan for
-            //          them.
-            expect
-              output_value == (
-                own_value |> assets.add(deposit_policy_id, burn_asset_name, -1)
-              )
+        // 3. Output value must be the same as the input value, except for the
+        //    deposit NFT.
+        //    TODO: Reserve contract might end up requiring an NFT.
+        //    TODO: Fees must be deduced whenever we have a clear plan for them.
+        expect
+          output_value == (
+            own_value |> assets.add(deposit_policy_id, burn_asset_name, -1)
+          )
 
-            let Pair(deposit_event_id, deposit_event_info) =
-              ledger_state.unsafe_event_to_key_value_pair(deposit_event)
+        let Pair(deposit_event_id, deposit_event_info) =
+          ledger_state.unsafe_event_to_key_value_pair(deposit_event)
 
-            and {
-              // 4. The referenced settlement node's deposit tree must contain
-              //    the subject deposit event. No need to check for the
-              //    inclusion time of the deposit.
-              plutarch_phas(
-                deposits_root,
-                deposit_event_id,
-                deposit_event_info,
-                membership_proof,
-                redeemers,
-              ),
-              // 5. Assert no datum is attached to the produced UTxO.
-              //    TODO: This might change depending on implementation of
-              //          reserve.
-              output_datum == NoDatum,
-              // 6. Deposit must go to the reserve.
-              output_address == reserve_addr,
-            }
-          }
-          Refund { refund_approach } ->
-            // 3. Numerous validations for the refund logic.
-            user_events.validate_refund(
-              own_value,
-              deposit_policy_id,
-              burn_asset_name,
-              output_address,
-              output_value,
-              output_datum,
-              refund_address,
-              refund_datum,
-              refund_approach,
-              deposits_root,
-              ledger_state.unsafe_event_to_id_data(deposit_event),
-              settlement_queue_policy_id,
-              parsed_settlement_node_datum.link,
-              settlement_start_time,
-              settlement_end_time,
-              inclusion_time,
-              reference_inputs,
-              redeemers,
-            )
+        and {
+          // 4. The referenced settlement node's deposit tree must contain the
+          //    subject deposit event. No need to check for the inclusion time
+          //    of the deposit.
+          plutarch_phas(
+            deposits_root,
+            deposit_event_id,
+            deposit_event_info,
+            membership_proof,
+            redeemers,
+          ),
+          // 5. Assert no datum is attached to the produced UTxO.
+          //    TODO: This might change depending on implementation of reserve.
+          output_datum == NoDatum,
+          // 6. Deposit must go to the reserve.
+          output_address == reserve_addr,
         }
       },
       purpose,

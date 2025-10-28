@@ -16,14 +16,14 @@ use midgard/common/types.{MerkleRoot, PosixTime}
 use midgard/common/utils.{plutarch_pexcludes}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/settlement_queue
+use midgard/settlement
 use midgard/user_events/witness.{
   validate_witness_redeemer, witness_script_prefix,
 }
 
 // ## Types
 
-pub type Datum<event_type> {
+pub type OptimisticDatum<event_type> {
   event: event_type,
   inclusion_time: PosixTime,
   witness: ScriptHash,

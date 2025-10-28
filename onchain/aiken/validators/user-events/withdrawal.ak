@@ -8,7 +8,7 @@ use midgard/common/utils.{plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/payout
-use midgard/settlement_queue
+use midgard/settlement
 use midgard/user_events
 use midgard/user_events/withdrawal.{
   AuthenticateWithdrawal, BurnWithdrawalNFT, Datum, MintRedeemer, Refund,
@@ -37,25 +37,18 @@ validator spend(hub_oracle: ScriptHash) {
 
     let hub.Datum {
       withdrawal: withdrawal_policy_id,
-      settlement_queue: settlement_queue_policy_id,
+      settlement: settlement_policy_id,
       payout: payout_policy_id,
       payout_addr,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-    let parsed_settlement_node_datum =
-      settlement_queue.get_datum(
+    expect settlement.Datum { withdrawals_root, ..  } =
+      settlement.get_datum(
         reference_inputs,
-        settlement_queue_policy_id,
+        settlement_policy_id,
         settlement_ref_input_index,
       )
-
-    expect settlement_queue.NodeData {
-      withdrawals_root,
-      start_time: settlement_start_time,
-      end_time: settlement_end_time,
-      ..
-    } = parsed_settlement_node_datum.data
 
     expect Some(withdrawal_datum) = datum
     let user_events.Datum {
@@ -159,7 +152,7 @@ validator spend(hub_oracle: ScriptHash) {
               refund_approach,
               withdrawals_root,
               ledger_state.unsafe_event_to_id_data(withdrawal_event),
-              settlement_queue_policy_id,
+              settlement_policy_id,
               parsed_settlement_node_datum.link,
               settlement_start_time,
               settlement_end_time,
