@@ -174,7 +174,7 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
           utils.get_own_input_at(inputs, own_out_ref, settlement_input_index)
         //
         let cont_output_datum_data =
-          output
+          outputs
             |> utils.get_continued_output_datum_at(
                 expected_address: input_address,
                 expected_value: input_value,
