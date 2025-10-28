@@ -1,5 +1,5 @@
 import { Database } from "@/services/database.js";
-import { SqlClient, SqlError } from "@effect/sql";
+import { SqlClient } from "@effect/sql";
 import { Effect } from "effect";
 import {
   DatabaseError,

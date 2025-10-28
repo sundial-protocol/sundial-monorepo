@@ -233,7 +233,7 @@ const getBlockHandler = Effect.gen(function* () {
   if (
     typeof hdrHash !== "string" ||
     !isHexString(hdrHash) ||
-    hdrHash.length !== 64
+    hdrHash.length !== 58
   ) {
     yield* Effect.logInfo(
       `GET /${BLOCK_ENDPOINT} - Invalid block hash: ${hdrHash}`,
