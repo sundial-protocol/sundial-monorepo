@@ -19,6 +19,7 @@ use midgard/fraud_proof/common/utils.{
 use midgard/fraud_proof/double_spend/step_01.{
   Cancel, Continue, StepRedeemer as Step1Redeemer, StepState as Step1State,
 }
+use midgard/hub_oracle as hub
 
 // ----------------- DOUBLE SPEND FRAUD PROOF: DEFINITION --------------------------
 // Proves membership Merkle proofs for 2 unique txs which spends the same input UTxO
@@ -38,6 +39,7 @@ validator main(
   plutarch_midgard_merkle_validator: ScriptHash,
   // Computation thread token policy
   ct_token_policy_id: PolicyId,
+  hub_oracle: ScriptHash,
 ) {
   spend(
     datum: Option<StepDatum>,
@@ -68,9 +70,11 @@ validator main(
         bad_tx1_info_hash,
         bad_tx1_to_root_proof_path,
         index_output,
+        hub_ref_input_index,
       } -> {
         //TODO get it from the oracle hub
-        let state_queue_policy = ""
+        let hub.Datum { state_queue, .. } =
+          hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
 
         let ct_token_asset_name =
           get_singleton_ct_token(own_input, ct_token_policy_id)
@@ -79,7 +83,7 @@ validator main(
             tx,
             bad_state_queue_node_ref_input_index,
             ct_token_asset_name,
-            state_queue_policy,
+            state_queue,
           )
 
         // -------- Double spend validation specific logic START --------
