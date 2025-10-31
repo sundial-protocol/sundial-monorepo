@@ -1,8 +1,24 @@
-<p align="center">
-  <img width="150px" src="documentation/public/midgard-icon-green.png" align="center" alt="Midgard Logo"/>
-  <h1 align="center">Midgard</h1>
-  <p align="center">Cardano's first optimistic rollup protocol</p>
-</p>
+# Sundial Monorepo
+A collection of tools and libraries comprising the Sundial Layer 2 blockchain.
+Submodules are listed below.
+
+# Documentation
+`/internal-docs` - Internal documentation for Sundial developers.
+
+`/indexer-openapi` - OpenAPI specification for Sundial Indexer API.
+
+`/indexer-utxorpc` - UTXO RPC specification for Sundial Indexer.
+
+# Staking & Defi
+`/ada-locker` - ADA smart contracts for Sundial Staking, written in Aiken & Typescript.
+
+`/scalus-locker` - Ada smart contracts for Sundial Staking & Lending, written in Scalus & Typescript.
+
+`/btc-locker` - BTC Scripts for Sundial Staking.
+
+`/airdrop-engine` - Airdrop engine for distributing yield to Sundial users.
+
+# Layer 2
 
 ## Build the onchain code
 

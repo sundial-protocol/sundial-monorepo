@@ -13,3 +13,9 @@
 [submodule "indexer-openapi"]
 	path = indexer-openapi
 	url = https://github.com/sundial-protocol/indexer-openapi
+[submodule "scalus-locker"]
+	path = scalus-locker
+	url = https://github.com/sundial-protocol/scalus-locker
+[submodule "airdrop-engine"]
+	path = airdrop-engine
+	url = https://github.com/sundial-protocol/airdrop-engine
