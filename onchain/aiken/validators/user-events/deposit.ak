@@ -12,9 +12,7 @@ use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement_queue
 use midgard/user_events
-use midgard/user_events/deposit.{
-  Datum, Refund, SpendRedeemer, TransferToReserve,
-}
+use midgard/user_events/deposit.{Datum, SpendRedeemer, TransferToReserve}
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
@@ -34,8 +32,12 @@ validator spend(hub_oracle: ScriptHash) {
       membership_proof,
     } = redeemer
 
-    let settlement.Datum { deposits_root, .. } = 
-      reference_inputs |> settlement.get_datum(settlement_policy_id, settlement_ref_input_index)
+    let settlement.Datum { deposits_root, .. } =
+      reference_inputs
+        |> settlement.get_datum(
+            settlement_policy_id,
+            settlement_ref_input_index,
+          )
 
     let hub.Datum {
       deposit: deposit_policy_id,
@@ -45,11 +47,7 @@ validator spend(hub_oracle: ScriptHash) {
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
     expect Some(deposit_datum) = datum
-    let Datum {
-      event: deposit_event,
-      inclusion_time,
-      ..
-    } = deposit_datum
+    let Datum { event: deposit_event, inclusion_time, .. } = deposit_datum
 
     // 1. Spending a user event UTxO must also be accompanied by the burning of
     //    its NFT (and consequently deregistration of its witness staking
@@ -87,8 +85,7 @@ validator spend(hub_oracle: ScriptHash) {
 
         and {
           // 4. The referenced settlement node's deposit tree must contain the
-          //    subject deposit event. No need to check for the inclusion time
-          //    of the deposit.
+          //    subject deposit event.
           plutarch_phas(
             deposits_root,
             deposit_event_id,
@@ -153,15 +150,15 @@ validator mint(hub_oracle: ScriptHash) {
         output_deposit_value |> assets.to_dict |> dict.to_pairs,
         False,
         0,
-        fn(policy_tokens_pair, beacon_found, token_count_so_far, return) {
-          if !beacon_found && policy_tokens_pair.1st == own_policy {
+        fn(policy_tokens_pair, state_nft_found, token_count_so_far, return) {
+          if !state_nft_found && policy_tokens_pair.1st == own_policy {
             expect [output_deposit_nft_tn_qty] =
               policy_tokens_pair.2nd |> dict.to_pairs
             expect output_deposit_nft_tn_qty == Pair(l2_id, 1)
             return(True, token_count_so_far)
           } else {
             let policy_token_count = dict.size(policy_tokens_pair.2nd)
-            return(beacon_found, token_count_so_far + policy_token_count)
+            return(state_nft_found, token_count_so_far + policy_token_count)
           }
         },
       )

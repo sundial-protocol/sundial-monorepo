@@ -43,7 +43,7 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-    expect settlement.Datum { withdrawals_root, ..  } =
+    expect settlement.Datum { withdrawals_root, .. } =
       settlement.get_datum(
         reference_inputs,
         settlement_policy_id,
