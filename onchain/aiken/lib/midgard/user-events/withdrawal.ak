@@ -1,5 +1,5 @@
 use aiken/merkle_patricia_forestry as mpf
-use midgard/ledger_state
+use midgard/ledger_state.{WithdrawalEvent, WithdrawalValidity}
 use midgard/user_events
 
 pub type Datum =
@@ -7,7 +7,7 @@ pub type Datum =
 
 pub type SpendPurpose {
   InitializePayout
-  Refund
+  Refund { validity_override: WithdrawalValidity }
 }
 
 pub type SpendRedeemer {

@@ -92,13 +92,13 @@ validator spend(hub_oracle: ScriptHash) {
               |> assets.add(tx_order_policy_id, burn_asset_name, -1)
           )
 
-        let Pair(tx_order_event_id, tx_order_event_tx) =
-          ledger_state.unsafe_event_to_key_value_pair(tx_order_event)
-
         // 6. For tx order UTxOs to be collectible, they must be stored in
         //    the tree with the validity provided via the redeemer.
+        let Pair(tx_order_event_id, tx_order_event_tx) =
+          ledger_state.unsafe_event_to_key_value_pair(tx_order_event)
+        //
         expect tx_order_tx: ledger_state.MidgardTxCompact = tx_order_event_tx
-
+        //
         let overridden_tx_order_tx: Data =
           ledger_state.MidgardTxCompact {
             ..tx_order_tx,
