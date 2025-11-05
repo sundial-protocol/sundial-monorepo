@@ -11,8 +11,8 @@ use midgard/payout
 use midgard/settlement
 use midgard/user_events
 use midgard/user_events/withdrawal.{
-  AuthenticateWithdrawal, BurnWithdrawalNFT, Datum, MintRedeemer, Refund,
-  SpendRedeemer, TransferToPayout,
+  AuthenticateWithdrawal, BurnWithdrawalNFT, Datum, InitializePayout,
+  MintRedeemer, Refund, SpendRedeemer,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -82,7 +82,7 @@ validator spend(hub_oracle: ScriptHash) {
         } = output
 
         when spend_purpose is {
-          TransferToPayout { membership_proof } -> {
+          InitializePayout -> {
             // 3. Output value must be the same as the input value, without the
             //    withdrawal NFT, and with the payout NFT added.
             expect

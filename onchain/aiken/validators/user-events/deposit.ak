@@ -10,7 +10,7 @@ use env
 use midgard/common/utils.{plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/settlement_queue
+use midgard/settlement
 use midgard/user_events
 use midgard/user_events/deposit.{Datum, SpendRedeemer, TransferToReserve}
 
@@ -84,7 +84,7 @@ validator spend(hub_oracle: ScriptHash) {
           ledger_state.unsafe_event_to_key_value_pair(deposit_event)
 
         and {
-          // 4. The referenced settlement node's deposit tree must contain the
+          // 4. The referenced settlement utxo's deposit tree must contain the
           //    subject deposit event.
           plutarch_phas(
             deposits_root,

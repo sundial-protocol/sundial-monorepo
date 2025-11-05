@@ -24,7 +24,8 @@ validator spend(hub_oracle: ScriptHash) {
       hub_ref_input_index,
       settlement_ref_input_index,
       burn_redeemer_index,
-      purpose,
+      membership_proof,
+      validity_override,
     } = redeemer
 
     let hub.Datum {
@@ -40,15 +41,11 @@ validator spend(hub_oracle: ScriptHash) {
         settlement_ref_input_index,
       )
 
-    expect settlement_queue.NodeData {
-      tx_orders_root,
-      start_time: settlement_start_time,
-      end_time: settlement_end_time,
-      ..
-    } = parsed_settlement_node_datum.data
+    expect settlement_queue.Datum { transactions_root, .. } =
+      parsed_settlement_node_datum.data
 
     expect Some(tx_order_datum) = datum
-    let user_events.Datum {
+    let user_events.OptimisticDatum {
       event: tx_order_event,
       inclusion_time,
       refund_address,
@@ -66,8 +63,10 @@ validator spend(hub_oracle: ScriptHash) {
         burn_redeemer_index,
       )
 
+    // TODO: `singular_utxo_indexer` has a flawed interface currently. Passing
+    //       `0` as the throwaway redeemer.
     singular_utxo_indexer.spend(
-      fn(_in_ix, input, spend_purpose, _out_ix, output) {
+      fn(_in_ix, input, _redeemer, _out_ix, output) {
         let Input { output: Output { value: own_value, .. }, .. } = input
 
         // 2. The produced UTxO must not have any scripts attached to it.
@@ -79,7 +78,13 @@ validator spend(hub_oracle: ScriptHash) {
           reference_script: None,
         } = output
 
-        // 3. Output value must be the same as the input value, without the tx
+        // 3. Refund address must be the recipient.
+        expect output_address == refund_address
+
+        // 4. Assert refund datum is attached to the output.
+        expect output_datum == refund_datum
+
+        // 5. Output value must be the same as the input value, without the tx
         //    order NFT.
         expect
           output_value == (
@@ -87,55 +92,35 @@ validator spend(hub_oracle: ScriptHash) {
               |> assets.add(tx_order_policy_id, burn_asset_name, -1)
           )
 
-        when spend_purpose is {
-          Conclude { membership_proof } -> {
-            let Pair(tx_order_event_id, tx_order_event_tx) =
-              ledger_state.unsafe_event_to_key_value_pair(tx_order_event)
+        let Pair(tx_order_event_id, tx_order_event_tx) =
+          ledger_state.unsafe_event_to_key_value_pair(tx_order_event)
 
-            // 5. The referenced settlement node's tx_order tree must contain
-            //    the subject tx_order event. No need to check for the
-            //    inclusion time of the tx_order.
-            expect
-              plutarch_phas(
-                tx_orders_root,
-                tx_order_event_id,
-                tx_order_event_tx,
-                membership_proof,
-                redeemers,
-              )
+        // 6. For tx order UTxOs to be collectible, they must be stored in
+        //    the tree with the validity provided via the redeemer.
+        expect tx_order_tx: ledger_state.MidgardTxCompact = tx_order_event_tx
 
-            and {
-              // 6. Assert refund datum is attached to the output.
-              output_datum == refund_datum,
-              // 7. Refund address must be the recipient.
-              output_address == refund_address,
-            }
+        let overridden_tx_order_tx: Data =
+          ledger_state.MidgardTxCompact {
+            ..tx_order_tx,
+            validity: validity_override,
           }
-          Refund { refund_approach } ->
-            // 3. Numerous validations for the refund logic.
-            user_events.validate_refund(
-              own_value,
-              tx_order_policy_id,
-              burn_asset_name,
-              output_address,
-              output_value,
-              output_datum,
-              refund_address,
-              refund_datum,
-              refund_approach,
-              tx_orders_root,
-              ledger_state.unsafe_event_to_id_data(tx_order_event),
-              settlement_queue_policy_id,
-              parsed_settlement_node_datum.link,
-              settlement_start_time,
-              settlement_end_time,
-              inclusion_time,
-              reference_inputs,
-              redeemers,
-            )
-        }
+
+        // 7. The referenced settlement node's tx_order tree must contain
+        //    the subject tx_order event. No need to check for the
+        //    inclusion time of the tx_order.
+        expect
+          plutarch_phas(
+            transactions_root,
+            tx_order_event_id,
+            overridden_tx_order_tx,
+            membership_proof,
+            redeemers,
+          )
+
+        // Done.
+        True
       },
-      purpose,
+      0,
       input_index,
       output_index,
       own_out_ref,
@@ -157,9 +142,9 @@ validator mint(hub_oracle: ScriptHash) {
     // 1. Perform numerous validations and grant access to:
     //    - Serialized and hashed nonce based on the output reference of a
     //      specified input UTxO
-    //    - The output value of the UTxO at the withdrawal address for the
-    //      minting (not burning) endpoint
-    //    - Order info (unused)
+    //    - The output value of the UTxO at the tx order address for the minting
+    //      (not burning) endpoint
+    //    - Included Midgard tx as `Data`
     let
       l1_id,
       output_tx_order_value,
@@ -179,19 +164,18 @@ validator mint(hub_oracle: ScriptHash) {
     let output_tx_order_nft_triplet =
       utils.get_single_asset_from_value_apart_from_ada(output_tx_order_value)
 
-    // 2. The output value of the UTxO at the withdrawal address must contain
-    //    only ADA and the authentication NFT.
+    // 2. The output value of the UTxO at the tx order address must contain only
+    //    ADA and the authentication NFT.
     expect output_tx_order_nft_triplet == (own_policy, l1_id, 1)
 
-    // 3. Tx order must be marked as valid. This is needed for spending the
-    //    UTxO, which requires validating the presence of its key-value in the
-    //    transactions tree (valid cases, which will presumably be the majority
-    //    of cases).
+    // 3. Tx order must be marked as valid. Only operators can inject invalid tx
+    //    orders in the tree.
     expect ledger_state.MidgardTxCompact {
       validity: ledger_state.TxIsValid,
       ..
     } = midgard_tx_data
 
+    // Done.
     True
   }
 
