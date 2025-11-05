@@ -9,6 +9,10 @@ Submodules are listed below.
 
 `/indexer-utxorpc` - UTXO RPC specification for Sundial Indexer.
 
+`/technical-spec` - Technical specification documents for the Sundial/Midgard L2.
+
+`/documentation` - User and developer documentation site for the Sundial/Midgard L2.
+
 # Staking & Defi
 `/ada-locker` - ADA smart contracts for Sundial Staking, written in Aiken & Typescript.
 
@@ -18,7 +22,14 @@ Submodules are listed below.
 
 `/airdrop-engine` - Airdrop engine for distributing yield to Sundial users.
 
+# Bridging
+`/charms-cardano` - Cardano side of the Charms bridge, written in Aiken by Sundial developers.
+
 # Layer 2
+
+`/onchain` - Onchain code for the Sundial Layer 2 blockchain, written in Aiken & Plutarch.
+
+`/demo` - Demo Layer 2 implementation for testing and prototyping.
 
 ## Build the onchain code
 

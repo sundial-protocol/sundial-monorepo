@@ -19,3 +19,6 @@
 [submodule "airdrop-engine"]
 	path = airdrop-engine
 	url = https://github.com/sundial-protocol/airdrop-engine
+[submodule "charms-cardano"]
+	path = charms-cardano
+	url = https://github.com/charmsdev/charms-cardano
