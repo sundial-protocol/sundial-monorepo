@@ -11,7 +11,7 @@ use aiken_design_patterns/merkelized_validator
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
-  Datum, InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
+  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
 }
 use env
 use midgard/common/constants.{posix_time_none}
@@ -233,7 +233,7 @@ pub fn get_authentic_output_datum_at_address_with_nft_at(
   nft_policy_id: PolicyId,
   nft_asset_name: AssetName,
   output_index: Int,
-) -> Datum {
+) -> Data {
   expect Some(Output {
     address: output_address,
     value: output_value,
@@ -241,12 +241,12 @@ pub fn get_authentic_output_datum_at_address_with_nft_at(
     reference_script: None,
   }) = list.at(outputs, output_index)
 
-  expect expected_address == address
+  expect expected_address == output_address
 
   let output_nft_triplet =
     get_single_asset_from_value_apart_from_ada(output_value)
 
-  expect input_nft_triplet == (nft_policy_id, nft_asset_name, 1)
+  expect output_nft_triplet == (nft_policy_id, nft_asset_name, 1)
 
   output_datum_data
 }

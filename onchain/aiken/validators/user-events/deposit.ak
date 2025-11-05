@@ -12,7 +12,7 @@ use midgard/hub_oracle as hub
 use midgard/ledger_state
 use midgard/settlement
 use midgard/user_events
-use midgard/user_events/deposit.{Datum, SpendRedeemer, TransferToReserve}
+use midgard/user_events/deposit.{Datum, SpendRedeemer}
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
@@ -32,13 +32,6 @@ validator spend(hub_oracle: ScriptHash) {
       membership_proof,
     } = redeemer
 
-    let settlement.Datum { deposits_root, .. } =
-      reference_inputs
-        |> settlement.get_datum(
-            settlement_policy_id,
-            settlement_ref_input_index,
-          )
-
     let hub.Datum {
       deposit: deposit_policy_id,
       settlement: settlement_policy_id,
@@ -46,8 +39,15 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
+    let settlement.Datum { deposits_root, .. } =
+      reference_inputs
+        |> settlement.get_datum(
+            settlement_policy_id,
+            settlement_ref_input_index,
+          )
+
     expect Some(deposit_datum) = datum
-    let Datum { event: deposit_event, inclusion_time, .. } = deposit_datum
+    let Datum { event: deposit_event, .. } = deposit_datum
 
     // 1. Spending a user event UTxO must also be accompanied by the burning of
     //    its NFT (and consequently deregistration of its witness staking
@@ -59,8 +59,10 @@ validator spend(hub_oracle: ScriptHash) {
         mint_redeemer_index,
       )
 
+    // TODO: Throwaway `0` used for redeemer here, due to bad interface of
+    //       `singular_utxo_indexer`.
     singular_utxo_indexer.spend(
-      fn(_in_ix, input, spend_purpose, _out_ix, output) {
+      fn(_in_ix, input, _spend_purpose, _out_ix, output) {
         let Input { output: Output { value: own_value, .. }, .. } = input
 
         // 2. The produced UTxO must not have any scripts attached to it.
@@ -100,7 +102,7 @@ validator spend(hub_oracle: ScriptHash) {
           output_address == reserve_addr,
         }
       },
-      purpose,
+      0,
       input_index,
       output_index,
       own_out_ref,

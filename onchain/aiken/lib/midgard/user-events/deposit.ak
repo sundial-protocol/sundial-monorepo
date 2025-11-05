@@ -1,6 +1,7 @@
+use aiken/crypto.{ScriptHash}
 use aiken/merkle_patricia_forestry as mpf
+use midgard/common/types.{PosixTime}
 use midgard/ledger_state
-use midgard/user_events
 
 pub type Datum {
   event: ledger_state.DepositEvent,

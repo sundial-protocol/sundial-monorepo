@@ -5,9 +5,9 @@ use cardano/transaction.{Input, Mint, Output, OutputReference, Transaction}
 use midgard/common/utils.{plutarch_phas}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/settlement_queue
+use midgard/settlement
 use midgard/user_events
-use midgard/user_events/tx_order.{Conclude, Datum, Refund, SpendRedeemer}
+use midgard/user_events/tx_order.{Datum, SpendRedeemer}
 
 validator spend(hub_oracle: ScriptHash) {
   spend(
@@ -30,24 +30,20 @@ validator spend(hub_oracle: ScriptHash) {
 
     let hub.Datum {
       tx_order: tx_order_policy_id,
-      settlement_queue: settlement_queue_policy_id,
+      settlement: settlement_policy_id,
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-    let parsed_settlement_node_datum =
-      settlement_queue.get_datum(
+    let settlement.Datum { transactions_root, .. } =
+      settlement.get_datum(
         reference_inputs,
-        settlement_queue_policy_id,
+        settlement_policy_id,
         settlement_ref_input_index,
       )
-
-    expect settlement_queue.Datum { transactions_root, .. } =
-      parsed_settlement_node_datum.data
 
     expect Some(tx_order_datum) = datum
     let user_events.OptimisticDatum {
       event: tx_order_event,
-      inclusion_time,
       refund_address,
       refund_datum,
       ..
@@ -105,9 +101,8 @@ validator spend(hub_oracle: ScriptHash) {
             validity: validity_override,
           }
 
-        // 7. The referenced settlement node's tx_order tree must contain
-        //    the subject tx_order event. No need to check for the
-        //    inclusion time of the tx_order.
+        // 7. The referenced settlement UTxO's tx_order tree must contain the
+        //    subject tx_order event.
         expect
           plutarch_phas(
             transactions_root,

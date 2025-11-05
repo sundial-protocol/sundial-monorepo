@@ -1,9 +1,8 @@
+use aiken/builtin
 use aiken/cbor
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, blake2b_256}
 use aiken/interval.{Finite}
-use aiken/merkle_patricia_forestry as mpf
-use aiken_design_patterns/linked_list/unordered.{NodeKey}
 use cardano/address.{Address}
 use cardano/assets.{AssetName, PolicyId, Value}
 use cardano/transaction.{
@@ -12,11 +11,9 @@ use cardano/transaction.{
 }
 use env
 use midgard/common/parameter_validation
-use midgard/common/types.{MerkleRoot, PosixTime}
-use midgard/common/utils.{plutarch_pexcludes}
+use midgard/common/types.{PosixTime}
 use midgard/hub_oracle as hub
 use midgard/ledger_state
-use midgard/settlement
 use midgard/user_events/witness.{
   validate_witness_redeemer, witness_script_prefix,
 }
@@ -29,12 +26,6 @@ pub type OptimisticDatum<event_type> {
   witness: ScriptHash,
   refund_address: Address,
   refund_datum: CardanoDatum,
-}
-
-pub type RefundApproach {
-  InvalidEvent { membership_proof: mpf.Proof }
-  SkippedEvent { non_membership_proof: mpf.Proof }
-  EventInSettlementGap { settlement_link_ref_input_index: Int }
 }
 
 pub type MintRedeemer {
@@ -173,15 +164,17 @@ pub fn authenticate_event(
   }) = outputs |> list.at(event_output_index)
 
   // Extracting common data shared between all event datums.
-  expect Datum {
-    event,
-    inclusion_time: output_event_inclusion_time,
-    witness: output_event_witness,
-    ..
-  }: Datum<Data> = output_event_datum_data
+  expect [event_data,
+    inclusion_time_data,
+    witness_data, ..] = builtin.unconstr_fields(output_event_datum_data)
+
+  let output_event_inclusion_time: PosixTime =
+    builtin.un_i_data(inclusion_time_data)
+
+  let output_event_witness: ScriptHash = builtin.un_b_data(witness_data)
 
   let Pair(event_id, event_info) =
-    ledger_state.unsafe_event_to_key_value_pair(event)
+    ledger_state.unsafe_event_to_key_value_pair(event_data)
 
   let nonce_input_out_ref_data: Data = nonce_input_out_ref
 

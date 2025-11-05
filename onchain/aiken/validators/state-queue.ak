@@ -272,7 +272,7 @@ validator mint(
         // Note: we trust the redeemer provided to settlement because we expect
         // it to check them.
         let settlement_minting_redeemer_data =
-          redeemers
+          self.redeemers
             |> utils.get_redeemer_at(
                 Mint(settlement_script_hash),
                 settlement_redeemer_index,

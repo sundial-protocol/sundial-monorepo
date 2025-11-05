@@ -5,7 +5,7 @@ use aiken_design_patterns/linked_list/ordered.{
 }
 use cardano/assets.{PolicyId, Value, quantity_of, tokens}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Spend, Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
 use midgard/active_operators.{
   ActivateOperator, Datum, Deinit, Init, ListStateTransition, MintRedeemer,
@@ -201,7 +201,7 @@ validator mint(
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
-        expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
+        expect parsed_hub_oracle_datum: hub.Datum = hub_oracle_datum
         expect Some(registered_operators_redeemer_pair) =
           list.at(self.redeemers, registered_operators_redeemer_index)
         expect registered_operators.Activate { node_to_activate_key, .. } =
@@ -327,7 +327,7 @@ validator mint(
         expect Some(hub_oracle_ref_input) =
           list.at(self.reference_inputs, hub_oracle_ref_input_index)
         expect InlineDatum(hub_oracle_datum) = hub_oracle_ref_input.output.datum
-        expect parsed_hub_oracle_datum: hub_oracle.Datum = hub_oracle_datum
+        expect parsed_hub_oracle_datum: hub.Datum = hub_oracle_datum
         expect Some(retired_operators_redeemer_pair) =
           list.at(self.redeemers, retired_operators_redeemer_index)
         expect retired_operators.RetireOperator { new_retired_operator_key, .. } =

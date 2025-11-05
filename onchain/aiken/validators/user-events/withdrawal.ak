@@ -11,8 +11,7 @@ use midgard/payout
 use midgard/settlement
 use midgard/user_events
 use midgard/user_events/withdrawal.{
-  AuthenticateWithdrawal, BurnWithdrawalNFT, Datum, InitializePayout,
-  MintRedeemer, Refund, SpendRedeemer,
+  Datum, InitializePayout, Refund, SpendRedeemer,
 }
 
 validator spend(hub_oracle: ScriptHash) {
@@ -43,7 +42,7 @@ validator spend(hub_oracle: ScriptHash) {
       ..
     } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-    expect settlement.Datum { withdrawals_root, .. } =
+    let settlement.Datum { withdrawals_root, .. } =
       settlement.get_datum(
         reference_inputs,
         settlement_policy_id,
@@ -51,13 +50,8 @@ validator spend(hub_oracle: ScriptHash) {
       )
 
     expect Some(withdrawal_datum) = datum
-    let user_events.Datum {
-      event: withdrawal_event,
-      inclusion_time,
-      refund_address,
-      refund_datum,
-      ..
-    } = withdrawal_datum
+    let user_events.OptimisticDatum { event: withdrawal_event, .. } =
+      withdrawal_datum
 
     // 1. Spending a user event UTxO must also be accompanied by the burning of
     //    its NFT (and consequently deregistration of its witness staking
@@ -108,7 +102,7 @@ validator spend(hub_oracle: ScriptHash) {
             // 5. Initiation of a payout accumulator can only happen for valid
             //    withdrawals.
             expect ledger_state.WithdrawalInfo {
-              withdrawal_body,
+              body: withdrawal_body,
               validity: ledger_state.WithdrawalIsValid,
               ..
             } = withdrawal_event_info
@@ -145,10 +139,10 @@ validator spend(hub_oracle: ScriptHash) {
             // Done.
             True
           }
-          Refund { refund_approach } -> {
+          Refund { validity_override } -> {
             // 3. Only invalid withdrawals can be refunded.
             //    TODO: worth defining a separate type for this?
-            expect refund_approach != ledger_state.WithdrawalIsValid
+            expect validity_override != ledger_state.WithdrawalIsValid
 
             // 4. Output value must be the same as the input value, without the
             //    withdrawal NFT.
@@ -165,7 +159,7 @@ validator spend(hub_oracle: ScriptHash) {
               ledger_state.unsafe_event_to_key_value_pair(withdrawal_event)
             //
             expect coerced_withdrawal_info: ledger_state.WithdrawalInfo =
-              withdrawal_event_info_data
+              withdrawal_event_info
             //
             let overridden_withdrawal_info: Data =
               ledger_state.WithdrawalInfo {

@@ -1,12 +1,13 @@
-use aiken/crypto.{VerificationKeyHash}
+use aiken/collection/list
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/merkle_patricia_forestry as mpf
-use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
+  InlineDatum, Input, Output, Redeemer, ScriptPurpose, Spend,
 }
 use midgard/common/types.{MerkleRoot, PosixTime}
 use midgard/common/utils
+use midgard/hub_oracle as hub
 use midgard/ledger_state
 
 pub type Datum {
@@ -43,7 +44,7 @@ pub type SpendRedeemer {
     event_type: EventType,
     membership_proof: mpf.Proof,
   }
-  Conclude { settlement_id: ByteArray, hub_ref_input_index: Int }
+  Conclude { settlement_id: ByteArray }
 }
 
 pub type EventType {
@@ -228,13 +229,13 @@ pub fn get_spending_redeemer_data(
       hub_oracle_ref_input_index,
     )
   //
-  expect Input {
+  expect Some(Input {
     output_reference: settlement_input_outref,
     output: Output { address: settlement_input_address, .. },
-  } = inputs |> list.at(settlement_input_index)
+  }) = inputs |> list.at(settlement_input_index)
   //
   expect
-    settlement_input_address.payment_credential == settlement_add.payment_credential
+    settlement_input_address.payment_credential == settlement_addr.payment_credential
   //
   redeemers
     |> utils.get_redeemer_at(
