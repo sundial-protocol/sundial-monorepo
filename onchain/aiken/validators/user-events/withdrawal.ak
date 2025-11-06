@@ -107,9 +107,8 @@ validator spend(hub_oracle: ScriptHash) {
               ..
             } = withdrawal_event_info
 
-            // 6. The referenced settlement node's withdrawal tree must contain
-            //    the subject withdrawal event. No need to check for the
-            //    inclusion time of the withdrawal.
+            // 6. The referenced settlement UTxO's withdrawal tree must contain
+            //    the subject withdrawal event.
             expect
               plutarch_phas(
                 withdrawals_root,
