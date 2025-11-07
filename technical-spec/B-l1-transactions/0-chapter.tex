@@ -53,7 +53,7 @@ This transaction (\cref{fig:tx-init-midgard}):
     \footnote{For example, if the nonce utxo is spent from a native script address, then initializing a Midgard instance parametrized by that nonce utxo must satisfy the signature and timing requirements of the native script.}
     of the Midgard instance.
   \item Produces the root nodes of the initially empty registered, active, and retired operator lists.
-  \item Produces the root nodes of the initially empty state and settlement queues.
+  \item Produces the root nodes of the initially empty state queue.
   \item Produces the scheduler, escape hatch, fraud proof catalogue, and hub oracle singleton utxos.
   \item Attaches the signatures necessary to spend the nonce utxo.
 \end{enumerate}
@@ -167,7 +167,7 @@ Correctness is jointly enforced by these script redeemers:
 \label{fig:tx-recover-bond}
 \end{figure}
 
-After all of a retired operator's block headers (in the state queue) and resolution claims (in the settlement queue) have matured, the operator can recover his ADA bond via a transaction that (\cref{fig:tx-recover-bond}):
+After all of a retired operator's block headers (in the state queue) and resolution claims (in the settlement contract) have matured, the operator can recover his ADA bond via a transaction that (\cref{fig:tx-recover-bond}):
 \begin{enumerate}
   \item Removes the operator's node from the retired operators list.
   \item Refunds the operator's ADA bond to the operator.
@@ -270,29 +270,29 @@ Merge a matured block header to the confirmed state via a transaction that (\cre
 \begin{enumerate}
   \item Removes the block header's node from the state queue.
   \item Updates the state queue's root node datum (i.e. Midgard's confirmed state) to the reflect the information contained in the block header.
-  \item If the block header contains any L1 user events (deposits, transaction orders, or withdrawal orders) append a new node containing the same user events to the settlement queue.
+  \item If the block header contains any transaction requests or L1 user events (deposits, transaction orders, or withdrawal orders) create a new utxo at the settlement contract containing all the transactions (both requests and orders), deposits and withdrawals.
 \end{enumerate}
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
   \item Merge to Confirmed State of the state queue minting policy (\cref{h:state-queue-minting-policy}).
-  \item Append Settlement Node of the settlement queue minting policy (\cref{h:settlement-queue-minting-policy}).
+  \item Spawn of the settlement minting policy (\cref{h:settlement-minting-policy}).
 \end{itemize}
 
-\section{Settlement queue}%
-\label{h:midgard-l1-tx-settlement-queue}%
+\section{Settlement}%
+\label{h:midgard-l1-tx-settlement}%
 
 \begin{figure}[H]
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/C-attach-resolution-claim.pdf}}
 \end{center}
-\caption[Attach resolution claim]{Attach an optimistic resolution claim to a settlement node.}
+\caption[Attach resolution claim]{Attach an optimistic resolution claim to a settlement utxo.}
 \label{fig:tx-attach-resolution-claim}
 \end{figure}
 
-Attach a claim that all user events in a settlement node have been resolved, via a transaction that (\cref{fig:tx-attach-resolution-claim}):
+Attach a claim that all user events in a settlement utxo have been resolved, via a transaction that (\cref{fig:tx-attach-resolution-claim}):
 \begin{enumerate}
-  \item Spends a settlement node without a resolution claim and updates its datum to attach a resolution claim. The claim must indicate the operator attaching the claim and the future time when the claim will mature (must be set according to \code{maturity\_duration} param).
+  \item Spends a settlement utxo without a resolution claim and updates its datum to attach a resolution claim. The claim must indicate the operator attaching the claim and the future time when the claim will mature (must be set according to \code{maturity\_duration} param).
   \item Spends the operator's node (must be active) and updates its datum's bond unlock time to the resolution claim's maturity time.
   \item Attaches the operator's signature to the transaction.
   \item References the scheduler to demonstrate that the current shift is assigned to the operator attaching the resolution claim.
@@ -300,7 +300,7 @@ Attach a claim that all user events in a settlement node have been resolved, via
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
-  \item Attach Resolution Claim of the settlement queue spending validator (\cref{h:settlement-queue-spending-validator}).
+  \item Attach Resolution Claim of the settlement spending validator (\cref{h:settlement-spending-validator}).
   \item Update Bond Hold New Settlement of the active operators spending validator (\cref{h:active-operators-spending-validator}).
 \end{itemize}
 
@@ -308,21 +308,21 @@ Correctness is jointly enforced by these script redeemers:
 \begin{center}
 \includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/D-disprove-resolution-claim.pdf}}
 \end{center}
-\caption[Disprove resolution claim]{Disprove an optimistic resolution claim of a settlement node.}
+\caption[Disprove resolution claim]{Disprove an optimistic resolution claim of a settlement utxo.}
 \label{fig:tx-disprove-resolution-claim}
 \end{figure}
 
-Disprove a settlement node's resolution claim via a transaction that (\cref{fig:tx-disprove-resolution-claim}):
+Disprove a settlement utxo's resolution claim via a transaction that (\cref{fig:tx-disprove-resolution-claim}):
 \begin{enumerate}
-  \item Spends a settlement node with a resolution claim and updates it to remove the resolution claim.
+  \item Spends a settlement utxo with a resolution claim and updates it to remove the resolution claim.
   \item Removes the resolution claim's operator node from the active operators or retired operators list (depending on where the operator's node resides).
   \item Slashes the dishonest operator's ADA bond, sending part of it (\code{fraud\_prover\_reward} param) to the transaction's submitter and paying the rest (\code{slashing\_penalty}) as transaction fees.
-  \item References an L1 user event as a counter-example to the resolution claim---the event is included in the settlement node but has not yet been resolved.
+  \item References an L1 user event as a counter-example to the resolution claim---the event is included in the settlement utxo but has not yet been resolved.
 \end{enumerate}
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
-  \item Disprove Resolution Claim of the settlement queue spending validator (\cref{h:settlement-queue-spending-validator}).
+  \item Disprove Resolution Claim of the settlement spending validator (\cref{h:settlement-spending-validator}).
   \item Remove Operator Bad Settlement of the active operators or retired operators minting policy (\cref{h:active-operators-minting-policy}, \cref{h:retired-operators-minting-policy}).
 \end{itemize}
 
