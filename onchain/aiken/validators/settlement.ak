@@ -12,7 +12,7 @@ use midgard/ledger_state
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/settlement.{
-  ActiveOperator, AttachResolutionClaim, Conclude, Datum,
+  ActiveOperator, AttachResolutionClaim, Resolve, Datum,
   DisproveResolutionClaim, MintRedeemer, Remove, ResolutionClaim,
   RetiredOperator, Spawn, SpendRedeemer,
 }
@@ -267,7 +267,7 @@ validator spend(hub_oracle: ScriptHash, settlement_policy_id: ScriptHash) {
           }
         }
       }
-      Conclude { settlement_id } -> {
+      Resolve { settlement_id } -> {
         // 1. The specified settlement NFT must be burnt.
         expect
           assets.quantity_of(tx.mint, settlement_policy_id, settlement_id) == -1
@@ -395,8 +395,8 @@ validator mint(hub_oracle: ScriptHash) {
             |> utils.get_redeemer_at(Spend(input_outref), spend_redeemer_index)
 
         // 2. The redeemer used for spending the `removed_settlement` must be
-        //    `Conclude`. This also validates the specified NFT is getting burnt.
-        expect Conclude { settlement_id: settlement_id_from_spend_redeemer }: SpendRedeemer =
+        //    `Resolve`. This also validates the specified NFT is getting burnt.
+        expect Resolve { settlement_id: settlement_id_from_spend_redeemer }: SpendRedeemer =
           settlement_spending_redeemer_data
 
         // 3. The `settlement_id` included in the spending redeemer must match

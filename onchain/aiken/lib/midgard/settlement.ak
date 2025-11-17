@@ -44,7 +44,7 @@ pub type SpendRedeemer {
     event_type: EventType,
     membership_proof: mpf.Proof,
   }
-  Conclude { settlement_id: ByteArray }
+  Resolve { settlement_id: ByteArray }
 }
 
 pub type EventType {

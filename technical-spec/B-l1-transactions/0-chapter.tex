@@ -328,19 +328,19 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/E-resolve-settlement-node.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/E-resolve-settlement-utxo.pdf}}
 \end{center}
-\caption[Resolve settlement node]{Resolve a settlement node after its resolution claim matures.}
-\label{fig:tx-resolve-settlement-node}
+\caption[Resolve settlement utxo]{Resolve a settlement utxo after its resolution claim matures.}
+\label{fig:tx-resolve-settlement-utxo}
 \end{figure}
 
-Resolve a settlement node via a transaction that (\cref{fig:tx-resolve-settlement-node}):
+Resolve a settlement utxo via a transaction that (\cref{fig:tx-resolve-settlement-utxo}):
 \begin{enumerate}
-  \item Removes a settlement queue node that contains a resolution claim with a maturity time preceding the transaction's time-validity lower bound.
-  \item Attaches the signature of the resolution claim's operator.
+  \item Spends a settlement utxo that contains a resolution claim with a maturity time preceding the transaction's time-validity lower bound.
+  \item Burns the settlement NFT.
 \end{enumerate}
 
-Correctness is enforced by the Resolve Settlement Node script redeemer of the settlement queue's minting policy (\cref{h:settlement-queue-minting-policy}).
+Correctness is jointly enforced by the Resolve redeemer of the settlement spending script (\cref{h:settlement-spending-validator}), and Remove redeemer of the settlement minting policy (\cref{h:settlement-minting-policy}).
 
 \section{User events}%
 \label{h:midgard-l1-tx-user-events}%
@@ -420,7 +420,7 @@ Conclude a confirmed transaction order via a transaction that (\cref{fig:tx-conc
 \begin{enumerate}
   \item Spends a transaction order and burns its NFT.
   \item De-registers the staking credential witnessing the transaction order.
-  \item References a settlement node that includes the transaction order to prove that it has been confirmed.
+  \item References a settlement utxo that includes the transaction order to prove that it has been confirmed with arbitrary validity.
 \end{enumerate}
 
 Correctness is jointly enforced by these script redeemers:
@@ -445,7 +445,7 @@ Absorb a confirmed deposit into Midgard reserves via a transaction that (\cref{f
 \begin{enumerate}
   \item Spends a deposit and burns its deposit NFT.
   \item De-registers the staking credential witnessing the deposit.
-  \item References a settlement node that includes the deposit to prove that it has been confirmed.
+  \item References a settlement utxo that includes the deposit to prove that it has been confirmed.
 \end{enumerate}
 
 Correctness is jointly enforced by these script redeemers:
@@ -468,19 +468,34 @@ Transform a confirmed withdrawal into a payout accumulator via a transaction tha
   \item Spends the withdrawal order and burns its NFT.
   \item Produces a payout accumulator with \code{l2\_value}, \code{l1\_address}, and \code{l1\_datum} datum fields matching those of the withdrawal order.
   \item De-registers the staking credential witnessing the withdrawal order.
-  \item References a settlement node that includes the withdrawal to prove that it has been confirmed.
+  \item References a settlement utxo that includes the withdrawal (marked as valid) to prove that it has been confirmed.
 \end{enumerate}
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
-  \item Initialize Payout Accumulator of the withdrawal order spending validator (\cref{h:withdrawal-order-spending-validator}).
+  \item Initialize Payout of the withdrawal order spending validator (\cref{h:withdrawal-order-spending-validator}).
+  \item Burn Withdrawal NFT of the withdrawal order minting policy (\cref{h:withdrawal-order-minting-policy}).
+  \item Burn or Mint of the witness staking script (\cref{h:witness-staking-script}).
+\end{itemize}
+
+Refund a confirmed invalid withdrawal to its refund address (\cref{fig:refund-invalid-withdrawal}):
+\begin{enumerate}
+  \item Spends the withdrawal order and burns its NFT.
+  \item Reproduces the utxo at \code{refund\_address}, with \code{refund\_datum} attached to it.
+  \item De-registers the staking credential witnessing the withdrawal order.
+  \item References a settlement utxo that includes the withdrawal (marked as invalid) to prove that it has been confirmed.
+\end{enumerate}
+
+Correctness is jointly enforced by these script redeemers:
+\begin{itemize}
+  \item Refund of the withdrawal order spending validator (\cref{h:withdrawal-order-spending-validator}).
   \item Burn Withdrawal NFT of the withdrawal order minting policy (\cref{h:withdrawal-order-minting-policy}).
   \item Burn or Mint of the witness staking script (\cref{h:witness-staking-script}).
 \end{itemize}
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/L-collect-reserve-funds.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/M-collect-reserve-funds.pdf}}
 \end{center}
 \caption[Collect reserve funds]{Collect funds from Midgard reserves into a payout accumulator.}
 \label{fig:tx-collect-reserve-funds}
@@ -502,7 +517,7 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/M-complete-payout.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/N-complete-payout.pdf}}
 \end{center}
 \caption[Conclude payout]{Conclude a payout from Midgard.}
 \label{fig:tx-conclude-payout}
@@ -525,7 +540,7 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/N-fraud-proof-init.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/O-fraud-proof-init.pdf}}
 \end{center}
 \caption[Fraud proof init]{Initialize the verification of a fraud proof.}
 \label{fig:tx-fraud-proof-init}
@@ -542,7 +557,7 @@ Correctness is enforced by the Init redeemer of the fraud proof computation thre
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/O-fraud-proof-cancel.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/P-fraud-proof-cancel.pdf}}
 \end{center}
 \caption[Fraud proof cancel]{Cancel the verification of a fraud proof.}
 \label{fig:tx-fraud-proof-cancel}
@@ -559,7 +574,7 @@ Correctness is enforced by the Cancel redeemer of the fraud proof minting policy
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/P-fraud-proof-step.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/Q-fraud-proof-step.pdf}}
 \end{center}
 \caption[Fraud proof step]{Perform a verification step of a fraud proof.}
 \label{fig:tx-fraud-proof-step}
@@ -581,7 +596,7 @@ Correctness is jointly enforced by these script redeemers:
 
 \begin{figure}[H]
 \begin{center}
-\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/Q-fraud-proof-conclude.pdf}}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/R-fraud-proof-conclude.pdf}}
 \end{center}
 \caption[Fraud proof conclude]{Conclude the verification of a fraud proof by performing its final step.}
 \label{fig:tx-fraud-proof-conclude}
