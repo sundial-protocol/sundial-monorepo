@@ -12,9 +12,9 @@ use midgard/ledger_state
 use midgard/retired_operators
 use midgard/scheduler.{Datum as SchedulerDatum, scheduler_asset_name}
 use midgard/settlement.{
-  ActiveOperator, AttachResolutionClaim, Resolve, Datum,
-  DisproveResolutionClaim, MintRedeemer, Remove, ResolutionClaim,
-  RetiredOperator, Spawn, SpendRedeemer,
+  ActiveOperator, AttachResolutionClaim, Datum, DisproveResolutionClaim,
+  MintRedeemer, Remove, ResolutionClaim, Resolve, RetiredOperator, Spawn,
+  SpendRedeemer,
 }
 use midgard/state_queue
 
