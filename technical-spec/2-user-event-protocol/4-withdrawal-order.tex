@@ -93,7 +93,7 @@ It's responsible for initializing the funding phase of a withdrawal order by rep
     Conditions:
     \begin{enumerate}
       \item Let \code{settlement} be the referenced settlement node.
-      \item Let \code{validity\_override} be the expected validity of the withdrawal stored in withdrawals tree of \code{settlement}.
+      \item Let \code{validity\_override} be the expected validity of the withdrawal stored in withdrawals tree of \code{settlement}, provided via the redeemer.
       \item The withdrawal order must be included in the withdrawals tree of \code{settlement} with a validity other than \code{WithdrawalIsValid}.
       \item Let \code{refund\_address} be the refund address retrieved from the withdrawal order utxo.
       \item Let \code{refund\_datum} be the datum information for the refund utxo retrieved from the withdrawal order utxo.

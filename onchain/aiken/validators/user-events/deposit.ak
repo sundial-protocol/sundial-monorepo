@@ -49,10 +49,9 @@ validator spend(hub_oracle: ScriptHash) {
     expect Some(deposit_datum) = datum
     let Datum { event: deposit_event, .. } = deposit_datum
 
-    // 1. Spending a user event UTxO must also be accompanied by the burning of
-    //    its NFT (and consequently deregistration of its witness staking
-    //    script).
-    expect user_events.BurnEventNFT { nonce_asset_name: burn_asset_name, .. }: user_events.MintRedeemer =
+    // 1. Spending a deposit UTxO must also be accompanied by the burning of its
+    //    NFT (and consequently deregistration of its witness staking script).
+    expect user_events.BurnEventNFT { nonce_asset_name: burn_asset_name, .. } =
       utils.get_redeemer_at(
         redeemers,
         Mint(deposit_policy_id),

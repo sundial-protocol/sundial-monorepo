@@ -87,7 +87,7 @@ It's responsible for validating conclusion of transaction orders, and sending ba
     Conditions:
     \begin{enumerate}
       \item Let \code{settlement} be the referenced settlement utxo.
-      \item Let \code{validity\_override} be the expected validity of the transaction order stored in transactions tree of \code{settlement}.
+      \item Let \code{validity\_override} be the expected validity of the transaction order stored in transactions tree of \code{settlement}, provided via the redeemer.
       \item The transaction order must be included in the transactions tree of \code{settlement} with its validity set to \code{validity\_override}.
       \item The \code{BurnEventNFT} endpoint of the transaction order minting script must be invoked with the corresponding \code{l1\_id} of the order utxo.
       \item Let \code{refund\_address} and \code{refund\_datum} be the refund information retrieved from the transaction order's datum.
