@@ -478,7 +478,15 @@ Correctness is jointly enforced by these script redeemers:
   \item Burn or Mint of the witness staking script (\cref{h:witness-staking-script}).
 \end{itemize}
 
-Refund a confirmed invalid withdrawal to its refund address (\cref{fig:refund-invalid-withdrawal}):
+\begin{figure}[H]
+\begin{center}
+\includegraphics[width=\txDiagramScale\linewidth]{\subfix{../images/tx-diagram/L-refund-invalid-withdrawal.pdf}}
+\end{center}
+\caption[Refund invalid withdrawal]{Send back the min ADA in a confirmed invalid withdrawal order utxo to the refund address.}
+\label{fig:tx-refund-invalid-withdrawal}
+\end{figure}
+
+Refund a confirmed invalid withdrawal to its refund address (\cref{fig:tx-refund-invalid-withdrawal}):
 \begin{enumerate}
   \item Spends the withdrawal order and burns its NFT.
   \item Reproduces the utxo at \code{refund\_address}, with \code{refund\_datum} attached to it.
