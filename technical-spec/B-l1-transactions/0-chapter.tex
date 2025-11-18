@@ -519,7 +519,7 @@ Collect funds from Midgard reserves into a payout accumulator via a transaction 
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
-  \item Collect Reserve Funds of the payout accumulator spending validator (\cref{h:payout-accumulator-spending-validator})
+  \item Collect Reserve Funds of the payout accumulator spending validator (\cref{h:payout-spending-validator})
   \item The sole redeemer of the reserve spending validator (\cref{h:reserve-spending-validator}).
 \end{itemize}
 
@@ -539,8 +539,8 @@ Conclude a payout from Midgard via a transaction that (\cref{fig:tx-conclude-pay
 
 Correctness is jointly enforced by these script redeemers:
 \begin{itemize}
-  \item Complete Payout of the payout accumulator spending validator (\cref{h:payout-accumulator-spending-validator}).
-  \item Burn of the payout accumulator minting policy (\cref{h:payout-accumulator-minting-policy}).
+  \item Complete Payout of the payout accumulator spending validator (\cref{h:payout-spending-validator}).
+  \item Burn of the payout accumulator minting policy (\cref{h:payout-minting-policy}).
 \end{itemize}
 
 \section{Fraud proofs}%
