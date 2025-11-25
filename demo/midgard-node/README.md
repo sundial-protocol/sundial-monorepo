@@ -1,6 +1,70 @@
-# Midgard Node – Demo CLI Application
+# Midgard Node
+
+Server application with GET and POST endpoints for interacting with Midgard.
 
 ## How to Run
+
+### With Docker
+
+Using Docker, you can run Midgard node on `localhost:3000` (or another port)
+quite easily.
+
+1. Run Docker deamon if not already running:
+
+```sh
+sudo dockerd
+```
+
+2. Pack the `midgard-sdk` tarball (see [here](../midgard-sdk/README.md)).
+
+3. Prepare your `.env` file. You can use `.env.example` as your starting point:
+
+```sh
+cp .env.example .env
+```
+
+4. Install all the dependencies and build:
+
+```sh
+cd ../midgard-node
+pnpm install && pnpm build
+```
+
+5. Run the application stack:
+
+```sh
+docker-compose up -d
+```
+
+Midgard node should be running on port `PORT` (from your `.env`).
+
+You can view logs of `midgard-node` with `docker`:
+
+```sh
+# Change container's name as needed:
+sudo docker logs -f midgard-node-midgard-node-1
+```
+
+If you made any changes to `midgard-node` and had an image running, restart it
+with the 3 steps:
+
+```sh
+docker-compose down -v
+docker image rm midgard-node-midgard-node
+docker-compose up -d
+```
+
+### Without Docker (No Monitoring)
+
+For running the node itself, a running PostgreSQL server is also needed.
+
+### Local run with monitoring
+
+- Run [starting script](local-run/start.sh) or see [the guide](local-run/MANUAL-RUN.md) for details.
+
+### Local run without monitoring
+
+- Build and run all necessary packages:
 
 ```sh
 # Optional
@@ -15,41 +79,20 @@ pnpm install
 pnpm run listen
 ```
 
-## Build image
+## Testing
 
-### Start docker daemon
+### Docker
 
-```sh
-nix develop
-sudo $(which dockerd)
-```
-
-### Build & run image
-
-```sh
-SEED_PHRASE="your seed phrase" nix develop
-sudo chown --recursive $(whoami):$(whoami) /var/run/docker.sock
-
-docker run --rm --publish 3000:3000 -it -e SEED_PHRASE="$SEED_PHRASE" \
-  $(docker build --build-context sdk=../midgard-sdk -q .)
-```
-
-### Test node
-
-```sh
-curl http://localhost:3000
-```
-
-### Testing
-
-For local testing run
-
-```sh
-pnpm test
-```
-
-For testing inside docker container run
+- For running tests inside docker container:
 
 ```sh
 docker-compose run --rm midgard-node-tests
+```
+
+### Local run
+
+- For running tests locally:
+```sh
+cd midgard-node
+pnpm test
 ```
