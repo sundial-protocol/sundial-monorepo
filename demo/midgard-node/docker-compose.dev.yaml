@@ -20,6 +20,8 @@ services:
       - ./db:/app/db
     depends_on:
       - postgres
+    networks:
+      midgard_net:
 
   postgres:
     image: postgres:15-alpine
@@ -31,7 +33,13 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    networks:
+      midgard_net:
+
+networks:
+  midgard_net:
 
 volumes:
   postgres-data:
+    driver: local

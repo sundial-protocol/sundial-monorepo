@@ -92,6 +92,7 @@ docker-compose run --rm midgard-node-tests
 ### Local run
 
 - For running tests locally:
+
 ```sh
 cd midgard-node
 pnpm test
