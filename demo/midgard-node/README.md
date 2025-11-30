@@ -9,7 +9,7 @@ Server application with GET and POST endpoints for interacting with Midgard.
 Using Docker, you can run Midgard node on `localhost:3000` (or another port)
 quite easily.
 
-1. Run Docker deamon if not already running:
+1. Run Docker deamon if it's not running already:
 
 ```sh
 sudo dockerd
@@ -34,6 +34,9 @@ pnpm install && pnpm build
 
 ```sh
 docker-compose up -d
+
+# or this for development:
+docker-compose up -f docker-compose.dev.yaml
 ```
 
 Midgard node should be running on port `PORT` (from your `.env`).
@@ -57,12 +60,6 @@ docker-compose up -d
 ### Without Docker (No Monitoring)
 
 For running the node itself, a running PostgreSQL server is also needed.
-
-### Local run with monitoring
-
-- Run [starting script](local-run/start.sh) or see [the guide](local-run/MANUAL-RUN.md) for details.
-
-### Local run without monitoring
 
 - Build and run all necessary packages:
 

@@ -44,7 +44,7 @@ import * as SDK from "@al-ft/midgard-sdk";
 ```
 
 Midgard SDK itself is built with `effect`, but it doesn't impose this on
-dependent packages. Having said that, it does offect function variants for
+dependent packages. Having said that, it does offer function variants for
 projects that use `effect` as well.
 
 The convention is the same as Lucid Evolution, i.e. functions that return
