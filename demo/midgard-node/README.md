@@ -78,13 +78,15 @@ nix develop
 
 # Bundle the SDK
 cd ../midgard-sdk
-pnpm install && pnpm run repack
+pnpm install
+pnpm repack
 
 # Go back to `midgard-node` and force reinstallation of the SDK (faster than
 # `pnpm install --force`)
 cd ../midgard-node
-rm -rf node_module && pnpm install
-pnpm run listen
+rm -rf node_module
+pnpm install
+pnpm listen
 ```
 
 ## Testing
