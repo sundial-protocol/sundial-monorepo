@@ -70,7 +70,7 @@ LEDGER_MPT_DB_PATH=midgard-ledger-mpt-db
 MEMPOOL_MPT_DB_PATH=midgard-mempool-mpt-db
 ```
 
-With a properly setup database, the following set of command should start the
+With a properly setup database, the following set of commands should start the
 most up to date `midgard-node`:
 ```sh
 # Optional

@@ -57,10 +57,10 @@ program
   .command("listen")
   .option(
     "-m, --with-monitoring",
-    "Flag for interacting with monitoring services",
+    "Flag for enabling interactions with monitoring services",
   )
   .action(async (_args, options) => {
-    console.log("🌳 Let's do this.");
+    console.log("🌳 Midgard");
     const program: Effect.Effect<
       void,
       | DatabaseError
