@@ -36,7 +36,7 @@ pnpm install && pnpm build
 docker-compose up -d
 
 # or this for development:
-docker-compose up -f docker-compose.dev.yaml
+sudo docker-compose -f docker-compose.dev.yaml up -d
 ```
 
 Midgard node should be running on port `PORT` (from your `.env`).
@@ -59,36 +59,43 @@ docker-compose up -d
 
 ### Without Docker (No Monitoring)
 
-For running the node itself, a running PostgreSQL server is also needed.
+For running the node itself, a running PostgreSQL server is also needed. The
+fields you most likely want to modify in your `.env` file are:
+```sh
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=midgard
+POSTGRES_HOST=localhost
+LEDGER_MPT_DB_PATH=midgard-ledger-mpt-db
+MEMPOOL_MPT_DB_PATH=midgard-mempool-mpt-db
+```
 
-- Build and run all necessary packages:
-
+With a properly setup database, the following set of command should start the
+most up to date `midgard-node`:
 ```sh
 # Optional
 nix develop
 
+# Bundle the SDK
 cd ../midgard-sdk
-pnpm install
-pnpm run repack
+pnpm install && pnpm run repack
 
+# Go back to `midgard-node` and force reinstallation of the SDK (faster than
+# `pnpm install --force`)
 cd ../midgard-node
-pnpm install
+rm -rf node_module && pnpm install
 pnpm run listen
 ```
 
 ## Testing
 
-### Docker
-
-- For running tests inside docker container:
+### With Docker
 
 ```sh
 docker-compose run --rm midgard-node-tests
 ```
 
-### Local run
-
-- For running tests locally:
+### Without Docker
 
 ```sh
 cd midgard-node

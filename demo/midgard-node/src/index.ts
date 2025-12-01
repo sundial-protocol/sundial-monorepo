@@ -60,7 +60,7 @@ program
     "Flag for interacting with monitoring services",
   )
   .action(async (_args, options) => {
-    console.log("Let's do this.");
+    console.log("🌳 Let's do this.");
     const program: Effect.Effect<
       void,
       | DatabaseError
