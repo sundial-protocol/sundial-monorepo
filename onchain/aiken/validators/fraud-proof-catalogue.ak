@@ -6,7 +6,7 @@ use aiken_design_patterns/linked_list/ordered.{
 }
 use cardano/assets.{PolicyId, quantity_of, tokens}
 use cardano/transaction.{InlineDatum, Input, OutputReference, Transaction}
-use midgard/fraud_proof/catalogue.{
+use midgard/fraud_proof_catalogue.{
   Deinit, Init, MintRedeemer, NewFraudCategory, RemoveFraudCategory,
   SpendRedeemer,
 }

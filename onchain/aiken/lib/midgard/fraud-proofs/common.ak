@@ -9,11 +9,43 @@ use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/common/utils.{get_singleton_asset_with_policy} as get_singleton_asset_with_policy
 use midgard/common/utils.{get_authentic_input_with_policy_at} as get_authentic_input_with_policy_at
 use midgard/computation_thread.{StepDatum, Success}
-use midgard/fraud_proof/common/types.{
-  ExclusionProofInputTx, ExclusionProofUtxo, FraudProofDatum,
-  MembershipProofInputs,
-}
 use midgard/ledger_state.{Header}
+
+pub type Proof =
+  ByteArray
+
+pub type MembershipProofInputs {
+  tx_root: ByteArray,
+  tx_hash: ByteArray,
+  tx_info_hash: ByteArray,
+  tx_to_root_proof_path: Proof,
+}
+
+pub type ExclusionProofInputTx {
+  tx_root: ByteArray,
+  invalid_input_tx_hash: ByteArray,
+  invalid_input_info_hash: ByteArray,
+  input_to_root_proof_path: Proof,
+}
+
+pub type ExclusionProofUtxo {
+  utxo_root: ByteArray,
+  invalid_utxo: ByteArray,
+  invalid_utxo_info_hash: ByteArray,
+  utxo_to_root_proof_path: Proof,
+}
+
+pub type InclusionProofTx {
+  current_block_txs_root: ByteArray,
+  invalid_tx: ByteArray,
+  invalid_tx_info_hash: ByteArray,
+  tx_to_root_proof_path: Proof,
+}
+
+// Last step datum for fraud proofs
+pub type FraudProofDatum {
+  fraud_prover: ByteArray,
+}
 
 // ------------ ABSTRACTIONS FOR ALL FRAUD PROOF STEPS ------------
 // Each step in a computation thread must in the continue redeemer:
