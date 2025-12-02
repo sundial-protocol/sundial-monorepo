@@ -806,82 +806,94 @@ const txQueueProcessorFork = (txQueue: Queue.Dequeue<string>) =>
     Effect.catchAllCause(Effect.logWarning),
   );
 
-export const runNode = Effect.gen(function* () {
-  const nodeConfig = yield* NodeConfig;
+export const runNode = (withMonitoring?: boolean) =>
+  Effect.gen(function* () {
+    const nodeConfig = yield* NodeConfig;
 
-  const prometheusExporter = new PrometheusExporter(
-    {
-      port: nodeConfig.PROM_METRICS_PORT,
-    },
-    () => {
-      `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
-    },
-  );
+    const txQueue = yield* Queue.unbounded<string>();
 
-  const originalStop = prometheusExporter.stopServer;
-  prometheusExporter.stopServer = async function () {
-    Effect.runSync(Effect.logInfo("Prometheus exporter is stopping!"));
-    return originalStop();
-  };
+    yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
 
-  const MetricsLive = NodeSdk.layer(() => ({
-    resource: { serviceName: "midgard-node" },
-    metricReader: prometheusExporter,
-    spanProcessor: new BatchSpanProcessor(
-      new OTLPTraceExporter({ url: nodeConfig.OLTP_EXPORTER_URL }),
-    ),
-  }));
+    const appThread = Layer.launch(
+      Layer.provide(
+        HttpServer.serve(router(txQueue)),
+        NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
+      ),
+    );
 
-  const txQueue = yield* Queue.unbounded<string>();
+    const blockCommitmentThread = blockCommitmentFork(
+      nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENT,
+    );
 
-  yield* InitDB.initializeDb().pipe(Effect.provide(Database.layer));
+    const blockConfirmationThread = blockConfirmationFork(
+      nodeConfig.WAIT_BETWEEN_BLOCK_CONFIRMATION,
+    );
 
-  const appThread = Layer.launch(
-    Layer.provide(
-      HttpServer.serve(router(txQueue)),
-      NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
-    ),
-  );
+    const mergeThread = mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS);
 
-  const blockCommitmentThread = blockCommitmentFork(
-    nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENT,
-  );
+    const monitorMempoolThread = withMonitoring
+      ? monitorMempoolFork
+      : Effect.void;
 
-  const blockConfirmationThread = blockConfirmationFork(
-    nodeConfig.WAIT_BETWEEN_BLOCK_CONFIRMATION,
-  );
+    const txQueueProcessorThread = txQueueProcessorFork(txQueue);
 
-  const mergeThread = mergeFork(nodeConfig.WAIT_BETWEEN_MERGE_TXS);
+    const program = Effect.all(
+      [
+        appThread,
+        blockCommitmentThread,
+        blockConfirmationThread,
+        mergeThread,
+        monitorMempoolThread,
+        txQueueProcessorThread,
+      ],
+      {
+        concurrency: "unbounded",
+      },
+    ).pipe(
+      Effect.provide(Database.layer),
+      Effect.provide(AlwaysSucceedsContract.Default),
+      Effect.provide(Lucid.Default),
+      Effect.provide(NodeConfig.layer),
+      Effect.provide(Globals.Default),
+    );
 
-  const monitorMempoolThread = monitorMempoolFork;
+    if (withMonitoring) {
+      const prometheusExporter = new PrometheusExporter(
+        {
+          port: nodeConfig.PROM_METRICS_PORT,
+        },
+        () => {
+          `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
+        },
+      );
 
-  const txQueueProcessorThread = txQueueProcessorFork(txQueue);
+      const originalStop = prometheusExporter.stopServer;
+      prometheusExporter.stopServer = async function () {
+        Effect.runSync(Effect.logInfo("Prometheus exporter is stopping!"));
+        return originalStop();
+      };
 
-  const program = Effect.all(
-    [
-      appThread,
-      blockCommitmentThread,
-      blockConfirmationThread,
-      mergeThread,
-      monitorMempoolThread,
-      txQueueProcessorThread,
-    ],
-    {
-      concurrency: "unbounded",
-    },
-  ).pipe(
-    Effect.provide(Database.layer),
-    Effect.provide(AlwaysSucceedsContract.Default),
-    Effect.provide(Lucid.Default),
-    Effect.provide(NodeConfig.layer),
-    Effect.provide(Globals.Default),
-  );
+      const MetricsLive = NodeSdk.layer(() => ({
+        resource: { serviceName: "midgard-node" },
+        metricReader: prometheusExporter,
+        spanProcessor: new BatchSpanProcessor(
+          new OTLPTraceExporter({ url: nodeConfig.OLTP_EXPORTER_URL }),
+        ),
+      }));
 
-  pipe(
-    program,
-    Effect.withSpan("midgard"),
-    Effect.provide(MetricsLive),
-    Effect.catchAllCause(Effect.logError),
-    Effect.runPromise,
-  );
-});
+      pipe(
+        program,
+        Effect.withSpan("midgard"),
+        Effect.provide(MetricsLive),
+        Effect.catchAllCause(Effect.logError),
+        Effect.runPromise,
+      );
+    } else {
+      pipe(
+        program,
+        Effect.withSpan("midgard"),
+        Effect.catchAllCause(Effect.logError),
+        Effect.runPromise,
+      );
+    }
+  });
