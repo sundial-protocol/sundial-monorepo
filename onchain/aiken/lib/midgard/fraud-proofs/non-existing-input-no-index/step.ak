@@ -1,4 +1,4 @@
-use midgard/fraud_proof/common/types.{Proof}
+use midgard/fraud_proofs/common.{Proof}
 use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact}
 
 pub type StepRedeemer {

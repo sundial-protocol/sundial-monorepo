@@ -6,7 +6,7 @@ use cardano/transaction.{
 }
 use midgard/common/utils
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proofs/token.{Datum, MintRedeemer, SpendRedeemer}
+use midgard/fraud_proof.{Datum, MintRedeemer, SpendRedeemer}
 use midgard/hub_oracle
 
 /// The spending validator of a fraud proof token never allows it to be spent.

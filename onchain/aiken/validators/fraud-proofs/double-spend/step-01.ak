@@ -11,12 +11,11 @@ use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proof/common/types.{MembershipProofInputs}
-use midgard/fraud_proof/common/utils.{
-  get_singleton_ct_token, get_tx_root_validate_block_hash, handle_cancel,
-  validate_membership_proof, validate_step_output,
+use midgard/fraud_proofs/common.{
+  MembershipProofInputs, get_singleton_ct_token, get_tx_root_validate_block_hash,
+  handle_cancel, validate_membership_proof, validate_step_output,
 }
-use midgard/fraud_proof/double_spend/step_01.{
+use midgard/fraud_proofs/double_spend/step_01.{
   Cancel, Continue, StepRedeemer as Step1Redeemer, StepState as Step1State,
 }
 use midgard/hub_oracle as hub

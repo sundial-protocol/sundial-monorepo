@@ -69,7 +69,7 @@ validator mint(
           list.at(self.outputs, appended_node_output_index)
         expect InlineDatum(appended_node_output_datum) =
           appended_node_output.datum
-        expect catalogue.Datum { .. } = appended_node_output_datum
+        expect fraud_proof_catalogue.Datum { .. } = appended_node_output_datum
 
         and {
           ordered.append(

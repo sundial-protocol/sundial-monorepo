@@ -23,7 +23,6 @@ validator computation_thread_policy(
         output_to_init_step_index,
         fraud_prover_hash,
         fraud_proof_catalogue_asset_name,
-        hub_oracle_asset_name,
         state_queue_asset_name,
       } -> {
         expect Some(fraud_proof_catalogue_node_input) =
@@ -36,8 +35,12 @@ validator computation_thread_policy(
         expect Some(output_to_init_step) =
           list.at(self.outputs, output_to_init_step_index)
 
-        expect hub.Datum { state_queu: state_queue_policy_id, .. } =
-          hub.get_datum(self.reference_inputs, hub_oracle_script_hash, hub_oracle_ref_input_index)
+        let hub.Datum { state_queue: state_queue_policy_id, .. } =
+          hub.get_datum(
+            self.reference_inputs,
+            hub_oracle_script_hash,
+            hub_oracle_ref_input_index,
+          )
 
         expect InlineDatum(fraud_proof_catalogue_node_datum) =
           fraud_proof_catalogue_node_input.output.datum
