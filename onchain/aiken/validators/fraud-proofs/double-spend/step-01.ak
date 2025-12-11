@@ -71,7 +71,6 @@ validator main(
         index_output,
         hub_ref_input_index,
       } -> {
-        //TODO get it from the oracle hub
         let hub.Datum { state_queue, .. } =
           hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)
 
