@@ -18,5 +18,6 @@ pub type SpendRedeemer {
   burn_redeemer_index: Int,
   payout_mint_redeemer_index: Int,
   membership_proof: mpf.Proof,
+  inclusion_proof_script_withdraw_redeemer_index: Int,
   purpose: SpendPurpose,
 }

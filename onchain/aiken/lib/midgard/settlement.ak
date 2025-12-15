@@ -43,6 +43,7 @@ pub type SpendRedeemer {
     unresolved_event_asset_name: AssetName,
     event_type: EventType,
     membership_proof: mpf.Proof,
+    inclusion_proof_script_withdraw_redeemer_index: Int,
   }
   Resolve { settlement_id: ByteArray }
 }

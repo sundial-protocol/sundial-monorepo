@@ -16,4 +16,5 @@ pub type SpendRedeemer {
   settlement_ref_input_index: Int,
   mint_redeemer_index: Int,
   membership_proof: mpf.Proof,
+  inclusion_proof_script_withdraw_redeemer_index: Int,
 }
