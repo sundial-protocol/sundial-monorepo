@@ -105,6 +105,7 @@ pub fn valid_event_inclusion(
   unresolved_event_ref_input_index: Int,
   reference_inputs: List<Input>,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
+  inclusion_proof_script_withdraw_redeemer_index: Int,
 ) {
   when event_type is {
     Deposit -> {
@@ -134,6 +135,7 @@ pub fn valid_event_inclusion(
         value: deposit_value,
         membership_proof: membership_proof,
         redeemers: redeemers,
+        withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
       )
     }
     Withdrawal { validity_override } -> {
@@ -171,6 +173,7 @@ pub fn valid_event_inclusion(
         value: overridden_withdrawal_info,
         membership_proof: membership_proof,
         redeemers: redeemers,
+        withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
       )
     }
     TxOrder { validity_override } -> {
@@ -208,6 +211,7 @@ pub fn valid_event_inclusion(
         value: overridden_tx_order_tx,
         membership_proof: membership_proof,
         redeemers: redeemers,
+        withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
       )
     }
   }

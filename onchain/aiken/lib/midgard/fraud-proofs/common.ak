@@ -131,6 +131,14 @@ pub fn validate_membership_proof(
       redeemers: tx.redeemers,
     )
   True
+  utils.plutarch_phas(
+    mpf_root: proof_inputs.tx_root,
+    key: proof_inputs.tx_hash,
+    value: proof_inputs.tx_info_hash,
+    membership_proof: proof_inputs.tx_to_root_proof_path,
+    redeemers: tx.redeemers,
+    withdraw_redeemer_index: withdraw_redeemer_index,
+  )
 }
 
 // Relevant to (2)

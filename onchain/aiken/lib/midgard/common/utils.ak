@@ -7,7 +7,7 @@ use aiken/crypto.{
 }
 use aiken/interval.{Finite, Interval, NegativeInfinity, PositiveInfinity}
 use aiken/merkle_patricia_forestry as mpf
-use aiken_design_patterns/merkelized_validator
+use aiken_design_patterns/stake_validator
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
@@ -18,7 +18,7 @@ use midgard/common/constants.{posix_time_none}
 use midgard/common/types.{H28, H32, PosixTime, ValuePairs}
 
 /// Check whether the interval starts on or after the point.
-pub fn is_hereafter(self: Interval<Int>, point: Int) -> Bool {
+pub fn is_hereafter(self: Interval, point: Int) -> Bool {
   when self.lower_bound.bound_type is {
     Finite(lo) -> point <= lo
     NegativeInfinity -> False
@@ -27,7 +27,7 @@ pub fn is_hereafter(self: Interval<Int>, point: Int) -> Bool {
 }
 
 /// Check whether the interval ends on or before the point.
-pub fn is_herebefore(self: Interval<Int>, point: Int) -> Bool {
+pub fn is_herebefore(self: Interval, point: Int) -> Bool {
   when self.upper_bound.bound_type is {
     Finite(hi) -> hi <= point
     PositiveInfinity -> False
@@ -400,29 +400,30 @@ pub fn plutarch_phas(
   value: Data,
   membership_proof: mpf.Proof,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
+  withdraw_redeemer_index: Int,
 ) -> Bool {
-  merkelized_validator.generic_delegated_validation(
-    staking_validator: env.plutarch_phas_validator_hash,
-    withdraw_redeemer_validator: fn(phas_validator_redeemer: Data) -> Bool {
-      expect [
-        redeemer_root_data, redeemer_key_data, redeemer_value_data,
-        redeemer_proof_data,
-        ..
-      ] = builtin.un_list_data(phas_validator_redeemer)
+  let phas_validator_redeemer <-
+    stake_validator.validate_withdraw(
+      env.plutarch_phas_validator_hash,
+      redeemers,
+      withdraw_redeemer_index,
+    )
+  expect [
+    redeemer_root_data, redeemer_key_data, redeemer_value_data,
+    redeemer_proof_data,
+    ..
+  ] = builtin.un_list_data(phas_validator_redeemer)
 
-      let mpf_root_data: Data = mpf_root
+  let mpf_root_data: Data = mpf_root
 
-      let proof_data: Data = membership_proof
+  let proof_data: Data = membership_proof
 
-      and {
-        redeemer_root_data == mpf_root_data,
-        redeemer_key_data == key,
-        redeemer_value_data == value,
-        redeemer_proof_data == proof_data,
-      }
-    },
-    redeemers: redeemers,
-  )
+  and {
+    redeemer_root_data == mpf_root_data,
+    redeemer_key_data == key,
+    redeemer_value_data == value,
+    redeemer_proof_data == proof_data,
+  }
 }
 
 /// Merkelized validator abstraction for `pexcludes` function from Plutarch.
@@ -431,27 +432,28 @@ pub fn plutarch_pexcludes(
   key: Data,
   non_membership_proof: mpf.Proof,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
+  withdraw_redeemer_index: Int,
 ) -> Bool {
-  merkelized_validator.generic_delegated_validation(
-    staking_validator: env.plutarch_pexcludes_validator_hash,
-    withdraw_redeemer_validator: fn(pexcludes_validator_redeemer: Data) -> Bool {
-      expect [redeemer_root_data,
-        redeemer_key_data,
-        redeemer_proof_data, ..] =
-        builtin.un_list_data(pexcludes_validator_redeemer)
+  let pexcludes_validator_redeemer <-
+    stake_validator.validate_withdraw(
+      env.plutarch_pexcludes_validator_hash,
+      redeemers,
+      withdraw_redeemer_index,
+    )
+  expect [redeemer_root_data,
+    redeemer_key_data,
+    redeemer_proof_data, ..] =
+    builtin.un_list_data(pexcludes_validator_redeemer)
 
-      let mpf_root_data: Data = mpf_root
+  let mpf_root_data: Data = mpf_root
 
-      let proof_data: Data = non_membership_proof
+  let proof_data: Data = non_membership_proof
 
-      and {
-        redeemer_root_data == mpf_root_data,
-        redeemer_key_data == key,
-        redeemer_proof_data == proof_data,
-      }
-    },
-    redeemers: redeemers,
-  )
+  and {
+    redeemer_root_data == mpf_root_data,
+    redeemer_key_data == key,
+    redeemer_proof_data == proof_data,
+  }
 }
 
 pub fn get_verification_key_hash(key: VerificationKey) -> VerificationKeyHash {
