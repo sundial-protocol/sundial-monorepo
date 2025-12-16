@@ -1,13 +1,24 @@
 use aiken/collection/list
-use aiken/crypto.{ScriptHash}
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
+use aiken/merkle_patricia_forestry as mpf
 use aiken/primitive/bytearray.{drop}
 use aiken_design_patterns/linked_list/unordered as unordered
-use aiken_design_patterns/merkelized_validator
+use aiken_design_patterns/singular_utxo_indexer
+use aiken_design_patterns/tx_level_minter
 use cardano/address.{Script, VerificationKey}
-use cardano/assets.{PolicyId, lovelace_of}
-use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use midgard/common/utils.{get_singleton_asset_with_policy}
-use midgard/computation_thread.{StepDatum, Success}
+use cardano/assets.{PolicyId, Value}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
+  Transaction,
+}
+use midgard/common/utils.{
+  get_singleton_asset_with_policy, plutarch_phas,
+  get_authentic_output_datum_at_credential_with_nft_at,
+  get_single_asset_from_value,
+  get_single_asset_from_value_apart_from_ada,
+  has_signed,
+}
+use midgard/computation_thread as ct
 use midgard/ledger_state.{Header}
 use midgard/state_queue
 
@@ -115,28 +126,39 @@ pub fn validate_membership_proof(
   plutarch_midgard_merkle_validator: ScriptHash,
   proof_inputs: MembershipProofInputs,
 ) -> Bool {
-  expect
-    merkelized_validator.delegated_validation(
-      function_input: MembershipProofInputs {
-        tx_root: proof_inputs.tx_root,
-        tx_hash: proof_inputs.tx_hash,
-        tx_info_hash: proof_inputs.tx_info_hash,
-        tx_to_root_proof_path: proof_inputs.tx_to_root_proof_path,
-      },
-      staking_validator: plutarch_midgard_merkle_validator,
-      input_data_coercer: fn(withdraw_redeemer: Data) {
-        expect coerced: MembershipProofInputs = withdraw_redeemer
-        coerced
-      },
-      redeemers: tx.redeemers,
-    )
+  // expect
+  //   merkelized_validator.delegated_validation(
+  //     function_input: MembershipProofInputs {
+  //       tx_root: proof_inputs.tx_root,
+  //       tx_hash: proof_inputs.tx_hash,
+  //       tx_info_hash: proof_inputs.tx_info_hash,
+  //       tx_to_root_proof_path: proof_inputs.tx_to_root_proof_path,
+  //     },
+  //     staking_validator: plutarch_midgard_merkle_validator,
+  //     redeemers: tx.redeemers,
+  //     input_data_coercer: fn(withdraw_redeemer: Data) {
+  //       expect coerced: MembershipProofInputs = withdraw_redeemer
+  //       coerced
+  //     },
+  //   )
   True
-  utils.plutarch_phas(
-    mpf_root: proof_inputs.tx_root,
-    key: proof_inputs.tx_hash,
-    value: proof_inputs.tx_info_hash,
-    membership_proof: proof_inputs.tx_to_root_proof_path,
-    redeemers: tx.redeemers,
+}
+
+// TODO
+pub fn validate_membership_proof_2(
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+  withdraw_redeemer_index: Int,
+  tx_root: ByteArray,
+  tx_hash: ByteArray,
+  tx_info_hash: ByteArray,
+  tx_to_root_proof: mpf.Proof,
+) -> Bool {
+  plutarch_phas(
+    mpf_root: tx_root,
+    key: tx_hash,
+    value: tx_info_hash,
+    membership_proof: tx_to_root_proof,
+    redeemers: redeemers,
     withdraw_redeemer_index: withdraw_redeemer_index,
   )
 }
@@ -147,21 +169,21 @@ pub fn validate_exclusion_proof(
   plutarch_midgard_merkle_validator: ScriptHash,
   proof_input: ExclusionProofInputTx,
 ) -> Bool {
-  expect
-    merkelized_validator.delegated_validation(
-      function_input: ExclusionProofInputTx {
-        tx_root: proof_input.tx_root,
-        invalid_input_tx_hash: proof_input.invalid_input_tx_hash,
-        invalid_input_info_hash: proof_input.invalid_input_info_hash,
-        input_to_root_proof_path: proof_input.input_to_root_proof_path,
-      },
-      staking_validator: plutarch_midgard_merkle_validator,
-      input_data_coercer: fn(withdraw_redeemer: Data) {
-        expect coerced: ExclusionProofInputTx = withdraw_redeemer
-        coerced
-      },
-      redeemers: tx.redeemers,
-    )
+  // expect
+  //   merkelized_validator.delegated_validation(
+  //     function_input: ExclusionProofInputTx {
+  //       tx_root: proof_input.tx_root,
+  //       invalid_input_tx_hash: proof_input.invalid_input_tx_hash,
+  //       invalid_input_info_hash: proof_input.invalid_input_info_hash,
+  //       input_to_root_proof_path: proof_input.input_to_root_proof_path,
+  //     },
+  //     staking_validator: plutarch_midgard_merkle_validator,
+  //     input_data_coercer: fn(withdraw_redeemer: Data) {
+  //       expect coerced: ExclusionProofInputTx = withdraw_redeemer
+  //       coerced
+  //     },
+  //     redeemers: tx.redeemers,
+  //   )
   True
 }
 
@@ -171,54 +193,51 @@ pub fn validate_exclusion_utxo_proof(
   plutarch_midgard_merkle_validator: ScriptHash,
   proof_input: ExclusionProofUtxo,
 ) -> Bool {
-  expect
-    merkelized_validator.delegated_validation(
-      function_input: ExclusionProofUtxo {
-        utxo_root: proof_input.utxo_root,
-        invalid_utxo: proof_input.invalid_utxo,
-        invalid_utxo_info_hash: proof_input.invalid_utxo_info_hash,
-        utxo_to_root_proof_path: proof_input.utxo_to_root_proof_path,
-      },
-      staking_validator: plutarch_midgard_merkle_validator,
-      input_data_coercer: fn(withdraw_redeemer: Data) {
-        expect coerced: ExclusionProofUtxo = withdraw_redeemer
-        coerced
-      },
-      redeemers: tx.redeemers,
-    )
+  // expect
+  //   merkelized_validator.delegated_validation(
+  //     function_input: ExclusionProofUtxo {
+  //       utxo_root: proof_input.utxo_root,
+  //       invalid_utxo: proof_input.invalid_utxo,
+  //       invalid_utxo_info_hash: proof_input.invalid_utxo_info_hash,
+  //       utxo_to_root_proof_path: proof_input.utxo_to_root_proof_path,
+  //     },
+  //     staking_validator: plutarch_midgard_merkle_validator,
+  //     input_data_coercer: fn(withdraw_redeemer: Data) {
+  //       expect coerced: ExclusionProofUtxo = withdraw_redeemer
+  //       coerced
+  //     },
+  //     redeemers: tx.redeemers,
+  //   )
   True
 }
 
 // Common validation for any step's output state (except final step)
 // Relevant to (3), (4), (5), (6)
 pub fn validate_step_output(
-  tx: Transaction,
-  index_output: Int,
+  outputs: List<Output>,
+  output_index: Int,
   next_validator_hash: ScriptHash,
   ct_token_policy_id: PolicyId,
   ct_token_asset_name: ByteArray,
-  step_datum: StepDatum,
-  expected_output_datum: StepDatum,
+  step_datum: ct.StepDatum,
+  expected_output_datum: ct.StepDatum,
 ) -> Bool {
-  expect Some(output_to_next_step) = list.at(tx.outputs, index_output)
+  // (5) Validate output goes to next validator
+  // (6) Validate CT token forwarding and no other minting/burning
+  let output_datum = get_authentic_output_datum_at_credential_with_nft_at(
+    outputs,
+    Script(next_validator_hash),
+    ct_token_policy_id,
+    ct_token_asset_name,
+    output_index,
+  )
+
   // (3) Validate fraud prover field matches
-  expect InlineDatum(output_datum) = output_to_next_step.datum
-  expect parsed_output_datum: StepDatum = output_datum
+  expect parsed_output_datum: ct.StepDatum = output_datum
   expect parsed_output_datum.fraud_prover == step_datum.fraud_prover
 
   // (4) Validate state transition
   expect parsed_output_datum.data == expected_output_datum.data
-
-  // (5) Validate output goes to next validator
-  expect Script(hash) = output_to_next_step.address.payment_credential
-  expect hash == next_validator_hash
-
-  // (6) Validate CT token forwarding and no other minting/burning
-  expect
-    Pair(ct_token_asset_name, 1) == get_singleton_asset_with_policy(
-      output_to_next_step.value,
-      ct_token_policy_id,
-    )
 
   True
 }
@@ -236,7 +255,7 @@ pub fn validate_final_step_output(
   index_output: Int,
   fraud_proof_token_policy: PolicyId,
   ct_token_asset_name: ByteArray,
-  step_datum: StepDatum,
+  step_datum: ct.StepDatum,
   computation_thread_redeemer_index: Int,
 ) -> Bool {
   // (3, 4) Validate output state is Void and fraud prover matches
@@ -257,7 +276,7 @@ pub fn validate_final_step_output(
   // (2) Validate computation thread token burn with Success redeemer
   expect Some(computation_thread_redeemer_pair) =
     list.at(tx.redeemers, computation_thread_redeemer_index)
-  expect Success { token_to_burn_asset_name } =
+  expect ct.Success { token_to_burn_asset_name } =
     computation_thread_redeemer_pair.2nd
   expect token_to_burn_asset_name == ct_token_asset_name
 
@@ -272,20 +291,67 @@ pub fn validate_final_step_output(
 
 // Umbrella Cancel Redeemer function
 pub fn handle_cancel(
-  own_input: Input,
-  index_output: Int,
-  step_datum: StepDatum,
-  ct_token_policy_id: PolicyId,
-  tx: Transaction,
+  computation_thread_token_policy_id: PolicyId,
+  input_index: Int,
+  mint_redeemer_index: Int,
+  own_out_ref: OutputReference,
+  inputs: List<Input>,
+  outputs: List<Output>,
+  tx_mint: Value,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+  extra_signatories: List<VerificationKeyHash>,
 ) -> Bool {
-  expect validate_ct_token_burn(own_input, ct_token_policy_id, tx)
-  expect
-    validate_ada_return_to_fraud_prover(
-      own_input,
-      index_output,
-      step_datum.fraud_prover,
-      tx,
+  let input, output <- singular_utxo_indexer.one_to_one(
+    input_index,
+    output_index,
+    own_out_ref,
+    inputs,
+    outputs,
+    True,
+  )
+
+  expect (inputs_nft_policy_id, inputs_nft_asset_name, 1) =
+    get_single_asset_from_value_apart_from_ada(
+      input_value,
     )
+  expect inputs_nft_policy_id == computation_thread_token_policy_id
+
+  let mint_redeemer_data, tn_qty_dict <- tx_level_minter.validate_mint(
+    computation_thread_token_policy_id,
+    tx_mint,
+    redeemers,
+    mint_redeemer_index,
+  )
+
+  expect Cancel { burnt_asset_name } = mint_redeemer_data
+
+  expect [(burnt_asset_name, -1)] = tn_qty_dict |> dict.to_list()
+
+  let input = get_authentic_input_with_nft_at(
+    inputs: inputs,
+    nft_policy_id: computation_thread_token_policy_id,
+    nft_asset_name: burnt_asset_name,
+    input_index: input_index,
+  )
+
+  expect Input {
+    output: Output {
+      value: input_value,
+      datum: InlineDatum(step_datum_data),
+      ..
+    },
+    ..
+  } = input
+
+  expect ct.StepDatum { fraud_prover, .. } = step_datum_data
+  
+  expect (mints_nft_policy_id, mints_nft_asset_name, -1) =
+    get_single_asset_from_value(tx_mint)
+  expect mints_nft_policy_id == computation_thread_token_policy_id
+  expect mints_nft_asset_name == inputs_nft_asset_name
+
+  expect fraud_prover |> has_signed(extra_signatories)
+
   True
 }
 
@@ -304,24 +370,6 @@ pub fn validate_ct_token_burn(
       tx.mint,
       ct_token_policy_id,
     )
-  True
-}
-
-// Relevant Cancel Redeemer Conditions: (2)
-pub fn validate_ada_return_to_fraud_prover(
-  own_input: Input,
-  index_output: Int,
-  fraud_prover: ByteArray,
-  tx: Transaction,
-) -> Bool {
-  // (2.1) Get the lovelace amount from our own validator's input (ADA inside the input of the fraud proof thread)
-  let lovelace = lovelace_of(own_input.output.value)
-  // (2.2) Verify an output is going to fraud prover address
-  expect Some(output_to_fraud_prover) = list.at(tx.outputs, index_output)
-  // (2.3) Validate output address matches fraud prover address
-  expect validate_output_to_fraud_prover(output_to_fraud_prover, fraud_prover)
-  // (2.4) Lovelace amount from our own validator's input to fraud prover
-  expect lovelace == lovelace_of(output_to_fraud_prover.value)
   True
 }
 

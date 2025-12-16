@@ -110,7 +110,7 @@ These redeemers should be handled in the following general pattern:
       Conditions:
         \begin{enumerate}
             \item Burn the computation thread token with the Cancel redeemer.
-            \item Return the ADA from the computation thread utxo to the fraud prover pub-key defined in the input datum.
+            \item The transaction must be signed by the fraud prover pub-key defined in the input datum.
             \item The transaction must \emph{not} mint or burn any other tokens.
         \end{enumerate}
 \end{description}

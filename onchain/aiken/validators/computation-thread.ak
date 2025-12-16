@@ -5,7 +5,7 @@ use aiken_design_patterns/linked_list/unordered as unordered
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/common/utils.{is_output_to_sc}
-use midgard/computation_thread.{StepDatum} as ct
+use midgard/computation_thread.{Cancel, Success, Init, MintRedeemer, StepDatum}
 use midgard/fraud_proof_catalogue as fpc
 use midgard/hub_oracle as hub
 use midgard/ledger_state
@@ -14,9 +14,9 @@ validator computation_thread_policy(
   fraud_proof_catalogue_script_hash: ByteArray,
   hub_oracle_script_hash: PolicyId,
 ) {
-  mint(redeemer: ct.Redeemer, policy_id: PolicyId, self: Transaction) {
+  mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
     when redeemer is {
-      ct.Mint {
+      Init {
         fraud_proof_set_node_ref_input_index,
         hub_oracle_ref_input_index,
         frauded_state_queue_node_ref_input_index,
@@ -87,14 +87,17 @@ validator computation_thread_policy(
           ),
         }
       }
-      ct.Success { token_to_burn_asset_name } -> and {
+      Success { token_to_burn_asset_name } -> and {
           quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
-      ct.Cancel { token_to_burn_asset_name } -> and {
-          quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
-          utils.quantity_of_policy_id(self.mint, policy_id) == 1,
-        }
+      Cancel { token_to_burn_asset_name } -> {
+        let burn_triplet = get_single_asset_from_value(self.mint)
+        let expected_burn_triplet = (policy_id, token_to_burn_asset_name, -1)
+        expect burn_triplet == expected_burn_triplet
+        // Done.
+        True
+      }
     }
   }
 

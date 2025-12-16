@@ -8,7 +8,7 @@ use aiken/crypto.{
 use aiken/interval.{Finite, Interval, NegativeInfinity, PositiveInfinity}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/stake_validator
-use cardano/address.{Address, Script}
+use cardano/address.{Address, Credential, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
@@ -121,6 +121,32 @@ pub fn get_single_asset_from_value(v: Value) -> (PolicyId, AssetName, Int) {
       |> dict.to_pairs
   expect [Pair(tn, qty)] = tn_qty_pairs |> dict.to_pairs
   (sym, tn, qty)
+}
+
+// Used to retrieve asset name from a value with a specific policy id
+pub fn get_asset_name_from_value_with_policy(
+  value: Value,
+  policy_id: PolicyId,
+) -> AssetName {
+  expect [Pair(asset_name, _)] =
+    value
+      |> assets.tokens(policy_id)
+      |> dict.to_pairs
+
+  asset_name
+}
+
+// Used to retrieve a singleton asset from a value with a specific policy id
+pub fn get_singleton_asset_with_policy(
+  value: Value,
+  policy_id: PolicyId,
+) -> Pair<AssetName, Int> {
+  expect [p] =
+    value
+      |> assets.tokens(policy_id)
+      |> dict.to_pairs
+
+  p
 }
 
 /// Expects exactly 2 tokens in the given `Value`, one of which must be ADA, and
@@ -251,30 +277,28 @@ pub fn get_authentic_output_datum_at_address_with_nft_at(
   output_datum_data
 }
 
-// Used to retrieve asset name from a value with a specific policy id
-pub fn get_asset_name_from_value_with_policy(
-  value: Value,
-  policy_id: PolicyId,
-) -> AssetName {
-  expect [Pair(asset_name, _)] =
-    value
-      |> assets.tokens(policy_id)
-      |> dict.to_pairs
+pub fn get_authentic_output_datum_at_credential_with_nft_at(
+  outputs: List<Output>,
+  expected_payment_credential: Credential,
+  nft_policy_id: PolicyId,
+  nft_asset_name: AssetName,
+  output_index: Int,
+) -> Data {
+  expect Some(Output {
+    address: Address { payment_credential, .. },
+    value: output_value,
+    datum: InlineDatum(output_datum_data),
+    reference_script: None,
+  }) = list.at(outputs, output_index)
 
-  asset_name
-}
+  expect expected_payment_credential == payment_credential
 
-// Used to retrieve a singleton asset from a value with a specific policy id
-pub fn get_singleton_asset_with_policy(
-  value: Value,
-  policy_id: PolicyId,
-) -> Pair<AssetName, Int> {
-  expect [p] =
-    value
-      |> assets.tokens(policy_id)
-      |> dict.to_pairs
+  let output_nft_triplet =
+    get_single_asset_from_value_apart_from_ada(output_value)
 
-  p
+  expect output_nft_triplet == (nft_policy_id, nft_asset_name, 1)
+
+  output_datum_data
 }
 
 // Verify a 32-byte hash (Blake2b-256)
