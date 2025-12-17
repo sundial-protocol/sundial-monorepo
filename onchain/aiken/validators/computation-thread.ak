@@ -5,12 +5,12 @@ use aiken_design_patterns/linked_list/unordered as unordered
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use midgard/common/utils.{is_output_to_sc}
-use midgard/computation_thread.{Cancel, Success, Init, MintRedeemer, StepDatum}
+use midgard/computation_thread.{Cancel, Init, MintRedeemer, StepDatum, Success}
 use midgard/fraud_proof_catalogue as fpc
 use midgard/hub_oracle as hub
 use midgard/ledger_state
 
-validator computation_thread_policy(
+validator mint(
   fraud_proof_catalogue_script_hash: ByteArray,
   hub_oracle_script_hash: PolicyId,
 ) {
@@ -92,6 +92,8 @@ validator computation_thread_policy(
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
       Cancel { token_to_burn_asset_name } -> {
+        // 1. Transaction must burn the specified token, without minting or
+        //    burning any other tokens.
         let burn_triplet = get_single_asset_from_value(self.mint)
         let expected_burn_triplet = (policy_id, token_to_burn_asset_name, -1)
         expect burn_triplet == expected_burn_triplet

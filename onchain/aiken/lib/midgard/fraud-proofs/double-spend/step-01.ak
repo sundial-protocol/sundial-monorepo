@@ -1,5 +1,5 @@
-use cardano/transaction.{TransactionId}
 use aiken/merkle_patricia_forestry as mpf
+use cardano/transaction.{TransactionId}
 
 // TODO: tx1_info_hash should have a more specific type
 // We can fix this when we start using the Plutarch MPT library

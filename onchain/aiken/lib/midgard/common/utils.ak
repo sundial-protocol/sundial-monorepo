@@ -201,6 +201,32 @@ pub fn get_authentic_input_with_nft_at(
   found_input
 }
 
+/// Similar to [`get_authentic_input_with_nft_at`](#get_authentic_input_with_nft_at),
+/// but only returns the datum data. Useful for avoiding destructuring the
+/// input an extra time when only the datum is needed.
+pub fn get_authentic_input_datum_with_nft_at(
+  inputs: List<Input>,
+  nft_policy_id: PolicyId,
+  nft_asset_name: AssetName,
+  input_index: Int,
+) -> Data {
+  expect Some(Input {
+    output: Output {
+      value: input_value,
+      datum: InlineDatum(input_datum_data),
+      ..
+    },
+    ..
+  }) = list.at(inputs, input_index)
+
+  let input_nft_triplet =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect input_nft_triplet == (nft_policy_id, nft_asset_name, 1)
+
+  input_datum_data
+}
+
 /// For state UTxOs of validators which their NFTs have policy IDs equal to
 /// their payment credentials.
 pub fn get_authentic_input_of(

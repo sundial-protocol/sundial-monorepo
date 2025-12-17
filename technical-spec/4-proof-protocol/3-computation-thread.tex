@@ -53,7 +53,12 @@ Redeemers:
     \item[Success.] Terminate the state machine normally from the final spending validator in the computation.
       There are no conditions because this redeemer relies on the spending validator to burn the token.
     \item[Cancel.] Terminate the state machine exceptionally from any spending validator in the computation.
-      There are no conditions because this redeemer relies on the spending validator to burn the token.
+      Conditions:
+        \begin{enumerate}
+            \item Let \code{burning\_computation\_thread\_token} be the asset name of the computation thread being canceled, provided via the redeemer.
+            \item The transaction must burn the computation thread token with asset name \code{burning\_computation\_thread\_token}.
+            \item The transaction must \emph{not} mint or burn any other tokens.
+        \end{enumerate}
 \end{description}
 
 \subsection{Spending validators}
@@ -109,7 +114,7 @@ These redeemers should be handled in the following general pattern:
     \item[Cancel.] Cancel the computation.
       Conditions:
         \begin{enumerate}
-            \item Burn the computation thread token with the Cancel redeemer.
+            \item Validate the `Cancel` redeemer from the computation thread policy is invoked (this in turn validates the burning of the specified computation thread token).
             \item The transaction must be signed by the fraud prover pub-key defined in the input datum.
             \item The transaction must \emph{not} mint or burn any other tokens.
         \end{enumerate}

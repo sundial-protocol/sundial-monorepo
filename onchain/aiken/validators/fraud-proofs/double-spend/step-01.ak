@@ -10,10 +10,8 @@ use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
+use midgard/common/utils.{plutarch_phas}
 use midgard/computation_thread.{StepDatum}
-use midgard/common/utils.{
-  plutarch_phas,
-}
 use midgard/fraud_proofs/common.{
   MembershipProofInputs, get_singleton_ct_token, get_tx_root_validate_block_hash,
   handle_cancel, validate_step_output,
@@ -91,14 +89,15 @@ validator main(
 
         // -------- Double spend validation specific logic START --------
         // Membership proof for tx1
-        expect plutarch_phas(
-          mpf_root: extracted_tx_root,
-          key: bad_tx1_hash,
-          value: bad_tx1_info_hash,
-          membership_proof: bad_tx1_to_root_proof_path,
-          redeemers: redeemers,
-          withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
-        )
+        expect
+          plutarch_phas(
+            mpf_root: extracted_tx_root,
+            key: bad_tx1_hash,
+            value: bad_tx1_info_hash,
+            membership_proof: bad_tx1_to_root_proof_path,
+            redeemers: redeemers,
+            withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
+          )
 
         // -------- Double spend validation specific logic END --------
         let step_1_state = Step1State { verified_tx1_hash: bad_tx1_hash }

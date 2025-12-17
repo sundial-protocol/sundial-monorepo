@@ -8,15 +8,14 @@ use aiken_design_patterns/tx_level_minter
 use cardano/address.{Script, VerificationKey}
 use cardano/assets.{PolicyId, Value}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,
+  InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptPurpose,
   Transaction,
 }
 use midgard/common/utils.{
-  get_singleton_asset_with_policy, plutarch_phas,
-  get_authentic_output_datum_at_credential_with_nft_at,
-  get_single_asset_from_value,
-  get_single_asset_from_value_apart_from_ada,
-  has_signed,
+  get_authentic_input_datum_with_nft_at,
+  get_authentic_output_datum_at_credential_with_nft_at, get_redeemer_at,
+  get_single_asset_from_value, get_single_asset_from_value_apart_from_ada,
+  get_singleton_asset_with_policy, has_signed, plutarch_phas,
 }
 use midgard/computation_thread as ct
 use midgard/ledger_state.{Header}
@@ -224,13 +223,14 @@ pub fn validate_step_output(
 ) -> Bool {
   // (5) Validate output goes to next validator
   // (6) Validate CT token forwarding and no other minting/burning
-  let output_datum = get_authentic_output_datum_at_credential_with_nft_at(
-    outputs,
-    Script(next_validator_hash),
-    ct_token_policy_id,
-    ct_token_asset_name,
-    output_index,
-  )
+  let output_datum =
+    get_authentic_output_datum_at_credential_with_nft_at(
+      outputs,
+      Script(next_validator_hash),
+      ct_token_policy_id,
+      ct_token_asset_name,
+      output_index,
+    )
 
   // (3) Validate fraud prover field matches
   expect parsed_output_datum: ct.StepDatum = output_datum
@@ -283,101 +283,46 @@ pub fn validate_final_step_output(
   True
 }
 
-// ------------ ABSTRACTED FUNCTIONS FOR ALL CANCEL REDEEMERS ------------
-// -------------- REDEEMER: CANCEL -----------------
-// (1) Burn the computation thread token 
-// (2) Return the ADA from the double spend computation thread utxo to the fraud prover pub-key defined in the input datum
-// (3) Transaction must not mint or burn any other tokens
-
-// Umbrella Cancel Redeemer function
-pub fn handle_cancel(
+pub fn cancel(
   computation_thread_token_policy_id: PolicyId,
   input_index: Int,
   mint_redeemer_index: Int,
-  own_out_ref: OutputReference,
   inputs: List<Input>,
-  outputs: List<Output>,
-  tx_mint: Value,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
   extra_signatories: List<VerificationKeyHash>,
 ) -> Bool {
-  let input, output <- singular_utxo_indexer.one_to_one(
-    input_index,
-    output_index,
-    own_out_ref,
-    inputs,
-    outputs,
-    True,
-  )
-
-  expect (inputs_nft_policy_id, inputs_nft_asset_name, 1) =
-    get_single_asset_from_value_apart_from_ada(
-      input_value,
+  // 1. Validate the `Cancel` redeemer from the computation thread policy is
+  //    invoked (this in turn validates the burning of the specified computation
+  //    thread token).
+  let mint_redeemer_data =
+    get_redeemer_at(
+      redeemers: redeemers,
+      expected_purpose: Mint(computation_thread_token_policy_id),
+      redeemer_index: mint_redeemer_index,
     )
-  expect inputs_nft_policy_id == computation_thread_token_policy_id
+  expect ct.Cancel { token_to_burn_asset_name: redeemer_burning_asset_name } =
+    mint_redeemer_data
 
-  let mint_redeemer_data, tn_qty_dict <- tx_level_minter.validate_mint(
-    computation_thread_token_policy_id,
-    tx_mint,
-    redeemers,
-    mint_redeemer_index,
-  )
-
-  expect Cancel { burnt_asset_name } = mint_redeemer_data
-
-  expect [(burnt_asset_name, -1)] = tn_qty_dict |> dict.to_list()
-
-  let input = get_authentic_input_with_nft_at(
-    inputs: inputs,
-    nft_policy_id: computation_thread_token_policy_id,
-    nft_asset_name: burnt_asset_name,
-    input_index: input_index,
-  )
-
-  expect Input {
-    output: Output {
-      value: input_value,
-      datum: InlineDatum(step_datum_data),
-      ..
-    },
-    ..
-  } = input
-
+  // 2. Transaction must be signed by the fraud prover.
+  let step_datum_data =
+    get_authentic_input_datum_with_nft_at(
+      inputs: inputs,
+      nft_policy_id: computation_thread_token_policy_id,
+      nft_asset_name: redeemer_burning_asset_name,
+      input_index: input_index,
+    )
   expect ct.StepDatum { fraud_prover, .. } = step_datum_data
-  
-  expect (mints_nft_policy_id, mints_nft_asset_name, -1) =
-    get_single_asset_from_value(tx_mint)
-  expect mints_nft_policy_id == computation_thread_token_policy_id
-  expect mints_nft_asset_name == inputs_nft_asset_name
-
   expect fraud_prover |> has_signed(extra_signatories)
 
+  // Done.
   True
 }
 
-// Relevant Cancel Redeemer Conditions: (1), (3)
-pub fn validate_ct_token_burn(
-  own_input: Input,
-  ct_token_policy_id: PolicyId,
-  tx: Transaction,
-) -> Bool {
-  // (1.2) Get computation thread token asset name in output
-  expect Pair(ct_token_asset_name, 1) =
-    get_singleton_asset_with_policy(own_input.output.value, ct_token_policy_id)
-  // (1.3) Burn the computation thread token, (3) Transaction must not mint or burn any other tokens
-  expect
-    Pair(ct_token_asset_name, -1) == get_singleton_asset_with_policy(
-      tx.mint,
-      ct_token_policy_id,
-    )
-  True
-}
+// ## Helper Functions
 
-// -------------- HELPER FUNCTIONS -----------------
-
-// Get computation thread token from input
-// This is used by all redeemers to identify the computation thread token passed
-// in from the previous step
+/// Get computation thread token from input
+/// This is used by all redeemers to identify the computation thread token passed
+/// in from the previous step
 pub fn get_singleton_ct_token(
   own_input: Input,
   ct_token_policy_id: PolicyId,
