@@ -1,6 +1,8 @@
-pub type StepDatum {
-  fraud_prover: ByteArray,
-  data: Data,
+use aiken/crypto.{VerificationKeyHash}
+
+pub type StepDatum<a> {
+  fraud_prover: VerificationKeyHash,
+  data: Option<a>,
 }
 
 pub type MintRedeemer {
@@ -9,7 +11,7 @@ pub type MintRedeemer {
     hub_oracle_ref_input_index: Int,
     frauded_state_queue_node_ref_input_index: Int,
     output_to_init_step_index: Int,
-    fraud_prover_hash: ByteArray,
+    fraud_prover_hash: VerificationKeyHash,
     fraud_proof_catalogue_asset_name: ByteArray,
     state_queue_asset_name: ByteArray,
   }

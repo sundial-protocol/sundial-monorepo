@@ -182,6 +182,93 @@ pub fn get_authentic_input_with_policy_at(
   found_input
 }
 
+/// Similar to [`get_authentic_input_with_policy_at`](#get_authentic_input_with_policy_at),
+/// but only returns the NFT's asset name. Useful for spending validators which
+/// already have access to the datum.
+pub fn get_authentic_input_asset_name_with_policy_at(
+  inputs: List<Input>,
+  nft_policy_id: PolicyId,
+  input_index: Int,
+) -> AssetName {
+  expect Some(Input { output: Output { value: input_value, .. }, .. }) =
+    list.at(inputs, input_index)
+
+  expect (input_nft_policy_id, input_nft_asset_name, 1) =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect input_nft_policy_id == nft_policy_id
+
+  input_nft_asset_name
+}
+
+pub fn get_authentic_input_and_asset_name_with_policy_at(
+  inputs: List<Input>,
+  nft_policy_id: PolicyId,
+  input_index: Int,
+  return: fn(Input, AssetName) -> result,
+) -> result {
+  expect Some(
+    Input { output: Output { value: input_value, .. }, .. } as found_input,
+  ) = list.at(inputs, input_index)
+
+  expect (input_nft_policy_id, input_nft_asset_name, 1) =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect input_nft_policy_id == nft_policy_id
+
+  return(found_input, input_nft_asset_name)
+}
+
+/// Similar to [`get_authentic_input_with_policy_at`](#get_authentic_input_with_policy_at),
+/// but only returns the datum data. Useful for avoiding destructuring the
+/// input an extra time when only the datum is needed.
+pub fn get_authentic_input_datum_with_policy_at(
+  inputs: List<Input>,
+  nft_policy_id: PolicyId,
+  input_index: Int,
+) -> Data {
+  expect Some(Input {
+    output: Output {
+      value: input_value,
+      datum: InlineDatum(input_datum_data),
+      ..
+    },
+    ..
+  }) = list.at(inputs, input_index)
+
+  expect (input_nft_policy_id, _, 1) =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect input_nft_policy_id == nft_policy_id
+
+  input_datum_data
+}
+
+/// Similar to [`get_authentic_input_datum_with_policy_at`](#get_authentic_input_datum_with_policy_at),
+/// with additional provision of NFT's asset name.
+pub fn get_authentic_input_datum_and_asset_name_with_policy_at(
+  inputs: List<Input>,
+  nft_policy_id: PolicyId,
+  input_index: Int,
+  return: fn(AssetName, Data) -> result,
+) -> result {
+  expect Some(Input {
+    output: Output {
+      value: input_value,
+      datum: InlineDatum(input_datum_data),
+      ..
+    },
+    ..
+  }) = list.at(inputs, input_index)
+
+  expect (input_nft_policy_id, input_nft_asset_name, 1) =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect input_nft_policy_id == nft_policy_id
+
+  return(input_nft_asset_name, input_datum_data)
+}
+
 /// For state UTxOs with specific NFTs. Note that the address is not checked.
 pub fn get_authentic_input_with_nft_at(
   inputs: List<Input>,

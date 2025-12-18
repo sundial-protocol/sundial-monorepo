@@ -1,22 +1,26 @@
 use aiken/merkle_patricia_forestry as mpf
 use cardano/transaction.{TransactionId}
+use midgard/computation_thread as ct
+use midgard/ledger_state.{MidgardTxBodyCompact}
 
-// TODO: tx1_info_hash should have a more specific type
-// We can fix this when we start using the Plutarch MPT library
-pub type StepRedeemer {
-  Cancel { input_index: Int, output_index: Int }
+pub type State {
+  verified_tx1_body: MidgardTxBodyCompact,
+}
+
+pub type Datum =
+  ct.StepDatum<State>
+
+pub type SpendRedeemer {
+  Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int }
   Continue {
     input_index: Int,
     output_index: Int,
     hub_ref_input_index: Int,
     bad_state_queue_node_ref_input_index: Int,
-    bad_tx1_hash: TransactionId,
-    bad_tx1_info_hash: ByteArray,
-    bad_tx1_to_root_proof_path: mpf.Proof,
+    bad_tx_id: TransactionId,
+    bad_tx_body: MidgardTxBodyCompact,
+    bad_tx: MidgardTxBodyCompact,
+    bad_tx_membership_proof: mpf.Proof,
     inclusion_proof_script_withdraw_redeemer_index: Int,
   }
-}
-
-pub type StepState {
-  verified_tx1_hash: TransactionId,
 }

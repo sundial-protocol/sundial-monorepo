@@ -4,7 +4,7 @@ use aiken_design_patterns/linked_list/ordered as ordered
 use aiken_design_patterns/linked_list/unordered as unordered
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use midgard/common/utils.{is_output_to_sc}
+use midgard/common/utils.{has_signed, is_output_to_sc}
 use midgard/computation_thread.{Cancel, Init, MintRedeemer, StepDatum, Success}
 use midgard/fraud_proof_catalogue as fpc
 use midgard/hub_oracle as hub
@@ -85,6 +85,7 @@ validator mint(
             policy_id,
             token_to_mint_asset_name,
           ),
+          fraud_prover_hash |> has_signed(self.extra_signatories),
         }
       }
       Success { token_to_burn_asset_name } -> and {
@@ -140,7 +141,7 @@ fn validate_output_to_initial_fraud_proof_step(
   token_asset_name: ByteArray,
 ) {
   expect InlineDatum(outputDatum) = output_to_init_step.datum
-  expect parsedDatum: StepDatum = outputDatum
+  expect parsedDatum: StepDatum<Data> = outputDatum
 
   let newDatum = StepDatum { fraud_prover: fraud_prover_hash, data: None }
 

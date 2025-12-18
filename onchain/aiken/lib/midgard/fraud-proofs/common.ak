@@ -11,6 +11,7 @@ use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptPurpose,
   Transaction,
 }
+use midgard/common/constants.{fraud_category_id_byte_count}
 use midgard/common/utils.{
   get_authentic_input_datum_with_nft_at,
   get_authentic_output_datum_at_credential_with_nft_at, get_redeemer_at,
@@ -91,7 +92,7 @@ pub fn get_tx_root_validate_block_hash(
     )
 
   // Get CT token and check match with the block hash
-  expect drop(ct_token_asset_name, n: 4) == block_hash
+  expect drop(ct_token_asset_name, fraud_category_id_byte_count) == block_hash
 
   parsed_state_queue_datum.transactions_root
 }
@@ -214,12 +215,12 @@ pub fn validate_exclusion_utxo_proof(
 // Relevant to (3), (4), (5), (6)
 pub fn validate_step_output(
   outputs: List<Output>,
-  output_index: Int,
   next_validator_hash: ScriptHash,
   ct_token_policy_id: PolicyId,
   ct_token_asset_name: ByteArray,
-  step_datum: ct.StepDatum,
-  expected_output_datum: ct.StepDatum,
+  fraud_prover: VerificationKeyHash,
+  expected_output_state: Data,
+  output_index: Int,
 ) -> Bool {
   // (5) Validate output goes to next validator
   // (6) Validate CT token forwarding and no other minting/burning
@@ -232,12 +233,10 @@ pub fn validate_step_output(
       output_index,
     )
 
-  // (3) Validate fraud prover field matches
-  expect parsed_output_datum: ct.StepDatum = output_datum
-  expect parsed_output_datum.fraud_prover == step_datum.fraud_prover
+  let expected_output_datum: Data =
+    ct.StepDatum { fraud_prover, data: Some(expected_output_state) }
 
-  // (4) Validate state transition
-  expect parsed_output_datum.data == expected_output_datum.data
+  expect expected_output_datum == output_datum
 
   True
 }
@@ -287,10 +286,9 @@ pub fn cancel(
   computation_thread_token_policy_id: PolicyId,
   input_index: Int,
   mint_redeemer_index: Int,
-  inputs: List<Input>,
-  redeemers: Pairs<ScriptPurpose, Redeemer>,
-  extra_signatories: List<VerificationKeyHash>,
+  tx: Transaction,
 ) -> Bool {
+  let Transaction { inputs, redeemers, extra_signatories, .. } = tx
   // 1. Validate the `Cancel` redeemer from the computation thread policy is
   //    invoked (this in turn validates the burning of the specified computation
   //    thread token).

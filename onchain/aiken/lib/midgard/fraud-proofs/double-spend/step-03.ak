@@ -1,7 +1,16 @@
 use cardano/transaction.{OutputReference, TransactionId}
+use midgard/computation_thread as ct
 use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact}
 
-pub type StepRedeemer {
+pub type State {
+  verified_tx1_hash: TransactionId,
+  verified_tx2_hash: TransactionId,
+}
+
+pub type Datum =
+  ct.StepDatum<State>
+
+pub type SpendRedeemer {
   Cancel { index_output: Int }
   Continue {
     fraudulent_input: Data,
@@ -13,10 +22,4 @@ pub type StepRedeemer {
     tx2: MidgardTxCompact,
     index_output: Int,
   }
-}
-
-pub type StepState {
-  verified_tx1_hash: TransactionId,
-  verified_tx2_hash: TransactionId,
-  verified_common_input: OutputReference,
 }
