@@ -1,3 +1,19 @@
+//// ## Double Spend Fraud Proof
+////
+//// Proves 2 unique transactions exist such that both spend the same UTxO.
+////
+//// First step's contract is responsible for verifying inclusion of the two
+//// transactions in a Midgard block, and passing them to the second step's
+//// contract.
+////
+//// This is meant to take place in two transactions:
+//// 1. First transaction spends the initialized fraud proof UTxO (which has no
+////    `data`) and reproduces the UTxO at own address with `data` containing
+////    the first verified bad transaction's body.
+//// 2. Second transaction spends the UTxO produced in the first transaction,
+////    and produces the UTxO at the next step's script address with `data`
+////    containing both verified bad transactions' bodies.
+
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
@@ -15,17 +31,6 @@ use midgard/fraud_proofs/double_spend/step_01.{
 use midgard/fraud_proofs/double_spend/step_02
 use midgard/hub_oracle as hub
 
-// ----------------- DOUBLE SPEND FRAUD PROOF: DEFINITION --------------------------
-// Proves membership Merkle proofs for 2 unique txs which spends the same input UTxO
-
-// Transaction1 (tx1):
-//   Inputs (tx_in1): [UTxO_A]
-//   Outputs (tx_out1): [UTxO_B, UTxO_C]
-
-// Transaction2 (tx2):
-//   Inputs (tx_in2): [UTxO_A]  <- Same UTxO as tx1
-//   Outputs (tx_out2): [UTxO_D]
-
 validator main(
   step_02_validator_script_hash: ScriptHash,
   computation_thread_token_policy_id: PolicyId,
@@ -37,9 +42,6 @@ validator main(
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    // expect Some(own_input) =
-    //   list.find(tx.inputs, fn(a_input) { a_input.output_reference == input })
-
     when redeemer is {
       Cancel { input_index } ->
         cancel(
@@ -48,7 +50,6 @@ validator main(
           computation_thread_mint_redeemer_index,
           tx,
         )
-      // Step 1: Membership proof for tx1
       Continue {
         input_index,
         output_index,
@@ -141,10 +142,11 @@ validator main(
           }
           Some(step_1_state) -> {
             // 5b. The UTxO must be produced at next step's script hash with the
-            //     verified first bad transaction included in its datum.
+            //     verified bad transactions included in its datum.
+            let tx1_body = step_1_state.verified_tx1_body
             let expected_output_state: Data =
               step_02.State {
-                verified_tx1_body: step_1_state.verified_tx1_body,
+                verified_tx1_body: tx1_body,
                 verified_tx2_body: bad_tx,
               }
             expect
@@ -157,6 +159,9 @@ validator main(
                 expected_output_state,
                 output_index,
               )
+
+            // 6b. The two transactions must be different.
+            expect tx1_body != bad_tx
 
             // Done.
             True
