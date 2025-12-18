@@ -97,6 +97,8 @@ validator main(
             computation_thread_token_policy_id,
             input_index,
           )
+        let Input { output_reference, output: own_inputs_output } = own_input
+        expect output_reference == own_out_ref
         // TODO: Do we need the computation thread token to be prefixed with
         //       the fraud category ID?
         expect
@@ -130,7 +132,7 @@ validator main(
 
         when m_data is {
           None -> {
-            expect Script(own_script_hash) = input.address.payment_credential
+            expect Script(own_script_hash) = own_inputs_output.address.payment_credential
 
             // 6a. The UTxO must be produced at own script hash with the
             //     verified first bad transaction ID and its inputs included in

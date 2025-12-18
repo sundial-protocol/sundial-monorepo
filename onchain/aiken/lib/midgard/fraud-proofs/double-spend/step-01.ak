@@ -1,13 +1,12 @@
 use aiken/merkle_patricia_forestry as mpf
 use cardano/transaction.{TransactionId}
-use midgard/common/types.{H32}
+use midgard/common/types.{MerkleRoot}
 use midgard/computation_thread as ct
 use midgard/ledger_state.{MidgardTxBodyCompact}
 
-// TODO: Use `MPT<Key, Value>` instead of linear hash.
 pub type State {
   verified_tx1_id: TransactionId,
-  verified_tx1_inputs_root: H32<List<OutputReference>>,
+  verified_tx1_inputs_root: MerkleRoot,
 }
 
 pub type Datum =
