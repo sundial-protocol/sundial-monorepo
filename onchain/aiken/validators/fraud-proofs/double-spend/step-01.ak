@@ -61,6 +61,11 @@ validator main(
         bad_tx_membership_proof,
         inclusion_proof_script_withdraw_redeemer_index,
       } -> {
+        // 1. Verify authenticity of the provided bad tx against its ID.
+        let bad_tx_id_data: Data = bad_tx_id
+        let bad_tx_data: Data = bad_tx
+        expect verify_hash_32(data: bad_tx_data, data_hash: bad_tx_id_data)
+
         let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
           tx
 
@@ -68,11 +73,11 @@ validator main(
 
         let ct.StepDatum { data: m_data, fraud_prover }: Datum = step_datum
 
-        // 1. Hub oracle must be provided as a reference input.
+        // 2. Hub oracle must be provided as a reference input.
         let hub.Datum { state_queue, .. } =
           hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-        // 2. The asset name of the computation thread token must match the
+        // 3. The asset name of the computation thread token must match the
         //    state queue node key (after dropping the fraud category ID prefix).
         let
           state_queue_datum,
@@ -100,7 +105,7 @@ validator main(
             fraud_category_id_byte_count,
           )
 
-        // 3. Specified bad transaction must be proven to be included in the
+        // 4. Specified bad transaction must be proven to be included in the
         //    referenced state queue node.
         let bad_tx_data: Data = bad_tx
         expect
@@ -113,19 +118,28 @@ validator main(
             withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
           )
 
-        // 4. Provided transaction body must match the hash retrieved from
+        // 5. Provided transaction body must match the hash retrieved from
         //    `bad_tx`.
-        let bad_tx_body: Data = bad_tx_body
-        expect utils.verify_hash_32(data: bad_tx_body, data_hash: bad_tx.body)
+        let bad_tx_body_data: Data = bad_tx_body
+        let bad_tx_body_hash: Data = bad_tx.body
+        expect
+          utils.verify_hash_32(
+            data: bad_tx_body_data,
+            data_hash: bad_tx_body_hash,
+          )
 
         when m_data is {
           None -> {
             expect Script(own_script_hash) = input.address.payment_credential
 
-            // 5a. The UTxO must be produced at own script hash with the
-            //     verified first bad transaction included in its datum.
+            // 6a. The UTxO must be produced at own script hash with the
+            //     verified first bad transaction ID and its inputs included in
+            //     the `data` field of its `StepDatum`.
             let expected_output_state: Data =
-              State { verified_tx1_body: bad_tx }
+              State {
+                verified_tx1_id: bad_tx_id,
+                verified_tx1_inputs_root: bad_tx_body.spend_inputs,
+              }
             expect
               validate_step_output(
                 outputs,
@@ -141,13 +155,14 @@ validator main(
             True
           }
           Some(step_1_state) -> {
-            // 5b. The UTxO must be produced at next step's script hash with the
-            //     verified bad transactions included in its datum.
-            let tx1_body = step_1_state.verified_tx1_body
+            // 6b. The UTxO must be produced at next step's script hash with the
+            //     verified bad transactions' inputs included in its datum.
+            let State { verified_tx1_id, verified_tx1_inputs_root } =
+              step_1_state
             let expected_output_state: Data =
               step_02.State {
-                verified_tx1_body: tx1_body,
-                verified_tx2_body: bad_tx,
+                verified_tx1_inputs_root,
+                verified_tx2_inputs_root: bad_tx_body.spend_inputs,
               }
             expect
               validate_step_output(
@@ -160,8 +175,8 @@ validator main(
                 output_index,
               )
 
-            // 6b. The two transactions must be different.
-            expect tx1_body != bad_tx
+            // 7b. The two transactions must be different.
+            expect verified_tx1_id != bad_tx_id
 
             // Done.
             True
