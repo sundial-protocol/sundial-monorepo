@@ -5,18 +5,17 @@ use aiken/primitive/bytearray.{drop}
 use aiken_design_patterns/linked_list/unordered as unordered
 use aiken_design_patterns/singular_utxo_indexer
 use aiken_design_patterns/tx_level_minter
-use cardano/address.{Script, VerificationKey}
-use cardano/assets.{PolicyId, Value}
+use cardano/address.{Address, Script, VerificationKey}
+use cardano/assets.{AssetName, PolicyId, Value}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptPurpose,
   Transaction,
 }
 use midgard/common/constants.{fraud_category_id_byte_count}
 use midgard/common/utils.{
-  get_authentic_input_datum_with_nft_at,
-  get_authentic_output_datum_at_credential_with_nft_at, get_redeemer_at,
-  get_single_asset_from_value, get_single_asset_from_value_apart_from_ada,
-  get_singleton_asset_with_policy, has_signed, plutarch_phas,
+  get_authentic_input_datum_with_nft_at, get_redeemer_at,
+  get_single_asset_from_value_apart_from_ada, get_singleton_asset_with_policy,
+  has_signed, plutarch_phas,
 }
 use midgard/computation_thread as ct
 use midgard/ledger_state.{Header}
@@ -211,32 +210,60 @@ pub fn validate_exclusion_utxo_proof(
   True
 }
 
+pub fn authenticate_input_and_get_info(
+  input: Input,
+  ct_token_policy_id: PolicyId,
+  return: fn(ScriptHash, AssetName, VerificationKeyHash, Option<Data>) -> result,
+) -> result {
+  expect Input {
+    output: Output {
+      address: Address { payment_credential: Script(input_script_hash), .. },
+      value,
+      datum: InlineDatum(input_datum_data),
+      ..
+    },
+    ..
+  } = input
+  let (input_nft_policy_id, input_nft_asset_name, input_nft_qty) =
+    get_single_asset_from_value_apart_from_ada(value)
+  expect input_nft_policy_id == ct_token_policy_id
+  expect input_nft_qty == 1
+  expect ct.StepDatum { fraud_prover, data: m_input_state }: ct.StepDatum<Data> =
+    input_datum_data
+  return(input_script_hash, input_nft_asset_name, fraud_prover, m_input_state)
+}
+
 // Common validation for any step's output state (except final step)
 // Relevant to (3), (4), (5), (6)
 pub fn validate_step_output(
-  outputs: List<Output>,
+  output: Output,
   next_validator_hash: ScriptHash,
   ct_token_policy_id: PolicyId,
   ct_token_asset_name: ByteArray,
   fraud_prover: VerificationKeyHash,
   expected_output_state: Data,
-  output_index: Int,
 ) -> Bool {
-  // (5) Validate output goes to next validator
-  // (6) Validate CT token forwarding and no other minting/burning
-  let output_datum =
-    get_authentic_output_datum_at_credential_with_nft_at(
-      outputs,
-      Script(next_validator_hash),
-      ct_token_policy_id,
-      ct_token_asset_name,
-      output_index,
-    )
+  // 1. The produced output must go to the next validator with an inline datum
+  //    and no reference script.
+  expect Output {
+    address: Address { payment_credential: Script(output_script_hash), .. },
+    value,
+    datum: InlineDatum(output_datum_data),
+    reference_script: None,
+  } = output
+  expect output_script_hash == next_validator_hash
 
+  // 2. There must be exactly one of the provided computation thread token in
+  //    the output value.
+  let expected_token_triplet = (ct_token_policy_id, ct_token_asset_name, 1)
+  let output_token_triplet = get_single_asset_from_value_apart_from_ada(value)
+  expect output_token_triplet == expected_token_triplet
+
+  // 3. The output `StepDatum` must carry over the fraud prover, and the
+  //    expected state.
   let expected_output_datum: Data =
     ct.StepDatum { fraud_prover, data: Some(expected_output_state) }
-
-  expect expected_output_datum == output_datum
+  expect expected_output_datum == output_datum_data
 
   True
 }

@@ -22,8 +22,7 @@ use midgard/common/constants.{fraud_category_id_byte_count}
 use midgard/common/utils.{plutarch_phas}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
-  MembershipProofInputs, cancel, get_singleton_ct_token,
-  get_tx_root_validate_block_hash, validate_step_output,
+  authenticate_input_and_get_info, cancel, validate_step_output,
 }
 use midgard/fraud_proofs/double_spend/step_01.{
   Cancel, Continue, Datum, SpendRedeemer,
@@ -77,8 +76,6 @@ validator main(
         let hub.Datum { state_queue, .. } =
           hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
 
-        // 3. The asset name of the computation thread token must match the
-        //    state queue node key (after dropping the fraud category ID prefix).
         let
           state_queue_datum,
           state_queue_node_key,
@@ -88,19 +85,35 @@ validator main(
             state_queue_policy,
             state_queue_node_ref_input_index,
           )
+
         let
           own_input,
-          computation_thread_token_asset_name,
+          continued_output,
         <-
-          utils.get_authentic_input_and_asset_name_with_policy_at(
-            inputs,
-            computation_thread_token_policy_id,
+          singular_utxo_indexer.one_to_one(
             input_index,
+            output_index,
+            own_out_ref,
+            inputs,
+            outputs,
+            // Double satisfaction prevented by validating the output UTxO carries
+            // the same computation thread token as the input's.
+            True,
           )
-        let Input { output_reference, output: own_inputs_output } = own_input
-        expect output_reference == own_out_ref
-        // TODO: Do we need the computation thread token to be prefixed with
-        //       the fraud category ID?
+
+        let
+          own_script_hash,
+          computation_thread_token_asset_name,
+          fraud_prover,
+          m_state_data,
+        <-
+          authenticate_input_and_get_info(
+            own_input,
+            computation_thread_token_policy_id,
+          )
+
+        // 3. The asset name of the computation thread token must match the
+        //    state queue node key (after dropping the fraud category ID prefix).
         expect
           state_queue_node_key == bytearray.drop(
             computation_thread_token_asset_name,
@@ -129,11 +142,8 @@ validator main(
             data: bad_tx_body_data,
             data_hash: bad_tx_body_hash,
           )
-
         when m_data is {
           None -> {
-            expect Script(own_script_hash) = own_inputs_output.address.payment_credential
-
             // 6a. The UTxO must be produced at own script hash with the
             //     verified first bad transaction ID and its inputs included in
             //     the `data` field of its `StepDatum`.
@@ -144,7 +154,7 @@ validator main(
               }
             expect
               validate_step_output(
-                outputs,
+                continued_output,
                 own_script_hash,
                 computation_thread_token_policy_id,
                 computation_thread_token_asset_name,
@@ -168,13 +178,12 @@ validator main(
               }
             expect
               validate_step_output(
-                outputs,
+                continued_output,
                 step_02_validator_script_hash,
                 computation_thread_token_policy_id,
                 computation_thread_token_asset_name,
                 fraud_prover,
                 expected_output_state,
-                output_index,
               )
 
             // 7b. The two transactions must be different.

@@ -390,30 +390,6 @@ pub fn get_authentic_output_datum_at_address_with_nft_at(
   output_datum_data
 }
 
-pub fn get_authentic_output_datum_at_credential_with_nft_at(
-  outputs: List<Output>,
-  expected_payment_credential: Credential,
-  nft_policy_id: PolicyId,
-  nft_asset_name: AssetName,
-  output_index: Int,
-) -> Data {
-  expect Some(Output {
-    address: Address { payment_credential, .. },
-    value: output_value,
-    datum: InlineDatum(output_datum_data),
-    reference_script: None,
-  }) = list.at(outputs, output_index)
-
-  expect expected_payment_credential == payment_credential
-
-  let output_nft_triplet =
-    get_single_asset_from_value_apart_from_ada(output_value)
-
-  expect output_nft_triplet == (nft_policy_id, nft_asset_name, 1)
-
-  output_datum_data
-}
-
 // Verify a 32-byte hash (Blake2b-256)
 pub fn verify_hash_32(data: Data, data_hash: H32<Data>) {
   expect blake2b_256(cbor.serialise(data)) == data_hash
