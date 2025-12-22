@@ -96,16 +96,14 @@ validator main(
             own_out_ref,
             inputs,
             outputs,
-            // Double satisfaction prevented by validating the output UTxO carries
-            // the same computation thread token as the input's.
+            // Double satisfaction prevented by validating the output UTxO
+            // carries the same computation thread token as the input's.
             True,
           )
 
         let
           own_script_hash,
           computation_thread_token_asset_name,
-          fraud_prover,
-          m_state_data,
         <-
           authenticate_input_and_get_info(
             own_input,

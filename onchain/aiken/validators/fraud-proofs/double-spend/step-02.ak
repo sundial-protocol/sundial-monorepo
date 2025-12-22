@@ -1,27 +1,22 @@
-use aiken/builtin
-use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
-use midgard/common/utils.{verify_hash_32}
+use midgard/common/utils.{plutarch_phas, verify_hash_32}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proofs/common.{
-  get_singleton_ct_token, handle_cancel, validate_step_output,
-} as fraud_proof_utils
-use midgard/fraud_proofs/double_spend/step_02
-use midgard/fraud_proofs/double_spend/step_03.{
+use midgard/fraud_proofs/common.{cancel, validate_step_output}
+use midgard/fraud_proofs/double_spend/step_02.{
   Cancel, Continue, Datum, SpendRedeemer, State,
 }
-use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact}
+use midgard/fraud_proofs/double_spend/step_03
 
 validator main(
-  double_spend_step_04_validator_script_hash: ScriptHash,
-  ct_token_policy_id: PolicyId,
+  step_03_validator_script_hash: ScriptHash,
+  computation_thread_token_policy_id: PolicyId,
 ) {
   spend(
     datum: Option<StepDatum>,
     redeemer: SpendRedeemer,
-    input: OutputReference,
+    own_out_ref: OutputReference,
     tx: Transaction,
   ) {
     when redeemer is {
@@ -38,63 +33,68 @@ validator main(
         output_index,
         double_spent_input_key,
         double_spent_input_value,
-        tx1_input_membership_proof,
-        tx2_input_membership_proof,
+        input_membership_proof,
       } -> {
-        let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
-          tx
+        let Transaction { inputs, outputs, .. } = tx
 
         expect Some(step_datum) = datum
-        expect step_02.State { verified_tx1_hash, verified_tx2_hash } =
-          step_datum.data
 
-        // -------- double spend validation specific logic START --------
-        // fraud prover provides a list of output references that are known to be part of the fraudulent block as the tx1, and tx2 full transactions,
-        // once serialized and hashed match the verified_tx1_hash and verified_tx2_hash hashes we have verified to be a part of the supposedly "fraudulent" block in previous steps.
-        verify_hash_32(tx1, verified_tx1_hash)
-        verify_hash_32(tx2, verified_tx2_hash)
+        expect ct.StepDatum { data: Some(state), fraud_prover }: Datum =
+          step_datum
 
-        // tx bodies provided by fraud prover, once serialized and hashed, match the hashed body field part of the inputted transactions
-        verify_hash_32(tx1_body, tx1.body)
-        verify_hash_32(tx2_body, tx2.body)
-
-        // input lists match tx body spend_inputs
-        verify_hash_32(tx1_input_utxos, tx1_body.spend_inputs)
-        verify_hash_32(tx2_input_utxos, tx2_body.spend_inputs)
-
-        // both input lists contain the fraudulent input
-        expect list.has(builtin.un_list_data(tx1_input_utxos), fraudulent_input)
-        expect list.has(builtin.un_list_data(tx2_input_utxos), fraudulent_input)
-        expect parsed_fraudulent_input: OutputReference = fraudulent_input
-
-        // -------- double spend validation specific logic END --------
-        let step_3_state =
-          State {
-            verified_tx1_hash,
-            verified_tx2_hash,
-            verified_common_input: parsed_fraudulent_input,
-          }
-        let expected_output_datum =
-          StepDatum {
-            fraud_prover: step_datum.fraud_prover,
-            data: step_3_state,
-          }
-
-        // Get CT token
-        let ct_token_asset_name =
-          get_singleton_ct_token(own_input, ct_token_policy_id)
-
+        // 1. Provided input must be a member of the first transaction's inputs.
         expect
-          validate_step_output(
-            tx,
-            index_output,
-            double_spend_step_04_validator_script_hash,
-            ct_token_policy_id,
-            ct_token_asset_name,
-            step_datum,
-            expected_output_datum,
+          plutarch_phas(
+            mpf_root: state.verified_tx1_inputs_root,
+            key: double_spent_input_key,
+            value: double_spent_input_value,
+            membership_proof: input_membership_proof,
           )
 
+        let
+          own_input,
+          continued_output,
+        <-
+          singular_utxo_indexer.one_to_one(
+            input_index,
+            output_index,
+            own_out_ref,
+            inputs,
+            outputs,
+            // Double satisfaction prevented by validating the output UTxO carries
+            // the same computation thread token as the input's.
+            True,
+          )
+
+        let
+          _own_script_hash,
+          computation_thread_token_asset_name,
+        <-
+          authenticate_input_and_get_info(
+            own_input,
+            computation_thread_token_policy_id,
+          )
+
+        // 2. The proven input, along with the unused second transaction must be
+        //    carried over in the datum of the next step.
+        let expected_output_state: Data =
+          step_03.State {
+            verified_tx2_inputs_root,
+            double_spent_input_key,
+            double_spent_input_value,
+          }
+        expect
+          validate_step_output(
+            continued_output,
+            step_03_validator_script_hash,
+            computation_thread_token_policy_id,
+            computation_thread_token_asset_name,
+            fraud_prover,
+            expected_output_state,
+            output_index,
+          )
+
+        // Done.
         True
       }
     }

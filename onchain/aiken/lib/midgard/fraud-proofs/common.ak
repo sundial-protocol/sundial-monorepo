@@ -213,13 +213,12 @@ pub fn validate_exclusion_utxo_proof(
 pub fn authenticate_input_and_get_info(
   input: Input,
   ct_token_policy_id: PolicyId,
-  return: fn(ScriptHash, AssetName, VerificationKeyHash, Option<Data>) -> result,
+  return: fn(ScriptHash, AssetName) -> result,
 ) -> result {
   expect Input {
     output: Output {
       address: Address { payment_credential: Script(input_script_hash), .. },
       value,
-      datum: InlineDatum(input_datum_data),
       ..
     },
     ..
@@ -228,13 +227,14 @@ pub fn authenticate_input_and_get_info(
     get_single_asset_from_value_apart_from_ada(value)
   expect input_nft_policy_id == ct_token_policy_id
   expect input_nft_qty == 1
-  expect ct.StepDatum { fraud_prover, data: m_input_state }: ct.StepDatum<Data> =
-    input_datum_data
-  return(input_script_hash, input_nft_asset_name, fraud_prover, m_input_state)
+  return(input_script_hash, input_nft_asset_name)
 }
 
-// Common validation for any step's output state (except final step)
-// Relevant to (3), (4), (5), (6)
+/// Validates authenticity of the given output by checking for its:
+/// - Destination script hash
+/// - Presence of exactly one computation thread token (and none other tokens)
+/// - Output datum carrying over expected fraud prover and state
+/// - Absence of an attached reference script
 pub fn validate_step_output(
   output: Output,
   next_validator_hash: ScriptHash,

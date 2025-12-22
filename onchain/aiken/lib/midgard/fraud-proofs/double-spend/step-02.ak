@@ -17,7 +17,6 @@ pub type SpendRedeemer {
     output_index: Int,
     double_spent_input_key: Data,
     double_spent_input_value: Data,
-    tx1_input_membership_proof: mpf.Proof,
-    tx2_input_membership_proof: mpf.Proof,
+    input_membership_proof: mpf.Proof,
   }
 }
