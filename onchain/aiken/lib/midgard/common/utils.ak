@@ -390,13 +390,13 @@ pub fn get_authentic_output_datum_at_address_with_nft_at(
 }
 
 // Verify a 32-byte hash (Blake2b-256)
-pub fn verify_hash_32(data: Data, data_hash: H32<Data>) {
-  expect blake2b_256(cbor.serialise(data)) == data_hash
+pub fn verify_hash_32(data: Data, data_hash: H32<Data>) -> Bool {
+  blake2b_256(cbor.serialise(data)) == data_hash
 }
 
 // Verify a 28-byte hash (Blake2b-224)
-pub fn verify_hash_28(data: Data, data_hash: H28<Data>) {
-  expect blake2b_224(cbor.serialise(data)) == data_hash
+pub fn verify_hash_28(data: Data, data_hash: H28<Data>) -> Bool {
+  blake2b_224(cbor.serialise(data)) == data_hash
 }
 
 /// Given a value, an NFT, and a `ValuePairs` (structured identical to `Value`,

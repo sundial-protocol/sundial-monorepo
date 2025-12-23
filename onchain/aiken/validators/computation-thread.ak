@@ -4,7 +4,9 @@ use aiken_design_patterns/linked_list/ordered as ordered
 use aiken_design_patterns/linked_list/unordered as unordered
 use cardano/assets.{PolicyId, flatten, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
-use midgard/common/utils.{has_signed, is_output_to_sc}
+use midgard/common/utils.{
+  get_single_asset_from_value, has_signed, is_output_to_sc,
+}
 use midgard/computation_thread.{
   BurnForCancellation, Init, MintRedeemer, StepDatum, Success,
 }

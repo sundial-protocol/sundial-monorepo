@@ -22,7 +22,7 @@ use cardano/transaction.{OutputReference, Transaction}
 use midgard/common/constants.{fraud_category_id_byte_count}
 use midgard/common/utils.{plutarch_phas, verify_hash_32}
 use midgard/computation_thread as ct
-use midgard/fraud_proofs/common.{cancel, continue}
+use midgard/fraud_proofs/common.{cancel, continue, verify_tx_hash}
 use midgard/fraud_proofs/double_spend/step_01.{Args, Datum, SpendRedeemer}
 use midgard/fraud_proofs/double_spend/step_02
 use midgard/hub_oracle as hub

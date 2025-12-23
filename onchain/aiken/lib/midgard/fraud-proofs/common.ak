@@ -8,10 +8,10 @@ use cardano/transaction.{
 }
 use midgard/common/utils.{
   get_redeemer_at, get_single_asset_from_value_apart_from_ada,
-  get_singleton_asset_with_policy, has_signed,
+  get_singleton_asset_with_policy, has_signed, verify_hash_32,
 }
 use midgard/computation_thread as ct
-use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId}
+use midgard/ledger_state.{MidgardTxCompact, MidgardTxId}
 
 pub fn cancel(
   computation_thread_token_policy_id: PolicyId,

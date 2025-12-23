@@ -3,7 +3,7 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/common/utils.{plutarch_phas, verify_hash_32}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proofs/common.{cancel, validate_step_output}
+use midgard/fraud_proofs/common.{cancel, continue}
 use midgard/fraud_proofs/double_spend/step_02.{
   Args, Datum, SpendRedeemer, State,
 }
