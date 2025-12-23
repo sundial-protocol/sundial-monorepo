@@ -1,6 +1,7 @@
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
+use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{cancel, finalize}
 use midgard/fraud_proofs/double_spend/step_03.{
   Args, Datum, SpendRedeemer, State,
@@ -18,15 +19,15 @@ validator main(
   ) {
     when redeemer is {
       ct.Cancel {
-        input_index: Int,
-        computation_thread_mint_redeemer_index: Int,
+        input_index,
+        computation_thread_mint_redeemer_index,
       } ->
         cancel(
           computation_thread_token_policy_id,
           datum,
           input_index,
           own_out_ref,
-          computation_thread_mint_redeemer_index: Int,
+          computation_thread_mint_redeemer_index,
           tx,
         )
       ct.Continue(Args {

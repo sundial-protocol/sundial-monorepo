@@ -54,8 +54,8 @@ validator main(
         hub_ref_input_index,
         bad_state_queue_node_ref_input_index,
         bad_tx_id,
-        bad_tx_body,
         bad_tx,
+        bad_tx_body,
         bad_tx_membership_proof,
         inclusion_proof_script_withdraw_redeemer_index,
       }) -> {
