@@ -67,7 +67,7 @@ validator main(
         // 1. Provided input must be a member of the first transaction's inputs.
         expect
           plutarch_phas(
-            mpf_root: input_state.verified_tx1_inputs_root,
+            merkle_root: input_state.verified_tx1_inputs_root,
             key: double_spent_input_key,
             value: double_spent_input_value,
             membership_proof: input_membership_proof,

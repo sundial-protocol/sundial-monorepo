@@ -1,6 +1,5 @@
-use aiken/merkle_patricia_forestry as mpf
 use cardano/transaction.{TransactionId}
-use midgard/common/types.{MerkleRoot}
+use midgard/common/types.{MerkleRoot, Proof}
 use midgard/computation_thread as ct
 use midgard/ledger_state.{MidgardTxBodyCompact}
 
@@ -20,7 +19,7 @@ pub type Args {
   bad_tx_id: TransactionId,
   bad_tx_body: MidgardTxBodyCompact,
   bad_tx: MidgardTxBodyCompact,
-  bad_tx_membership_proof: mpf.Proof,
+  bad_tx_membership_proof: Proof,
   inclusion_proof_script_withdraw_redeemer_index: Int,
 }
 

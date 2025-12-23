@@ -6,7 +6,6 @@ use aiken/crypto.{
   ScriptHash, VerificationKey, VerificationKeyHash, blake2b_224, blake2b_256,
 }
 use aiken/interval.{Finite, Interval, NegativeInfinity, PositiveInfinity}
-use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/stake_validator
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
@@ -15,7 +14,7 @@ use cardano/transaction.{
 }
 use env
 use midgard/common/constants.{posix_time_none}
-use midgard/common/types.{H28, H32, PosixTime, ValuePairs}
+use midgard/common/types.{H28, H32, PosixTime, Proof, ValuePairs}
 
 /// Check whether the interval starts on or after the point.
 pub fn is_hereafter(self: Interval, point: Int) -> Bool {
@@ -508,10 +507,10 @@ pub fn get_redeemer_at(
 
 /// Merkelized validator abstraction for `phas` function from Plutarch.
 pub fn plutarch_phas(
-  mpf_root: ByteArray,
+  merkle_root: ByteArray,
   key: Data,
   value: Data,
-  membership_proof: mpf.Proof,
+  membership_proof: Proof,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
   withdraw_redeemer_index: Int,
 ) -> Bool {
@@ -527,12 +526,12 @@ pub fn plutarch_phas(
     ..
   ] = builtin.un_list_data(phas_validator_redeemer)
 
-  let mpf_root_data: Data = mpf_root
+  let merkle_root_data: Data = merkle_root
 
   let proof_data: Data = membership_proof
 
   and {
-    redeemer_root_data == mpf_root_data,
+    redeemer_root_data == merkle_root_data,
     redeemer_key_data == key,
     redeemer_value_data == value,
     redeemer_proof_data == proof_data,
@@ -541,9 +540,9 @@ pub fn plutarch_phas(
 
 /// Merkelized validator abstraction for `pexcludes` function from Plutarch.
 pub fn plutarch_pexcludes(
-  mpf_root: ByteArray,
+  merkle_root: ByteArray,
   key: Data,
-  non_membership_proof: mpf.Proof,
+  non_membership_proof: Proof,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
   withdraw_redeemer_index: Int,
 ) -> Bool {
@@ -558,12 +557,12 @@ pub fn plutarch_pexcludes(
     redeemer_proof_data, ..] =
     builtin.un_list_data(pexcludes_validator_redeemer)
 
-  let mpf_root_data: Data = mpf_root
+  let merkle_root_data: Data = merkle_root
 
   let proof_data: Data = non_membership_proof
 
   and {
-    redeemer_root_data == mpf_root_data,
+    redeemer_root_data == merkle_root_data,
     redeemer_key_data == key,
     redeemer_proof_data == proof_data,
   }

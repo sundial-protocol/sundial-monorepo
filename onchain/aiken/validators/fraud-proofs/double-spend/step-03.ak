@@ -12,7 +12,7 @@ validator main(
 ) {
   spend(
     datum: Option<Datum>,
-    redeemer: Step4Redeemer,
+    redeemer: SpendRedeemer,
     input: OutputReference,
     tx: Transaction,
   ) {
@@ -65,7 +65,7 @@ validator main(
         //    inputs.
         expect
           plutarch_phas(
-            mpf_root: verified_tx2_inputs_root,
+            merkle_root: verified_tx2_inputs_root,
             key: double_spent_input_key,
             value: double_spent_input_value,
             membership_proof: input_membership_proof,

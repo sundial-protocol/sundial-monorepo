@@ -14,12 +14,13 @@
 ////    and produces the UTxO at the next step's script address with `data`
 ////    containing both verified bad transactions' bodies.
 
+use aiken/builtin
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/common/constants.{fraud_category_id_byte_count}
-use midgard/common/utils.{plutarch_phas}
+use midgard/common/utils.{plutarch_phas, verify_hash_32}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{cancel, continue}
 use midgard/fraud_proofs/double_spend/step_01.{Args, Datum, SpendRedeemer}
@@ -44,7 +45,7 @@ validator main(
           datum,
           input_index,
           own_out_ref,
-          computation_thread_mint_redeemer_index: Int,
+          computation_thread_mint_redeemer_index,
           tx,
         )
       ct.Continue(Args {
@@ -61,7 +62,11 @@ validator main(
         // 1. Verify authenticity of the provided bad tx against its ID.
         let bad_tx_id_data: Data = bad_tx_id
         let bad_tx_data: Data = bad_tx
-        expect verify_hash_32(data: bad_tx_data, data_hash: bad_tx_id_data)
+        expect
+          verify_hash_32(
+            data: bad_tx_data,
+            data_hash: builtin.un_b_data(bad_tx_id_data),
+          )
 
         let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
           tx
@@ -113,7 +118,7 @@ validator main(
         let bad_tx_data: Data = bad_tx
         expect
           plutarch_phas(
-            mpf_root: state_queue_datum.transactions_root,
+            merkle_root: state_queue_datum.transactions_root,
             key: builtin.b_data(bad_tx_id),
             value: bad_tx_data,
             membership_proof: bad_tx_membership_proof,
@@ -128,7 +133,7 @@ validator main(
         expect
           utils.verify_hash_32(
             data: bad_tx_body_data,
-            data_hash: bad_tx_body_hash,
+            data_hash: builtin.un_b_data(bad_tx_body_hash),
           )
         when m_input_state_data is {
           None -> {

@@ -1,5 +1,4 @@
-use aiken/merkle_patricia_forestry as mpf
-use midgard/common/types.{MerkleRoot}
+use midgard/common/types.{MerkleRoot, Proof}
 use midgard/computation_thread as ct
 
 pub type State {
@@ -15,7 +14,7 @@ pub type Args {
   output_index: Int,
   double_spent_input_key: Data,
   double_spent_input_value: Data,
-  input_membership_proof: mpf.Proof,
+  input_membership_proof: Proof,
   inclusion_proof_script_withdraw_redeemer_index: Int,
 }
 

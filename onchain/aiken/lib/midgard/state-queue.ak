@@ -1,6 +1,6 @@
 use aiken_design_patterns/linked_list/unordered.{NodeDatum}
 use cardano/assets.{AssetName}
-use cardano/transaction.{InlineDatum, Input, OutputReference}
+use cardano/transaction.{Input, OutputReference}
 use midgard/common/utils
 use midgard/ledger_state.{ConfirmedState, Header}
 use midgard/registered_operators.{OperatorStatus}
