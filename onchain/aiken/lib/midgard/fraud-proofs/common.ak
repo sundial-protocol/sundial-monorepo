@@ -80,7 +80,7 @@ pub fn continue(
     VerificationKeyHash,
     Option<a>,
     ScriptHash,
-    Option<Data>,
+    Data,
   ) ->
     Bool,
 ) -> Bool {
@@ -114,12 +114,17 @@ pub fn continue(
   } = output
   let output_nft_triplet =
     get_single_asset_from_value_apart_from_ada(output_value)
-  expect output_nft_triplet == input_nft_triplet
+  expect
+    output_nft_triplet == (
+      computation_thread_token_policy_id,
+      computation_thread_token_asset_name,
+      1,
+    )
 
   // 2. Fraud prover must not change during the transition.
   expect ct.StepDatum {
     fraud_prover: output_fraud_prover,
-    data: m_output_state_data,
+    data: Some(output_state_data),
   }: ct.StepDatum<Data> = output_datum_data
   expect output_fraud_prover == fraud_prover
 
