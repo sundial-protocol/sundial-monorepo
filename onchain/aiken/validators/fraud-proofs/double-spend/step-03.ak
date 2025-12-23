@@ -3,7 +3,7 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/fraud_proofs/common.{cancel, finalize}
 use midgard/fraud_proofs/double_spend/step_03.{
-  Cancel, Continue, Datum, SpendRedeemer, State,
+  Args, Datum, SpendRedeemer, State,
 }
 
 validator main(
@@ -17,7 +17,10 @@ validator main(
     tx: Transaction,
   ) {
     when redeemer is {
-      Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int } ->
+      ct.Cancel {
+        input_index: Int,
+        computation_thread_mint_redeemer_index: Int,
+      } ->
         cancel(
           computation_thread_token_policy_id,
           datum,
@@ -26,7 +29,11 @@ validator main(
           computation_thread_mint_redeemer_index: Int,
           tx,
         )
-      Continue { index_output, output_index, computation_thread_redeemer_index } -> {
+      ct.Continue(Args {
+        index_output,
+        output_index,
+        computation_thread_redeemer_index,
+      }) -> {
         let Transaction { inputs, outputs, mint, redeemers, .. } = tx
         let
           _own_script_hash,

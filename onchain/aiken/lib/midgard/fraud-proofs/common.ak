@@ -1,25 +1,16 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
-use aiken/merkle_patricia_forestry as mpf
-use aiken/primitive/bytearray.{drop}
-use aiken_design_patterns/linked_list/unordered as unordered
 use aiken_design_patterns/singular_utxo_indexer
-use aiken_design_patterns/tx_level_minter
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{AssetName, PolicyId, Value}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptPurpose,
-  Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
 }
-use midgard/common/constants.{fraud_category_id_byte_count}
 use midgard/common/utils.{
   get_redeemer_at, get_single_asset_from_value_apart_from_ada,
-  get_singleton_asset_with_policy, has_signed, plutarch_phas,
+  get_singleton_asset_with_policy, has_signed,
 }
 use midgard/computation_thread as ct
-use midgard/fraud_proof
-use midgard/ledger_state.{Header}
-use midgard/state_queue
 
 pub fn cancel(
   computation_thread_token_policy_id: PolicyId,
@@ -39,8 +30,9 @@ pub fn cancel(
       expected_purpose: Mint(computation_thread_token_policy_id),
       redeemer_index: mint_redeemer_index,
     )
-  expect ct.Cancel { burning_token_asset_name: redeemer_burning_asset_name } =
-    mint_redeemer_data
+  expect ct.BurnForCancellation {
+    burning_token_asset_name: redeemer_burning_asset_name,
+  } = mint_redeemer_data
 
   // 2. Input UTxO must be authentic.
   expect Some(Input {
@@ -58,8 +50,7 @@ pub fn cancel(
     )
 
   // 3. Transaction must be signed by the fraud prover.
-  expect Some(step_datum) = m_datum
-  expect ct.StepDatum { fraud_prover, .. } = step_datum
+  expect Some(ct.StepDatum { fraud_prover, .. }) = m_datum
   expect fraud_prover |> has_signed(extra_signatories)
 
   // Done.
@@ -210,7 +201,7 @@ pub fn finalize(
 
   // 5. Custom validation for each fraud proof must pass.
   validation_fn(
-    own_script_hash,
+    input_script_hash,
     computation_thread_token_asset_name,
     fraud_prover,
     m_input_state_data,
@@ -271,7 +262,7 @@ fn validate_input_and_provide_output(
     },
     ..
   } = input
-  let (input_nft_policy_id, computation_thread_token_asset_name, input_nft_qty) as input_nft_triplet =
+  let (input_nft_policy_id, computation_thread_token_asset_name, input_nft_qty) =
     get_single_asset_from_value_apart_from_ada(input_value)
   expect input_nft_policy_id == computation_thread_token_policy_id
   expect input_nft_qty == 1

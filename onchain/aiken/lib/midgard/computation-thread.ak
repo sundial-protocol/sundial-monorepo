@@ -5,6 +5,11 @@ pub type StepDatum<a> {
   data: Option<a>,
 }
 
+pub type StepRedeemer<a> {
+  Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int }
+  Continue(a)
+}
+
 pub type MintRedeemer {
   Init {
     fraud_proof_set_node_ref_input_index: Int,
@@ -16,5 +21,5 @@ pub type MintRedeemer {
     state_queue_asset_name: ByteArray,
   }
   Success { burning_token_asset_name: ByteArray }
-  Cancel { burning_token_asset_name: ByteArray }
+  BurnForCancellation { burning_token_asset_name: ByteArray }
 }

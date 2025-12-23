@@ -22,9 +22,7 @@ use midgard/common/constants.{fraud_category_id_byte_count}
 use midgard/common/utils.{plutarch_phas}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{cancel, continue}
-use midgard/fraud_proofs/double_spend/step_01.{
-  Cancel, Continue, Datum, SpendRedeemer,
-}
+use midgard/fraud_proofs/double_spend/step_01.{Args, Datum, SpendRedeemer}
 use midgard/fraud_proofs/double_spend/step_02
 use midgard/hub_oracle as hub
 
@@ -40,7 +38,7 @@ validator main(
     tx: Transaction,
   ) {
     when redeemer is {
-      Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int } ->
+      ct.Cancel { input_index, computation_thread_mint_redeemer_index } ->
         cancel(
           computation_thread_token_policy_id,
           datum,
@@ -49,7 +47,7 @@ validator main(
           computation_thread_mint_redeemer_index: Int,
           tx,
         )
-      Continue {
+      ct.Continue(Args {
         input_index,
         output_index,
         hub_ref_input_index,
@@ -59,7 +57,7 @@ validator main(
         bad_tx,
         bad_tx_membership_proof,
         inclusion_proof_script_withdraw_redeemer_index,
-      } -> {
+      }) -> {
         // 1. Verify authenticity of the provided bad tx against its ID.
         let bad_tx_id_data: Data = bad_tx_id
         let bad_tx_data: Data = bad_tx

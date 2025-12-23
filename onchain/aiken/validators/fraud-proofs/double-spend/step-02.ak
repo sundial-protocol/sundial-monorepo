@@ -5,7 +5,7 @@ use midgard/common/utils.{plutarch_phas, verify_hash_32}
 use midgard/computation_thread.{StepDatum}
 use midgard/fraud_proofs/common.{cancel, validate_step_output}
 use midgard/fraud_proofs/double_spend/step_02.{
-  Cancel, Continue, Datum, SpendRedeemer, State,
+  Args, Datum, SpendRedeemer, State,
 }
 use midgard/fraud_proofs/double_spend/step_03
 
@@ -20,7 +20,10 @@ validator main(
     tx: Transaction,
   ) {
     when redeemer is {
-      Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int } ->
+      ct.Cancel {
+        input_index: Int,
+        computation_thread_mint_redeemer_index: Int,
+      } ->
         cancel(
           computation_thread_token_policy_id,
           datum,
@@ -29,14 +32,14 @@ validator main(
           computation_thread_mint_redeemer_index: Int,
           tx,
         )
-      Continue {
+      ct.Continue(Args {
         input_index,
         output_index,
         double_spent_input_key,
         double_spent_input_value,
         input_membership_proof,
         inclusion_proof_script_withdraw_redeemer_index,
-      } -> {
+      }) -> {
         let Transaction { inputs, outputs, .. } = tx
 
         expect Some(step_datum) = datum

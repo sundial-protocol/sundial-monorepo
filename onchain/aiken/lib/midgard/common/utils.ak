@@ -8,7 +8,7 @@ use aiken/crypto.{
 use aiken/interval.{Finite, Interval, NegativeInfinity, PositiveInfinity}
 use aiken/merkle_patricia_forestry as mpf
 use aiken_design_patterns/stake_validator
-use cardano/address.{Address, Credential, Script}
+use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose,

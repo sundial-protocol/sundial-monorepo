@@ -10,14 +10,14 @@ pub type State {
 pub type Datum =
   ct.StepDatum<State>
 
-pub type SpendRedeemer {
-  Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int }
-  Continue {
-    input_index: Int,
-    output_index: Int,
-    double_spent_input_key: Data,
-    double_spent_input_value: Data,
-    input_membership_proof: mpf.Proof,
-    inclusion_proof_script_withdraw_redeemer_index: Int,
-  }
+pub type Args {
+  input_index: Int,
+  output_index: Int,
+  double_spent_input_key: Data,
+  double_spent_input_value: Data,
+  input_membership_proof: mpf.Proof,
+  inclusion_proof_script_withdraw_redeemer_index: Int,
 }
+
+pub type SpendRedeemer =
+  ct.StepRedeemer<Args>
