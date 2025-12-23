@@ -1,9 +1,7 @@
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
-use midgard/common/utils.{plutarch_phas, verify_hash_32}
-use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proofs/common.{cancel, validate_step_output}
+use midgard/fraud_proofs/common.{cancel, finalize}
 use midgard/fraud_proofs/double_spend/step_03.{
   Cancel, Continue, Datum, SpendRedeemer, State,
 }
@@ -13,7 +11,7 @@ validator main(
   fraud_proof_token_policy_id: ScriptHash,
 ) {
   spend(
-    datum: Option<StepDatum>,
+    datum: Option<Datum>,
     redeemer: Step4Redeemer,
     input: OutputReference,
     tx: Transaction,
