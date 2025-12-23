@@ -11,6 +11,7 @@ use midgard/common/utils.{
   get_singleton_asset_with_policy, has_signed,
 }
 use midgard/computation_thread as ct
+use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId}
 
 pub fn cancel(
   computation_thread_token_policy_id: PolicyId,
@@ -206,6 +207,11 @@ pub fn finalize(
     fraud_prover,
     m_input_state_data,
   )
+}
+
+pub fn verify_tx_hash(bad_tx_id: MidgardTxId, bad_tx: MidgardTxCompact) -> Bool {
+  let bad_tx_data: Data = bad_tx
+  verify_hash_32(data: bad_tx_data, data_hash: bad_tx_id)
 }
 
 pub fn validate_output_to_fraud_prover(

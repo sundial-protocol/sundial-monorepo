@@ -1,10 +1,9 @@
-use cardano/transaction.{TransactionId}
 use midgard/common/types.{MerkleRoot, Proof}
 use midgard/computation_thread as ct
-use midgard/ledger_state.{MidgardTxBodyCompact}
+use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxId}
 
 pub type State {
-  verified_tx1_id: TransactionId,
+  verified_tx1_id: MidgardTxId,
   verified_tx1_inputs_root: MerkleRoot,
 }
 
@@ -16,7 +15,7 @@ pub type Args {
   output_index: Int,
   hub_ref_input_index: Int,
   bad_state_queue_node_ref_input_index: Int,
-  bad_tx_id: TransactionId,
+  bad_tx_id: MidgardTxId,
   bad_tx_body: MidgardTxBodyCompact,
   bad_tx: MidgardTxBodyCompact,
   bad_tx_membership_proof: Proof,

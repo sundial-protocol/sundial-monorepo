@@ -60,13 +60,7 @@ validator main(
         inclusion_proof_script_withdraw_redeemer_index,
       }) -> {
         // 1. Verify authenticity of the provided bad tx against its ID.
-        let bad_tx_id_data: Data = bad_tx_id
-        let bad_tx_data: Data = bad_tx
-        expect
-          verify_hash_32(
-            data: bad_tx_data,
-            data_hash: builtin.un_b_data(bad_tx_id_data),
-          )
+        expect verify_tx_hash(bad_tx_id, bad_tx)
 
         let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
           tx
