@@ -20,79 +20,68 @@ validator main(
     tx: Transaction,
   ) {
     when redeemer is {
-      Cancel { input_index } ->
+      Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int } ->
         cancel(
           computation_thread_token_policy_id,
+          datum,
           input_index,
-          computation_thread_mint_redeemer_index,
+          own_out_ref,
+          computation_thread_mint_redeemer_index: Int,
           tx,
         )
-
       Continue {
         input_index,
         output_index,
         double_spent_input_key,
         double_spent_input_value,
         input_membership_proof,
+        inclusion_proof_script_withdraw_redeemer_index,
       } -> {
         let Transaction { inputs, outputs, .. } = tx
 
         expect Some(step_datum) = datum
 
-        expect ct.StepDatum { data: Some(state), fraud_prover }: Datum =
-          step_datum
-
-        // 1. Provided input must be a member of the first transaction's inputs.
-        expect
-          plutarch_phas(
-            mpf_root: state.verified_tx1_inputs_root,
-            key: double_spent_input_key,
-            value: double_spent_input_value,
-            membership_proof: input_membership_proof,
-          )
-
         let
-          own_input,
-          continued_output,
+          _own_script_hash,
+          computation_thread_token_asset_name,
+          _fraud_prover,
+          m_input_state_data,
+          output_script_hash,
+          output_state_data,
         <-
-          singular_utxo_indexer.one_to_one(
+          continue(
+            computation_thread_token_policy_id,
+            step_datum,
             input_index,
             output_index,
             own_out_ref,
             inputs,
             outputs,
-            // Double satisfaction prevented by validating the output UTxO carries
-            // the same computation thread token as the input's.
-            True,
           )
 
-        let
-          _own_script_hash,
-          computation_thread_token_asset_name,
-        <-
-          authenticate_input_and_get_info(
-            own_input,
-            computation_thread_token_policy_id,
+        expect Some(input_state) = m_input_state_data
+
+        // 1. Provided input must be a member of the first transaction's inputs.
+        expect
+          plutarch_phas(
+            mpf_root: input_state.verified_tx1_inputs_root,
+            key: double_spent_input_key,
+            value: double_spent_input_value,
+            membership_proof: input_membership_proof,
+            redeemers: redeemers,
+            withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
           )
 
         // 2. The proven input, along with the unused second transaction must be
         //    carried over in the datum of the next step.
+        expect output_script_hash == step_03_validator_script_hash
         let expected_output_state: Data =
           step_03.State {
             verified_tx2_inputs_root,
             double_spent_input_key,
             double_spent_input_value,
           }
-        expect
-          validate_step_output(
-            continued_output,
-            step_03_validator_script_hash,
-            computation_thread_token_policy_id,
-            computation_thread_token_asset_name,
-            fraud_prover,
-            expected_output_state,
-            output_index,
-          )
+        expect output_state_data == expected_output_state
 
         // Done.
         True

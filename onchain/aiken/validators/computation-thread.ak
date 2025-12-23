@@ -88,15 +88,15 @@ validator mint(
           fraud_prover_hash |> has_signed(self.extra_signatories),
         }
       }
-      Success { token_to_burn_asset_name } -> and {
-          quantity_of(self.mint, policy_id, token_to_burn_asset_name) == -1,
+      Success { burning_token_asset_name } -> and {
+          quantity_of(self.mint, policy_id, burning_token_asset_name) == -1,
           utils.quantity_of_policy_id(self.mint, policy_id) == 1,
         }
-      Cancel { token_to_burn_asset_name } -> {
+      Cancel { burning_token_asset_name } -> {
         // 1. Transaction must burn the specified token, without minting or
         //    burning any other tokens.
         let burn_triplet = get_single_asset_from_value(self.mint)
-        let expected_burn_triplet = (policy_id, token_to_burn_asset_name, -1)
+        let expected_burn_triplet = (policy_id, burning_token_asset_name, -1)
         expect burn_triplet == expected_burn_triplet
         // Done.
         True

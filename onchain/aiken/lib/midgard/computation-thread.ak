@@ -15,6 +15,6 @@ pub type MintRedeemer {
     fraud_proof_catalogue_asset_name: ByteArray,
     state_queue_asset_name: ByteArray,
   }
-  Success { token_to_burn_asset_name: ByteArray }
-  Cancel { token_to_burn_asset_name: ByteArray }
+  Success { burning_token_asset_name: ByteArray }
+  Cancel { burning_token_asset_name: ByteArray }
 }

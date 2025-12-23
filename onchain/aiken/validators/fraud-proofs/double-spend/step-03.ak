@@ -1,17 +1,16 @@
-use aiken/collection/list
+use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
+use midgard/common/utils.{plutarch_phas, verify_hash_32}
 use midgard/computation_thread.{StepDatum}
-use midgard/fraud_proofs/common.{
-  get_singleton_ct_token, handle_cancel, validate_final_step_output,
-}
-use midgard/fraud_proofs/double_spend/step_04.{
-  Cancel, Continue, StepRedeemer as Step4Redeemer,
+use midgard/fraud_proofs/common.{cancel, validate_step_output}
+use midgard/fraud_proofs/double_spend/step_03.{
+  Cancel, Continue, Datum, SpendRedeemer, State,
 }
 
 validator main(
-  fraud_proof_token_policy: PolicyId,
-  ct_token_policy_id: PolicyId,
+  computation_thread_token_policy_id: PolicyId,
+  fraud_proof_token_policy_id: ScriptHash,
 ) {
   spend(
     datum: Option<StepDatum>,
@@ -19,38 +18,57 @@ validator main(
     input: OutputReference,
     tx: Transaction,
   ) {
-    expect Some(step_datum) = datum
-    expect Some(own_input) =
-      list.find(tx.inputs, fn(a_input) { a_input.output_reference == input })
-
     when redeemer is {
-      Cancel { index_output } -> {
-        expect
-          handle_cancel(
-            own_input,
-            index_output,
-            step_datum,
-            ct_token_policy_id,
-            tx,
+      Cancel { input_index: Int, computation_thread_mint_redeemer_index: Int } ->
+        cancel(
+          computation_thread_token_policy_id,
+          datum,
+          input_index,
+          own_out_ref,
+          computation_thread_mint_redeemer_index: Int,
+          tx,
+        )
+      Continue { index_output, output_index, computation_thread_redeemer_index } -> {
+        let Transaction { inputs, outputs, mint, redeemers, .. } = tx
+        let
+          _own_script_hash,
+          _computation_thread_token_asset_name,
+          _fraud_prover,
+          m_input_state_data,
+        <-
+          finalize(
+            computation_thread_token_policy_id,
+            fraud_proof_token_policy_id,
+            datum,
+            input_index,
+            output_index,
+            own_out_ref,
+            inputs,
+            outputs,
+            mint,
           )
-        True
-      }
-      // Step 4: Final step to mint fraud token and burn CT token
-      Continue { index_output, computation_thread_redeemer_index } -> {
-        // get CT token
-        let ct_token_asset_name =
-          get_singleton_ct_token(own_input, ct_token_policy_id)
 
+        expect Some(input_state) = m_input_state_data
+
+        let State {
+          verified_tx2_inputs_root,
+          double_spent_input_key,
+          double_spent_input_value,
+        } = input_state
+
+        // 1. Provided input must be a member of the second transaction's
+        //    inputs.
         expect
-          validate_final_step_output(
-            tx,
-            index_output,
-            fraud_proof_token_policy,
-            ct_token_asset_name,
-            step_datum,
-            computation_thread_redeemer_index,
+          plutarch_phas(
+            mpf_root: verified_tx2_inputs_root,
+            key: double_spent_input_key,
+            value: double_spent_input_value,
+            membership_proof: input_membership_proof,
+            redeemers: redeemers,
+            withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
           )
 
+        // Done.
         True
       }
     }

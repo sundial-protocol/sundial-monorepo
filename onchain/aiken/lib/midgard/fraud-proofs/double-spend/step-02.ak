@@ -18,5 +18,6 @@ pub type SpendRedeemer {
     double_spent_input_key: Data,
     double_spent_input_value: Data,
     input_membership_proof: mpf.Proof,
+    inclusion_proof_script_withdraw_redeemer_index: Int,
   }
 }
