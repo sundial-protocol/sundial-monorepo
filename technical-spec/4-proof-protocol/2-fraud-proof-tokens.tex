@@ -20,6 +20,7 @@ Redeemers:
             \item The transaction must burn a \code{computation\_thread} token via the Success redeemer.
             \item The transaction must mint a \code{fraud\_proof} token with the same token name as the \code{computation\_thread} token.
             \item The \code{fraud\_proof} token must be sent to an address which its payment part is the same script as the token's policy ID.
+            \item The transaction must \emph{not} mint or burn any other tokens.
         \end{enumerate}
 \end{description}
 

@@ -162,14 +162,15 @@ pub fn continue(
 pub fn finalize(
   computation_thread_token_policy_id: PolicyId,
   fraud_proof_token_policy_id: PolicyId,
+  fraud_proof_address: Address,
   step_datum: ct.StepDatum<a>,
   input_index: Int,
   output_index: Int,
+  fraud_proof_minting_redeemer_index: Int,
   own_out_ref: OutputReference,
   inputs: List<Input>,
   outputs: List<Output>,
-  mint: Value,
-  extra_signatories: List<VerificationKeyHash>,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
   validation_fn: fn(ScriptHash, AssetName, VerificationKeyHash, Option<a>) ->
     Bool,
 ) -> Bool {
@@ -191,19 +192,19 @@ pub fn finalize(
     )
 
   // 1. Output UTxO must:
-  //    - Go to an address which its payment credential is a script.
+  //    - Go to `fraud_proof_address` retrieved from hub oracle.
   //    - Have an inline datum attached.
   //    - Not have a reference script attached.
   expect Output {
-    address: Address { payment_credential: Script(output_script_hash), .. },
+    address: output_address,
     value: output_value,
     datum: InlineDatum(output_datum_data),
     reference_script: None,
   } = output
 
-  // 1. Successful fraud proofs must be reserved at an address which its
-  //    payment credential is that of `fraud_proof`'s script hash.
-  expect output_script_hash == fraud_proof_token_policy_id
+  // 1. Successful fraud proofs must be reserved at fraud proof's spending
+  //    script which is an always fails script.
+  expect output_address == fraud_proof_address
 
   // 2. Produced UTxO at `fraud_proof` must have only 1 NFT of its own script
   //    hash, with the same asset name as the input NFT's.
@@ -222,18 +223,23 @@ pub fn finalize(
   > = output_datum_data
   expect output_fraud_prover == fraud_prover
 
-  // 4. Exactly one `fraud_proof` NFT must be minted, with the same asset name
-  //    as the input NFT's.
-  //
-  //    > [!NOTE]
-  //    > Here we are implicitly assuming this minting also validates the
-  //    > burning of the computation thread NFT.
-  expect Pair(mint_asset_name, 1) =
-    mint |> get_singleton_asset_with_policy(fraud_proof_token_policy_id)
-  expect mint_asset_name == computation_thread_token_asset_name
+  // 4. Fraud proof's minting script must be invoked (which also validates the
+  //    burning of the computation thread token).
+  let fraud_proof_mint_redeemer_data =
+    get_redeemer_at(
+      redeemers: redeemers,
+      expected_purpose: Mint(fraud_proof_token_policy_id),
+      redeemer_index: computation_thread_mint_redeemer_index,
+    )
+  expect fraud_proof.MintRedeemer {
+    computation_thread_token_asset_name: fraud_proof_redeemer_burning_asset_name,
+    ..
+  } = fraud_proof_mint_redeemer_data
 
-  // 5. Transaction must be signed by the fraud prover.
-  expect fraud_prover |> has_signed(extra_signatories)
+  // 5. The asset name specified in fraud proof's redeemer must match the token
+  //    included in the spending input.
+  expect
+    fraud_proof_redeemer_burning_asset_name == computation_thread_token_asset_name
 
   // 6. Custom validation for each fraud proof must pass.
   validation_fn(

@@ -9,11 +9,21 @@ use midgard/computation_thread as ct
 use midgard/fraud_proof.{Datum, MintRedeemer, SpendRedeemer}
 use midgard/hub_oracle as hub
 
-/// Midgard fraud proof tokens last forever, we'll use this script hash as the
-/// payment part of their destination address. The staking part will be up to
-/// the fraud prover to set.
-validator main(computation_thread_script_hash: ByteArray) {
-  mint(redeemer: MintRedeemer, own_policy: PolicyId, self: Transaction) {
+/// The spending validator of a fraud proof token never allows it to be spent.
+/// Midgard fraud proof tokens last forever.
+validator spend {
+  else(_) {
+    trace @"Midgard - Fraud Proof Spending Validator"
+    fail
+  }
+}
+
+/// Midgard fraud proof tokens last forever.
+validator mint(
+  computation_thread_script_hash: ByteArray,
+  hub_oracle_script_hash: PolicyId,
+) {
+  mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
     let Transaction { reference_inputs, mint, redeemers, .. } = self
 
     let MintRedeemer {
@@ -38,8 +48,8 @@ validator main(computation_thread_script_hash: ByteArray) {
     expect
       success_redeemer_burning_asset_name == computation_thread_token_asset_name
 
-    // 3. Only the computation thread token must be burnt, and fraud proof token
-    //    with the same asset name must be minted.
+    // 3. Only the computation thread token must be burned, and fraud proof
+    //    token with the same asset name must be minted.
     let expected_mint =
       assets.merge(
         assets.from_asset(
@@ -47,7 +57,7 @@ validator main(computation_thread_script_hash: ByteArray) {
           computation_thread_token_asset_name,
           -1,
         ),
-        assets.from_asset(own_policy, computation_thread_token_asset_name, 1),
+        assets.from_asset(policy_id, computation_thread_token_asset_name, 1),
       )
     expect mint == expected_mint
 

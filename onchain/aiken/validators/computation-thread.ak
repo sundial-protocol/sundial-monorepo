@@ -92,16 +92,22 @@ validator mint(
           fraud_prover_hash |> has_signed(self.extra_signatories),
         }
       }
-      Success { burning_token_asset_name } -> and {
-          quantity_of(self.mint, policy_id, burning_token_asset_name) == -1,
-          utils.quantity_of_policy_id(self.mint, policy_id) == 1,
-        }
+      Success { burning_token_asset_name } -> {
+        // 1. Specified token must be burned. The rest of validations
+        //    (including the coupling of this endpoint with minting of a
+        //    `fraud_proof` token) are done in each fraud proof's last step.
+        expect quantity_of(self.mint, policy_id, burning_token_asset_name) == -1
+
+        // Done.
+        True
+      }
       BurnForCancellation { burning_token_asset_name } -> {
         // 1. Transaction must burn the specified token, without minting or
         //    burning any other tokens.
-        let burn_triplet = get_single_asset_from_value(self.mint)
-        let expected_burn_triplet = (policy_id, burning_token_asset_name, -1)
-        expect burn_triplet == expected_burn_triplet
+        let expected_mint =
+          assets.from_asset(policy_id, burning_token_asset_name, -1)
+        expect expected_mint == self.mint
+
         // Done.
         True
       }

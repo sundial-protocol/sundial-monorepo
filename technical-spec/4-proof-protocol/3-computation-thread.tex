@@ -51,14 +51,11 @@ Redeemers:
             \item The transaction must \emph{not} mint or burn any other tokens.
         \end{enumerate}
     \item[Success.] Terminate the state machine normally from the final spending validator in the computation.
-      Couples its validation with that of the fraud proof minting policy.
-      Conditions:
+      Relies on fraud proofs' last steps to couple it with the fraud proof's minting.
+      Condition:
         \begin{enumerate}
-            \item Let \code{fraud\_proof} be the policy ID of the fraud proof token, and \code{computation\_thread}, retrieved from the hub oracle utxo.
             \item Let \code{successful\_computation\_thread\_token} be the asset name of the computation thread that has successfully completed, provided via the redeemer.
-            \item The transaction must burn the computation thread token with asset name \code{successful\_computation\_thread\_token}.
-            \item The transaction must mint the fraud proof token defined by the fraud proof minting policy.
-            \item The transaction must \emph{not} mint or burn any other tokens.
+            \item The transaction must burn exactly 1 computation thread token with asset name \code{successful\_computation\_thread\_token}.
         \end{enumerate}
     \item[BurnForCancellation.] Terminate the state machine exceptionally from any spending validator in the computation.
       Conditions:
