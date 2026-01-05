@@ -20,10 +20,7 @@ validator main(
     tx: Transaction,
   ) {
     when redeemer is {
-      ct.Cancel {
-        input_index,
-        computation_thread_mint_redeemer_index,
-      } ->
+      ct.Cancel { input_index, computation_thread_mint_redeemer_index } ->
         cancel(
           computation_thread_token_policy_id,
           datum,

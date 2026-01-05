@@ -1,17 +1,24 @@
+use aiken/builtin
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
+use aiken/primitive/bytearray
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{AssetName, PolicyId, Value}
 use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptPurpose,
+  Transaction,
 }
+use midgard/common/constants.{fraud_category_id_byte_count}
+use midgard/common/types.{Proof}
 use midgard/common/utils.{
   get_redeemer_at, get_single_asset_from_value_apart_from_ada,
-  get_singleton_asset_with_policy, has_signed, verify_hash_32,
+  get_singleton_asset_with_policy, has_signed, plutarch_phas, verify_hash_32,
 }
 use midgard/computation_thread as ct
-use midgard/ledger_state.{MidgardTxCompact, MidgardTxId}
+use midgard/hub_oracle as hub
+use midgard/ledger_state.{Header, MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId}
+use midgard/state_queue
 
 pub fn cancel(
   computation_thread_token_policy_id: PolicyId,
@@ -209,9 +216,72 @@ pub fn finalize(
   )
 }
 
-pub fn verify_tx_hash(bad_tx_id: MidgardTxId, bad_tx: MidgardTxCompact) -> Bool {
+fn verify_tx_and_its_body(
+  bad_tx_id: MidgardTxId,
+  bad_tx: MidgardTxCompact,
+  bad_tx_body: MidgardTxBodyCompact,
+) -> Bool {
   let bad_tx_data: Data = bad_tx
-  verify_hash_32(data: bad_tx_data, data_hash: bad_tx_id)
+  and {
+    verify_hash_32(data: bad_tx_data, data_hash: bad_tx_id),
+    verify_hash_32(data: bad_tx_body, data_hash: bad_tx.body),
+  }
+}
+
+pub fn verify_bad_tx_in_state_queue_node_and_get_header(
+  bad_tx_id: MidgardTxId,
+  bad_tx: MidgardTxCompact,
+  bad_tx_body: MidgardTxBodyCompact,
+  bad_tx_membership_proof: Proof,
+  computation_thread_token_asset_name: AssetName,
+  hub_oracle: PolicyId,
+  hub_ref_input_index: Int,
+  bad_state_queue_node_ref_input_index: Int,
+  inclusion_proof_script_withdraw_redeemer_index: Int,
+  reference_inputs: List<Input>,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+) -> Header {
+  // 1. Verify authenticity of the provided bad tx and its body against its ID,
+  //    and body hash.
+  expect verify_tx_and_its_body(bad_tx_id, bad_tx, bad_tx_body)
+
+  // 2. Hub oracle must be provided as a reference input.
+  let hub.Datum { state_queue: state_queue_policy, .. } =
+    hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+
+  let
+    state_queue_datum,
+    state_queue_node_key,
+  <-
+    state_queue.get_block_datum(
+      reference_inputs,
+      state_queue_policy,
+      bad_state_queue_node_ref_input_index,
+    )
+
+  // 3. The asset name of the computation thread token must match the state
+  //    queue node key (after dropping the fraud category ID prefix).
+  expect
+    state_queue_node_key == bytearray.drop(
+      computation_thread_token_asset_name,
+      fraud_category_id_byte_count,
+    )
+
+  // 4. Specified bad transaction must be proven to be included in the
+  //    referenced state queue node.
+  let bad_tx_data: Data = bad_tx
+  expect
+    plutarch_phas(
+      merkle_root: state_queue_datum.transactions_root,
+      key: builtin.b_data(bad_tx_id),
+      value: bad_tx_data,
+      membership_proof: bad_tx_membership_proof,
+      redeemers: redeemers,
+      withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
+    )
+
+  // Done. Return the block header.
+  state_queue_datum
 }
 
 pub fn validate_output_to_fraud_prover(
