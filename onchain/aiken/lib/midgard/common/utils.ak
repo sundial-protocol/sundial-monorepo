@@ -506,6 +506,9 @@ pub fn get_redeemer_at(
 }
 
 /// Merkelized validator abstraction for `phas` function from Plutarch.
+///
+/// > [!WARNING]
+/// > This function can only be used **once within a given transaction**.
 pub fn plutarch_phas(
   merkle_root: ByteArray,
   key: Data,
@@ -539,6 +542,9 @@ pub fn plutarch_phas(
 }
 
 /// Merkelized validator abstraction for `pexcludes` function from Plutarch.
+///
+/// > [!WARNING]
+/// > This function can only be used **once within a given transaction**.
 pub fn plutarch_pexcludes(
   merkle_root: ByteArray,
   key: Data,

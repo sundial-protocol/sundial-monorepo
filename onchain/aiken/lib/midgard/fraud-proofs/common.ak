@@ -65,6 +65,24 @@ pub fn cancel(
   True
 }
 
+/// Generic helper for validating requirements specific for progressing a fraud
+/// proof. It provides:
+/// - Script hash of the spending/input UTxO (i.e. fraud proof's step script).
+/// - Asset name of the computation thread token carried by the input UTxO.
+/// - Verification key hash of the fraud prover.
+/// - The `data` field of the spending `StepDatum` (which is of type
+///   `Option<a>`).
+/// - Output's script hash (i.e. the payment part of its address).
+/// - Output's state data (of type `Data`, i.e. it is validated `data` field of
+///   `StepDatum` is `Some<Data>`).
+///
+/// The reason input state data is provided with `Option` is to allow this
+/// function to also be used in the first step of the fraud proofs (since all
+/// fraud proofs start with `None` in the `data` field).
+///
+/// On the other hand, output state data is provided as `Data` directly to
+/// disallow this function to be used for final steps. [`finalize`](#finalize)
+/// should be used instead.
 pub fn continue(
   computation_thread_token_policy_id: PolicyId,
   step_datum: ct.StepDatum<a>,
@@ -296,6 +314,15 @@ pub fn validate_output_to_fraud_prover(
 
 // Internal Helpers
 
+/// Validates authenticity of the input at `input_index` (i.e. that it comes
+/// from a script, and that it carries only a computation thread token), and
+/// provides:
+/// - Script hash of the input's address.
+/// - Asset name of the computation thread.
+/// - Verification key hash of the fraud prover.
+/// - The `data` field of the spending `StepDatum` (which is of type
+///   `Option<a>`). `Option` so that first steps can also be covered.
+/// - The output at `output_index` (no validation is performed on it).
 fn validate_input_and_provide_output(
   computation_thread_token_policy_id: PolicyId,
   step_datum: ct.StepDatum<a>,
@@ -324,7 +351,8 @@ fn validate_input_and_provide_output(
       inputs,
       outputs,
       // Double satisfaction prevented by validating the output UTxO carries the
-      // same computation thread token as the input's.
+      // same computation thread token as the input's. This is _NOT_ carried out
+      // in this function though, hence this helper itself not being exposed.
       True,
     )
 
