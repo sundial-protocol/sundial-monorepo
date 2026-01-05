@@ -25,7 +25,6 @@ pub type Datum {
   scheduler_addr: Address,
   state_queue_addr: Address,
   fraud_proof_catalogue_addr: Address,
-  fraud_proof_addr: Address,
   deposit_addr: Address,
   withdrawal_addr: Address,
   tx_order_addr: Address,

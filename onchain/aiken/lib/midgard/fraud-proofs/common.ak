@@ -17,7 +17,9 @@ use midgard/common/utils.{
 }
 use midgard/computation_thread as ct
 use midgard/hub_oracle as hub
-use midgard/ledger_state.{Header, MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId}
+use midgard/ledger_state.{
+  Header, MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId,
+}
 use midgard/state_queue
 
 pub fn cancel(
@@ -120,7 +122,8 @@ pub fn continue(
 
   // 1. Output UTxO must:
   //    - Go to an address which its payment credential is a script.
-  //    - Carry the same NFT as the input UTxO, with no other tokens.
+  //    - Carry the same NFT as the input UTxO, with no other tokens
+  //      (consequently preventing double satisfaction).
   //    - Have an inline datum attached.
   //    - Not have a reference script attached.
   expect Output {
@@ -166,6 +169,7 @@ pub fn finalize(
   inputs: List<Input>,
   outputs: List<Output>,
   mint: Value,
+  extra_signatories: List<VerificationKeyHash>,
   validation_fn: fn(ScriptHash, AssetName, VerificationKeyHash, Option<a>) ->
     Bool,
 ) -> Bool {
@@ -219,13 +223,19 @@ pub fn finalize(
   expect output_fraud_prover == fraud_prover
 
   // 4. Exactly one `fraud_proof` NFT must be minted, with the same asset name
-  //    as the input NFT's. Here we are implicitly assuming this minting also
-  //    validates the burning of the computation thread NFT.
+  //    as the input NFT's.
+  //
+  //    > [!NOTE]
+  //    > Here we are implicitly assuming this minting also validates the
+  //    > burning of the computation thread NFT.
   expect Pair(mint_asset_name, 1) =
     mint |> get_singleton_asset_with_policy(fraud_proof_token_policy_id)
   expect mint_asset_name == computation_thread_token_asset_name
 
-  // 5. Custom validation for each fraud proof must pass.
+  // 5. Transaction must be signed by the fraud prover.
+  expect fraud_prover |> has_signed(extra_signatories)
+
+  // 6. Custom validation for each fraud proof must pass.
   validation_fn(
     input_script_hash,
     computation_thread_token_asset_name,

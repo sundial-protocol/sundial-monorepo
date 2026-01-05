@@ -8,7 +8,9 @@ use cardano/transaction.{
 }
 use midgard/common/utils.{verify_hash_32}
 use midgard/computation_thread as ct
-use midgard/fraud_proofs/common.{cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header}
+use midgard/fraud_proofs/common.{
+  cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header,
+}
 // use midgard/fraud_proofs/common.{
 //   MembershipProofInputs, get_singleton_ct_token, get_tx_root_validate_block_hash,
 //   handle_cancel, validate_final_step_output, validate_membership_proof,

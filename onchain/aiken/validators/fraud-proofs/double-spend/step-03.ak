@@ -32,7 +32,14 @@ validator main(
         output_index,
         computation_thread_redeemer_index,
       }) -> {
-        let Transaction { inputs, outputs, mint, redeemers, .. } = tx
+        let Transaction {
+          inputs,
+          outputs,
+          mint,
+          redeemers,
+          extra_signatories,
+          ..
+        } = tx
         let
           _own_script_hash,
           _computation_thread_token_asset_name,
