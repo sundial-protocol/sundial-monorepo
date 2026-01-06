@@ -1,6 +1,8 @@
 use aiken/crypto.{ScriptHash}
+use cardano/address.{Address}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
+use midgard/common/utils.{plutarch_phas}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{cancel, finalize}
 use midgard/fraud_proofs/double_spend/step_03.{
@@ -10,6 +12,7 @@ use midgard/fraud_proofs/double_spend/step_03.{
 validator main(
   computation_thread_token_policy_id: PolicyId,
   fraud_proof_token_policy_id: ScriptHash,
+  fraud_proof_token_address: Address,
 ) {
   spend(
     datum: Option<Datum>,
@@ -28,18 +31,14 @@ validator main(
           tx,
         )
       ct.Continue(Args {
-        index_output,
+        input_index,
         output_index,
-        computation_thread_redeemer_index,
+        fraud_proof_mint_redeemer_index,
       }) -> {
-        let Transaction {
-          inputs,
-          outputs,
-          mint,
-          redeemers,
-          extra_signatories,
-          ..
-        } = tx
+        let Transaction { inputs, outputs, redeemers, .. } = tx
+
+        expect Some(step_datum) = datum
+
         let
           _own_script_hash,
           _computation_thread_token_asset_name,
@@ -49,13 +48,15 @@ validator main(
           finalize(
             computation_thread_token_policy_id,
             fraud_proof_token_policy_id,
-            datum,
+            fraud_proof_token_address,
+            step_datum,
             input_index,
             output_index,
+            fraud_proof_mint_redeemer_index,
             own_out_ref,
             inputs,
             outputs,
-            mint,
+            redeemers,
           )
 
         expect Some(input_state) = m_input_state_data

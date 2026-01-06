@@ -4,7 +4,7 @@ use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/primitive/bytearray
 use aiken_design_patterns/singular_utxo_indexer
 use cardano/address.{Address, Script, VerificationKey}
-use cardano/assets.{AssetName, PolicyId, Value}
+use cardano/assets.{AssetName, PolicyId}
 use cardano/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptPurpose,
   Transaction,
@@ -12,10 +12,11 @@ use cardano/transaction.{
 use midgard/common/constants.{fraud_category_id_byte_count}
 use midgard/common/types.{Proof}
 use midgard/common/utils.{
-  get_redeemer_at, get_single_asset_from_value_apart_from_ada,
-  get_singleton_asset_with_policy, has_signed, plutarch_phas, verify_hash_32,
+  get_redeemer_at, get_single_asset_from_value_apart_from_ada, has_signed,
+  plutarch_phas, verify_hash_32,
 }
 use midgard/computation_thread as ct
+use midgard/fraud_proof
 use midgard/hub_oracle as hub
 use midgard/ledger_state.{
   Header, MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId,
@@ -166,7 +167,7 @@ pub fn finalize(
   step_datum: ct.StepDatum<a>,
   input_index: Int,
   output_index: Int,
-  fraud_proof_minting_redeemer_index: Int,
+  fraud_proof_mint_redeemer_index: Int,
   own_out_ref: OutputReference,
   inputs: List<Input>,
   outputs: List<Output>,
@@ -192,7 +193,6 @@ pub fn finalize(
     )
 
   // 1. Output UTxO must:
-  //    - Go to `fraud_proof_address` retrieved from hub oracle.
   //    - Have an inline datum attached.
   //    - Not have a reference script attached.
   expect Output {
@@ -202,12 +202,12 @@ pub fn finalize(
     reference_script: None,
   } = output
 
-  // 1. Successful fraud proofs must be reserved at fraud proof's spending
+  // 2. Successful fraud proofs must be reserved at fraud proof's spending
   //    script which is an always fails script.
   expect output_address == fraud_proof_address
 
-  // 2. Produced UTxO at `fraud_proof` must have only 1 NFT of its own script
-  //    hash, with the same asset name as the input NFT's.
+  // 3. Produced UTxO at `fraud_proof` must have only 1 NFT of `fraud_proof`
+  //    policy, with the same asset name as the input NFT's.
   let output_nft_triplet =
     get_single_asset_from_value_apart_from_ada(output_value)
   expect
@@ -217,31 +217,31 @@ pub fn finalize(
       1,
     )
 
-  // 3. Fraud prover must be presreved, with no additional `data`.
+  // 4. Fraud prover must be presreved, with no additional `data`.
   expect ct.StepDatum { fraud_prover: output_fraud_prover, data: None }: ct.StepDatum<
     Data,
   > = output_datum_data
   expect output_fraud_prover == fraud_prover
 
-  // 4. Fraud proof's minting script must be invoked (which also validates the
+  // 5. Fraud proof's minting script must be invoked (which also validates the
   //    burning of the computation thread token).
   let fraud_proof_mint_redeemer_data =
     get_redeemer_at(
       redeemers: redeemers,
       expected_purpose: Mint(fraud_proof_token_policy_id),
-      redeemer_index: computation_thread_mint_redeemer_index,
+      redeemer_index: fraud_proof_mint_redeemer_index,
     )
   expect fraud_proof.MintRedeemer {
     computation_thread_token_asset_name: fraud_proof_redeemer_burning_asset_name,
     ..
   } = fraud_proof_mint_redeemer_data
 
-  // 5. The asset name specified in fraud proof's redeemer must match the token
+  // 6. The asset name specified in fraud proof's redeemer must match the token
   //    included in the spending input.
   expect
     fraud_proof_redeemer_burning_asset_name == computation_thread_token_asset_name
 
-  // 6. Custom validation for each fraud proof must pass.
+  // 7. Custom validation for each fraud proof must pass.
   validation_fn(
     input_script_hash,
     computation_thread_token_asset_name,

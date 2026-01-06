@@ -14,7 +14,7 @@ pub type Args {
   bad_tx: MidgardTxCompact,
   bad_tx_body: MidgardTxBodyCompact,
   bad_tx_membership_proof: Proof,
-  computation_thread_redeemer_index: Int,
+  fraud_proof_mint_redeemer_index: Int,
   inclusion_proof_script_withdraw_redeemer_index: Int,
 }
 

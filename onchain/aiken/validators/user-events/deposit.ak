@@ -59,17 +59,6 @@ validator spend(hub_oracle: ScriptHash) {
         mint_redeemer_index,
       )
 
-    // TODO: Throwaway `0` used for redeemer here, due to bad interface of
-    //       `singular_utxo_indexer`.
-    // pub fn one_to_one(
-    //   input_index: Int,
-    //   output_index: Int,
-    //   own_ref: OutputReference,
-    //   inputs: List<Input>,
-    //   outputs: List<Output>,
-    //   double_satisfaction_prevented: Bool,
-    //   validation_logic: fn(Input, Output) -> Bool,
-    // ) -> Bool {
     let
       input,
       output,
@@ -107,9 +96,9 @@ validator spend(hub_oracle: ScriptHash) {
     let Pair(deposit_event_id, deposit_event_info) =
       ledger_state.unsafe_event_to_key_value_pair(deposit_event)
 
-    and {
-      // 4. The referenced settlement utxo's deposit tree must contain the
-      //    subject deposit event.
+    // 4. The referenced settlement utxo's deposit tree must contain the
+    //    subject deposit event.
+    expect
       plutarch_phas(
         deposits_root,
         deposit_event_id,
@@ -117,13 +106,17 @@ validator spend(hub_oracle: ScriptHash) {
         membership_proof,
         redeemers,
         inclusion_proof_script_withdraw_redeemer_index,
-      ),
-      // 5. Assert no datum is attached to the produced UTxO.
-      //    TODO: This might change depending on implementation of reserve.
-      output_datum == NoDatum,
-      // 6. Deposit must go to the reserve.
-      output_address == reserve_addr,
-    }
+      )
+
+    // 5. Assert no datum is attached to the produced UTxO.
+    //    TODO: This might change depending on implementation of reserve.
+    output_datum == NoDatum
+
+    // 6. Deposit must go to the reserve.
+    output_address == reserve_addr
+
+    // Done.
+    True
   }
 
   else(_) {
