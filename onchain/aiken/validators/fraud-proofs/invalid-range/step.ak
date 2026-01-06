@@ -13,7 +13,7 @@ use cardano/transaction.{
 use midgard/common/utils.{verify_hash_32}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
-  cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header,
+  cancel, finalize, verify_bad_tx_in_state_queue_node_and_get_header,
 }
 use midgard/fraud_proofs/invalid_range/step.{Args, Datum, SpendRedeemer}
 use midgard/hub_oracle as hub
@@ -31,10 +31,6 @@ validator main(
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
-    expect Some(step_datum) = datum
-    expect Some(own_input) =
-      list.find(tx.inputs, fn(a_input) { a_input.output_reference == input })
-
     when redeemer is {
       ct.Cancel { input_index, computation_thread_mint_redeemer_index } ->
         cancel(

@@ -34,7 +34,7 @@ validator main(
         output_index,
         double_spent_input_key,
         double_spent_input_value,
-        input_membership_proof,
+        double_spent_input_membership_proof,
         inclusion_proof_script_withdraw_redeemer_index,
       }) -> {
         let Transaction { inputs, outputs, .. } = tx
@@ -67,7 +67,7 @@ validator main(
             merkle_root: input_state.verified_tx1_inputs_root,
             key: double_spent_input_key,
             value: double_spent_input_value,
-            membership_proof: input_membership_proof,
+            membership_proof: double_spent_input_membership_proof,
             redeemers: redeemers,
             withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
           )

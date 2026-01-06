@@ -14,7 +14,7 @@ pub type Args {
   output_index: Int,
   double_spent_input_key: Data,
   double_spent_input_value: Data,
-  input_membership_proof: Proof,
+  double_spent_input_membership_proof: Proof,
   inclusion_proof_script_withdraw_redeemer_index: Int,
 }
 
