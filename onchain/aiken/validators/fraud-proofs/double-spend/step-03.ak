@@ -33,7 +33,9 @@ validator main(
       ct.Continue(Args {
         input_index,
         output_index,
+        input_membership_proof,
         fraud_proof_mint_redeemer_index,
+        inclusion_proof_script_withdraw_redeemer_index,
       }) -> {
         let Transaction { inputs, outputs, redeemers, .. } = tx
 

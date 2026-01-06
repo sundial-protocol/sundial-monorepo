@@ -2,7 +2,9 @@ use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/linked_list/unordered as unordered
-use aiken_design_patterns/validity_range_normalization as vrn
+use aiken_design_patterns/validity_range_normalization.{
+  Always, ClosedRange, FromNegInf, ToPosInf,
+} as vrn
 use cardano/address.{Address}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{
@@ -26,7 +28,7 @@ validator main(
   spend(
     datum: Option<Datum>,
     redeemer: SpendRedeemer,
-    input: OutputReference,
+    own_out_ref: OutputReference,
     tx: Transaction,
   ) {
     expect Some(step_datum) = datum

@@ -22,7 +22,9 @@ use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
   cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header,
 }
-use midgard/fraud_proofs/double_spend/step_01.{Args, Datum, SpendRedeemer}
+use midgard/fraud_proofs/double_spend/step_01.{
+  Args, Datum, SpendRedeemer, State,
+}
 use midgard/fraud_proofs/double_spend/step_02
 use midgard/hub_oracle as hub
 
