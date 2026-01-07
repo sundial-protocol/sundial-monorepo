@@ -183,13 +183,6 @@ library
     ViewPatterns
 
   exposed-modules:
-    MerkleTree.Helpers
-    MerkleTree.MerklePatriciaForestry
-    MerkleTree.Merkling
-    Midgard.Crypto
-    Midgard.List
-    Midgard.PlutusDataList
-    Midgard.Utils
     Profile
     Types.Blocks
     Types.Classes
@@ -262,12 +255,6 @@ test-suite helpers-tests
   main-is:          Test.hs
   hs-source-dirs:   src src/Testing
   other-modules:
-    MerkleTree.Helpers
-    MerkleTree.MerklePatriciaForestry
-    MerkleTree.Merkling
-    Midgard.Crypto
-    Midgard.List
-    Midgard.Utils
     Testing.Crypto
     Testing.Eval
     Testing.MerklePatriciaForestry
