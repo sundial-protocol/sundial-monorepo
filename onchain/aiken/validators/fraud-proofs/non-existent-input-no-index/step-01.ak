@@ -10,25 +10,19 @@ use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
   cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header,
 }
-use midgard/fraud_proofs/non_existing_input_no_index/step.{
-  Datum, Args, SpendRedeemer
+use midgard/fraud_proofs/non_existent_input_no_index/step_01.{
+  Args, Datum, SpendRedeemer,
 }
-use midgard/hub_oracle as hub
+use midgard/fraud_proofs/non_existent_input_no_index/step_02
 
 validator main(
-  // Fraud proof token policy
-  fraud_proof_token_policy: PolicyId,
-  // Script hash of stake validator (forwarded merkle proof logic)
-  plutarch_midgard_merkle_validator_inclusion: ScriptHash,
-  // Script hash of stake validator (forwarded merkle proof logic)
-  plutarch_midgard_merkle_validator_input_hash_inclusion: ScriptHash,
-  // Computation thread token policy
-  ct_token_policy_id: PolicyId,
+  step_02_validator_script_hash: ScriptHash,
+  computation_thread_token_policy_id: PolicyId,
   hub_oracle: ScriptHash,
 ) {
   spend(
     datum: Option<Datum>,
-    redeemer: Step1Redeemer,
+    redeemer: SpendRedeemer,
     own_out_ref: OutputReference,
     tx: Transaction,
   ) {
@@ -42,8 +36,7 @@ validator main(
           computation_thread_mint_redeemer_index,
           tx,
         )
-      // Step 1: Membership proof for tx1
-      ct.Continue (Args{
+      ct.Continue(Args {
         bad_state_queue_node_ref_input_index,
         bad_tx_hash,
         bad_tx_info_hash,
@@ -71,7 +64,7 @@ validator main(
           own_script_hash,
           computation_thread_token_asset_name,
           _fraud_prover,
-          m_input_state_data,
+          _m_input_state_data,
           output_script_hash,
           output_state_data,
         <-
@@ -85,7 +78,14 @@ validator main(
             outputs,
           )
 
-        // 2. The provided transaction must be valid, and must be included in
+        // 2. The UTxO must be produced at next step's script hash with the
+        //    verified bad transactions' inputs included in its datum.
+        expect output_script_hash == step_02_validator_script_hash
+        let expected_output_state: Data =
+          step_02.State { verified_tx1_inputs_root: bad_tx_body.spend_inputs }
+        expect output_state_data == expected_output_state
+
+        // 3. The provided transaction must be valid, and must be included in
         //    the specified state queue node.
         expect _header =
           verify_bad_tx_in_state_queue_node_and_get_header(
@@ -102,7 +102,8 @@ validator main(
             redeemers,
           )
 
-
+        // Done.
+        True
 
         let hub.Datum { state_queue, .. } =
           hub.get_datum(tx.reference_inputs, hub_oracle, hub_ref_input_index)

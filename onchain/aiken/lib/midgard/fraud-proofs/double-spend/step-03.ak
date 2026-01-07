@@ -1,9 +1,10 @@
 use midgard/common/types.{MerkleRoot, Proof}
 use midgard/computation_thread as ct
+use midgard/ledger_state.{MidgardInputId}
 
 pub type State {
   verified_tx2_inputs_root: MerkleRoot,
-  double_spent_input_key: Data,
+  double_spent_input_key: MidgardInputId,
   double_spent_input_value: Data,
 }
 

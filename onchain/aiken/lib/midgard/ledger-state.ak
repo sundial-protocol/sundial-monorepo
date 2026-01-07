@@ -181,6 +181,13 @@ pub type MidgardTxValidity {
 
 // ### Transaction body
 
+/// Datatype to allow inputs of a Midgard tx to be in custom order.
+pub type MidgardInputId {
+  input_index: Int,
+  transaction_id: MidgardTxId,
+  output_index: Int,
+}
+
 /// Midgard transaction body.
 /// Compact representation.
 pub type MidgardTxBodyCompact {

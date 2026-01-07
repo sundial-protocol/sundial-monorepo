@@ -110,10 +110,10 @@ validator spend(hub_oracle: ScriptHash) {
 
     // 5. Assert no datum is attached to the produced UTxO.
     //    TODO: This might change depending on implementation of reserve.
-    output_datum == NoDatum
+    expect output_datum == NoDatum
 
     // 6. Deposit must go to the reserve.
-    output_address == reserve_addr
+    expect output_address == reserve_addr
 
     // Done.
     True

@@ -76,7 +76,7 @@ validator main(
             computation_thread_token_policy_id,
             fraud_proof_token_policy_id,
             fraud_proof_token_address,
-            datum,
+            step_datum,
             input_index,
             output_index,
             fraud_proof_mint_redeemer_index,
@@ -116,16 +116,17 @@ validator main(
         //
         //    > [!NOTE]
         //    > We are assuming inclusive lower bound and exclusive upper bound
-        //    > in the block. TODO: This needs clarifications in specs.
-        when bad_tx_normalized_validity_range is {
-          ClosedRange { lower, upper } -> or {
-              lower < block_valid_from,
-              upper >= block_valid_to,
-            }
-          FromNegInf { upper } -> upper >= block_valid_to
-          ToPosInf { lower } -> lower < block_valid_from
-          Always -> fail @"The tx does not have an invalid time range"
-        }
+        //    > in the block. TODO: This needs clarification in specs.
+        expect
+          when bad_tx_normalized_validity_range is {
+            ClosedRange { lower, upper } -> or {
+                lower < block_valid_from,
+                upper >= block_valid_to,
+              }
+            FromNegInf { upper } -> upper >= block_valid_to
+            ToPosInf { lower } -> lower < block_valid_from
+            Always -> fail @"The tx does not have an invalid time range"
+          }
 
         // Done.
         True

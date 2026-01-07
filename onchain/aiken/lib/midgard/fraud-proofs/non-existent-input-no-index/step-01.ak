@@ -1,6 +1,6 @@
 use midgard/common/types.{MerkleRoot, Proof}
 use midgard/computation_thread as ct
-use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact}
+use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId}
 
 pub type Datum =
   ct.StepDatum<Data>
@@ -16,7 +16,6 @@ pub type Args {
   bad_tx_membership_proof: Proof,
   fraud_proof_mint_redeemer_index: Int,
   inclusion_proof_script_withdraw_redeemer_index: Int,
-
   bad_state_queue_node_ref_input_index: Int,
   bad_tx_hash: ByteArray,
   bad_tx_info_hash: ByteArray,

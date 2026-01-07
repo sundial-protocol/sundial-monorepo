@@ -250,15 +250,15 @@ pub fn finalize(
   )
 }
 
-fn verify_tx_and_its_body(
-  bad_tx_id: MidgardTxId,
-  bad_tx: MidgardTxCompact,
-  bad_tx_body: MidgardTxBodyCompact,
+pub fn verify_tx_and_its_body(
+  tx_id: MidgardTxId,
+  tx: MidgardTxCompact,
+  tx_body: MidgardTxBodyCompact,
 ) -> Bool {
-  let bad_tx_data: Data = bad_tx
+  let tx_data: Data = tx
   and {
-    verify_hash_32(data: bad_tx_data, data_hash: bad_tx_id),
-    verify_hash_32(data: bad_tx_body, data_hash: bad_tx.body),
+    verify_hash_32(data: tx_data, data_hash: tx_id),
+    verify_hash_32(data: tx_body, data_hash: tx.body),
   }
 }
 

@@ -26,7 +26,6 @@ use midgard/fraud_proofs/double_spend/step_01.{
   Args, Datum, SpendRedeemer, State,
 }
 use midgard/fraud_proofs/double_spend/step_02
-use midgard/hub_oracle as hub
 
 validator main(
   step_02_validator_script_hash: ScriptHash,
