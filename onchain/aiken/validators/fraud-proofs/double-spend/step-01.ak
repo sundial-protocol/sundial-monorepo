@@ -1,4 +1,4 @@
-//// ## Double Spend Fraud Proof
+//// ## Double Spend Fraud Proof (Section 5.1.1)
 ////
 //// Proves 2 unique transactions exist such that both spend the same UTxO.
 ////
@@ -86,7 +86,7 @@ validator main(
 
         // 2. The provided transaction must be valid, and must be included in
         //    the specified state queue node.
-        let _header =
+        expect _header =
           verify_bad_tx_in_state_queue_node_and_get_header(
             bad_tx_id,
             bad_tx,

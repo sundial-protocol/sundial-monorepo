@@ -2,8 +2,12 @@ use midgard/common/types.{MerkleRoot, Proof}
 use midgard/computation_thread as ct
 use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact}
 
+pub type State {
+  verified_tx_inputs_root: MerkleRoot,
+}
+
 pub type Datum =
-  ct.StepDatum<Data>
+  ct.StepDatum<State>
 
 pub type Args {
   input_index: Int,
@@ -37,3 +41,4 @@ pub type Args {
 
 pub type SpendRedeemer =
   ct.StepRedeemer<Args>
+

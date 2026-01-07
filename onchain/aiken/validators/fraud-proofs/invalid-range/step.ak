@@ -1,3 +1,9 @@
+//// ## Invalid Range Fraud Proof (Section 5.1.2)
+////
+//// Proves a given transaction, which has a validity range with one or both
+//// ends bounded, is included in a Midgard block whose validity range does not
+//// cover the transaction's validity range.
+
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite, Interval}
