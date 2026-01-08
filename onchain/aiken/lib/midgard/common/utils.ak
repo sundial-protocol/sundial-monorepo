@@ -6,6 +6,7 @@ use aiken/crypto.{
   ScriptHash, VerificationKey, VerificationKeyHash, blake2b_224, blake2b_256,
 }
 use aiken/interval.{Finite, Interval, NegativeInfinity, PositiveInfinity}
+use aiken_design_patterns/merkelized_validator
 use aiken_design_patterns/stake_validator
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
@@ -14,7 +15,7 @@ use cardano/transaction.{
 }
 use env
 use midgard/common/constants.{posix_time_none}
-use midgard/common/types.{H28, H32, PosixTime, Proof, ValuePairs}
+use midgard/common/types.{H28, H32, MerkleRoot, PosixTime, Proof, ValuePairs}
 
 /// Check whether the interval starts on or after the point.
 pub fn is_hereafter(self: Interval, point: Int) -> Bool {
@@ -510,7 +511,7 @@ pub fn get_redeemer_at(
 /// > [!WARNING]
 /// > This function can only be used **once within a given transaction**.
 pub fn plutarch_phas(
-  merkle_root: ByteArray,
+  merkle_root: MerkleRoot,
   key: Data,
   value: Data,
   membership_proof: Proof,
@@ -546,7 +547,7 @@ pub fn plutarch_phas(
 /// > [!WARNING]
 /// > This function can only be used **once within a given transaction**.
 pub fn plutarch_pexcludes(
-  merkle_root: ByteArray,
+  merkle_root: MerkleRoot,
   key: Data,
   non_membership_proof: Proof,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
@@ -572,6 +573,27 @@ pub fn plutarch_pexcludes(
     redeemer_key_data == key,
     redeemer_proof_data == proof_data,
   }
+}
+
+pub fn plutarch_pdelete(
+  merkle_root_before_delete: MerkleRoot,
+  key: Data,
+  value: Data,
+  membership_proof: Proof,
+  redeemers: Pairs<ScriptPurpose, Redeemer>,
+  withdraw_redeemer_index: Int,
+) -> MerkleRoot {
+  let proof_data: Data = membership_proof
+  let function_input: List<Data> =
+    [builtin.b_data(merkle_root_before_delete), key, value, proof_data]
+  merkelized_validator.delegated_compute(
+    function_input: function_input,
+    staking_validator: env.plutarch_pdelete_validator_hash,
+    redeemers: redeemers,
+    redeemer_index: withdraw_redeemer_index,
+    input_data_coercer: builtin.un_list_data,
+    output_data_coercer: builtin.un_b_data,
+  )
 }
 
 pub fn get_verification_key_hash(key: VerificationKey) -> VerificationKeyHash {

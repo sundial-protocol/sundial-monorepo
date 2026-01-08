@@ -79,12 +79,16 @@ validator main(
           )
 
         // 3. The UTxO must be produced at next step's script hash with the
-        //    verified bad transactions' inputs included in its datum.
+        //    verified transaction's outputs root included in its datum, the
+        //    non-existent input's output index (which is expected to be larger
+        //    than the last output in the provided trie), and output index `0`
+        //    which is the first output to be deleted from the trie.
         expect output_script_hash == step_04_validator_script_hash
         let expected_output_state: Data =
           step_04.State {
             verified_outputs_root: previous_tx_body.outputs,
             non_existent_input_output_index,
+            output_index_to_delete: 0,
           }
         expect output_state_data == expected_output_state
 
