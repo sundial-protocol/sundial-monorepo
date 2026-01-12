@@ -9,34 +9,43 @@ import Plutarch.Builtin.Crypto (pblake2b_256)
 import Plutarch.LedgerApi.AssocMap qualified as AssocMap
 import Plutarch.LedgerApi.Interval qualified as Interval
 import Plutarch.LedgerApi.V3 (
-  PDatum,
-  PDatumHash,
   PPosixTime (..),
   PPubKeyHash (..),
   PRedeemer,
   PScriptHash,
-  PScriptPurpose,
   PTxId,
   PTxInInfo,
   PTxOut,
   PTxOutRef,
  )
 import Plutarch.LedgerApi.Value qualified as Value
-import Plutarch.MerkleTree.PatriciaForestry
+import Plutarch.MerkleTree.PatriciaForestry (
+  MerklePatriciaForestry,
+  PMerklePatriciaForestry,
+  PProof,
+  phas,
+ )
 import Plutarch.Prelude
-import PlutusLedgerApi.Data.V1 (
+import PlutusLedgerApi.V3 (
   BuiltinByteString,
+  BuiltinData,
+  CurrencySymbol,
   FromData,
+  Lovelace,
+  MintValue,
   POSIXTime,
-  ScriptPurpose,
+  POSIXTimeRange,
+  PubKeyHash,
+  Redeemer,
+  ScriptHash,
   ToData,
+  TxId,
   TxInInfo,
   TxOut,
   TxOutRef,
   UnsafeFromData,
+  Value,
  )
-import PlutusLedgerApi.V2 qualified as V2
-import PlutusLedgerApi.V3 qualified as V3
 import PlutusTx qualified
 
 data Block = Block
@@ -107,9 +116,9 @@ deriving via
     PLiftable PStateCommitment
 
 data MidgardScriptInfo
-  = MintingScript V2.CurrencySymbol
-  | SpendingScript V2.ScriptHash V2.TxOutRef
-  | ObservingScript V2.ScriptHash
+  = MintingScript CurrencySymbol
+  | SpendingScript ScriptHash TxOutRef
+  | ObservingScript ScriptHash
   deriving stock (Generic)
 
 PlutusTx.unstableMakeIsData ''MidgardScriptInfo
@@ -135,16 +144,15 @@ deriving via
 data MidgardTxInfo = MidgardTxInfo
   { mtxInfoInputs :: [TxInInfo]
   , mtxInfoReferenceInputs :: [TxInInfo]
-  , mtxInfoOutputs :: [V2.TxOut]
-  , mtxInfoFee :: V2.Lovelace
-  , mtxInfoMint :: V2.Value
-  , mtxInfoMintCount :: Integer
-  , mtxInfoObservers :: [V2.ScriptHash]
-  , mtxInfoValidRange :: V2.POSIXTimeRange
-  , mtxInfoSignatories :: [V2.PubKeyHash]
-  , mtxInfoRedeemers :: V2.Map ScriptPurpose V2.Redeemer
-  , mtxInfoData :: V2.Map V2.DatumHash V2.Datum
-  , mtxInfoId :: V3.TxId
+  , mtxInfoOutputs :: [TxOut]
+  , mtxInfoFee :: Lovelace
+  , mtxInfoValidRange :: POSIXTimeRange
+  , mtxInfoObservers :: [ScriptHash]
+  , mtxInfoSignatories :: [PubKeyHash]
+  , mtxInfoMint :: MintValue
+  , mtxInfoScriptIntegrityHash :: BuiltinData
+  , mtxInfoAuxDataHash :: BuiltinData
+  , mtxInfoId :: TxId
   }
   deriving stock (Generic, Show)
 
@@ -158,20 +166,15 @@ data PMidgardTxInfo (s :: S)
   , pmidguardTxInfo'outputs :: Term s (PAsData (PBuiltinList PTxOut))
   , -- the transaction fee
     pmidguardTxInfo'fee :: Term s (PAsData Value.PLovelace)
-  , -- value minted by the transaction
-    pmidguardTxInfo'mint :: Term s (PAsData (Value.PValue 'AssocMap.Sorted 'Value.NoGuarantees))
-  , -- count of unique tokens minted by the transaction
-    pmidguardTxInfo'mintCount :: Term s (PAsData PInteger)
+  , pmidguardTxInfo'validRange :: Term s (PAsData (Interval.PInterval PPosixTime))
   , -- Script hashes of all observer scripts executing in the transaction
     pmidguardTxInfo'observers :: Term s (PAsData (PBuiltinList (PAsData PScriptHash)))
-  , pmidguardTxInfo'validRange :: Term s (PAsData (Interval.PInterval PPosixTime))
   , pmidguardTxInfo'signatories :: Term s (PAsData (PBuiltinList (PAsData PPubKeyHash)))
-  , pmidguardTxInfo'redeemers :: Term s (PAsData (PBuiltinList (PAsData (PBuiltinPair (PAsData PScriptPurpose) (PAsData PRedeemer)))))
-  , pmidguardTxInfo'data :: Term s (PAsData (PBuiltinList (PAsData (PBuiltinPair (PAsData PDatumHash) (PAsData PDatum)))))
-  , -- hash of the pending transaction
-    -- TODO:
-    -- probably have to change this to script data integrity hash
-    pmidguardTxInfo'id :: Term s (PAsData PTxId)
+  , -- value minted by the transaction
+    pmidguardTxInfo'mint :: Term s (PAsData (Value.PValue 'AssocMap.Sorted 'Value.NoGuarantees))
+  , pmidguardTxInfo'scriptIntegrityHash :: Term s PData
+  , pmidguardTxInfo'auxDataHash :: Term s PData
+  , pmidguardTxInfo'id :: Term s (PAsData PTxId)
   }
   deriving stock (Generic)
   deriving anyclass
@@ -206,14 +209,14 @@ data MidgardTxBodyContent = MidgardTxBodyContent
   , txInsCollateral :: [TxOutRef]
   , txInsReference :: [TxOutRef]
   , txOuts :: [TxOut]
-  , txTotalCollateral :: V2.Lovelace
+  , txTotalCollateral :: Lovelace
   , txReturnCollateral :: TxOut
-  , txFee :: V2.Lovelace
-  , txValidityLowerBound :: Maybe V2.POSIXTime
-  , txValidityUpperBound :: Maybe V2.POSIXTime
+  , txFee :: Lovelace
+  , txValidityLowerBound :: Maybe POSIXTime
+  , txValidityUpperBound :: Maybe POSIXTime
   , -- signed tx body
-    txRequiredSigners :: [V2.PubKeyHash]
-  , txMintValue :: V2.Value
+    txRequiredSigners :: [PubKeyHash]
+  , txMintValue :: Value
   }
   deriving stock (Generic, Show)
 
@@ -228,8 +231,8 @@ newtype Signature = Signature {getSignature :: BuiltinByteString}
   deriving newtype (FromData, UnsafeFromData, ToData)
 
 data MidgardTxWitness = MidgardTxWitness
-  { pkWits :: [(PubKey, Signature, V2.PubKeyHash)]
-  , scriptWits :: [(V2.ScriptHash, V2.Redeemer)]
+  { pkWits :: [(PubKey, Signature, PubKeyHash)]
+  , scriptWits :: [(ScriptHash, Redeemer)]
   }
   deriving stock (Generic, Show)
 
