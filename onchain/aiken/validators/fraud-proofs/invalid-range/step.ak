@@ -19,7 +19,7 @@ use cardano/transaction.{
 use midgard/common/utils.{verify_hash_32}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
-  cancel, finalize, verify_bad_tx_in_state_queue_node_and_get_header,
+  cancel, finalize, verify_tx_in_state_queue_node_and_get_header,
 }
 use midgard/fraud_proofs/invalid_range/step.{Args, Datum, SpendRedeemer}
 use midgard/hub_oracle as hub
@@ -93,7 +93,7 @@ validator main(
           end_time: block_valid_to,
           ..
         } =
-          verify_bad_tx_in_state_queue_node_and_get_header(
+          verify_tx_in_state_queue_node_and_get_header(
             bad_tx_id,
             bad_tx,
             bad_tx_body,
@@ -113,6 +113,10 @@ validator main(
         // 3. One or more **bounds** of the bad transaction's validity interval
         //    must fall out of the block's. Meaning unbounded ends are not
         //    validated against the block's time range.
+        //
+        //    Also if the range is invalid (i.e. lower bound is greater than or
+        //    equal to the upper bound), the fraud proof should be able to
+        //    succeed.
         //
         //    > [!NOTE]
         //    > We are assuming inclusive lower bound and exclusive upper bound

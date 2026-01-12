@@ -262,22 +262,22 @@ pub fn verify_tx_and_its_body(
   }
 }
 
-pub fn verify_bad_tx_in_state_queue_node_and_get_header(
-  bad_tx_id: MidgardTxId,
-  bad_tx: MidgardTxCompact,
-  bad_tx_body: MidgardTxBodyCompact,
-  bad_tx_membership_proof: Proof,
+pub fn verify_tx_in_state_queue_node_and_get_header(
+  tx_id: MidgardTxId,
+  tx: MidgardTxCompact,
+  tx_body: MidgardTxBodyCompact,
+  tx_membership_proof: Proof,
   computation_thread_token_asset_name: AssetName,
   hub_oracle: PolicyId,
   hub_ref_input_index: Int,
-  bad_state_queue_node_ref_input_index: Int,
+  state_queue_node_ref_input_index: Int,
   inclusion_proof_script_withdraw_redeemer_index: Int,
   reference_inputs: List<Input>,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
 ) -> Header {
-  // 1. Verify authenticity of the provided bad tx and its body against its ID,
-  //    and body hash.
-  expect verify_tx_and_its_body(bad_tx_id, bad_tx, bad_tx_body)
+  // 1. Verify authenticity of the provided tx and its body against its ID, and
+  //    body hash.
+  expect verify_tx_and_its_body(tx_id, tx, tx_body)
 
   // 2. Hub oracle must be provided as a reference input.
   let hub.Datum { state_queue: state_queue_policy, .. } =
@@ -290,7 +290,7 @@ pub fn verify_bad_tx_in_state_queue_node_and_get_header(
     state_queue.get_block_datum(
       reference_inputs,
       state_queue_policy,
-      bad_state_queue_node_ref_input_index,
+      state_queue_node_ref_input_index,
     )
 
   // 3. The asset name of the computation thread token must match the state
@@ -301,15 +301,15 @@ pub fn verify_bad_tx_in_state_queue_node_and_get_header(
       fraud_category_id_byte_count,
     )
 
-  // 4. Specified bad transaction must be proven to be included in the
-  //    referenced state queue node.
-  let bad_tx_data: Data = bad_tx
+  // 4. Specified transaction must be proven to be included in the referenced
+  //    state queue node.
+  let tx_data: Data = tx
   expect
     plutarch_phas(
       merkle_root: state_queue_datum.transactions_root,
-      key: builtin.b_data(bad_tx_id),
-      value: bad_tx_data,
-      membership_proof: bad_tx_membership_proof,
+      key: builtin.b_data(tx_id),
+      value: tx_data,
+      membership_proof: tx_membership_proof,
       redeemers: redeemers,
       withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
     )

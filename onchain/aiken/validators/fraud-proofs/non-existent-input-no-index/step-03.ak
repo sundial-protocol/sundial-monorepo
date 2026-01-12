@@ -4,8 +4,8 @@ use cardano/transaction.{Input, OutputReference, Transaction}
 use midgard/common/utils
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
-  cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header,
-  verify_tx_and_its_body,
+  cancel, continue, verify_tx_and_its_body,
+  verify_tx_in_state_queue_node_and_get_header,
 }
 use midgard/fraud_proofs/non_existent_input_no_index/step_03.{
   Args, Datum, SpendRedeemer, State,

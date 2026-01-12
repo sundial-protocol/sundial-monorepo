@@ -4,7 +4,7 @@ use cardano/transaction.{Input, OutputReference, Transaction}
 use midgard/common/utils.{plutarch_phas}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
-  cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header,
+  cancel, continue, verify_tx_in_state_queue_node_and_get_header,
 }
 use midgard/fraud_proofs/non_existent_input_no_index/step_02.{
   Args, Datum, SpendRedeemer,
@@ -64,7 +64,8 @@ validator main(
 
         expect Some(input_state) = m_input_state_data
 
-        // 2. Provided input must be a member of the first transaction's inputs.
+        // 2. Provided input must be a member of the verified transaction's
+        //    inputs.
         expect
           plutarch_phas(
             merkle_root: input_state.verified_tx_inputs_root,
@@ -75,7 +76,8 @@ validator main(
             withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
           )
 
-        // 3. The proven inputs key must be passed to the next step.
+        // 3. The proven inputs key must be passed to the next step so that its
+        //    producing transaction can be verified against the included hash.
         expect output_script_hash == step_03_validator_script_hash
         let expected_output_state: Data =
           step_03.State {

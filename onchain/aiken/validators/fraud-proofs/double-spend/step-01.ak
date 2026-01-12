@@ -20,7 +20,7 @@ use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
-  cancel, continue, verify_bad_tx_in_state_queue_node_and_get_header,
+  cancel, continue, verify_tx_in_state_queue_node_and_get_header,
 }
 use midgard/fraud_proofs/double_spend/step_01.{
   Args, Datum, SpendRedeemer, State,
@@ -86,7 +86,7 @@ validator main(
         // 2. The provided transaction must be valid, and must be included in
         //    the specified state queue node.
         expect _header =
-          verify_bad_tx_in_state_queue_node_and_get_header(
+          verify_tx_in_state_queue_node_and_get_header(
             bad_tx_id,
             bad_tx,
             bad_tx_body,

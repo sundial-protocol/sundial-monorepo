@@ -6,8 +6,8 @@ use midgard/common/constants.{empty_merkle_tree_root}
 use midgard/common/utils
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
-  cancel, continue, finalize, verify_bad_tx_in_state_queue_node_and_get_header,
-  verify_tx_and_its_body,
+  cancel, continue, finalize, verify_tx_and_its_body,
+  verify_tx_in_state_queue_node_and_get_header,
 }
 use midgard/fraud_proofs/non_existent_input_no_index/step_04.{
   Datum, Finalize, Recurse, SpendRedeemer, State,
@@ -41,8 +41,7 @@ validator main(
         membership_proof,
         merkle_delete_script_withdraw_redeemer_index,
       }) -> {
-        let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
-          tx
+        let Transaction { inputs, outputs, redeemers, .. } = tx
 
         expect Some(step_datum) = datum
 
@@ -97,6 +96,7 @@ validator main(
         let expected_output_state: Data =
           State {
             ..input_state,
+            verified_outputs_root: updated_outputs_root,
             output_index_to_delete: output_index_to_delete + 1,
           }
         expect output_state_data == expected_output_state
@@ -108,7 +108,52 @@ validator main(
         input_index,
         output_index,
         fraud_proof_mint_redeemer_index,
-      }) -> todo
+      }) -> {
+        let Transaction { inputs, outputs, redeemers, .. } = tx
+
+        expect Some(step_datum) = datum
+
+        // 1. Specified input must be authentic and properly reproduced at the
+        //    fraud proof's spending address.
+        let
+          _own_script_hash,
+          _computation_thread_token_asset_name,
+          _fraud_prover,
+          m_input_state_data,
+        <-
+          finalize(
+            computation_thread_token_policy_id,
+            fraud_proof_token_policy_id,
+            fraud_proof_token_address,
+            step_datum,
+            input_index,
+            output_index,
+            fraud_proof_mint_redeemer_index,
+            own_out_ref,
+            inputs,
+            outputs,
+            redeemers,
+          )
+
+        expect Some(
+          State {
+            verified_outputs_root,
+            non_existent_input_output_index,
+            output_index_to_delete,
+          } as input_state,
+        ) = m_input_state_data
+
+        // 2. With `Finalize` redeemer, the outputs must be empty.
+        expect verified_outputs_root == empty_merkle_tree_root
+
+        // 3. With outputs exhausted, `non_existent_input_output_index` must be
+        //    greater than or equal `output_index_to_delete` (since this value
+        //    is now equal to the "length" of the outputs list).
+        expect non_existent_input_output_index >= output_index_to_delete
+
+        // Done.
+        True
+      }
     }
   }
 
