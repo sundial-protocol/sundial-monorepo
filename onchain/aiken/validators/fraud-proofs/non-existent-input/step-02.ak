@@ -1,12 +1,10 @@
-use aiken_design_patterns/validity_range_normalization.{
-  Always, ClosedRange, FromNegInf, ToPosInf,
-} as vrn
 use cardano/address.{Address}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
+use midgard/common/utils
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{cancel, finalize}
-use midgard/fraud_proofs/invalid_range/step_02.{
+use midgard/fraud_proofs/non_existent_input/step_02.{
   Args, Datum, SpendRedeemer, State,
 }
 
@@ -34,6 +32,12 @@ validator main(
       ct.Continue(Args {
         input_index,
         output_index,
+        non_existent_input_key,
+        non_existent_input_value,
+        membership_proof_in_bad_tx,
+        membership_proof_script_redeemer_index,
+        non_membership_proof_in_ledger,
+        non_membership_proof_script_redeemer_index,
         fraud_proof_mint_redeemer_index,
       }) -> {
         let Transaction { inputs, outputs, redeemers, .. } = tx
@@ -62,33 +66,31 @@ validator main(
             redeemers,
           )
 
-        expect Some(State {
-          block_valid_from,
-          block_valid_to,
-          bad_tx_normalized_validity_range,
-        }) = m_input_state_data
+        expect Some(State { bad_tx_inputs_root, blocks_prev_utxos_root }) =
+          m_input_state_data
 
-        // 2. One or more **bounds** of the bad transaction's validity interval
-        //    must fall out of the block's. Meaning unbounded ends are not
-        //    validated against the block's time range.
-        //
-        //    Also if the range is invalid (i.e. lower bound is greater than or
-        //    equal to the upper bound), the fraud proof should be able to
-        //    succeed.
-        //
-        //    > [!NOTE]
-        //    > We are assuming inclusive lower bound and exclusive upper bound
-        //    > in the block. TODO: This needs clarification in specs.
+        let non_existent_input_key_data: Data = non_existent_input_key
+
+        // 2. Target input must be included in the verified transaction inputs.
         expect
-          when bad_tx_normalized_validity_range is {
-            ClosedRange { lower, upper } -> or {
-                lower < block_valid_from,
-                upper >= block_valid_to,
-              }
-            FromNegInf { upper } -> upper >= block_valid_to
-            ToPosInf { lower } -> lower < block_valid_from
-            Always -> fail @"The tx does not have an invalid time range"
-          }
+          utils.plutarch_phas(
+            merkle_root: bad_tx_inputs_root,
+            key: non_existent_input_key_data,
+            value: non_existent_input_value,
+            membership_proof: membership_proof_in_bad_tx,
+            redeemers: redeemers,
+            withdraw_redeemer_index: membership_proof_script_redeemer_index,
+          )
+
+        // 3. Target input must be absent from the verified block's prev ledger.
+        expect
+          utils.plutarch_pexcludes(
+            merkle_root: blocks_prev_utxos_root,
+            key: non_existent_input_key_data,
+            non_membership_proof: non_membership_proof_in_ledger,
+            redeemers: redeemers,
+            withdraw_redeemer_index: non_membership_proof_script_redeemer_index,
+          )
 
         // Done.
         True
