@@ -1,12 +1,8 @@
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
-use cardano/transaction.{Input, OutputReference, Transaction}
-use midgard/common/utils
+use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread as ct
-use midgard/fraud_proofs/common.{
-  cancel, continue, verify_tx_and_its_body,
-  verify_tx_in_state_queue_node_and_get_header,
-}
+use midgard/fraud_proofs/common.{cancel, continue, verify_tx_and_its_body}
 use midgard/fraud_proofs/non_existent_input_no_index/step_03.{
   Args, Datum, SpendRedeemer, State,
 }
@@ -39,8 +35,7 @@ validator main(
         previous_tx,
         previous_tx_body,
       }) -> {
-        let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
-          tx
+        let Transaction { inputs, outputs, .. } = tx
 
         expect Some(step_datum) = datum
 

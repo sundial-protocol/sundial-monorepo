@@ -133,13 +133,11 @@ validator main(
             redeemers,
           )
 
-        expect Some(
-          State {
-            verified_outputs_root,
-            non_existent_input_output_index,
-            output_index_to_delete,
-          } as input_state,
-        ) = m_input_state_data
+        expect Some(State {
+          verified_outputs_root,
+          non_existent_input_output_index,
+          output_index_to_delete,
+        }) = m_input_state_data
 
         // 2. With `Finalize` redeemer, the outputs must be empty.
         expect verified_outputs_root == empty_merkle_tree_root

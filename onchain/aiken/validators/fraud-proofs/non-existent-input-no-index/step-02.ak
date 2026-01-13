@@ -1,11 +1,9 @@
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
-use cardano/transaction.{Input, OutputReference, Transaction}
+use cardano/transaction.{OutputReference, Transaction}
 use midgard/common/utils.{plutarch_phas}
 use midgard/computation_thread as ct
-use midgard/fraud_proofs/common.{
-  cancel, continue, verify_tx_in_state_queue_node_and_get_header,
-}
+use midgard/fraud_proofs/common.{cancel, continue}
 use midgard/fraud_proofs/non_existent_input_no_index/step_02.{
   Args, Datum, SpendRedeemer,
 }

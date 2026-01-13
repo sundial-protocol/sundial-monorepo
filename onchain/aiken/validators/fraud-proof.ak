@@ -1,13 +1,8 @@
-use aiken/collection/list
-use cardano/address.{Address, Script}
-use cardano/assets.{PolicyId, flatten, quantity_of}
-use cardano/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, Transaction,
-}
+use cardano/assets.{PolicyId}
+use cardano/transaction.{Mint, Transaction}
 use midgard/common/utils
 use midgard/computation_thread as ct
-use midgard/fraud_proof.{Datum, MintRedeemer}
-use midgard/hub_oracle as hub
+use midgard/fraud_proof.{MintRedeemer}
 
 /// The spending validator of a fraud proof token never allows it to be spent.
 /// Midgard fraud proof tokens last forever.
@@ -19,12 +14,9 @@ validator spend {
 }
 
 /// Midgard fraud proof tokens last forever.
-validator mint(
-  computation_thread_script_hash: ByteArray,
-  hub_oracle_script_hash: PolicyId,
-) {
+validator mint(computation_thread_script_hash: ByteArray) {
   mint(redeemer: MintRedeemer, policy_id: PolicyId, self: Transaction) {
-    let Transaction { reference_inputs, mint, redeemers, .. } = self
+    let Transaction { mint, redeemers, .. } = self
 
     let MintRedeemer {
       computation_thread_token_asset_name,
