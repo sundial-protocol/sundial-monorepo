@@ -2,11 +2,10 @@
 ////
 //// Proves a given transaction, which has a validity range with one or both
 //// ends bounded, is included in a Midgard block whose validity range does not
-//// cover the transaction's validity range.
+//// cover the transaction's validity range. Or if the transaction has an
+//// invalid time range (i.e. reversed interval).
 
-use aiken/collection/list
 use aiken/crypto.{ScriptHash}
-use aiken/interval.{Finite, Interval}
 use aiken_design_patterns/linked_list/unordered as unordered
 use aiken_design_patterns/validity_range_normalization.{
   Always, ClosedRange, FromNegInf, ToPosInf,
@@ -141,20 +140,4 @@ validator main(
   else(_) {
     fail
   }
-}
-
-pub fn get_validity_range_validate_block_hash(
-  tx: Transaction,
-  state_queue_node_ref_input_index: Int,
-) -> (Int, Int) {
-  // Reference input with block_hash 
-  expect Some(state_queue_node_input) =
-    list.at(tx.reference_inputs, state_queue_node_ref_input_index)
-
-  // Extract tx_root via the state queue block hash
-  expect InlineDatum(state_queue_datum_data) =
-    state_queue_node_input.output.datum
-  expect state_queue_node_datum: unordered.NodeDatum = state_queue_datum_data
-  expect parsed_state_queue_datum: Header = state_queue_node_datum.data
-  (parsed_state_queue_datum.start_time, parsed_state_queue_datum.end_time)
 }

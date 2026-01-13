@@ -1,11 +1,12 @@
-//// Fraud proof validator for the non-existing input violation.
+//// ## Non-Existent Input UTxO (No Index) Fraud Proof (Section 5.1.1)
+////
+//// Proves a given transaction spends an input, such that the preimage of its
+//// transaction ID exist, yet its output index is larger than the last output
+//// of said transaction.
 
-use aiken/builtin
-use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
-use cardano/transaction.{Input, OutputReference, Transaction}
-use midgard/common/utils
+use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{
   cancel, continue, verify_tx_in_state_queue_node_and_get_header,

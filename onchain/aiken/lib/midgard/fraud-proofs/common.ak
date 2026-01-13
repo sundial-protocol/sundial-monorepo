@@ -23,6 +23,110 @@ use midgard/ledger_state.{
 }
 use midgard/state_queue
 
+pub type TxInclusionArgs {
+  input_index: Int,
+  output_index: Int,
+  hub_ref_input_index: Int,
+  state_queue_node_ref_input_index: Int,
+  tx_id: MidgardTxId,
+  tx: MidgardTxCompact,
+  tx_body: MidgardTxBodyCompact,
+  tx_membership_proof: Proof,
+  inclusion_proof_script_withdraw_redeemer_index: Int,
+}
+
+pub fn pass_tx_to_next_step(
+  computation_thread_token_policy_id: PolicyId,
+  hub_oracle: ScriptHash,
+  datum: Option<ct.StepDatum<input_state>>,
+  tx_inclusion_args: TxInclusionArgs,
+  own_out_ref: OutputReference,
+  l1_tx: Transaction,
+  validation: fn(
+    ScriptHash,
+    AssetName,
+    VerificationKeyHash,
+    Option<input_state>,
+    ScriptHash,
+    Data<output_state>,
+    Header,
+    MidgardTxId,
+    MidgardTxCompact,
+    MidgardTxBodyCompact,
+  ) ->
+    Bool,
+) -> Bool {
+  let TxInclusionArgs {
+    input_index,
+    output_index,
+    hub_ref_input_index,
+    state_queue_node_ref_input_index,
+    tx_id,
+    tx,
+    tx_body,
+    tx_membership_proof,
+    inclusion_proof_script_withdraw_redeemer_index,
+  } = tx_inclusion_args
+
+  let Transaction { inputs, outputs, reference_inputs, redeemers, .. } = l1_tx
+
+  expect Some(step_datum) = datum
+
+  // 1. Specified input must be authentic and properly reproduced.
+  let
+    own_script_hash,
+    computation_thread_token_asset_name,
+    fraud_prover,
+    m_input_state_data,
+    output_script_hash,
+    output_state_data,
+  <-
+    continue(
+      computation_thread_token_policy_id,
+      step_datum,
+      input_index,
+      output_index,
+      own_out_ref,
+      inputs,
+      outputs,
+    )
+
+  // 2. The provided transaction must be valid, and must be included in
+  //    the specified state queue node.
+  let header =
+    verify_tx_in_state_queue_node_and_get_header(
+      tx_id,
+      tx,
+      tx_body,
+      tx_membership_proof,
+      computation_thread_token_asset_name,
+      hub_oracle,
+      hub_ref_input_index,
+      state_queue_node_ref_input_index,
+      inclusion_proof_script_withdraw_redeemer_index,
+      reference_inputs,
+      redeemers,
+    )
+
+  // 3. Custom validation must pass.
+  expect
+    validation(
+      own_script_hash,
+      computation_thread_token_asset_name,
+      fraud_prover,
+      m_input_state_data,
+      output_script_hash,
+      output_state_data,
+      header,
+      tx_id,
+      tx,
+      tx_body,
+    )
+
+  // Done.
+  True
+}
+
 pub fn cancel(
   computation_thread_token_policy_id: PolicyId,
   m_datum: Option<ct.StepDatum<a>>,
@@ -88,7 +192,7 @@ pub fn cancel(
 /// should be used instead.
 pub fn continue(
   computation_thread_token_policy_id: PolicyId,
-  step_datum: ct.StepDatum<a>,
+  step_datum: ct.StepDatum<input_state>,
   input_index: Int,
   output_index: Int,
   own_out_ref: OutputReference,
@@ -98,9 +202,9 @@ pub fn continue(
     ScriptHash,
     AssetName,
     VerificationKeyHash,
-    Option<a>,
+    Option<input_state>,
     ScriptHash,
-    Data,
+    Data<output_state>,
   ) ->
     Bool,
 ) -> Bool {
@@ -164,7 +268,7 @@ pub fn finalize(
   computation_thread_token_policy_id: PolicyId,
   fraud_proof_token_policy_id: PolicyId,
   fraud_proof_address: Address,
-  step_datum: ct.StepDatum<a>,
+  step_datum: ct.StepDatum<input_state>,
   input_index: Int,
   output_index: Int,
   fraud_proof_mint_redeemer_index: Int,
@@ -172,7 +276,12 @@ pub fn finalize(
   inputs: List<Input>,
   outputs: List<Output>,
   redeemers: Pairs<ScriptPurpose, Redeemer>,
-  validation_fn: fn(ScriptHash, AssetName, VerificationKeyHash, Option<a>) ->
+  validation_fn: fn(
+    ScriptHash,
+    AssetName,
+    VerificationKeyHash,
+    Option<input_state>,
+  ) ->
     Bool,
 ) -> Bool {
   let

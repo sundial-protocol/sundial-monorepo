@@ -14,14 +14,11 @@
 ////    and produces the UTxO at the next step's script address with `data`
 ////    containing both verified bad transactions' bodies.
 
-use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
 use midgard/computation_thread as ct
-use midgard/fraud_proofs/common.{
-  cancel, continue, verify_tx_in_state_queue_node_and_get_header,
-}
+use midgard/fraud_proofs/common.{cancel, pass_tx_to_next_step}
 use midgard/fraud_proofs/double_spend/step_01.{
   Args, Datum, SpendRedeemer, State,
 }
@@ -48,56 +45,26 @@ validator main(
           computation_thread_mint_redeemer_index,
           tx,
         )
-      ct.Continue(Args {
-        input_index,
-        output_index,
-        hub_ref_input_index,
-        bad_state_queue_node_ref_input_index,
-        bad_tx_id,
-        bad_tx,
-        bad_tx_body,
-        bad_tx_membership_proof,
-        inclusion_proof_script_withdraw_redeemer_index,
-      }) -> {
-        let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
-          tx
-
-        expect Some(step_datum) = datum
-
-        // 1. Specified input must be authentic and properly reproduced.
+      ct.Continue(tx_inclusion_args) -> {
         let
           own_script_hash,
-          computation_thread_token_asset_name,
+          _computation_thread_token_asset_name,
           _fraud_prover,
           m_input_state_data,
           output_script_hash,
           output_state_data,
+          _header,
+          bad_tx_id,
+          _bad_tx,
+          bad_tx_body,
         <-
-          continue(
+          pass_tx_to_next_step(
             computation_thread_token_policy_id,
-            step_datum,
-            input_index,
-            output_index,
-            own_out_ref,
-            inputs,
-            outputs,
-          )
-
-        // 2. The provided transaction must be valid, and must be included in
-        //    the specified state queue node.
-        expect _header =
-          verify_tx_in_state_queue_node_and_get_header(
-            bad_tx_id,
-            bad_tx,
-            bad_tx_body,
-            bad_tx_membership_proof,
-            computation_thread_token_asset_name,
             hub_oracle,
-            hub_ref_input_index,
-            bad_state_queue_node_ref_input_index,
-            inclusion_proof_script_withdraw_redeemer_index,
-            reference_inputs,
-            redeemers,
+            datum,
+            tx_inclusion_args,
+            own_out_ref,
+            tx,
           )
 
         when m_input_state_data is {
