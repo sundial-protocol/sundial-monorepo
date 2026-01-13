@@ -1,14 +1,12 @@
+use aiken/builtin
 use aiken/crypto.{ScriptHash}
 use cardano/address.{Address}
 use cardano/assets.{PolicyId}
-use cardano/transaction.{Input, OutputReference, Transaction}
+use cardano/transaction.{OutputReference, Transaction}
 use midgard/common/constants.{empty_merkle_tree_root}
 use midgard/common/utils
 use midgard/computation_thread as ct
-use midgard/fraud_proofs/common.{
-  cancel, continue, finalize, verify_tx_and_its_body,
-  verify_tx_in_state_queue_node_and_get_header,
-}
+use midgard/fraud_proofs/common.{cancel, continue, finalize}
 use midgard/fraud_proofs/non_existent_input_no_index/step_04.{
   Datum, Finalize, Recurse, SpendRedeemer, State,
 }
@@ -81,7 +79,7 @@ validator main(
         expect non_existent_input_output_index > output_index_to_delete
 
         let updated_outputs_root =
-          plutarch_pdelete(
+          utils.plutarch_pdelete(
             merkle_root_before_delete: verified_outputs_root,
             key: builtin.i_data(output_index_to_delete),
             value: output_to_delete,
