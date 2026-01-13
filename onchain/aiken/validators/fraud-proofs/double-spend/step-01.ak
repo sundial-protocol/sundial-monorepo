@@ -46,6 +46,8 @@ validator main(
           tx,
         )
       ct.Continue(tx_inclusion_args) -> {
+        // 1. Generic validations for passing the provided bad tx to the next
+        //    step must pass.
         let
           own_script_hash,
           _computation_thread_token_asset_name,
@@ -69,7 +71,7 @@ validator main(
 
         when m_input_state_data is {
           None -> {
-            // 3a. The UTxO must be produced at own script hash with the
+            // 2a. The UTxO must be produced at own script hash with the
             //     verified first bad transaction ID and its inputs included in
             //     the `data` field of its `StepDatum`.
             expect output_script_hash == own_script_hash
@@ -84,7 +86,7 @@ validator main(
             True
           }
           Some(step_1_state) -> {
-            // 3b. The UTxO must be produced at next step's script hash with the
+            // 2b. The UTxO must be produced at next step's script hash with the
             //     verified bad transactions' inputs included in its datum.
             expect output_script_hash == step_02_validator_script_hash
             let State { verified_tx1_id, verified_tx1_inputs_root } =
@@ -96,7 +98,7 @@ validator main(
               }
             expect output_state_data == expected_output_state
 
-            // 4b. The two transactions must be different.
+            // 3b. The two transactions must be different.
             expect verified_tx1_id != bad_tx_id
 
             // Done.

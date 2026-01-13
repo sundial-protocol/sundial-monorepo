@@ -1,7 +1,7 @@
-use midgard/common/types.{MerkleRoot, Proof}
+use midgard/common/types.{MerkleRoot}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{TxInclusionArgs}
-use midgard/ledger_state.{MidgardTxBodyCompact, MidgardTxCompact, MidgardTxId}
+use midgard/ledger_state.{MidgardTxId}
 
 pub type State {
   verified_tx1_id: MidgardTxId,
