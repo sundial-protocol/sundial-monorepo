@@ -1,10 +1,3 @@
-//// ## Invalid Range Fraud Proof (Section 5.1.2)
-////
-//// Proves a given transaction, which has a validity range with one or both
-//// ends bounded, is included in a Midgard block whose validity range does not
-//// cover the transaction's validity range. Or if the transaction has an
-//// invalid time range (i.e. reversed interval).
-
 use aiken/crypto.{ScriptHash}
 use aiken_design_patterns/linked_list/unordered as unordered
 use aiken_design_patterns/validity_range_normalization.{
@@ -17,18 +10,15 @@ use cardano/transaction.{
 }
 use midgard/common/utils.{verify_hash_32}
 use midgard/computation_thread as ct
-use midgard/fraud_proofs/common.{
-  cancel, finalize, verify_tx_in_state_queue_node_and_get_header,
+use midgard/fraud_proofs/common.{cancel, finalize}
+use midgard/fraud_proofs/invalid_range/step_02.{
+  Args, Datum, SpendRedeemer, State,
 }
-use midgard/fraud_proofs/invalid_range/step.{Args, Datum, SpendRedeemer}
-use midgard/hub_oracle as hub
-use midgard/ledger_state.{Header}
 
 validator main(
   fraud_proof_token_policy_id: PolicyId,
   fraud_proof_token_address: Address,
   computation_thread_token_policy_id: PolicyId,
-  hub_oracle: ScriptHash,
 ) {
   spend(
     datum: Option<Datum>,
@@ -49,17 +39,9 @@ validator main(
       ct.Continue(Args {
         input_index,
         output_index,
-        hub_ref_input_index,
-        bad_state_queue_node_ref_input_index,
-        bad_tx_id,
-        bad_tx,
-        bad_tx_body,
-        bad_tx_membership_proof,
         fraud_proof_mint_redeemer_index,
-        inclusion_proof_script_withdraw_redeemer_index,
       }) -> {
-        let Transaction { inputs, outputs, reference_inputs, redeemers, .. } =
-          tx
+        let Transaction { inputs, outputs, redeemers, .. } = tx
 
         expect Some(step_datum) = datum
 
@@ -67,9 +49,9 @@ validator main(
         //    fraud proof's spending address.
         let
           _own_script_hash,
-          computation_thread_token_asset_name,
+          _computation_thread_token_asset_name,
           _fraud_prover,
-          _m_input_state_data,
+          m_input_state_data,
         <-
           finalize(
             computation_thread_token_policy_id,
@@ -85,31 +67,13 @@ validator main(
             redeemers,
           )
 
-        // 2. The provided transaction must be valid, and must be included in
-        //    the specified state queue node.
-        let Header {
-          start_time: block_valid_from,
-          end_time: block_valid_to,
-          ..
-        } =
-          verify_tx_in_state_queue_node_and_get_header(
-            bad_tx_id,
-            bad_tx,
-            bad_tx_body,
-            bad_tx_membership_proof,
-            computation_thread_token_asset_name,
-            hub_oracle,
-            hub_ref_input_index,
-            bad_state_queue_node_ref_input_index,
-            inclusion_proof_script_withdraw_redeemer_index,
-            reference_inputs,
-            redeemers,
-          )
+        expect Some(State {
+          block_valid_from,
+          block_valid_to,
+          bad_tx_normalized_validity_range,
+        }) = m_input_state_data
 
-        let bad_tx_normalized_validity_range =
-          vrn.normalize_time_range(bad_tx_body.validity_interval)
-
-        // 3. One or more **bounds** of the bad transaction's validity interval
+        // 2. One or more **bounds** of the bad transaction's validity interval
         //    must fall out of the block's. Meaning unbounded ends are not
         //    validated against the block's time range.
         //
