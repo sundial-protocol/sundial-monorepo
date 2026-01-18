@@ -16,13 +16,13 @@ import Testing.Eval (passertEval)
 -- import Midgard.Utils (pand'List)
 
 import Data.Word (Word8)
+import Plutarch.Core.Utils
+import Plutarch.MerkleTree.Helpers
+import Plutarch.MerkleTree.Merkling
 import Plutarch.Monadic qualified as P
 import Testing.Crypto qualified as Crypto
 import Testing.MerklePatriciaForestry qualified as MPF
 import Testing.MidgardValidator qualified as MidgardValidator
-import Plutarch.MerkleTree.Merkling
-import Plutarch.MerkleTree.Helpers
-import Plutarch.Core.Utils
 
 genByteString :: Gen BS.ByteString
 genByteString = do

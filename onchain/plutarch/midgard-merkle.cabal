@@ -123,8 +123,7 @@ common dependencies
     , text
 
 library
-  import:         lang, dependencies
-
+  import:          lang, dependencies
   exposed-modules:
     Profile
     Types.Blocks
@@ -132,7 +131,7 @@ library
     Types.Constants
     Types.StateCommitment
 
-  hs-source-dirs:     src
+  hs-source-dirs:  src
 
 executable midgard
   import:         lang, dependencies
@@ -154,15 +153,16 @@ executable midgard
 --   build-depends:  migdard-contracts
 
 test-suite helpers-tests
-  import:           lang, dependencies
-  type:             exitcode-stdio-1.0
-  main-is:          Test.hs
-  hs-source-dirs:   tests
+  import:         lang, dependencies
+  type:           exitcode-stdio-1.0
+  main-is:        Test.hs
+  hs-source-dirs: tests
   other-modules:
     Testing.Crypto
     Testing.Eval
     Testing.MerklePatriciaForestry
     Testing.MidgardValidator
+    Testing.ScriptContextBuilder
     Testing.TransactionProofs
 
   build-depends:

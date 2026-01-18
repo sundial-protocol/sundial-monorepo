@@ -17,20 +17,20 @@ import Testing.Eval (passertEval, psucceeds)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
 import Data.List (findIndices, sortOn)
+import Plutarch.Core.Eval (toBuiltinHexString)
 import Plutarch.MerkleTree.PatriciaForestry (MerklePatriciaForestry (..))
 import Plutarch.Prelude
 import PlutusCore.Crypto.Hash qualified as Hash
 import PlutusLedgerApi.V1.Value qualified as Value
+import PlutusLedgerApi.V3 (POSIXTime (POSIXTime))
 import PlutusLedgerApi.V3 hiding (POSIXTime)
+import PlutusLedgerApi.V3.MintValue (MintValue (UnsafeMintValue))
 import PlutusTx.AssocMap qualified as AssocMap
 import PlutusTx.Eq qualified
 import Prettyprinter (Pretty (pretty), defaultLayoutOptions, layoutPretty)
 import Prettyprinter.Render.String (renderString)
 import Types.Blocks
 import Types.StateCommitment
-import PlutusLedgerApi.V3.MintValue (MintValue(UnsafeMintValue))
-import Plutarch.Core.Eval (toBuiltinHexString)
-import PlutusLedgerApi.V3 (POSIXTime (POSIXTime))
 
 tests :: TestTree
 tests =
