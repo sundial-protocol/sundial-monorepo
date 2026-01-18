@@ -18,7 +18,7 @@ import Data.Text qualified as T
 import PlutusLedgerApi.V2 (Address (..), BuiltinByteString, Credential (..))
 import PlutusTx.Builtins.HasOpaque
 import PlutusTx.Prelude qualified as P
-import Testing.Eval (psucceeds, passertEval)
+import Testing.Eval (passertEval, psucceeds)
 
 -- import Midgard.Crypto
 
@@ -40,15 +40,16 @@ import Data.ByteString (ByteString)
 import Data.Maybe (mapMaybe)
 import Data.Word (Word8)
 import Numeric (readHex)
+import Plutarch.Builtin.Crypto (pblake2b_256)
+import Plutarch.Core.Eval (toBuiltinHexString)
 import PlutusCore.Crypto.Hash qualified as Hash
 import PlutusLedgerApi.V1.Value
 import PlutusLedgerApi.V3
+import PlutusLedgerApi.V3.MintValue (MintValue (UnsafeMintValue))
 import PlutusTx.AssocMap qualified as Map
 import Prettyprinter
+import Testing.ScriptContextBuilder (TxOutBuilder, buildScriptContext, currencySymbolFromHex, withAddress, withFee, withInlineDatum, withMint, withOutRef, withOutput, withReferenceInput, withReferenceScript, withRewardingScript, withScriptInput, withSigner, withTxOutAddress, withTxOutInlineDatum, withTxOutValue, withValidRange, withValue, withWithdrawal)
 import Types.StateCommitment
-import Plutarch.Core.Eval (toBuiltinHexString)
-import PlutusLedgerApi.V3.MintValue (MintValue(UnsafeMintValue))
-import Plutarch.Builtin.Crypto (pblake2b_256)
 
 -- [TxInInfo {txInInfoOutRef = TxOutRef {txOutRefId = 0a04d88a1f166ed9586d8b09e4fd4e5b4c9e0843f49c26887836019903aab146, txOutRefIdx = 0}, txInInfoResolved = TxOut {txOutAddress = Address {addressCredential = ScriptCredential f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef, addressStakingCredential = Nothing}, txOutValue = Value {getValue = Map {unMap = [(,Map {unMap = [("",2324041)]}),(6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978,Map {unMap = [("DjedOrderTicket",1)]})]}}, txOutDatum = OutputDatum (Datum {getDatum = toBuiltinData $ Constr 0 [Constr 2 [I 1240,I 911],Constr 0 [Constr 0 [B "(\140\182\147\254c\159\n/1\155t\216Ga\NUL\226^\254\179y\252\NULB\251\253\156\221"],Constr 1 []],Constr 0 [I 100,I 153],I 1640995390000,B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]}), txOutReferenceScript = Nothing}}
 -- ,TxInInfo {txInInfoOutRef = TxOutRef {txOutRefId = 1769b7044d8a1866e5d6c0cebda3a97a9891db65999228b3cc73fd24ff08ccea, txOutRefIdx = 0}, txInInfoResolved = TxOut {txOutAddress = Address {addressCredential = ScriptCredential f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef, addressStakingCredential = Nothing}, txOutValue = Value {getValue = Map {unMap = [(,Map {unMap = [("",715417902)]}),(6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978,Map {unMap = [("DjedOrderTicket",1)]})]}}, txOutDatum = OutputDatum (Datum {getDatum = toBuiltinData $ Constr 0 [Constr 2 [I 1000000000,I 692810458],Constr 0 [Constr 0 [B "5\219h\ESC_\172\237-\133\142\140\171\201\151\162\211\217\SI\ESC\204\238\155\USJLwJ\177"],Constr 1 []],Constr 0 [I 100,I 153],I 1640995389000,B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]}), txOutReferenceScript = Nothing}}
@@ -80,359 +81,401 @@ import Plutarch.Builtin.Crypto (pblake2b_256)
 
 mockInfo :: TxInfo
 mockInfo =
-  TxInfo
-    { txInfoInputs =
-        [ TxInInfo
-            { txInInfoOutRef =
+  scriptContextTxInfo . buildScriptContext $
+    mconcat
+      [ withScriptInput (dataToBuiltinData $ Constr 0 []) $
+          mconcat
+            [ withOutRef
                 TxOutRef
                   { txOutRefId = TxId $ toBuiltinHexString "5341cfbf7fcd8bba13672a0b1f2d236e340165c30282ea0c2244873e164fecf6"
                   , txOutRefIdx = 0
                   }
-            , txInInfoResolved =
-                TxOut
-                  { txOutAddress =
-                      Address
-                        { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef"
-                        , addressStakingCredential = Nothing
-                        }
-                  , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 2323130)]), (CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae", Map.safeFromList [(TokenName "DjedMicroUSD", 5000000)]), (CurrencySymbol $ toBuiltinHexString "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978", Map.safeFromList [(TokenName "DjedOrderTicket", 1)])]}
-                  , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 [Constr 1 [I 5000000], Constr 0 [Constr 0 [B "\ESCQ?\SOHR\GS\166\ACK\139\&8\200\187\234\248\237'\b\167Z[\215\253\142\247\EM\193.\222"], Constr 1 []], Constr 0 [I 100, I 153], I 1640995578000, B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]})
-                  , txOutReferenceScript = Nothing
+            , withAddress
+                Address
+                  { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef"
+                  , addressStakingCredential = Nothing
                   }
-            }
-        , TxInInfo
-            { txInInfoOutRef =
+            , withValue $
+                mconcat
+                  [ lovelaceValue 2323130
+                  , singleton (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae") (TokenName "DjedMicroUSD") 5000000
+                  , singleton (currencySymbolFromHex "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978") (TokenName "DjedOrderTicket") 1
+                  ]
+            , withInlineDatum $
+                dataToBuiltinData $
+                  Constr 0 [Constr 1 [I 5000000], Constr 0 [Constr 0 [B "\ESCQ?\SOHR\GS\166\ACK\139\&8\200\187\234\248\237'\b\167Z[\215\253\142\247\EM\193.\222"], Constr 1 []], Constr 0 [I 100, I 153], I 1640995578000, B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]
+            ]
+      , withScriptInput (dataToBuiltinData $ Constr 0 []) $
+          mconcat
+            [ withOutRef
                 TxOutRef
                   { txOutRefId = TxId $ toBuiltinHexString "5f2cf50df72e14ac9d9839ebb4cf1ca4a2baea15d280b78f7eb6e30c0e943904"
                   , txOutRefIdx = 0
                   }
-            , txInInfoResolved =
-                TxOut
-                  { txOutAddress =
-                      Address
-                        { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef"
-                        , addressStakingCredential = Nothing
-                        }
-                  , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 2323130)]), (CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae", Map.safeFromList [(TokenName "DjedMicroUSD", 20), (TokenName "ShenMicroUSD", 5)]), (CurrencySymbol $ toBuiltinHexString "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978", Map.safeFromList [(TokenName "DjedOrderTicket", 1)])]}
-                  , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 [Constr 4 [I 20, I 5], Constr 0 [Constr 0 [B "_\131\145]\220\192>\158'\193Fm\167\US\157\181\RS\227ZE\201\167ILk.\251p"], Constr 1 []], Constr 0 [I 100, I 153], I 1640995579000, B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]})
-                  , txOutReferenceScript = Nothing
+            , withAddress
+                Address
+                  { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef"
+                  , addressStakingCredential = Nothing
                   }
-            }
-        ]
-    , txInfoReferenceInputs =
-        [ TxInInfo
-            { txInInfoOutRef =
+            , withValue $
+                mconcat
+                  [ lovelaceValue 2323130
+                  , singleton (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae") (TokenName "DjedMicroUSD") 20
+                  , singleton (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae") (TokenName "ShenMicroUSD") 5
+                  , singleton (currencySymbolFromHex "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978") (TokenName "DjedOrderTicket") 1
+                  ]
+            , withInlineDatum $
+                dataToBuiltinData $
+                  Constr 0 [Constr 4 [I 20, I 5], Constr 0 [Constr 0 [B "_\131\145]\220\192>\158'\193Fm\167\US\157\181\RS\227ZE\201\167ILk.\251p"], Constr 1 []], Constr 0 [I 100, I 153], I 1640995579000, B "jod\152\RSW\252\249\205\204\\\201C\177(K\192\253\SYNo\211\203\206g9\151yx"]
+            ]
+      , withReferenceInput $
+          mconcat
+            [ withReferenceScript . ScriptHash $ toBuiltinHexString "f00e837533ffbfb71868d2ef7209a99585a46d1b665babf06fa3dec2"
+            , withOutRef
                 TxOutRef
                   { txOutRefId = TxId $ toBuiltinHexString "85a099cf014316a0ea5361f6380926fbaba831d9cb4fb915e7b8dcce06009610"
                   , txOutRefIdx = 0
                   }
-            , txInInfoResolved =
-                TxOut
-                  { txOutAddress =
-                      Address
-                        { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
-                        , addressStakingCredential = Nothing
-                        }
-                  , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 70162490)]), (CurrencySymbol $ toBuiltinHexString "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71", Map.safeFromList [(TokenName "ProcessOrdersStakeRef", 1)])]}
-                  , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 []})
-                  , txOutReferenceScript = Just $ ScriptHash $ toBuiltinHexString "f00e837533ffbfb71868d2ef7209a99585a46d1b665babf06fa3dec2"
+            , withAddress
+                Address
+                  { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
+                  , addressStakingCredential = Nothing
                   }
-            }
-        , TxInInfo
-            { txInInfoOutRef =
+            , withValue $
+                mconcat
+                  [ lovelaceValue 70162490
+                  , singleton (currencySymbolFromHex "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71") (TokenName "ProcessOrdersStakeRef") 1
+                  ]
+            , withInlineDatum $ dataToBuiltinData $ Constr 0 []
+            ]
+      , withReferenceInput $
+          mconcat
+            [ withReferenceScript . ScriptHash $ toBuiltinHexString "f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef"
+            , withOutRef
                 TxOutRef
                   { txOutRefId = TxId $ toBuiltinHexString "e5b68b7f5dc68b417bad4effa6af75cd34b55a9c963445c6faa914730706df50"
                   , txOutRefIdx = 0
                   }
-            , txInInfoResolved =
-                TxOut
-                  { txOutAddress =
-                      Address
-                        { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
-                        , addressStakingCredential = Nothing
-                        }
-                  , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 19567400)]), (CurrencySymbol $ toBuiltinHexString "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71", Map.safeFromList [(TokenName "RequestRef", 1)])]}
-                  , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 []})
-                  , txOutReferenceScript = Just $ ScriptHash $ toBuiltinHexString "f22fa1f3f22c8e72e82a4ffadeb2a63f33d37eb224d16cd61c3942ef"
+            , withAddress
+                Address
+                  { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
+                  , addressStakingCredential = Nothing
                   }
-            }
-        , TxInInfo
-            { txInInfoOutRef =
+            , withValue $
+                mconcat
+                  [ lovelaceValue 19567400
+                  , singleton (currencySymbolFromHex "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71") (TokenName "RequestRef") 1
+                  ]
+            , withInlineDatum $ dataToBuiltinData $ Constr 0 []
+            ]
+      , withReferenceInput $
+          mconcat
+            [ withReferenceScript . ScriptHash $ toBuiltinHexString "c79327e6c5e5d4d282cd46c59c7108b91d11d02512582e2ba7fc88f7"
+            , withOutRef
                 TxOutRef
                   { txOutRefId = TxId $ toBuiltinHexString "e5b68b7f5dc68b417bad4effa6af75cd34b55a9c963445c6faa914730706df50"
                   , txOutRefIdx = 1
                   }
-            , txInInfoResolved =
-                TxOut
-                  { txOutAddress =
-                      Address
-                        { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
-                        , addressStakingCredential = Nothing
-                        }
-                  , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 43358600)]), (CurrencySymbol $ toBuiltinHexString "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71", Map.safeFromList [(TokenName "StablecoinRef", 1)])]}
-                  , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 []})
-                  , txOutReferenceScript = Just $ ScriptHash $ toBuiltinHexString "c79327e6c5e5d4d282cd46c59c7108b91d11d02512582e2ba7fc88f7"
+            , withAddress
+                Address
+                  { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
+                  , addressStakingCredential = Nothing
                   }
-            }
-        , TxInInfo
-            { txInInfoOutRef =
+            , withValue $
+                mconcat
+                  [ lovelaceValue 43358600
+                  , singleton (currencySymbolFromHex "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71") (TokenName "StablecoinRef") 1
+                  ]
+            , withInlineDatum $ dataToBuiltinData $ Constr 0 []
+            ]
+      , withReferenceInput $
+          mconcat
+            [ withReferenceScript . ScriptHash $ toBuiltinHexString "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978"
+            , withOutRef
                 TxOutRef
                   { txOutRefId = TxId $ toBuiltinHexString "eaa1707746762475e1ba1d1f146e9d9b025a2542e60d57ff044c875a106f1314"
                   , txOutRefIdx = 0
                   }
-            , txInInfoResolved =
-                TxOut
-                  { txOutAddress =
-                      Address
-                        { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
-                        , addressStakingCredential = Nothing
-                        }
-                  , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 39578730)]), (CurrencySymbol $ toBuiltinHexString "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71", Map.safeFromList [(TokenName "OrderMintingRef", 1)])]}
-                  , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 []})
-                  , txOutReferenceScript = Just $ ScriptHash $ toBuiltinHexString "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978"
+            , withAddress
+                Address
+                  { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
+                  , addressStakingCredential = Nothing
                   }
-            }
-        , TxInInfo
-            { txInInfoOutRef =
+            , withValue $
+                mconcat
+                  [ lovelaceValue 39578730
+                  , singleton (currencySymbolFromHex "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71") (TokenName "OrderMintingRef") 1
+                  ]
+            , withInlineDatum $ dataToBuiltinData $ Constr 0 []
+            ]
+      , withReferenceInput $
+          mconcat
+            [ withReferenceScript . ScriptHash $ toBuiltinHexString "375b0147a033a95077621b603a126a37c32f621d86866c40a4db5fe9"
+            , withOutRef
                 TxOutRef
                   { txOutRefId = TxId $ toBuiltinHexString "eaa1707746762475e1ba1d1f146e9d9b025a2542e60d57ff044c875a106f1314"
-                  , txOutRefIdx = 2
+                  , txOutRefIdx = 1
                   }
-            , txInInfoResolved =
-                TxOut
-                  { txOutAddress =
-                      Address
-                        { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
-                        , addressStakingCredential = Nothing
-                        }
-                  , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 2840290)]), (CurrencySymbol $ toBuiltinHexString "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71", Map.safeFromList [(TokenName "RequestStakeRef", 1)])]}
-                  , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 []})
-                  , txOutReferenceScript = Just $ ScriptHash $ toBuiltinHexString "375b0147a033a95077621b603a126a37c32f621d86866c40a4db5fe9"
+            , withAddress
+                Address
+                  { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "6b40222d9adccb5574e2b522274c0146264d7114b8a5fdcbd0cfd622"
+                  , addressStakingCredential = Nothing
                   }
+            , withValue $
+                mconcat
+                  [ lovelaceValue 2840290
+                  , singleton (currencySymbolFromHex "fbd4071892e0403910693a386dab46e03581663e8a4927f0d7d88c71") (TokenName "RequestStakeRef") 1
+                  ]
+            , withInlineDatum $ dataToBuiltinData $ Constr 0 []
+            ]
+      , foldMap withOutput mockOutputs
+      , withFee 1067218
+      , withMint
+          (singleton (currencySymbolFromHex "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978") (TokenName "DjedOrderTicket") (-4))
+          . dataToBuiltinData
+          $ Constr 1 []
+      , withRewardingScript
+          (dataToBuiltinData $ I 2)
+          (ScriptCredential . ScriptHash $ toBuiltinHexString "375b0147a033a95077621b603a126a37c32f621d86866c40a4db5fe9")
+          0
+      , withRewardingScript
+          (dataToBuiltinData $ Constr 0 [B "\EOT\ENQ\NUL\SOH"])
+          (ScriptCredential . ScriptHash $ toBuiltinHexString "f00e837533ffbfb71868d2ef7209a99585a46d1b665babf06fa3dec2")
+          0
+      , withValidRange
+          Interval
+            { ivFrom = LowerBound (Finite (POSIXTime {getPOSIXTime = 1640995581000})) True
+            , ivTo = UpperBound (Finite (POSIXTime {getPOSIXTime = 1640995761000})) False
             }
-        ]
-    , txInfoOutputs = mockOutputs
-    , txInfoFee = Lovelace 1067218
-    , txInfoMint = UnsafeMintValue (Map.safeFromList [(CurrencySymbol $ toBuiltinHexString "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978", Map.safeFromList [(TokenName "DjedOrderTicket", -4)])])
-    , txInfoTxCerts = []
-    , txInfoWdrl =
-        Map.unsafeFromList
-          [ (ScriptCredential $ ScriptHash $ toBuiltinHexString "375b0147a033a95077621b603a126a37c32f621d86866c40a4db5fe9", 0)
-          , (ScriptCredential $ ScriptHash $ toBuiltinHexString "f00e837533ffbfb71868d2ef7209a99585a46d1b665babf06fa3dec2", 0)
-          ]
-    , txInfoValidRange = Interval {ivFrom = LowerBound (Finite (POSIXTime {getPOSIXTime = 1640995581000})) True, ivTo = UpperBound (Finite (POSIXTime {getPOSIXTime = 1640995761000})) False}
-    , txInfoSignatories = [PubKeyHash $ toBuiltinHexString "1b46202fd51db10e8d29082daa24135e44fd944ce52e285844ef1e53"]
-    , txInfoRedeemers =
-        Map.unsafeFromList
-          [ (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "5341cfbf7fcd8bba13672a0b1f2d236e340165c30282ea0c2244873e164fecf6", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 0 []})
-          , (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "5f2cf50df72e14ac9d9839ebb4cf1ca4a2baea15d280b78f7eb6e30c0e943904", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 0 []})
-          , (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "ac6fdf5f0c3e6e3092a7a063d45eca133e96305ed8d27a5e6b8fe2f05db8c62a", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 1 []})
-          , (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "c63f3dccdc455977f9cd557aa7fbb825f9babd29ac4da3251dbde765afd29d54", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 0 []})
-          , (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "e053c715fccb903f438f57bd40c7150e88514c58f6796e4733851d7ca6181d56", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 0 []})
-          , (Minting $ CurrencySymbol $ toBuiltinHexString "6a6f64981e57fcf9cdcc5cc943b1284bc0fd166fd3cbce6739977978", Redeemer {getRedeemer = dataToBuiltinData $ Constr 1 []})
-          , (Rewarding (ScriptCredential $ ScriptHash $ toBuiltinHexString "375b0147a033a95077621b603a126a37c32f621d86866c40a4db5fe9"), Redeemer {getRedeemer = dataToBuiltinData $ I 2})
-          , (Rewarding (ScriptCredential $ ScriptHash $ toBuiltinHexString "f00e837533ffbfb71868d2ef7209a99585a46d1b665babf06fa3dec2"), Redeemer {getRedeemer = dataToBuiltinData $ Constr 0 [B "\EOT\ENQ\NUL\SOH"]})
-          ]
-    , txInfoData = Map.unsafeFromList []
-    , txInfoId = TxId $ toBuiltinHexString "657dddd5c9e2b88062a45c5958f96e0509d94a1df2a7171b1d2ad87eeee79d30"
-    , txInfoVotes = Map.unsafeFromList []
-    , txInfoProposalProcedures = []
-    , txInfoCurrentTreasuryAmount = Nothing
-    , txInfoTreasuryDonation = Nothing
-    }
+      , withSigner . PubKeyHash $ toBuiltinHexString "1b46202fd51db10e8d29082daa24135e44fd944ce52e285844ef1e53"
+      ]
 
-mockOutputs :: [TxOut]
+-- These existed in the original mockTxInfo but seem unnecessary?
+{-
+txInfoRedeemers =
+  Map.unsafeFromList
+    [ (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "ac6fdf5f0c3e6e3092a7a063d45eca133e96305ed8d27a5e6b8fe2f05db8c62a", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 1 []})
+    , (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "c63f3dccdc455977f9cd557aa7fbb825f9babd29ac4da3251dbde765afd29d54", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 0 []})
+    , (Spending (TxOutRef {txOutRefId = TxId $ toBuiltinHexString "e053c715fccb903f438f57bd40c7150e88514c58f6796e4733851d7ca6181d56", txOutRefIdx = 0}), Redeemer {getRedeemer = dataToBuiltinData $ Constr 0 []})
+    ]
+-}
+
+mockOutputs :: [TxOutBuilder]
 mockOutputs =
-  [ TxOut
-      { txOutAddress =
+  [ mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "c79327e6c5e5d4d282cd46c59c7108b91d11d02512582e2ba7fc88f7"
             , addressStakingCredential = Nothing
             }
-      , txOutValue =
-          Value
-            { getValue =
-                Map.safeFromList
-                  [ (adaSymbol, Map.safeFromList [(adaToken, 818638619)])
-                  ,
-                    ( CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae"
-                    , Map.safeFromList
-                        [ (TokenName "DjedMicroUSD", 999999999825000000)
-                        , (TokenName "DjedStableCoinNFT", 1)
-                        , (TokenName "ShenMicroUSD", 999999998989998760)
-                        ]
-                    )
-                  ]
-            }
-      , txOutDatum =
-          OutputDatum
-            ( Datum
-                { getDatum =
-                    dataToBuiltinData $
-                      Constr
+      , withTxOutValue $
+          mconcat
+            [ lovelaceValue 818638619
+            , singleton (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae") (TokenName "DjedMicroUSD") 999999999825000000
+            , singleton (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae") (TokenName "DjedStableCoinNFT") 1
+            , singleton (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae") (TokenName "ShenMicroUSD") 999999998989998760
+            ]
+      , withTxOutInlineDatum . dataToBuiltinData $
+          Constr
+            0
+            [ I 816268119
+            , I 175000000
+            , I 1010001240
+            , Constr
+                0
+                [ Constr
+                    0
+                    [ Constr
                         0
-                        [ I 816268119
-                        , I 175000000
-                        , I 1010001240
-                        , Constr
-                            0
-                            [ Constr
-                                0
-                                [ Constr
-                                    0
-                                    [ Constr 0 [B "\222\169\&5\178\144\239\176\155\&0\209\t\253\218\222\246W\199s\vQ\177>L\131\167\r\179VD\183\NAK\141", I 0]
-                                    , I 1640995393000
-                                    ]
-                                ]
-                            , I 1823130
-                            , I 2370500
-                            , Constr 1 []
-                            , B "^m\SUBo6B\215(:Y\250\\\ETX\146\ETBh\239\187\132t\212\213\US%\162\178\224\174"
-                            , Constr
-                                0
-                                [ Constr 0 [B "P\b\214\&9>\254\255\173\132;\199F=\SYN\DC1k`\153\162fE\176$&\194M \219\217&o\ENQ", I 0]
-                                , Constr 0 [Constr 0 [B "P\b\214\&9>\254\255\173\132;\199F=\SYN\DC1k`\153\162fE\176$&\194M \219\217&o\ENQ", I 0]]
-                                ]
-                            ]
+                        [ Constr 0 [B "\222\169\&5\178\144\239\176\155\&0\209\t\253\218\222\246W\199s\vQ\177>L\131\167\r\179VD\183\NAK\141", I 0]
+                        , I 1640995393000
                         ]
-                }
-            )
-      , txOutReferenceScript = Nothing
-      }
-  , TxOut
-      { txOutAddress =
+                    ]
+                , I 1823130
+                , I 2370500
+                , Constr 1 []
+                , B "^m\SUBo6B\215(:Y\250\\\ETX\146\ETBh\239\187\132t\212\213\US%\162\178\224\174"
+                , Constr
+                    0
+                    [ Constr 0 [B "P\b\214\&9>\254\255\173\132;\199F=\SYN\DC1k`\153\162fE\176$&\194M \219\217&o\ENQ", I 0]
+                    , Constr 0 [Constr 0 [B "P\b\214\&9>\254\255\173\132;\199F=\SYN\DC1k`\153\162fE\176$&\194M \219\217&o\ENQ", I 0]]
+                    ]
+                ]
+            ]
+      ]
+  , mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = PubKeyCredential $ PubKeyHash $ toBuiltinHexString "5f83915ddcc03e9e27c1466da71f9db51ee35a45c9a7494c6b2efb70"
             , addressStakingCredential = Nothing
             }
-      , txOutValue =
-          Value
-            { getValue =
-                Map.safeFromList
-                  [ (adaSymbol, Map.safeFromList [(adaToken, 1823130)])
-                  ,
-                    ( CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae"
-                    , Map.safeFromList
-                        [(TokenName "ShenMicroUSD", 10000000)]
-                    )
-                  ]
-            }
-      , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 [Constr 5 [I 7361978, I 10000000], Constr 0 [Constr 0 [B "\222\169\&5\178\144\239\176\155\&0\209\t\253\218\222\246W\199s\vQ\177>L\131\167\r\179VD\183\NAK\141", I 0]]]})
-      , txOutReferenceScript = Nothing
-      }
-  , TxOut
-      { txOutAddress =
+      , withTxOutValue $
+          mconcat
+            [ lovelaceValue 1823130
+            , singleton
+                (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae")
+                (TokenName "ShenMicroUSD")
+                10000000
+            ]
+      , withTxOutInlineDatum . dataToBuiltinData $
+          Constr
+            0
+            [ Constr 5 [I 7361978, I 10000000]
+            , Constr
+                0
+                [ Constr
+                    0
+                    [ B "\222\169\&5\178\144\239\176\155\&0\209\t\253\218\222\246W\199s\vQ\177>L\131\167\r\179VD\183\NAK\141"
+                    , I 0
+                    ]
+                ]
+            ]
+      ]
+  , mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = PubKeyCredential $ PubKeyHash $ toBuiltinHexString "5f83915ddcc03e9e27c1466da71f9db51ee35a45c9a7494c6b2efb70"
             , addressStakingCredential = Nothing
             }
-      , txOutValue =
-          Value
-            { getValue =
-                Map.safeFromList
-                  [ (adaSymbol, Map.safeFromList [(adaToken, 1823130)])
-                  ,
-                    ( CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae"
-                    , Map.safeFromList
-                        [(TokenName "DjedMicroUSD", 100000000)]
-                    )
-                  ]
-            }
-      , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 [Constr 4 [I 66339870, I 100000000], Constr 0 [Constr 0 [B "L\235C?|$\211\&2uF\146N\191\NAK\146\DLE\200\153\132\248\&1\178*(\174)pR\ETBX/?", I 0]]]})
-      , txOutReferenceScript = Nothing
-      }
-  , TxOut
-      { txOutAddress =
+      , withTxOutValue $
+          mconcat
+            [ lovelaceValue 1823130
+            , singleton
+                (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae")
+                (TokenName "DjedMicroUSD")
+                100000000
+            ]
+      , withTxOutInlineDatum . dataToBuiltinData $
+          Constr
+            0
+            [ Constr 4 [I 66339870, I 100000000]
+            , Constr
+                0
+                [ Constr
+                    0
+                    [ B "L\235C?|$\211\&2uF\146N\191\NAK\146\DLE\200\153\132\248\&1\178*(\174)pR\ETBX/?"
+                    , I 0
+                    ]
+                ]
+            ]
+      ]
+  , mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = PubKeyCredential $ PubKeyHash $ toBuiltinHexString "1b513f01521da6068b38c8bbeaf8ed2708a75a5bd7fd8ef719c12ede"
             , addressStakingCredential = Nothing
             }
-      , txOutValue =
-          Value
-            { getValue =
-                Map.safeFromList
-                  [ (adaSymbol, Map.safeFromList [(adaToken, 1823130)])
-                  ,
-                    ( CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae"
-                    , Map.safeFromList
-                        [(TokenName "DjedMicroUSD", 75000000)]
-                    )
-                  ]
-            }
-      , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 [Constr 4 [I 49754902, I 75000000], Constr 0 [Constr 0 [B "~s\140\255<\200\tb_\129t \183\136^\ETX\130\213\249\136^?\159@;A\133\214\&43\ENQ\160", I 0]]]})
-      , txOutReferenceScript = Nothing
-      }
-  , TxOut
-      { txOutAddress =
+      , withTxOutValue $
+          mconcat
+            [ lovelaceValue 1823130
+            , singleton
+                (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae")
+                (TokenName "DjedMicroUSD")
+                75000000
+            ]
+      , withTxOutInlineDatum . dataToBuiltinData $
+          Constr
+            0
+            [ Constr 4 [I 49754902, I 75000000]
+            , Constr
+                0
+                [ Constr
+                    0
+                    [ B "~s\140\255<\200\tb_\129t \183\136^\ETX\130\213\249\136^?\159@;A\133\214\&43\ENQ\160"
+                    , I 0
+                    ]
+                ]
+            ]
+      ]
+  , mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = PubKeyCredential $ PubKeyHash $ toBuiltinHexString "288cb693fe639f0a2f319b74d8476100e25efeb379fc0042fbfd9cdd"
             , addressStakingCredential = Nothing
             }
-      , txOutValue =
-          Value
-            { getValue =
-                Map.safeFromList
-                  [ (adaSymbol, Map.safeFromList [(adaToken, 1823130)])
-                  ,
-                    ( CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae"
-                    , Map.safeFromList
-                        [(TokenName "ShenMicroUSD", 1240)]
-                    )
-                  ]
-            }
-      , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 [Constr 5 [I 911, I 1240], Constr 0 [Constr 0 [B "\n\EOT\216\138\US\SYNn\217Xm\139\t\228\253N[L\158\bC\244\156&\136x6\SOH\153\ETX\170\177F", I 0]]]})
-      , txOutReferenceScript = Nothing
-      }
-  , TxOut
-      { txOutAddress =
+      , withTxOutValue $
+          mconcat
+            [ lovelaceValue 1823130
+            , singleton
+                (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae")
+                (TokenName "ShenMicroUSD")
+                1240
+            ]
+      , withTxOutInlineDatum . dataToBuiltinData $
+          Constr
+            0
+            [ Constr 5 [I 911, I 1240]
+            , Constr
+                0
+                [ Constr
+                    0
+                    [ B "\n\EOT\216\138\US\SYNn\217Xm\139\t\228\253N[L\158\bC\244\156&\136x6\SOH\153\ETX\170\177F"
+                    , I 0
+                    ]
+                ]
+            ]
+      ]
+  , mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = PubKeyCredential $ PubKeyHash $ toBuiltinHexString "35db681b5faced2d858e8cabc997a2d3d90f1bccee9b1f4a4c774ab1"
             , addressStakingCredential = Nothing
             }
-      , txOutValue =
-          Value
-            { getValue =
-                Map.safeFromList
-                  [ (adaSymbol, Map.safeFromList [(adaToken, 1823130)])
-                  ,
-                    ( CurrencySymbol $ toBuiltinHexString "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae"
-                    , Map.safeFromList
-                        [(TokenName "ShenMicroUSD", 1000000000)]
-                    )
-                  ]
-            }
-      , txOutDatum = OutputDatum (Datum {getDatum = dataToBuiltinData $ Constr 0 [Constr 5 [I 692810458, I 1000000000], Constr 0 [Constr 0 [B "\ETBi\183\EOTM\138\CANf\229\214\192\206\189\163\169z\152\145\219e\153\146(\179\204s\253$\255\b\204\234", I 0]]]})
-      , txOutReferenceScript = Nothing
-      }
-  , TxOut
-      { txOutAddress =
+      , withTxOutValue $
+          mconcat
+            [ lovelaceValue 1823130
+            , singleton
+                (currencySymbolFromHex "5e6d1a6f3642d7283a59fa5c03921768efbb8474d4d51f25a2b2e0ae")
+                (TokenName "ShenMicroUSD")
+                1000000000
+            ]
+      , withTxOutInlineDatum . dataToBuiltinData $
+          Constr
+            0
+            [ Constr 5 [I 692810458, I 1000000000]
+            , Constr
+                0
+                [ Constr
+                    0
+                    [ B "\ETBi\183\EOTM\138\CANf\229\214\192\206\189\163\169z\152\145\219e\153\146(\179\204s\253$\255\b\204\234"
+                    , I 0
+                    ]
+                ]
+            ]
+      ]
+  , mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = ScriptCredential $ ScriptHash $ toBuiltinHexString "8698142a5109a8c0781fd367ab190c528401b69df6cb00b5459eb45c"
             , addressStakingCredential = Nothing
             }
-      , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 22740445)])]}
-      , txOutDatum =
-          OutputDatum
-            ( Datum
-                { getDatum =
-                    dataToBuiltinData $
-                      Constr
+      , withTxOutValue $ lovelaceValue 22740445
+      , withTxOutInlineDatum . dataToBuiltinData $
+          Constr
+            0
+            [ Constr
+                0
+                [ Constr
+                    0
+                    [ Constr
                         0
-                        [Constr 0 [Constr 0 [Constr 0 [B "\222\169\&5\178\144\239\176\155\&0\209\t\253\218\222\246W\199s\vQ\177>L\131\167\r\179VD\183\NAK\141", I 0], I 1640995393000], I 1640995635000]]
-                }
-            )
-      , txOutReferenceScript = Nothing
-      }
-  , TxOut
-      { txOutAddress =
+                        [ B "\222\169\&5\178\144\239\176\155\&0\209\t\253\218\222\246W\199s\vQ\177>L\131\167\r\179VD\183\NAK\141"
+                        , I 0
+                        ]
+                    , I 1640995393000
+                    ]
+                , I 1640995635000
+                ]
+            ]
+      ]
+  , mconcat
+      [ withTxOutAddress
           Address
             { addressCredential = PubKeyCredential $ PubKeyHash $ toBuiltinHexString "1b46202fd51db10e8d29082daa24135e44fd944ce52e285844ef1e53"
             , addressStakingCredential = Nothing
             }
-      , txOutValue = Value {getValue = Map.safeFromList [(adaSymbol, Map.safeFromList [(adaToken, 999999999802333717)])]}
-      , txOutDatum = NoOutputDatum
-      , txOutReferenceScript = Nothing
-      }
+      , withTxOutValue $ lovelaceValue 999999999802333717
+      ]
   ]
 
 hashMidgardTx :: MidgardTxInfo -> ByteString
