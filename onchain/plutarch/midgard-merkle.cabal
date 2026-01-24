@@ -129,7 +129,9 @@ library
     Types.Blocks
     Types.Classes
     Types.Constants
+    Types.Membership
     Types.StateCommitment
+    Validators.Membership
 
   hs-source-dirs:  src
 
