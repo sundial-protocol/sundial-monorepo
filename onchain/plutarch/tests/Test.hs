@@ -21,8 +21,8 @@ import Plutarch.MerkleTree.Helpers
 import Plutarch.MerkleTree.Merkling
 import Plutarch.Monadic qualified as P
 import Testing.Crypto qualified as Crypto
+import Testing.MembershipValidator qualified as MembershipValidator
 import Testing.MerklePatriciaForestry qualified as MPF
-import Testing.MidgardValidator qualified as MidgardValidator
 
 genByteString :: Gen BS.ByteString
 genByteString = do
@@ -127,5 +127,5 @@ tests =
         ]
     , MPF.tests
     , Crypto.tests
-    , MidgardValidator.tests
+    , MembershipValidator.tests
     ]

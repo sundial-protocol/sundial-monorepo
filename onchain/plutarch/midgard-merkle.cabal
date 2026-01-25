@@ -162,8 +162,8 @@ test-suite helpers-tests
   other-modules:
     Testing.Crypto
     Testing.Eval
+    Testing.MembershipValidator
     Testing.MerklePatriciaForestry
-    Testing.MidgardValidator
     Testing.ScriptContextBuilder
     Testing.TransactionProofs
 
