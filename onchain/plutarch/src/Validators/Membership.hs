@@ -42,7 +42,7 @@ membershipStakeValidator = plam $ \ctx -> P.do
     , validateMembership
     ]
 
--- | 'Withdraw zero' validator to ensure the merkle tree DOES NOT contain a specific entry.
+-- | 'Withdraw zero' validator to ensure the merkle tree _no longer_ contains a specific entry.
 nonMembershipStakeValidator :: ClosedTerm (PScriptContext :--> PUnit)
 nonMembershipStakeValidator = plam $ \ctx -> P.do
   PScriptContext {pscriptContext'redeemer, pscriptContext'scriptInfo} <-
@@ -56,14 +56,14 @@ nonMembershipStakeValidator = plam $ \ctx -> P.do
       pfromData $
         -- Q (Chase): Should we perhaps use PTryFrom here?
         punsafeCoerce @(PAsData PMerkleNonMembershipRedeemer) (pto pscriptContext'redeemer)
-  let validateMembership =
+  let validateAbsence =
         pexcludes
           # pfromData pmnmInputRoot
           # pfromData pmnmInputKey
           # pfromData pmnmInputProof
   pvalidateConditions
     [ pisRewardingScript (pdata pscriptContext'scriptInfo)
-    , validateMembership
+    , validateAbsence
     ]
 
 -- Test whether an element is absent in the trie with a specific value.
