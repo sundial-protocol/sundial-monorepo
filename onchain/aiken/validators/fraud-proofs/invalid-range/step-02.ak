@@ -1,18 +1,19 @@
-use aiken/crypto.{ScriptHash}
+use aiken_design_patterns/validity_range_normalization.{
+  Always, ClosedRange, FromNegInf, ToPosInf,
+} as vrn
 use cardano/address.{Address}
 use cardano/assets.{PolicyId}
 use cardano/transaction.{OutputReference, Transaction}
-use midgard/common/utils.{plutarch_phas}
 use midgard/computation_thread as ct
 use midgard/fraud_proofs/common.{cancel, finalize}
-use midgard/fraud_proofs/double_spend/step_03.{
+use midgard/fraud_proofs/invalid_range/step_02.{
   Args, Datum, SpendRedeemer, State,
 }
 
 validator main(
-  computation_thread_token_policy_id: PolicyId,
-  fraud_proof_token_policy_id: ScriptHash,
+  fraud_proof_token_policy_id: PolicyId,
   fraud_proof_token_address: Address,
+  computation_thread_token_policy_id: PolicyId,
 ) {
   spend(
     datum: Option<Datum>,
@@ -33,14 +34,14 @@ validator main(
       ct.Continue(Args {
         input_index,
         output_index,
-        input_membership_proof,
         fraud_proof_mint_redeemer_index,
-        inclusion_proof_script_withdraw_redeemer_index,
       }) -> {
         let Transaction { inputs, outputs, redeemers, .. } = tx
 
         expect Some(step_datum) = datum
 
+        // 1. Specified input must be authentic and properly reproduced at the
+        //    fraud proof's spending address.
         let
           _own_script_hash,
           _computation_thread_token_asset_name,
@@ -61,25 +62,33 @@ validator main(
             redeemers,
           )
 
-        expect Some(input_state) = m_input_state_data
+        expect Some(State {
+          block_valid_from,
+          block_valid_to,
+          bad_tx_normalized_validity_range,
+        }) = m_input_state_data
 
-        let State {
-          verified_tx2_inputs_root,
-          double_spent_input_key,
-          double_spent_input_value,
-        } = input_state
-
-        // 1. Provided input must be a member of the second transaction's
-        //    inputs.
+        // 2. One or more **bounds** of the bad transaction's validity interval
+        //    must fall out of the block's. Meaning unbounded ends are not
+        //    validated against the block's time range.
+        //
+        //    Also if the range is invalid (i.e. lower bound is greater than or
+        //    equal to the upper bound), the fraud proof should be able to
+        //    succeed.
+        //
+        //    > [!NOTE]
+        //    > We are assuming inclusive lower bound and exclusive upper bound
+        //    > in the block. TODO: This needs clarification in specs.
         expect
-          plutarch_phas(
-            merkle_root: verified_tx2_inputs_root,
-            key: double_spent_input_key,
-            value: double_spent_input_value,
-            membership_proof: input_membership_proof,
-            redeemers: redeemers,
-            withdraw_redeemer_index: inclusion_proof_script_withdraw_redeemer_index,
-          )
+          when bad_tx_normalized_validity_range is {
+            ClosedRange { lower, upper } -> or {
+                lower < block_valid_from,
+                upper >= block_valid_to,
+              }
+            FromNegInf { upper } -> upper >= block_valid_to
+            ToPosInf { lower } -> lower < block_valid_from
+            Always -> fail @"The tx does not have an invalid time range"
+          }
 
         // Done.
         True
