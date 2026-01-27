@@ -129,7 +129,9 @@ library
     Types.Blocks
     Types.Classes
     Types.Constants
+    Types.Membership
     Types.StateCommitment
+    Validators.Membership
 
   hs-source-dirs:  src
 
@@ -160,8 +162,8 @@ test-suite helpers-tests
   other-modules:
     Testing.Crypto
     Testing.Eval
+    Testing.MembershipValidator
     Testing.MerklePatriciaForestry
-    Testing.MidgardValidator
     Testing.ScriptContextBuilder
     Testing.TransactionProofs
 
