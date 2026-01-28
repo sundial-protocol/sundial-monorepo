@@ -14,16 +14,23 @@
 
 import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Address, LucidEvolution, Script } from "@lucid-evolution/lucid";
+import {
+  Address,
+  LucidEvolution,
+  Script,
+  TxSignBuilder,
+} from "@lucid-evolution/lucid";
 import { Effect, Metric, Ref } from "effect";
 import {
   TxConfirmError,
   fetchFirstBlockTxs,
   handleSignSubmit,
   TxSubmitError,
+  TxSignError,
 } from "../utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
-import { breakDownTx, LucidError } from "@/utils.js";
+import { DatabaseError } from "@/database/utils/common.js";
+import { breakDownTx } from "@/utils.js";
 import { Database, Globals } from "@/services/index.js";
 
 const mergeBlockCounter = Metric.counter("merge_block_count", {
@@ -40,7 +47,7 @@ const MIN_QUEUE_LENGTH_FOR_MERGING: number = 8;
 const getStateQueueLength = (
   lucid: LucidEvolution,
   stateQueueAddress: Address,
-): Effect.Effect<number, LucidError, Globals> =>
+): Effect.Effect<number, SDK.Utils.LucidError, Globals> =>
   Effect.gen(function* () {
     const globals = yield* Globals;
     const LATEST_SYNC_OF_STATE_QUEUE_LENGTH = yield* Ref.get(
@@ -58,7 +65,7 @@ const getStateQueueLength = (
       const stateQueueUtxos = yield* Effect.tryPromise({
         try: () => lucid.utxosAt(stateQueueAddress),
         catch: (e) =>
-          new LucidError({
+          new SDK.Utils.LucidError({
             message: `Failed to fetch UTxOs at state queue address: ${stateQueueAddress}`,
             cause: e,
           }),
@@ -91,7 +98,19 @@ export const buildAndSubmitMergeTx = (
   fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
   spendScript: Script,
   mintScript: Script,
-): Effect.Effect<void, LucidError | Error, Globals | Database> =>
+): Effect.Effect<
+  void,
+  | SDK.Utils.CmlDeserializationError
+  | SDK.Utils.DataCoercionError
+  | SDK.Utils.HashingError
+  | SDK.Utils.LinkedListError
+  | SDK.Utils.LucidError
+  | SDK.Utils.StateQueueError
+  | DatabaseError
+  | TxSubmitError
+  | TxSignError,
+  Database | Globals
+> =>
   Effect.gen(function* () {
     const globals = yield* Globals;
     const currentStateQueueLength = yield* getStateQueueLength(
@@ -138,38 +157,33 @@ export const buildAndSubmitMergeTx = (
       }
       yield* Effect.logInfo("🔸 Building merge transaction...");
       // Build the transaction
-      const txBuilder = yield* SDK.Endpoints.mergeToConfirmedStateProgram(
-        lucid,
-        fetchConfig,
-        {
+      const txBuilder: TxSignBuilder =
+        yield* SDK.Endpoints.mergeToConfirmedStateProgram(lucid, fetchConfig, {
           confirmedUTxO,
           firstBlockUTxO,
           stateQueueSpendingScript: spendScript,
           stateQueueMintingScript: mintScript,
-        },
-      ).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
+        }).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
 
       // Submit the transaction
-      const onSubmitFailure = (
-        err: TxSubmitError | { _tag: "TxSubmitError" },
-      ) =>
+      const onSubmitFailure = (err: TxSubmitError) =>
         Effect.gen(function* () {
           yield* Effect.logError(`Submit tx error: ${err}`);
           yield* Effect.fail(
             new TxSubmitError({
               message: "failed to submit the merge tx",
               cause: err,
+              txHash: txBuilder.toHash(),
             }),
           );
         });
       const onConfirmFailure = (err: TxConfirmError) =>
         Effect.logError(`Confirm tx error: ${err}`);
-      yield* handleSignSubmit(
-        lucid,
-        txBuilder,
-        onSubmitFailure,
-        onConfirmFailure,
-      ).pipe(Effect.withSpan("handleSignSubmit-merge-tx"));
+      yield* handleSignSubmit(lucid, txBuilder).pipe(
+        Effect.catchTag("TxSubmitError", onSubmitFailure),
+        Effect.catchTag("TxConfirmError", onConfirmFailure),
+        Effect.withSpan("handleSignSubmit-merge-tx"),
+      );
       yield* Effect.logInfo(
         "🔸 Merge transaction submitted, updating the db...",
       );

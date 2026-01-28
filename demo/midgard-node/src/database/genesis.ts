@@ -3,7 +3,7 @@ import { Database, NodeConfig } from "@/services/index.js";
 import { Columns as LedgerColumns } from "./utils/ledger.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { UTxO, utxoToCore } from "@lucid-evolution/lucid";
-import { DBInsertError } from "./utils/common.js";
+import { DatabaseError } from "./utils/common.js";
 
 /**
  * Inserts genesis UTXOs from the imported TypeScript module into the MPT database
@@ -11,7 +11,7 @@ import { DBInsertError } from "./utils/common.js";
  */
 export const insertGenesisUtxos: Effect.Effect<
   void,
-  DBInsertError,
+  DatabaseError,
   NodeConfig | Database
 > = Effect.gen(function* () {
   const config = yield* NodeConfig;
@@ -45,4 +45,9 @@ export const insertGenesisUtxos: Effect.Effect<
     `🟣 Successfully inserted ${ledgerEntries.length} genesis UTxOs. Funded addresses are:
 ${Array.from(new Set(config.GENESIS_UTXOS.map((u) => u.address))).join("\n")}`,
   );
-});
+}).pipe(
+  Effect.catchTag("DatabaseError", (_e) =>
+    Effect.logInfo(`🟣 Genesis UTxOs already exist. Skipping insertion.`),
+  ),
+  Effect.andThen(Effect.succeed(Effect.void)),
+);

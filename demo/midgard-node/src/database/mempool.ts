@@ -2,26 +2,22 @@ import { Database } from "@/services/database.js";
 import * as Tx from "@/database/utils/tx.js";
 import {
   clearTable,
-  DBDeleteError,
-  DBInsertError,
-  sqlErrorToDBSelectError,
-  DBSelectError,
+  sqlErrorToDatabaseError,
+  DatabaseError,
   retrieveNumberOfEntries,
 } from "@/database/utils/common.js";
 import * as MempoolLedgerDB from "./mempoolLedger.js";
 import { Effect } from "effect";
 import { SqlClient } from "@effect/sql";
-import { ProcessedTx, CmlDeserializationError } from "@/utils.js";
+import * as AddressHistoryDB from "@/database/addressHistory.js";
+import { ProcessedTx } from "@/utils.js";
+import { LedgerUtils } from "./index.js";
 
 export const tableName = "mempool";
 
 export const insert = (
   processedTx: ProcessedTx,
-): Effect.Effect<
-  void,
-  DBInsertError | DBDeleteError | CmlDeserializationError,
-  Database
-> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const { txId, txCbor, spent, produced } = processedTx;
     // Insert the tx itself in `MempoolDB`.
@@ -33,6 +29,8 @@ export const insert = (
     yield* MempoolLedgerDB.insert(produced);
     // Remove spent inputs from MempoolLedgerDB.
     yield* MempoolLedgerDB.clearUTxOs(spent);
+    // Add handled addresses to the lookup table
+    yield* AddressHistoryDB.insert(spent, produced);
   }).pipe(
     Effect.withLogSpan(`insert ${tableName}`),
     Effect.tapError((e) =>
@@ -42,7 +40,7 @@ export const insert = (
 
 export const insertMultiple = (
   processedTxs: ProcessedTx[],
-): Effect.Effect<void, DBInsertError | DBDeleteError, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     if (processedTxs.length === 0) {
       return;
@@ -54,13 +52,22 @@ export const insertMultiple = (
     // Insert the tx itself in `MempoolDB`.
     yield* Tx.insertEntries(tableName, txEntries);
 
-    const allProduced = processedTxs.flatMap((v) => v.produced);
-    const allSpent = processedTxs.flatMap((v) => v.spent);
+    const initAcc: { allProduced: LedgerUtils.Entry[]; allSpent: Buffer[] } = {
+      allProduced: [],
+      allSpent: [],
+    };
+    const { allProduced, allSpent } = processedTxs.reduce((acc, v) => {
+      acc.allProduced.push(...v.produced);
+      acc.allSpent.push(...v.spent);
+      return acc;
+    }, initAcc);
 
     // Insert produced UTxOs in `MempoolLedgerDB`.
     yield* MempoolLedgerDB.insert(allProduced);
     // Remove spent inputs from MempoolLedgerDB.
     yield* MempoolLedgerDB.clearUTxOs(allSpent);
+    // Update AddressHistoryDB
+    yield* AddressHistoryDB.insert(allSpent, allProduced);
   }).pipe(
     Effect.withLogSpan(`insert ${tableName}`),
     Effect.tapError((e) => Effect.logError(`${tableName} db: insert: ${e}`)),
@@ -74,7 +81,7 @@ export const retrieveTxCborsByHashes = (txHashes: Buffer[]) =>
 
 export const retrieve: Effect.Effect<
   readonly Tx.Entry[],
-  DBSelectError,
+  DatabaseError,
   Database
 > = Effect.gen(function* () {
   yield* Effect.logDebug(`${tableName} db: attempt to retrieve keyValues`);
@@ -87,15 +94,15 @@ export const retrieve: Effect.Effect<
   Effect.tapErrorTag("SqlError", (e) =>
     Effect.logError(`${tableName} db: retrieve: ${JSON.stringify(e)}`),
   ),
-  sqlErrorToDBSelectError(tableName),
+  sqlErrorToDatabaseError(tableName, "Failed to retrieve given transactions"),
 );
 
-export const retrieveTxCount: Effect.Effect<number, DBSelectError, Database> =
+export const retrieveTxCount: Effect.Effect<bigint, DatabaseError, Database> =
   retrieveNumberOfEntries(tableName);
 
 export const clearTxs = (
   txHashes: Buffer[],
-): Effect.Effect<void, DBDeleteError, Database> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Tx.delMultiple(tableName, txHashes);
 
 export const clear = clearTable(tableName);

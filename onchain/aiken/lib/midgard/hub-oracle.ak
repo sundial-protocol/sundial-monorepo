@@ -17,8 +17,8 @@ pub type Datum {
   deposit: PolicyId,
   withdrawal: PolicyId,
   tx_order: PolicyId,
-  settlement_queue: PolicyId,
-  escrow: PolicyId,
+  settlement: PolicyId,
+  payout: PolicyId,
   registered_operators_addr: Address,
   active_operators_addr: Address,
   retired_operators_addr: Address,
@@ -29,9 +29,9 @@ pub type Datum {
   deposit_addr: Address,
   withdrawal_addr: Address,
   tx_order_addr: Address,
-  settlement_queue_addr: Address,
+  settlement_addr: Address,
   reserve_addr: Address,
-  escrow_addr: Address,
+  payout_addr: Address,
   reserve_observer: ScriptHash,
 }
 
