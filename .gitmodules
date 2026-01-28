@@ -1,0 +1,24 @@
+[submodule "ada-locker"]
+	path = ada-locker
+	url = https://github.com/sundial-protocol/ada-locker
+[submodule "internal-docs"]
+	path = internal-docs
+	url = https://github.com/sundial-protocol/internal-docs
+[submodule "btc-locker"]
+	path = btc-locker
+	url = https://github.com/sundial-protocol/btc-locker
+[submodule "indexer-utxorpc"]
+	path = indexer-utxorpc
+	url = https://github.com/sundial-protocol/indexer-utxorpc
+[submodule "indexer-openapi"]
+	path = indexer-openapi
+	url = https://github.com/sundial-protocol/indexer-openapi
+[submodule "scalus-locker"]
+	path = scalus-locker
+	url = https://github.com/sundial-protocol/scalus-locker
+[submodule "airdrop-engine"]
+	path = airdrop-engine
+	url = https://github.com/sundial-protocol/airdrop-engine
+[submodule "charms-cardano"]
+	path = charms-cardano
+	url = https://github.com/charmsdev/charms-cardano
