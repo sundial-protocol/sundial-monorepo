@@ -161,13 +161,11 @@ const getTxHandler = Effect.gen(function* () {
     );
     return yield* HttpServerResponse.json(
       { error: `Invalid transaction hash: ${txHashParam}` },
-      { status: 404 },
+      { status: 400 },
     );
   }
 
   const txHashBytes = Buffer.from(fromHex(txHashParam));
-  yield* Effect.logInfo("txHashBytes", txHashBytes);
-
   return yield* lookupTxCbor(txHashBytes, txHashParam).pipe(
     Effect.tap((foundCbor) => Effect.logInfo("foundCbor", bufferToHex(foundCbor))),
     Effect.flatMap((foundCbor) =>
