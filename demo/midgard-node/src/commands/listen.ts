@@ -863,7 +863,9 @@ export const runNode = (withMonitoring?: boolean) =>
           port: nodeConfig.PROM_METRICS_PORT,
         },
         () => {
-          `Prometheus metrics available at http://localhost:${nodeConfig.PROM_METRICS_PORT}/metrics`;
+          console.log(
+            `Prometheus metrics available at http://0.0.0.0:${nodeConfig.PROM_METRICS_PORT}/metrics`,
+          );
         },
       );
 
