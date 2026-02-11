@@ -47,10 +47,7 @@ export class DatabaseError extends Data.TaggedError("DatabaseError")<
   SDK.Utils.GenericErrorFields & { readonly table: string }
 > {}
 
-export const NotFoundErrorTypeId = Symbol.for("@midgard/NotFoundError");
-
-export class NotFoundError extends TypeIdError(
-  NotFoundErrorTypeId,
+export class NotFoundError extends Data.TaggedError(
   "NotFoundError",
 )<SDK.Utils.GenericErrorFields & {
   readonly table: string;
