@@ -42,20 +42,12 @@ export const isHexString = (str: string): boolean => {
   return hexRegex.test(str);
 };
 
-export const bufferToHex = (buf: Buffer): string => {
-  try {
-    return buf.toString("hex");
-  } catch (_) {
-    return "<no hex for undefined>";
-  }
-};
-
-export const findSpentAndProducedUTxOs = (
+export const breakDownTxMinimally = (
   txCBOR: Buffer,
   txHash?: Buffer,
 ): Effect.Effect<
   { spent: Buffer[]; produced: Ledger.MinimalEntry[] },
-  SDK.Utils.CmlUnexpectedError
+  SDK.CmlUnexpectedError
 > =>
   Effect.gen(function* () {
     const spent: Buffer[] = [];
@@ -70,7 +62,7 @@ export const findSpentAndProducedUTxOs = (
       yield* Effect.try({
         try: () => spent.push(Buffer.from(inputs.get(i).to_cbor_bytes())),
         catch: (e) =>
-          new SDK.Utils.CmlUnexpectedError({
+          new SDK.CmlUnexpectedError({
             message: `An error occurred on input CBOR serialization`,
             cause: e,
           }),
@@ -89,14 +81,21 @@ export const findSpentAndProducedUTxOs = (
     return { spent, produced };
   });
 
+/**
+ * Given a transaction CBOR bytes, this function breaks it down into its spent
+ * outrefs and produced outputs (as ledger entries).
+ *
+ * @param txCbor - Uint8Array of the CBOR encoded transaction itself (expected to be deserializable to a CML.Transaction).
+ * @returns An effect that can be reduced to a `ProcessedTx`.
+ */
 export const breakDownTx = (
   txCbor: Uint8Array,
-): Effect.Effect<ProcessedTx, SDK.Utils.CmlDeserializationError> =>
+): Effect.Effect<ProcessedTx, SDK.CmlDeserializationError> =>
   Effect.gen(function* () {
     const deserializedTx = yield* Effect.try({
       try: () => CML.Transaction.from_cbor_bytes(txCbor),
       catch: (e) =>
-        new SDK.Utils.CmlDeserializationError({
+        new SDK.CmlDeserializationError({
           message: `Failed to deserialize transaction: ${txCbor}`,
           cause: e,
         }),
@@ -165,6 +164,22 @@ export const batchProgram = <A, E, C>(
   );
 };
 
+export const trivialTransactionFromCMLUnspentOutput = (
+  transactionUnspentOutput: CML.TransactionUnspentOutput,
+): Effect.Effect<CML.Transaction, never, never> =>
+  Effect.gen(function* () {
+    const inputs = CML.TransactionInputList.new();
+    const outputs = CML.TransactionOutputList.new();
+    outputs.add(transactionUnspentOutput.output());
+    const fee = 0n;
+
+    const transactionBody = CML.TransactionBody.new(inputs, outputs, fee);
+    const witnessSet = CML.TransactionWitnessSet.new();
+
+    const transaction = CML.Transaction.new(transactionBody, witnessSet, true);
+    return transaction;
+  });
+
 export const ENV_VARS_GUIDE = `
 Make sure you first have set the environment variable for your seed phrase:
 
@@ -182,4 +197,4 @@ Kupmios:
 
 export class FileSystemError extends Data.TaggedError(
   "FileSystemError",
-)<SDK.Utils.GenericErrorFields> {}
+)<SDK.GenericErrorFields> {}
