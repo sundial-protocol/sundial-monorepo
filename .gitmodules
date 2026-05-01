@@ -22,3 +22,6 @@
 [submodule "charms-cardano"]
 	path = charms-cardano
 	url = https://github.com/charmsdev/charms-cardano
+[submodule "technical-spec/Lean4Midgard"]
+	path = technical-spec/Lean4Midgard
+	url = https://github.com/input-output-hk/rnd-midgard.git

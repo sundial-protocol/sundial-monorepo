@@ -19,9 +19,8 @@ services:
     volumes:
       - ./db:/app/db
     depends_on:
-      - postgres
-    networks:
-      midgard_net:
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:15-alpine
@@ -34,11 +33,11 @@ services:
       - postgres-data:/var/lib/postgresql/data/pgdata
     ports:
       - "5433:5432"
-    networks:
-      midgard_net:
-
-networks:
-  midgard_net:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -h 127.0.0.1 -p 5432"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
 volumes:
   postgres-data:

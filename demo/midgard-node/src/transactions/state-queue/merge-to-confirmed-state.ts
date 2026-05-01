@@ -4,15 +4,15 @@
  *
  * 1. Fetches the confirmed state and the block it points to (i.e. the oldest
  *    block in the queue).
- * 2. Fetches the transactions of that block by querying BlocksDB and its
+ * 2. Fetches the transactions of that block by querying BlocksTxsDB and its
  *    associated inputs table..
  * 3. Apply those transactions to ConfirmedLedgerDB and update the table to
  *    store the updated UTxO set.
- * 4. Remove all header hashes from BlocksDB associated with the merged block.
+ * 4. Remove all header hashes from BlocksTxsDB associated with the merged block.
  * 5. Build and submit the merge transaction.
  */
 
-import { BlocksDB, ConfirmedLedgerDB } from "@/database/index.js";
+import { BlocksTxsDB, ConfirmedLedgerDB } from "@/database/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import {
   Address,
@@ -27,7 +27,7 @@ import {
   handleSignSubmit,
   TxSubmitError,
   TxSignError,
-} from "../utils.js";
+} from "@/transactions/utils.js";
 import { Entry as LedgerEntry } from "@/database/utils/ledger.js";
 import { DatabaseError } from "@/database/utils/common.js";
 import { breakDownTx } from "@/utils.js";
@@ -47,15 +47,15 @@ const MIN_QUEUE_LENGTH_FOR_MERGING: number = 8;
 const getStateQueueLength = (
   lucid: LucidEvolution,
   stateQueueAddress: Address,
-): Effect.Effect<number, SDK.Utils.LucidError, Globals> =>
+): Effect.Effect<number, SDK.LucidError, Globals> =>
   Effect.gen(function* () {
     const globals = yield* Globals;
-    const LATEST_SYNC_OF_STATE_QUEUE_LENGTH = yield* Ref.get(
-      globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH,
+    const LATEST_SYNC_TIME_OF_STATE_QUEUE_LENGTH = yield* Ref.get(
+      globals.LATEST_SYNC_TIME_OF_STATE_QUEUE_LENGTH,
     );
     const now_millis = Date.now();
     if (
-      now_millis - LATEST_SYNC_OF_STATE_QUEUE_LENGTH >
+      now_millis - LATEST_SYNC_TIME_OF_STATE_QUEUE_LENGTH >
       MAX_LIFE_OF_LOCAL_SYNC
     ) {
       // We consider in-memory state queue length stale.
@@ -65,7 +65,7 @@ const getStateQueueLength = (
       const stateQueueUtxos = yield* Effect.tryPromise({
         try: () => lucid.utxosAt(stateQueueAddress),
         catch: (e) =>
-          new SDK.Utils.LucidError({
+          new SDK.LucidError({
             message: `Failed to fetch UTxOs at state queue address: ${stateQueueAddress}`,
             cause: e,
           }),
@@ -75,7 +75,10 @@ const getStateQueueLength = (
         globals.BLOCKS_IN_QUEUE,
         Math.max(0, stateQueueUtxos.length - 1),
       );
-      yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now());
+      yield* Ref.set(
+        globals.LATEST_SYNC_TIME_OF_STATE_QUEUE_LENGTH,
+        Date.now(),
+      );
 
       return stateQueueUtxos.length;
     } else {
@@ -95,17 +98,17 @@ const getStateQueueLength = (
  */
 export const buildAndSubmitMergeTx = (
   lucid: LucidEvolution,
-  fetchConfig: SDK.TxBuilder.StateQueue.FetchConfig,
+  fetchConfig: SDK.StateQueueFetchConfig,
   spendScript: Script,
   mintScript: Script,
 ): Effect.Effect<
   void,
-  | SDK.Utils.CmlDeserializationError
-  | SDK.Utils.DataCoercionError
-  | SDK.Utils.HashingError
-  | SDK.Utils.LinkedListError
-  | SDK.Utils.LucidError
-  | SDK.Utils.StateQueueError
+  | SDK.CmlDeserializationError
+  | SDK.DataCoercionError
+  | SDK.HashingError
+  | SDK.LinkedListError
+  | SDK.LucidError
+  | SDK.StateQueueError
   | DatabaseError
   | TxSubmitError
   | TxSignError,
@@ -136,34 +139,36 @@ export const buildAndSubmitMergeTx = (
       "🔸 Fetching confirmed state and the first block in queue from L1...",
     );
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
-      yield* SDK.Endpoints.fetchConfirmedStateAndItsLinkProgram(
-        lucid,
-        fetchConfig,
-      );
+      yield* SDK.fetchConfirmedStateAndItsLinkProgram(lucid, fetchConfig);
     if (firstBlockUTxO) {
       yield* Effect.logInfo(
         `🔸 First block found: ${firstBlockUTxO.utxo.txHash}#${firstBlockUTxO.utxo.outputIndex}`,
       );
       // Fetch transactions from the first block
-      yield* Effect.logInfo("🔸 Looking up its transactions from BlocksDB...");
+      yield* Effect.logInfo(
+        "🔸 Looking up its transactions from BlocksTxsDB...",
+      );
       const { txs: firstBlockTxs, headerHash } = yield* fetchFirstBlockTxs(
         firstBlockUTxO,
       ).pipe(Effect.withSpan("fetchFirstBlockTxs"));
       if (firstBlockTxs.length === 0) {
         yield* Effect.logInfo(
-          "🔸 ❌ Failed to find first block's transactions in BlocksDB.",
+          "🔸 ❌ Failed to find first block's transactions in BlocksTxsDB.",
         );
         return;
       }
       yield* Effect.logInfo("🔸 Building merge transaction...");
       // Build the transaction
-      const txBuilder: TxSignBuilder =
-        yield* SDK.Endpoints.mergeToConfirmedStateProgram(lucid, fetchConfig, {
+      const txBuilder: TxSignBuilder = yield* SDK.mergeToConfirmedStateProgram(
+        lucid,
+        fetchConfig,
+        {
           confirmedUTxO,
           firstBlockUTxO,
           stateQueueSpendingScript: spendScript,
           stateQueueMintingScript: mintScript,
-        }).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
+        },
+      ).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
 
       // Submit the transaction
       const onSubmitFailure = (err: TxSubmitError) =>
@@ -209,7 +214,7 @@ export const buildAndSubmitMergeTx = (
 
       // - Clear all the spent UTxOs from the confirmed ledger
       // - Add all the produced UTxOs from the confirmed ledger
-      // - Remove all the tx hashes of the merged block from BlocksDB
+      // - Remove all the tx hashes of the merged block from BlocksTxsDB
       const bs = 100;
       yield* Effect.logInfo("🔸 Clear confirmed ledger db...");
       for (let i = 0; i < spentOutRefs.length; i += bs) {
@@ -223,9 +228,9 @@ export const buildAndSubmitMergeTx = (
           // .map((u) => utxoToOutRefAndCBORArray(u)),
           .pipe(Effect.withSpan(`confirmed-ledger-insert-${i}`));
       }
-      yield* Effect.logInfo("🔸 Clear block from BlocksDB...");
-      yield* BlocksDB.clearBlock(headerHash).pipe(
-        Effect.withSpan("clear-block-from-BlocksDB"),
+      yield* Effect.logInfo("🔸 Clear block from BlocksTxsDB...");
+      yield* BlocksTxsDB.clearBlock(headerHash).pipe(
+        Effect.withSpan("clear-block-from-BlocksTxsDB"),
       );
       yield* Effect.logInfo("🔸 ☑️  Merge transaction completed.");
 
@@ -236,7 +241,10 @@ export const buildAndSubmitMergeTx = (
       yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n - 1);
     } else {
       yield* Ref.set(globals.BLOCKS_IN_QUEUE, 0);
-      yield* Ref.set(globals.LATEST_SYNC_OF_STATE_QUEUE_LENGTH, Date.now());
+      yield* Ref.set(
+        globals.LATEST_SYNC_TIME_OF_STATE_QUEUE_LENGTH,
+        Date.now(),
+      );
       yield* Effect.logInfo("🔸 No blocks found in queue.");
       return;
     }
