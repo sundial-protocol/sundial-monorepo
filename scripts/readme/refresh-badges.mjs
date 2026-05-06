@@ -72,21 +72,29 @@ const BADGE_SPECS = {
     endMarker: '<!-- badge:observability:end -->',
     type: 'boolean',
   },
-  'api-coverage': {
-    altText: 'API Coverage',
-    label: 'api coverage',
-    startMarker: '<!-- badge:api-coverage:start -->',
-    endMarker: '<!-- badge:api-coverage:end -->',
+  'node-coverage': {
+    altText: 'Node Coverage',
+    label: 'node coverage',
+    startMarker: '<!-- badge:node-coverage:start -->',
+    endMarker: '<!-- badge:node-coverage:end -->',
     type: 'coverage',
-    coveragePath: resolve(REPO_ROOT, 'coverage/api/coverage-summary.json'),
+    coveragePath: resolve(REPO_ROOT, 'demo/coverage/node/coverage-summary.json'),
   },
-  'indexer-coverage': {
-    altText: 'Indexer Coverage',
-    label: 'indexer coverage',
-    startMarker: '<!-- badge:indexer-coverage:start -->',
-    endMarker: '<!-- badge:indexer-coverage:end -->',
+  'sdk-coverage': {
+    altText: 'SDK Coverage',
+    label: 'sdk coverage',
+    startMarker: '<!-- badge:sdk-coverage:start -->',
+    endMarker: '<!-- badge:sdk-coverage:end -->',
     type: 'coverage',
-    coveragePath: resolve(REPO_ROOT, 'coverage/indexer/coverage-summary.json'),
+    coveragePath: resolve(REPO_ROOT, 'demo/coverage/sdk/coverage-summary.json'),
+  },
+  'ts-coverage': {
+    altText: 'TS Coverage',
+    label: 'ts coverage',
+    startMarker: '<!-- badge:ts-coverage:start -->',
+    endMarker: '<!-- badge:ts-coverage:end -->',
+    type: 'coverage',
+    coveragePath: resolve(REPO_ROOT, 'demo/coverage/ts/coverage-summary.json'),
   },
 };
 

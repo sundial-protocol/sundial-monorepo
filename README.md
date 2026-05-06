@@ -19,10 +19,35 @@ Submodules are listed below.
 <img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
 <!-- badge:security:end -->
     </td>
+      </tr>
+        <tr>
         <td>
       <!-- badge:unit:start -->
 <img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
 <!-- badge:unit:end -->
+    </td>
+     <td>
+      &nbsp;
+    </td>
+     <td>
+     &nbsp;
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <!-- badge:node-coverage:start -->
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-20.0%25-red?style=flat-square" />
+<!-- badge:node-coverage:end -->
+    </td>
+    <td>
+      <!-- badge:sdk-coverage:start -->
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-42.0%25-red?style=flat-square" />
+<!-- badge:sdk-coverage:end -->
+    </td>
+    <td>
+      <!-- badge:ts-coverage:start -->
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-66.1%25-orange?style=flat-square" />
+<!-- badge:ts-coverage:end -->
     </td>
   </tr>
 </table>
