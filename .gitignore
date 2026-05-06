@@ -9,3 +9,35 @@ data/
 .direnv
 utils.log
 .env
+
+# temp directory
+.temp
+.tmp
+/test/fixtures/bitcoind/artifacts
+/test/fixtures/bitcoind/work
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# coverage directory used by tools like istanbul
+coverage
+testing
+
+# local agent instructions
+/AGENTS.md
+/CLAUDE.md
+.codex
+.claude
+.anthropic
+.openai
+templates/
+audits/raw
+
+# editor/IDE
+/.vscode
+
+# local security scan reports
+/gitleaks-report.json
