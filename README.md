@@ -2,6 +2,26 @@
 A collection of tools and libraries comprising the Sundial Layer 2 blockchain.
 Submodules are listed below.
 
+<table>
+  <tr>
+    <td>
+      <!-- badge:build:start -->
+<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+<!-- badge:build:end -->
+    </td>
+    <td>
+      <!-- badge:quality:start -->
+<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
+<!-- badge:quality:end -->
+    </td>
+    <td>
+      <!-- badge:security:start -->
+<img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+<!-- badge:security:end -->
+    </td>
+  </tr>
+</table>
+
 # Documentation
 `/internal-docs` - Internal documentation for Sundial developers.
 

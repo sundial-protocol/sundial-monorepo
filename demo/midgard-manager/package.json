@@ -10,6 +10,9 @@
   "scripts": {
     "build": "pnpm --filter @midgard-manager/* build",
     "dev": "pnpm --filter @midgard-manager/* dev",
+    "type-check:cli": "pnpm --filter @midgard-manager/cli run type-check",
+    "type-check:tx-generator": "pnpm --filter @midgard-manager/tx-generator run type-check",
+    "type-check": "pnpm run type-check:cli && pnpm run type-check:tx-generator",
     "lint": "pnpm --filter @midgard-manager/* lint",
     "clean": "pnpm --filter @midgard-manager/* clean",
     "start": "pnpm --filter @midgard-manager/cli start",

@@ -37,7 +37,9 @@ function input(hashFill: number, index: number): CML.TransactionInput {
   return CML.TransactionInput.new(txHash(hashFill), BigInt(index));
 }
 
-function inputList(...inputs: CML.TransactionInput[]): CML.TransactionInputList {
+function inputList(
+  ...inputs: CML.TransactionInput[]
+): CML.TransactionInputList {
   const list = CML.TransactionInputList.new();
   for (const i of inputs) list.add(i);
   return list;
@@ -53,7 +55,9 @@ function conwayOutput(
   return CML.TransactionOutput.new_conway_format_tx_out(out);
 }
 
-function outputList(...outputs: CML.TransactionOutput[]): CML.TransactionOutputList {
+function outputList(
+  ...outputs: CML.TransactionOutput[]
+): CML.TransactionOutputList {
   const list = CML.TransactionOutputList.new();
   for (const o of outputs) list.add(o);
   return list;

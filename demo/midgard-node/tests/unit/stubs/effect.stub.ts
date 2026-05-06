@@ -4,8 +4,7 @@ type GenericFields = {
 };
 
 export const Data = {
-  TaggedError:
-    (name: string) =>
+  TaggedError: (name: string) =>
     class extends Error {
       cause?: unknown;
 

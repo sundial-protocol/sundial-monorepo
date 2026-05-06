@@ -12,6 +12,7 @@
     "clean": "rimraf dist",
     "reset": "rimraf dist node_modules *.tgz",
     "build": "tsup src/index.ts --minify --format esm,cjs --dts --clean",
+    "type-check": "tsc --noEmit -p tsconfig.quality.json --skipLibCheck",
     "lint": "eslint",
     "repack": "pnpm run build  && pnpm pack",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
@@ -23,7 +24,6 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@effect/vitest": "^0.17.8",
     "@sinclair/typebox": "^0.34.28",
     "@types/node": "^22.13.5",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
@@ -31,18 +31,23 @@
     "eslint": "^9.21.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.5.2",
+    "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
-    "vitest": "2.1.8",
-    "rimraf": "^6.0.1"
+    "vitest": "^4.1.5"
+  },
+  "overrides": {
+    "@cardano-sdk/core": "0.46.12",
+    "@cardano-sdk/crypto": "0.4.5",
+    "ip-address": "10.2.0"
   },
   "directories": {
     "test": "test"
   },
   "dependencies": {
     "@harmoniclabs/crypto": "^0.3.0",
-    "@lucid-evolution/lucid": "^0.4.29",
+    "@lucid-evolution/lucid": "^0.4.23",
     "@noble/hashes": "^1.7.1",
     "effect": "^3.14.22"
   }

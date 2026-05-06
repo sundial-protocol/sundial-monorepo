@@ -556,8 +556,8 @@ describe("TransactionBody", () => {
       ...baseBody(),
       // Two policies: one minting, one burning
       mint: [
-        [bytes(28, 0xaa), [[bytesSeq(4), 100n]]],   // mint 100
-        [bytes(28, 0xbb), [[bytesSeq(3), -50n]]],    // burn 50
+        [bytes(28, 0xaa), [[bytesSeq(4), 100n]]], // mint 100
+        [bytes(28, 0xbb), [[bytesSeq(3), -50n]]], // burn 50
       ],
     });
   });

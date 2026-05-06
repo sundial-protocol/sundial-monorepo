@@ -146,7 +146,9 @@ export function writeBigU64(w: Writer, n: bigint): void {
 export function readBigU64(r: Reader): bigint {
   const b = r.read(8);
   const dv = new DataView(b.buffer, b.byteOffset, 8);
-  return (BigInt(dv.getUint32(0, false)) << 32n) | BigInt(dv.getUint32(4, false));
+  return (
+    (BigInt(dv.getUint32(0, false)) << 32n) | BigInt(dv.getUint32(4, false))
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -167,8 +169,9 @@ export function writeBigI64(w: Writer, n: bigint): void {
 export function readBigI64(r: Reader): bigint {
   const b = r.read(8);
   const dv = new DataView(b.buffer, b.byteOffset, 8);
-  const raw = (BigInt(dv.getUint32(0, false)) << 32n) | BigInt(dv.getUint32(4, false));
-  return raw >= (1n << 63n) ? raw - (1n << 64n) : raw;
+  const raw =
+    (BigInt(dv.getUint32(0, false)) << 32n) | BigInt(dv.getUint32(4, false));
+  return raw >= 1n << 63n ? raw - (1n << 64n) : raw;
 }
 
 // ---------------------------------------------------------------------------

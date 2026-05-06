@@ -11,8 +11,18 @@ const outrefCborBytes = Buffer.from([0x82, 0xab, 0xcd]);
 const testAddress =
   "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58";
 
-const utxoA = { txHash: "aa".repeat(32), outputIndex: 0, address: testAddress, assets: {} };
-const utxoB = { txHash: "bb".repeat(32), outputIndex: 1, address: testAddress, assets: {} };
+const utxoA = {
+  txHash: "aa".repeat(32),
+  outputIndex: 0,
+  address: testAddress,
+  assets: {},
+};
+const utxoB = {
+  txHash: "bb".repeat(32),
+  outputIndex: 1,
+  address: testAddress,
+  assets: {},
+};
 
 vi.mock("@lucid-evolution/lucid", () => {
   const mockInputList = {
@@ -46,13 +56,11 @@ vi.mock("@lucid-evolution/lucid", () => {
         })),
       },
       TransactionBody: {
-        new: vi.fn(
-          (inputs: any, outputs: any, fee: bigint) => ({
-            inputs: () => inputs,
-            outputs: () => outputs,
-            fee: () => fee,
-          }),
-        ),
+        new: vi.fn((inputs: any, outputs: any, fee: bigint) => ({
+          inputs: () => inputs,
+          outputs: () => outputs,
+          fee: () => fee,
+        })),
       },
       TransactionWitnessSet: {
         new: vi.fn(() => ({})),
@@ -98,11 +106,16 @@ vi.mock("@lucid-evolution/lucid", () => {
     utxoToCore: vi.fn((utxo: any) => ({
       to_cbor_bytes: () =>
         Buffer.from(
-          JSON.stringify({ txHash: utxo.txHash, outputIndex: utxo.outputIndex }),
+          JSON.stringify({
+            txHash: utxo.txHash,
+            outputIndex: utxo.outputIndex,
+          }),
         ),
     })),
     coreToUtxo: vi.fn((cml: any) => {
-      const data = JSON.parse(Buffer.from(cml.to_cbor_bytes()).toString("utf8"));
+      const data = JSON.parse(
+        Buffer.from(cml.to_cbor_bytes()).toString("utf8"),
+      );
       return {
         txHash: data.txHash,
         outputIndex: data.outputIndex,
@@ -182,10 +195,7 @@ describe("Minimal transaction breakdown uses supplied hash", () => {
 describe("Serialize UTxOs for storage", () => {
   it.effect("Serialize UTxOs for storage", () =>
     Effect.gen(function* () {
-      const buf = yield* serializeUTxOsForStorage([
-        utxoA as any,
-        utxoB as any,
-      ]);
+      const buf = yield* serializeUTxOsForStorage([utxoA as any, utxoB as any]);
       expect(buf).toBeInstanceOf(Buffer);
       expect(buf.length).toBeGreaterThan(0);
     }),

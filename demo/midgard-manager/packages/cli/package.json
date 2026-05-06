@@ -11,6 +11,7 @@
     "build:ts": "tsup",
     "clean": "rimraf dist/*",
     "check": "tsc -b tsconfig.json",
+    "type-check": "tsc -b tsconfig.json",
     "lint": "eslint . --max-warnings=0",
     "start": "node dist/bin.js",
     "copy-package-json": "tsx scripts/copy-package-json.ts",

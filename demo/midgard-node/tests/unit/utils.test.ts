@@ -47,7 +47,10 @@ describe("UTxO converts to out ref", () => {
       assets: {},
     };
     const result = utxoToOutRef(utxo as any);
-    expect(result).toEqual({ txHash: utxo.txHash, outputIndex: utxo.outputIndex });
+    expect(result).toEqual({
+      txHash: utxo.txHash,
+      outputIndex: utxo.outputIndex,
+    });
   });
 });
 

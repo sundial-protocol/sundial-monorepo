@@ -168,7 +168,10 @@ const withdrawalDatumFixture = {
 const validNodeDatumCbor = Data.to(nodeDatumFixture, NodeDatum);
 const validDepositDatumCbor = Data.to(depositDatumFixture, DepositDatum);
 const validTxOrderDatumCbor = Data.to(txOrderDatumFixture, TxOrderDatum);
-const validWithdrawalDatumCbor = Data.to(withdrawalDatumFixture, WithdrawalOrderDatum);
+const validWithdrawalDatumCbor = Data.to(
+  withdrawalDatumFixture,
+  WithdrawalOrderDatum,
+);
 
 const makeBuilderSpy = (): BuilderSpy & Record<string, unknown> => {
   const builder: Record<string, unknown> = {};
@@ -248,8 +251,12 @@ describe("SDK unit plan coverage", () => {
   });
 
   it("Public index exports fraud-proof helpers", () => {
-    expect(typeof sdk.incompleteFraudProofCatalogueInitTxProgram).toBe("function");
-    expect(typeof sdk.incompleteFraudProofComputationThreadInitTxProgram).toBe("function");
+    expect(typeof sdk.incompleteFraudProofCatalogueInitTxProgram).toBe(
+      "function",
+    );
+    expect(typeof sdk.incompleteFraudProofComputationThreadInitTxProgram).toBe(
+      "function",
+    );
     expect(typeof sdk.incompleteFraudProofTokenMintTxProgram).toBe("function");
   });
 
@@ -311,24 +318,50 @@ describe("SDK unit plan coverage", () => {
   });
 
   it("AddressData extracts payment credential", async () => {
-    const decoded = await Effect.runPromise(sdk.addressDataFromBech32(addressKeyA));
+    const decoded = await Effect.runPromise(
+      sdk.addressDataFromBech32(addressKeyA),
+    );
     expect("PublicKeyCredential" in decoded.paymentCredential).toBe(true);
     if ("PublicKeyCredential" in decoded.paymentCredential) {
-      expect(decoded.paymentCredential.PublicKeyCredential[0]).toBe(pubKeyHashA);
+      expect(decoded.paymentCredential.PublicKeyCredential[0]).toBe(
+        pubKeyHashA,
+      );
     }
   });
 
   it("Find active operator by public-key hash", async () => {
-    const active = [{ utxo: makeUtxo({ txHash: txHashA, outputIndex: 0 }), datum: { key: pubKeyHashA, link: null, bondUnlockTime: null }, assetName: assetNameA }];
-    const retired = [{ utxo: makeUtxo({ txHash: txHashB, outputIndex: 1 }), datum: { key: "99".repeat(28), link: null, bondUnlockTime: null }, assetName: assetNameA }];
-    const found = await Effect.runPromise(sdk.findOperatorByPKH(active as any, retired as any, pubKeyHashA));
+    const active = [
+      {
+        utxo: makeUtxo({ txHash: txHashA, outputIndex: 0 }),
+        datum: { key: pubKeyHashA, link: null, bondUnlockTime: null },
+        assetName: assetNameA,
+      },
+    ];
+    const retired = [
+      {
+        utxo: makeUtxo({ txHash: txHashB, outputIndex: 1 }),
+        datum: { key: "99".repeat(28), link: null, bondUnlockTime: null },
+        assetName: assetNameA,
+      },
+    ];
+    const found = await Effect.runPromise(
+      sdk.findOperatorByPKH(active as any, retired as any, pubKeyHashA),
+    );
     expect(found.isActive).toBe(true);
     expect(found.datum.key).toBe(pubKeyHashA);
   });
 
   it("Find retired operator by public-key hash", async () => {
-    const retired = [{ utxo: makeUtxo({ txHash: txHashB, outputIndex: 1 }), datum: { key: pubKeyHashA, link: scriptHashA, bondUnlockTime: posixT2 }, assetName: assetNameA }];
-    const found = await Effect.runPromise(sdk.findOperatorByPKH([], retired as any, pubKeyHashA));
+    const retired = [
+      {
+        utxo: makeUtxo({ txHash: txHashB, outputIndex: 1 }),
+        datum: { key: pubKeyHashA, link: scriptHashA, bondUnlockTime: posixT2 },
+        assetName: assetNameA,
+      },
+    ];
+    const found = await Effect.runPromise(
+      sdk.findOperatorByPKH([], retired as any, pubKeyHashA),
+    );
     expect(found.isActive).toBe(false);
     expect(found.datum.key).toBe(pubKeyHashA);
   });
@@ -420,12 +453,17 @@ describe("SDK unit plan coverage", () => {
     const cbor = Data.to(txOrderDatumFixture, TxOrderDatum);
     const decoded = Data.from(cbor, TxOrderDatum) as typeof txOrderDatumFixture;
     expect(decoded.event.tx).toBe(hexA);
-    expect(decoded.refundAddress.paymentCredential).toEqual(addressDataKeyA.paymentCredential);
+    expect(decoded.refundAddress.paymentCredential).toEqual(
+      addressDataKeyA.paymentCredential,
+    );
   });
 
   it("Withdrawal datum schema round trips", () => {
     const cbor = Data.to(withdrawalDatumFixture, WithdrawalOrderDatum);
-    const decoded = Data.from(cbor, WithdrawalOrderDatum) as typeof withdrawalDatumFixture;
+    const decoded = Data.from(
+      cbor,
+      WithdrawalOrderDatum,
+    ) as typeof withdrawalDatumFixture;
     expect(decoded.event.info.validity).toBe("WithdrawalIsValid");
     expect(decoded.inclusionTime).toBe(posixT1);
   });
@@ -472,7 +510,11 @@ describe("SDK unit plan coverage", () => {
   });
 
   it("Retired operator datum round trips", () => {
-    const datum = { key: pubKeyHashA, link: scriptHashA, bondUnlockTime: posixT2 };
+    const datum = {
+      key: pubKeyHashA,
+      link: scriptHashA,
+      bondUnlockTime: posixT2,
+    };
     const cbor = Data.to(datum, RetiredOperatorDatum);
     const decoded = Data.from(cbor, RetiredOperatorDatum) as typeof datum;
     expect(decoded.key).toBe(pubKeyHashA);
@@ -518,7 +560,10 @@ describe("SDK unit plan coverage", () => {
   it("Fraud-proof computation step datum round trips", () => {
     const datum = { fraudProver: pubKeyHashA, data: hexA };
     const cbor = Data.to(datum, FraudProofComputationThreadStepDatum);
-    const decoded = Data.from(cbor, FraudProofComputationThreadStepDatum) as typeof datum;
+    const decoded = Data.from(
+      cbor,
+      FraudProofComputationThreadStepDatum,
+    ) as typeof datum;
     expect(decoded.fraudProver).toBe(pubKeyHashA);
     expect(decoded.data).toBe(hexA);
   });
@@ -540,31 +585,57 @@ describe("SDK unit plan coverage", () => {
   });
 
   it("getDatumFromUTxO decodes valid inline datum", async () => {
-    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validDepositDatumCbor });
-    const decoded = await Effect.runPromise(getDatumFromUTxO(utxo as any, DepositDatum));
+    const utxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
+    const decoded = await Effect.runPromise(
+      getDatumFromUTxO(utxo as any, DepositDatum),
+    );
     expect(decoded.event.id.txHash.hash).toBe(txHashA);
     expect(decoded.inclusionTime).toBe(posixT1);
   });
 
   it("authenticateUTxO returns authentic datum and asset name", async () => {
-    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validDepositDatumCbor });
-    const result = await Effect.runPromise(authenticateUTxO(utxo as any, policyIdA, DepositDatum));
+    const utxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
+    const result = await Effect.runPromise(
+      authenticateUTxO(utxo as any, policyIdA, DepositDatum),
+    );
     expect(result.assetName).toBe(assetNameA);
     expect(result.datum.event.id.txHash.hash).toBe(txHashA);
   });
 
   it("authenticateUTxO adds extra fields", async () => {
-    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validDepositDatumCbor });
+    const utxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
     const result = await Effect.runPromise(
-      authenticateUTxO(utxo as any, policyIdA, DepositDatum, () => ({ extra: "ok" })),
+      authenticateUTxO(utxo as any, policyIdA, DepositDatum, () => ({
+        extra: "ok",
+      })),
     );
     expect(result.extra).toBe("ok");
     expect(result.datum.inclusionTime).toBe(posixT1);
   });
 
   it("authenticateUTxOs returns all valid UTxOs", async () => {
-    const utxoA = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validDepositDatumCbor });
-    const utxoB = makeUtxo({ txHash: txHashB, outputIndex: 1, datum: validDepositDatumCbor });
+    const utxoA = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
+    const utxoB = makeUtxo({
+      txHash: txHashB,
+      outputIndex: 1,
+      datum: validDepositDatumCbor,
+    });
     const result = await Effect.runPromise(
       authenticateUTxOs([utxoA as any, utxoB as any], policyIdA, DepositDatum),
     );
@@ -575,7 +646,11 @@ describe("SDK unit plan coverage", () => {
 
   it("fetchSingleAuthenticUTxOProgram returns one converted UTxO", async () => {
     const lucid = makeLucidMock();
-    const rawUtxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validDepositDatumCbor });
+    const rawUtxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
     lucid.utxosAt.mockResolvedValue([rawUtxo]);
     const converted = [{ id: "one" }];
     const conversionFunction = vi.fn(() => Effect.succeed(converted));
@@ -597,7 +672,9 @@ describe("SDK unit plan coverage", () => {
 
   it("fetchUserEventUTxOsProgram filters inside inclusion window", async () => {
     const lucid = makeLucidMock();
-    lucid.utxosAt.mockResolvedValue([makeUtxo({ txHash: txHashA, outputIndex: 0 })]);
+    lucid.utxosAt.mockResolvedValue([
+      makeUtxo({ txHash: txHashA, outputIndex: 0 }),
+    ]);
 
     const conversionFunction = vi.fn(() =>
       Effect.succeed([
@@ -625,8 +702,14 @@ describe("SDK unit plan coverage", () => {
   });
 
   it("Deposit UTxO conversion adds derived extra fields", async () => {
-    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validDepositDatumCbor });
-    const result = await Effect.runPromise(utxosToDepositUTxOs([utxo as any], policyIdA));
+    const utxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
+    const result = await Effect.runPromise(
+      utxosToDepositUTxOs([utxo as any], policyIdA),
+    );
     expect(result).toHaveLength(1);
     expect(result[0].idCbor).toBeInstanceOf(Buffer);
     expect(result[0].infoCbor).toBeInstanceOf(Buffer);
@@ -634,8 +717,14 @@ describe("SDK unit plan coverage", () => {
   });
 
   it("Tx-order UTxO conversion adds derived extra fields", async () => {
-    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validTxOrderDatumCbor });
-    const result = await Effect.runPromise(utxosToTxOrderUTxOs([utxo as any], policyIdA));
+    const utxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validTxOrderDatumCbor,
+    });
+    const result = await Effect.runPromise(
+      utxosToTxOrderUTxOs([utxo as any], policyIdA),
+    );
     expect(result).toHaveLength(1);
     expect(result[0].idCbor).toBeInstanceOf(Buffer);
     expect(result[0].infoCbor).toBeInstanceOf(Buffer);
@@ -643,8 +732,14 @@ describe("SDK unit plan coverage", () => {
   });
 
   it("Withdrawal UTxO conversion adds derived extra fields", async () => {
-    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validWithdrawalDatumCbor });
-    const result = await Effect.runPromise(utxosToWithdrawalUTxOs([utxo as any], policyIdA));
+    const utxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validWithdrawalDatumCbor,
+    });
+    const result = await Effect.runPromise(
+      utxosToWithdrawalUTxOs([utxo as any], policyIdA),
+    );
     expect(result).toHaveLength(1);
     expect(result[0].idCbor).toBeInstanceOf(Buffer);
     expect(result[0].infoCbor).toBeInstanceOf(Buffer);
@@ -654,7 +749,9 @@ describe("SDK unit plan coverage", () => {
   it("Inclusion time uses network protocol wait", async () => {
     const lucid = makeLucidMock();
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
-    const inclusionTime = await Effect.runPromise(findInclusionTimeForUserEvent(lucid as any));
+    const inclusionTime = await Effect.runPromise(
+      findInclusionTimeForUserEvent(lucid as any),
+    );
     expect(inclusionTime).toBe(1_050_000);
     expect(nowSpy).toHaveBeenCalled();
   });
@@ -693,11 +790,17 @@ describe("SDK unit plan coverage", () => {
     expect(builder.mintAssets).toHaveBeenCalledTimes(1);
     expect(builder.pay.ToAddressWithData).toHaveBeenCalledTimes(1);
     expect(builder.validTo).toHaveBeenCalledWith(Number(posixT2));
-    expect(builder.attach.MintingPolicy).toHaveBeenCalledWith(validatorA.mintingScript);
+    expect(builder.attach.MintingPolicy).toHaveBeenCalledWith(
+      validatorA.mintingScript,
+    );
   });
 
   it("Linked-list node datum decodes from UTxO", async () => {
-    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0, datum: validNodeDatumCbor });
+    const utxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validNodeDatumCbor,
+    });
     const datum = await Effect.runPromise(getNodeDatumFromUTxO(utxo as any));
     expect(datum.key).toEqual(nodeDatumFixture.key);
     expect(datum.next).toEqual(nodeDatumFixture.next);
@@ -720,6 +823,8 @@ describe("SDK unit plan coverage", () => {
     expect(tx).toBe(builder);
     expect(builder.mintAssets).toHaveBeenCalledTimes(1);
     expect(builder.pay.ToAddressWithData).toHaveBeenCalledTimes(1);
-    expect(builder.attach.Script).toHaveBeenCalledWith(validatorA.mintingScript);
+    expect(builder.attach.Script).toHaveBeenCalledWith(
+      validatorA.mintingScript,
+    );
   });
 });

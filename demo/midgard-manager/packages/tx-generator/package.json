@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "type-check": "tsc --noEmit -p tsconfig.json --skipLibCheck",
     "dev": "tsc --watch",
     "start": "node ./dist/bin/index.js",
     "lint": "eslint . --max-warnings=0",
