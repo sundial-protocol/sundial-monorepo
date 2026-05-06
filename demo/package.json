@@ -10,7 +10,7 @@
     "install-sdk": "pnpm --filter midgard-sdk install",
     "repack-sdk": "pnpm --filter midgard-sdk repack",
     "build:all": "node ../scripts/readme/run-badged-command.mjs build \"npm run build\"",
-    "badges:seed:test:all": "node ../scripts/readme/refresh-badges.mjs build 1 && node ../scripts/readme/refresh-badges.mjs quality 1 && node ../scripts/readme/refresh-badges.mjs security 1",
+    "badges:seed:test:all": "node ../scripts/readme/refresh-badges.mjs build 1 && node ../scripts/readme/refresh-badges.mjs quality 1 && node ../scripts/readme/refresh-badges.mjs security 1 && node ../scripts/readme/refresh-badges.mjs unit 1",
     "test:all": "npm run badges:seed:test:all && npm run build:all && npm run quality:check:all && npm run security:check:all && npm run test:unit:all",
     "quality:check:all": "node ../scripts/readme/run-badged-command.mjs quality \"npm run quality:format:check:all && npm run quality:lint:check:all && npm run quality:type:all\"",
     "quality:format:check:all": "npm run quality:format:check:midgard-sdk && npm run quality:format:check:midgard-manager && npm run quality:format:check:midgard-node && npm run quality:terraform:format:check",
@@ -45,9 +45,10 @@
     "security:audit:midgard-manager": "pnpm --dir midgard-manager audit --audit-level high",
     "security:audit:midgard-node": "npm --prefix midgard-node audit --audit-level=high",
     "security:audit:midgard-ts": "npm --prefix midgard-ts audit --audit-level=high",
-    "test:unit:all": "node ../scripts/readme/run-badged-command.mjs unit \"npm run test:node:unit && npm run test:sdk:unit\"",
+    "test:unit:all": "node ../scripts/readme/run-badged-command.mjs unit \"npm run test:node:unit && npm run test:sdk:unit && npm run test:legacy\"",
     "test:node:unit": "vitest run --config vitest/node.unit.config.mts midgard-node/tests/unit",
-    "test:sdk:unit": "vitest run --config vitest/sdk.unit.config.mts midgard-sdk/tests/unit"
+    "test:sdk:unit": "vitest run --config vitest/sdk.unit.config.mts midgard-sdk/tests/unit",
+    "test:legacy": "npm --prefix midgard-node run test && npm --prefix midgard-sdk run test && npm --prefix midgard-ts run test"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
