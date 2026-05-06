@@ -11,7 +11,7 @@
     "repack-sdk": "pnpm --filter midgard-sdk repack",
     "build:all": "node ../scripts/readme/run-badged-command.mjs build \"npm run build\"",
     "badges:seed:test:all": "node ../scripts/readme/refresh-badges.mjs build 1 && node ../scripts/readme/refresh-badges.mjs quality 1 && node ../scripts/readme/refresh-badges.mjs security 1",
-    "test:all": "npm run badges:seed:test:all && npm run build:all && npm run quality:check:all && npm run security:check:all",
+    "test:all": "npm run badges:seed:test:all && npm run build:all && npm run quality:check:all && npm run security:check:all && npm run test:unit:all",
     "quality:check:all": "node ../scripts/readme/run-badged-command.mjs quality \"npm run quality:format:check:all && npm run quality:lint:check:all && npm run quality:type:all\"",
     "quality:format:check:all": "npm run quality:format:check:midgard-sdk && npm run quality:format:check:midgard-manager && npm run quality:format:check:midgard-node && npm run quality:terraform:format:check",
     "quality:format:check:midgard-sdk": "npm --prefix midgard-sdk run format-check",
@@ -45,7 +45,7 @@
     "security:audit:midgard-manager": "pnpm --dir midgard-manager audit --audit-level high",
     "security:audit:midgard-node": "npm --prefix midgard-node audit --audit-level=high",
     "security:audit:midgard-ts": "npm --prefix midgard-ts audit --audit-level=high",
-    "test:unit": "npm run test:node:unit && npm run test:sdk:unit",
+    "test:unit:all": "node ../scripts/readme/run-badged-command.mjs unit \"npm run test:node:unit && npm run test:sdk:unit\"",
     "test:node:unit": "vitest run --config vitest/node.unit.config.mts midgard-node/tests/unit",
     "test:sdk:unit": "vitest run --config vitest/sdk.unit.config.mts midgard-sdk/tests/unit"
   },
@@ -53,10 +53,15 @@
     "cross-env": "^7.0.3",
     "knip": "^5.63.0",
     "prettier": "^3.5.2",
-    "vitest": "^4.1.5"
+    "vitest": "^3.0.7"
   },
   "engines": {
     "node": ">=18"
   },
-  "packageManager": "pnpm@10.30.3+sha512.c961d1e0a2d8e354ecaa5166b822516668b7f44cb5bd95122d590dd81922f606f5473b6d23ec4a5be05e7fcd18e8488d47d978bbe981872f1145d06e9a740017"
+  "packageManager": "pnpm@10.30.3+sha512.c961d1e0a2d8e354ecaa5166b822516668b7f44cb5bd95122d590dd81922f606f5473b6d23ec4a5be05e7fcd18e8488d47d978bbe981872f1145d06e9a740017",
+  "pnpm": {
+    "overrides": {
+      "effect": "3.21.2"
+    }
+  }
 }

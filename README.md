@@ -19,6 +19,11 @@ Submodules are listed below.
 <img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
 <!-- badge:security:end -->
     </td>
+        <td>
+      <!-- badge:unit:start -->
+<img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:unit:end -->
+    </td>
   </tr>
 </table>
 

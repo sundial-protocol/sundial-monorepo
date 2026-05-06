@@ -1,3 +1,14 @@
+export type UTxO = Record<string, unknown>;
+
+export const toHex = (bytes: Uint8Array): string =>
+  Buffer.from(bytes).toString("hex");
+
+export const fromHex = (hex: string): Uint8Array => Buffer.from(hex, "hex");
+
+export const utxoToCore = (_utxo: UTxO): unknown => {
+  throw new Error("utxoToCore is not implemented in unit stubs.");
+};
+
 export const CML = {
   Transaction: {
     from_cbor_bytes: () => {
