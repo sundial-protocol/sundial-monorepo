@@ -112,8 +112,7 @@ const calculateOutputLovelace = (totalLovelace: bigint, utxosCount: number): big
 export const generateMultiOutputTransactions = async (
   config: MultiOutputTransactionConfig
 ): Promise<SerializedMidgardTransaction[]> => {
-  const { network, initialUTxO, utxosCount, finalUtxosCount, walletSeedOrPrivateKey, nodeClient } =
-    config;
+  const { network, initialUTxO, utxosCount, finalUtxosCount, walletSeedOrPrivateKey } = config;
 
   validateConfig(config);
   const privateKey = parseUnknownKeytoBech32PrivateKey(walletSeedOrPrivateKey);

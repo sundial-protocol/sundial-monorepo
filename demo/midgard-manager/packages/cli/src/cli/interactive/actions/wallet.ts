@@ -1,6 +1,5 @@
 import { confirm, input, select } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { Effect, pipe } from 'effect';
 import ora from 'ora-classic';
 
 import { addWallet, getWallet, listWallets, removeWallet } from '../../../config/wallets.js';

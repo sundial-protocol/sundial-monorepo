@@ -1,5 +1,5 @@
 import { Args, Command, Options } from '@effect/cli';
-import { startGenerator, stopGenerator } from '@midgard-manager/tx-generator';
+import { startGenerator } from '@midgard-manager/tx-generator';
 import chalk from 'chalk';
 import { Effect, pipe } from 'effect';
 import fs from 'fs/promises';

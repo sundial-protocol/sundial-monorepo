@@ -110,7 +110,7 @@ class ManualCommandImpl {
   }
 
   async loop() {
-    while (true) {
+    for (;;) {
       try {
         displayHeader('Main Menu');
         await displayStatus(this._config);
@@ -132,7 +132,7 @@ class ManualCommandImpl {
         const sectionMenu = menu.sections.find((s) => s.name === section);
         if (!sectionMenu) continue;
 
-        while (true) {
+        for (;;) {
           displayHeader(`${sectionMenu.name}`);
           displayKeyboardHints();
 

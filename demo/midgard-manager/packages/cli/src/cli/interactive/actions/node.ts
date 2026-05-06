@@ -97,7 +97,7 @@ export const configureNodeEndpoint: Action = {
 export const clearNodeDatabase: Action = {
   name: 'Clear Mempool (Not Implemented)',
   description: "Placeholder for clearing the node's mempool (not yet available)",
-  execute: async (context) => {
+  execute: async (_context) => {
     try {
       console.log(chalk.dim('Press Ctrl+C to cancel this operation and return to menu\n'));
 
