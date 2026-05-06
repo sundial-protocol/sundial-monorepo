@@ -49,8 +49,7 @@ validator spend(
         active_node_input_index,
         active_node_output_index,
         hub_oracle_ref_input_index,
-        state_queue_input_index,
-        state_queue_redeemer_index,
+        state_queue_mint_redeemer_index,
       } -> {
         let Transaction {
           inputs,
@@ -97,20 +96,18 @@ validator spend(
           }
         expect active_node_output_data == expected_active_node_output_data
 
-        // 3. Transaction must spend a UTxO from state queue with the Commit
+        // 3. Transaction must mint block node at state queue with the Commit
         //    Block Header redeemer. The operator's signature should be
         //    validated there.
         expect state_queue.CommitBlockHeader {
           operator: state_queue_redeemer_operator,
           ..
         } =
-          utils.get_spending_redeemer_data_at(
-            hub_datum.state_queue_addr,
-            state_queue_input_index,
-            state_queue_redeemer_index,
-            inputs,
-            redeemers,
-          )
+          redeemers
+            |> utils.get_redeemer_at(
+                Mint(hub_datum.state_queue),
+                state_queue_mint_redeemer_index,
+              )
 
         // 4. The operator specified in state queue's redeemer must match the
         //    key of the spending active operator node.
