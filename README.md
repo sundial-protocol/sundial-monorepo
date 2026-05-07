@@ -32,7 +32,9 @@ Submodules are listed below.
 <!-- badge:integration:end -->
     </td>
     <td>
-      &nbsp;
+      <!-- badge:e2e:start -->
+<img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:e2e:end -->
     </td>
   </tr>
   <tr>
