@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
+      "@sdk": resolve(__dirname, "src"),
     },
   },
   test: {

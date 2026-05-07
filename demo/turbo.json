@@ -5,6 +5,10 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "*.tgz"]
     },
+    "midgard-manager#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["packages/*/dist/**", "packages/*/*.tgz"]
+    },
     "type-check": {
       "dependsOn": ["^type-check"],
       "outputs": []
