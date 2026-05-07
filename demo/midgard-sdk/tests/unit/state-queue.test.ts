@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("SDK unit state queue programs", () => {
-  it("State queue helpers and transaction programs work on happy paths", async () => {
+  it("State queue helpers and transaction programs work", async () => {
     const builder = makeBuilderSpy();
     const lucid = makeLucidMock(builder);
     const stateQueueKey = "ab".repeat(28);

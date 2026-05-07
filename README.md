@@ -38,7 +38,7 @@ Submodules are listed below.
   <tr>
     <td>
       <!-- badge:node-coverage:start -->
-<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-20.0%25-red?style=flat-square" />
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-70.5%25-orange?style=flat-square" />
 <!-- badge:node-coverage:end -->
     </td>
     <td>

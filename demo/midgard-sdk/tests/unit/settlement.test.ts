@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe("SDK unit settlement programs", () => {
-  it("Settlement helpers and resolve transaction programs succeed on happy flow", async () => {
+  it("Settlement helpers and resolve transaction programs succeed", async () => {
     const builder = makeBuilderSpy();
     const lucid = makeLucidMock(builder);
     const settlementUTxO = {

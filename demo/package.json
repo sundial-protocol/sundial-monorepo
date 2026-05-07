@@ -30,7 +30,7 @@
     "quality:lint:fix:sdk": "npm --prefix midgard-sdk run lint -- --fix",
     "quality:lint:fix:manager": "npm --prefix midgard-manager run lint:fix",
     "quality:knip:check": "cross-env DATABASE_URL=memory:// knip",
-    "quality:osv:check": "npm run security:audit:all",
+    "quality:osv:check": "bash ../scripts/test/security/osv.sh",
     "quality:type:all": "npm run quality:type:node && npm run quality:type:sdk && npm run quality:type:ts",
     "quality:type:node": "npm --prefix midgard-node run type-check",
     "quality:type:sdk": "npm --prefix midgard-sdk run type-check",
