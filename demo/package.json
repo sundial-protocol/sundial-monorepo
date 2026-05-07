@@ -11,7 +11,7 @@
     "repack-sdk": "pnpm --filter midgard-sdk repack",
     "build:all": "node ../scripts/readme/run-badged-command.mjs build \"npm run build\"",
     "badges:seed:test:all": "node ../scripts/readme/refresh-badges.mjs build 1 && node ../scripts/readme/refresh-badges.mjs quality 1 && node ../scripts/readme/refresh-badges.mjs security 1 && node ../scripts/readme/refresh-badges.mjs unit 1 && node ../scripts/readme/refresh-badges.mjs integration 1",
-    "tests:all": "npm run badges:seed:test:all && npm run build:all && npm run quality:check:all && npm run security:check:all && npm run test:unit:all && npm run test:unit:coverage:all npm run test:integration:all && npm run test:legacy:all",
+    "tests:all": "npm run badges:seed:test:all && npm run build:all && npm run quality:check:all && npm run security:check:all && npm run test:unit:all && npm run test:unit:coverage:all && npm run test:integration:all && npm run test:legacy:all",
     "quality:check:all": "node ../scripts/readme/run-badged-command.mjs quality \"npm run quality:format:check:all && npm run quality:lint:check:all && npm run quality:type:all\"",
     "quality:format:check:all": "npm run quality:format:check:sdk && npm run quality:format:check:manager && npm run quality:format:check:node && npm run quality:terraform:format:check",
     "quality:format:check:sdk": "npm --prefix midgard-sdk run format-check",
@@ -62,8 +62,8 @@
     "cross-env": "^7.0.3",
     "knip": "^5.63.0",
     "prettier": "^3.5.2",
-    "@vitest/coverage-v8": "3.0.7",
-    "vitest": "3.0.7"
+    "@vitest/coverage-v8": "3.2.4",
+    "vitest": "3.2.4"
   },
   "engines": {
     "node": ">=18"

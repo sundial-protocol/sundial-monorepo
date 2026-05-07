@@ -135,6 +135,7 @@ import {
   serializeUTxOsForStorage,
   deserializeUTxOsFromStorage,
 } from "@/database/utils/common.js";
+import { CML } from "@lucid-evolution/lucid";
 
 const mockUnspentOutput = {
   output: () => ({ to_cbor_bytes: () => outputCborBytes }),
@@ -216,4 +217,59 @@ describe("Deserialize UTxOs from storage", () => {
       expect(hashes).toContain(utxoB.txHash);
     }),
   );
+});
+
+describe("breakDownTxMinimally without explicit txHash uses CML.hash_transaction", () => {
+  it.effect(
+    "breakDownTxMinimally without explicit txHash uses CML.hash_transaction",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* breakDownTxMinimally(txCborA);
+        expect(result.spent.length).toBe(1);
+        expect(result.produced.length).toBe(1);
+        const produced = result.produced[0] as any;
+        expect(produced.outref).toBeInstanceOf(Buffer);
+      }),
+  );
+});
+
+describe("breakDownTxMinimally catches input CBOR serialization error", () => {
+  it.effect(
+    "breakDownTxMinimally catches input CBOR serialization error",
+    () => {
+      vi.mocked(CML.Transaction.from_cbor_bytes).mockReturnValueOnce({
+        body: () => ({
+          inputs: () => ({
+            len: () => 1,
+            get: () => ({
+              to_cbor_bytes: () => {
+                throw new Error("bad input cbor");
+              },
+            }),
+          }),
+          outputs: () => ({ len: () => 0 }),
+        }),
+      } as any);
+      return breakDownTxMinimally(txCborA, txIdABytes).pipe(
+        Effect.exit,
+        Effect.map((exit) => {
+          expect(exit._tag).toBe("Failure");
+        }),
+      );
+    },
+  );
+});
+
+describe("breakDownTx catches deserialization error", () => {
+  it.effect("breakDownTx catches deserialization error", () => {
+    vi.mocked(CML.Transaction.from_cbor_bytes).mockImplementationOnce(() => {
+      throw new Error("bad cbor bytes");
+    });
+    return breakDownTx(txCborA).pipe(
+      Effect.exit,
+      Effect.map((exit) => {
+        expect(exit._tag).toBe("Failure");
+      }),
+    );
+  });
 });
