@@ -165,7 +165,10 @@ describe("SDK user-events integration", () => {
         assets: { lovelace: 2_000_000n, [toUnit("aa".repeat(28), "00")]: 1n },
       };
 
-      const converted = yield* utxosToDepositUTxOs([good, bad] as any, FIXTURE_POLICY_ID_A);
+      const converted = yield* utxosToDepositUTxOs(
+        [good, bad] as any,
+        FIXTURE_POLICY_ID_A,
+      );
       expect(converted).toHaveLength(1);
       expect(converted[0].assetName).toBe(DEPOSIT_ASSET_NAME);
     }),
@@ -179,7 +182,9 @@ describe("SDK user-events integration", () => {
         mintingPolicy: FIXTURE_VALIDATOR.mintingScript,
         policyId: FIXTURE_POLICY_ID_A,
         nonceUTxO: FIXTURE_NONCE_UTXO as any,
-        cardanoTx: { to_cbor_hex: () => FIXTURE_TX_CBOR_HEX } as unknown as CML.Transaction,
+        cardanoTx: {
+          to_cbor_hex: () => FIXTURE_TX_CBOR_HEX,
+        } as unknown as CML.Transaction,
         refundAddress: FIXTURE_ADDRESS_DATA_KEY_A,
         refundDatum: null,
       });
@@ -299,7 +304,9 @@ describe("SDK user-events integration", () => {
       );
 
       expect(wrapped.length).toBe(direct.length);
-      expect(wrapped[0].idCbor.toString("hex")).toBe(direct[0].idCbor.toString("hex"));
+      expect(wrapped[0].idCbor.toString("hex")).toBe(
+        direct[0].idCbor.toString("hex"),
+      );
     }),
   );
 

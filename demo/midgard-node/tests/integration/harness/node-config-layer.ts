@@ -21,8 +21,7 @@ export type TestNodeConfigOptions = {
 
 export const makeTestNodeConfigLayer = (opts: TestNodeConfigOptions = {}) => {
   const ledgerPath =
-    opts.ledgerMptPath ??
-    path.join(os.tmpdir(), `nit-ledger-${randomUUID()}`);
+    opts.ledgerMptPath ?? path.join(os.tmpdir(), `nit-ledger-${randomUUID()}`);
   const mempoolPath =
     opts.mempoolMptPath ??
     path.join(os.tmpdir(), `nit-mempool-${randomUUID()}`);

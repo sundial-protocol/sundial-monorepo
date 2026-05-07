@@ -91,7 +91,9 @@ describe("SDK common types and encoding integration", () => {
     Effect.gen(function* () {
       const cbor = Data.to(FIXTURE_VALUE, Value);
       const decoded = Data.from(cbor, Value);
-      const qty = decoded.inner.get(FIXTURE_POLICY_ID_A)?.get(FIXTURE_ASSET_NAME_A);
+      const qty = decoded.inner
+        .get(FIXTURE_POLICY_ID_A)
+        ?.get(FIXTURE_ASSET_NAME_A);
 
       expect(decoded.inner.size).toBe(1);
       expect(qty).toBe(42n);

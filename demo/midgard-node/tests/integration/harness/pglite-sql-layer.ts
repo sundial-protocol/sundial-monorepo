@@ -52,7 +52,9 @@ class PGliteConnection {
   execute(
     sql: string,
     params: ReadonlyArray<unknown>,
-    transformRows: ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>) | undefined,
+    transformRows:
+      | ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>)
+      | undefined,
   ) {
     return transformRows
       ? Effect.map(this.run(sql, params), transformRows)
@@ -87,7 +89,9 @@ class PGliteConnection {
   executeUnprepared(
     sql: string,
     params: ReadonlyArray<unknown>,
-    transformRows: ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>) | undefined,
+    transformRows:
+      | ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>)
+      | undefined,
   ) {
     return this.execute(sql, params, transformRows);
   }
@@ -95,7 +99,9 @@ class PGliteConnection {
   executeStream(
     sql: string,
     params: ReadonlyArray<unknown>,
-    transformRows: ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>) | undefined,
+    transformRows:
+      | ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>)
+      | undefined,
   ) {
     return Stream.fromEffect(this.execute(sql, params, transformRows));
   }

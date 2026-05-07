@@ -156,21 +156,24 @@ describe("Multiple queued transactions are drained together", () => {
 // ─── NIT-010 ─────────────────────────────────────────────────────────────────
 
 describe("Mempool retrieval by hash sees newly processed transaction", () => {
-  it.effect("Mempool retrieval by hash sees newly processed transaction", () => {
-    const layers = makeBaseLayers();
-    return Effect.gen(function* () {
-      yield* DBInitialization.program;
-      yield* MempoolLedgerDB.insert([makeSeedEntry()]);
+  it.effect(
+    "Mempool retrieval by hash sees newly processed transaction",
+    () => {
+      const layers = makeBaseLayers();
+      return Effect.gen(function* () {
+        yield* DBInitialization.program;
+        yield* MempoolLedgerDB.insert([makeSeedEntry()]);
 
-      const processed = yield* breakDownTx(txCborA);
-      yield* MempoolDB.insertMultiple([processed]);
+        const processed = yield* breakDownTx(txCborA);
+        yield* MempoolDB.insertMultiple([processed]);
 
-      const cbor = yield* MempoolDB.retrieveTxCborByHash(processed.txId);
+        const cbor = yield* MempoolDB.retrieveTxCborByHash(processed.txId);
 
-      expect(cbor).not.toBeUndefined();
-      expect(Buffer.from(cbor!).equals(txCborA)).toBe(true);
-    }).pipe(Effect.provide(layers));
-  });
+        expect(cbor).not.toBeUndefined();
+        expect(Buffer.from(cbor!).equals(txCborA)).toBe(true);
+      }).pipe(Effect.provide(layers));
+    },
+  );
 });
 
 // ─── NIT-011 ─────────────────────────────────────────────────────────────────

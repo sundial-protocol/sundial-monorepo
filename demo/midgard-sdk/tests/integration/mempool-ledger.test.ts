@@ -14,14 +14,8 @@ import {
   makeReturn,
   OutputReference,
 } from "@sdk/common.ts";
-import {
-  authenticateUTxOs,
-  getStateToken,
-} from "@sdk/internals.ts";
-import {
-  DepositDatum,
-  utxosToDepositUTxOs,
-} from "@sdk/user-events/deposit.ts";
+import { authenticateUTxOs, getStateToken } from "@sdk/internals.ts";
+import { DepositDatum, utxosToDepositUTxOs } from "@sdk/user-events/deposit.ts";
 import {
   TxOrderDatum,
   utxosToTxOrderUTxOs,
@@ -183,48 +177,58 @@ describe("SDK mempool and ledger-shape integration", () => {
     }),
   );
 
-  it.effect("deposit and tx-order UTxO conversion produce CBOR payload buffers", () =>
-    Effect.gen(function* () {
-      const deposit = {
-        txHash: FIXTURE_TX_HASH_A,
-        outputIndex: 0,
-        address: FIXTURE_ADDRESS_SCRIPT_A,
-        assets: {
-          lovelace: 2_000_000n,
-          [toUnit(FIXTURE_POLICY_ID_A, assetName)]: 1n,
-        },
-        datum: makeDepositDatum(),
-      };
-      const txOrder = {
-        txHash: FIXTURE_TX_HASH_A,
-        outputIndex: 1,
-        address: FIXTURE_ADDRESS_SCRIPT_A,
-        assets: {
-          lovelace: 2_000_000n,
-          [toUnit(FIXTURE_POLICY_ID_A, assetName)]: 1n,
-        },
-        datum: Data.to(
-          {
-            event: { id: FIXTURE_OUTREF_A, tx: FIXTURE_TX_CBOR_HEX },
-            inclusionTime: 1n,
-            refundAddress: {
-              paymentCredential: { PublicKeyCredential: [FIXTURE_PUB_KEY_HASH_A] },
-              stakeCredential: null,
-            },
-            refundDatum: null,
+  it.effect(
+    "deposit and tx-order UTxO conversion produce CBOR payload buffers",
+    () =>
+      Effect.gen(function* () {
+        const deposit = {
+          txHash: FIXTURE_TX_HASH_A,
+          outputIndex: 0,
+          address: FIXTURE_ADDRESS_SCRIPT_A,
+          assets: {
+            lovelace: 2_000_000n,
+            [toUnit(FIXTURE_POLICY_ID_A, assetName)]: 1n,
           },
-          TxOrderDatum,
-        ),
-      };
+          datum: makeDepositDatum(),
+        };
+        const txOrder = {
+          txHash: FIXTURE_TX_HASH_A,
+          outputIndex: 1,
+          address: FIXTURE_ADDRESS_SCRIPT_A,
+          assets: {
+            lovelace: 2_000_000n,
+            [toUnit(FIXTURE_POLICY_ID_A, assetName)]: 1n,
+          },
+          datum: Data.to(
+            {
+              event: { id: FIXTURE_OUTREF_A, tx: FIXTURE_TX_CBOR_HEX },
+              inclusionTime: 1n,
+              refundAddress: {
+                paymentCredential: {
+                  PublicKeyCredential: [FIXTURE_PUB_KEY_HASH_A],
+                },
+                stakeCredential: null,
+              },
+              refundDatum: null,
+            },
+            TxOrderDatum,
+          ),
+        };
 
-      const deposits = yield* utxosToDepositUTxOs([deposit] as any, FIXTURE_POLICY_ID_A);
-      const txOrders = yield* utxosToTxOrderUTxOs([txOrder] as any, FIXTURE_POLICY_ID_A);
+        const deposits = yield* utxosToDepositUTxOs(
+          [deposit] as any,
+          FIXTURE_POLICY_ID_A,
+        );
+        const txOrders = yield* utxosToTxOrderUTxOs(
+          [txOrder] as any,
+          FIXTURE_POLICY_ID_A,
+        );
 
-      expect(deposits[0].idCbor.length).toBeGreaterThan(0);
-      expect(deposits[0].infoCbor.length).toBeGreaterThan(0);
-      expect(txOrders[0].idCbor.length).toBeGreaterThan(0);
-      expect(txOrders[0].infoCbor.toString("hex")).toBe(FIXTURE_TX_CBOR_HEX);
-    }),
+        expect(deposits[0].idCbor.length).toBeGreaterThan(0);
+        expect(deposits[0].infoCbor.length).toBeGreaterThan(0);
+        expect(txOrders[0].idCbor.length).toBeGreaterThan(0);
+        expect(txOrders[0].infoCbor.toString("hex")).toBe(FIXTURE_TX_CBOR_HEX);
+      }),
   );
 
   it.effect("hex helpers normalize storage payloads", () =>

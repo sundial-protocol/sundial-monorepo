@@ -20,14 +20,23 @@ import * as UserEvents from "@/database/utils/user-events.js";
 import { Globals } from "@/services/globals.js";
 
 const makeBaseLayers = () =>
-  Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer(), Globals.Default);
+  Layer.mergeAll(
+    makeTestSqlLayer(),
+    makeTestNodeConfigLayer(),
+    Globals.Default,
+  );
 
 const makeUserEventEntry = (seed: number): UserEvents.Entry => ({
   [UserEvents.Columns.ID]: Buffer.alloc(32, seed),
   [UserEvents.Columns.INFO]: Buffer.alloc(16, seed + 0x10),
-  [UserEvents.Columns.ASSET_NAME]: seed.toString(16).padStart(2, "0").repeat(10),
+  [UserEvents.Columns.ASSET_NAME]: seed
+    .toString(16)
+    .padStart(2, "0")
+    .repeat(10),
   [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64, seed + 0x20),
-  [UserEvents.Columns.INCLUSION_TIME]: new Date(1_700_000_000_000 + seed * 1_000),
+  [UserEvents.Columns.INCLUSION_TIME]: new Date(
+    1_700_000_000_000 + seed * 1_000,
+  ),
 });
 
 // ─── NIT-016 ─────────────────────────────────────────────────────────────────
@@ -167,30 +176,33 @@ describe("Sync stores deposits, tx orders, and withdrawals in one pass", () => {
 // ─── NIT-020 ─────────────────────────────────────────────────────────────────
 
 describe("Sync advances latest fetch time after events are persisted", () => {
-  it.effect("Sync advances latest fetch time after events are persisted", () => {
-    const layers = makeBaseLayers();
-    return Effect.gen(function* () {
-      yield* DBInitialization.program;
+  it.effect(
+    "Sync advances latest fetch time after events are persisted",
+    () => {
+      const layers = makeBaseLayers();
+      return Effect.gen(function* () {
+        yield* DBInitialization.program;
 
-      const globals = yield* Globals;
-      const startTime = yield* Ref.get(globals.LATEST_USER_EVENTS_FETCH_TIME);
+        const globals = yield* Globals;
+        const startTime = yield* Ref.get(globals.LATEST_USER_EVENTS_FETCH_TIME);
 
-      // Insert a deposit event (simulates work done during a sync pass).
-      const depositEntry = makeUserEventEntry(5);
-      yield* DepositsDB.insertEntry(depositEntry);
+        // Insert a deposit event (simulates work done during a sync pass).
+        const depositEntry = makeUserEventEntry(5);
+        yield* DepositsDB.insertEntry(depositEntry);
 
-      // Advance the fetch time (as syncUserEvents would do after inserting events).
-      const newTime = Date.now();
-      yield* Ref.set(globals.LATEST_USER_EVENTS_FETCH_TIME, newTime);
+        // Advance the fetch time (as syncUserEvents would do after inserting events).
+        const newTime = Date.now();
+        yield* Ref.set(globals.LATEST_USER_EVENTS_FETCH_TIME, newTime);
 
-      const afterTime = yield* Ref.get(globals.LATEST_USER_EVENTS_FETCH_TIME);
-      expect(afterTime).toBeGreaterThan(startTime);
+        const afterTime = yield* Ref.get(globals.LATEST_USER_EVENTS_FETCH_TIME);
+        expect(afterTime).toBeGreaterThan(startTime);
 
-      // Verify the deposit is visible before and after the ref update.
-      const entries = yield* DepositsDB.retrieveAllEntries();
-      expect(entries.length).toBe(1);
-    }).pipe(Effect.provide(layers));
-  });
+        // Verify the deposit is visible before and after the ref update.
+        const entries = yield* DepositsDB.retrieveAllEntries();
+        expect(entries.length).toBe(1);
+      }).pipe(Effect.provide(layers));
+    },
+  );
 });
 
 // ─── NIT-021 ─────────────────────────────────────────────────────────────────
@@ -390,7 +402,8 @@ describe("User-event tables preserve independent event types", () => {
       // No cross-table contamination.
       const depositId = depositEntry[UserEvents.Columns.ID].toString("hex");
       const txOrderId = txOrderEntry[UserEvents.Columns.ID].toString("hex");
-      const withdrawalId = withdrawalEntry[UserEvents.Columns.ID].toString("hex");
+      const withdrawalId =
+        withdrawalEntry[UserEvents.Columns.ID].toString("hex");
 
       expect(
         Buffer.from(events.deposits[0][UserEvents.Columns.ID]).toString("hex"),
@@ -399,7 +412,9 @@ describe("User-event tables preserve independent event types", () => {
         Buffer.from(events.txOrders[0][UserEvents.Columns.ID]).toString("hex"),
       ).toBe(txOrderId);
       expect(
-        Buffer.from(events.withdrawals[0][UserEvents.Columns.ID]).toString("hex"),
+        Buffer.from(events.withdrawals[0][UserEvents.Columns.ID]).toString(
+          "hex",
+        ),
       ).toBe(withdrawalId);
     }).pipe(Effect.provide(layers));
   });

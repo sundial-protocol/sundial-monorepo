@@ -82,7 +82,10 @@ describe("SDK state-queue integration", () => {
         assetName: "Node",
       });
 
-      const converted = yield* utxoToStateQueueUTxO(root as any, FIXTURE_POLICY_ID_A);
+      const converted = yield* utxoToStateQueueUTxO(
+        root as any,
+        FIXTURE_POLICY_ID_A,
+      );
       expect(converted.utxo.txHash).toBe("aa".repeat(32));
       expect(converted.datum.key).toBe("Empty");
       expect(converted.assetName).toBe("Node");
@@ -230,81 +233,89 @@ describe("SDK state-queue integration", () => {
     }),
   );
 
-  it.effect("header update helper produces new header and link for root anchor", () =>
-    Effect.gen(function* () {
-      const { lucid } = makeFakeLucid();
-      const latestRoot = {
-        key: "Empty",
-        next: "Empty",
-        data: makeConfirmedStateData(),
-      };
+  it.effect(
+    "header update helper produces new header and link for root anchor",
+    () =>
+      Effect.gen(function* () {
+        const { lucid } = makeFakeLucid();
+        const latestRoot = {
+          key: "Empty",
+          next: "Empty",
+          data: makeConfirmedStateData(),
+        };
 
-      const result = yield* updateLatestBlocksDatumAndGetTheNewHeaderProgram(
-        lucid as any,
-        latestRoot as any,
-        FIXTURE_MERKLE_ROOT_A,
-        FIXTURE_MERKLE_ROOT_B,
-        FIXTURE_MERKLE_ROOT_A,
-        FIXTURE_MERKLE_ROOT_B,
-        2_000_000n,
-      );
+        const result = yield* updateLatestBlocksDatumAndGetTheNewHeaderProgram(
+          lucid as any,
+          latestRoot as any,
+          FIXTURE_MERKLE_ROOT_A,
+          FIXTURE_MERKLE_ROOT_B,
+          FIXTURE_MERKLE_ROOT_A,
+          FIXTURE_MERKLE_ROOT_B,
+          2_000_000n,
+        );
 
-      expect(result.nodeDatum.next).not.toBe("Empty");
-      expect(result.header.utxosRoot).toBe(FIXTURE_MERKLE_ROOT_A);
-      expect(result.header.endTime).toBe(2_000_000n);
-    }),
+        expect(result.nodeDatum.next).not.toBe("Empty");
+        expect(result.header.utxosRoot).toBe(FIXTURE_MERKLE_ROOT_A);
+        expect(result.header.endTime).toBe(2_000_000n);
+      }),
   );
 
-  it.effect("merge-to-confirmed-state tx burns oldest block NFT and rewrites root", () =>
-    Effect.gen(function* () {
-      const confirmed = yield* utxoToStateQueueUTxO(
-        makeStateQueueUtxo({
-          txHash: "21".repeat(32),
-          outputIndex: 0,
-          datum: {
-            key: "Empty",
-            next: { Key: { key: "66".repeat(28) } },
-            data: makeConfirmedStateData(),
-          },
-          assetName: "Node",
-        }) as any,
-        FIXTURE_POLICY_ID_A,
-      );
-      const firstBlock = yield* utxoToStateQueueUTxO(
-        makeStateQueueUtxo({
-          txHash: "22".repeat(32),
-          outputIndex: 1,
-          datum: {
-            key: { Key: { key: "66".repeat(28) } },
-            next: "Empty",
-            data: makeHeaderData(),
-          },
-          assetName: `Node${"66".repeat(28)}`,
-        }) as any,
-        FIXTURE_POLICY_ID_A,
-      );
-      const { lucid } = makeFakeLucid();
+  it.effect(
+    "merge-to-confirmed-state tx burns oldest block NFT and rewrites root",
+    () =>
+      Effect.gen(function* () {
+        const confirmed = yield* utxoToStateQueueUTxO(
+          makeStateQueueUtxo({
+            txHash: "21".repeat(32),
+            outputIndex: 0,
+            datum: {
+              key: "Empty",
+              next: { Key: { key: "66".repeat(28) } },
+              data: makeConfirmedStateData(),
+            },
+            assetName: "Node",
+          }) as any,
+          FIXTURE_POLICY_ID_A,
+        );
+        const firstBlock = yield* utxoToStateQueueUTxO(
+          makeStateQueueUtxo({
+            txHash: "22".repeat(32),
+            outputIndex: 1,
+            datum: {
+              key: { Key: { key: "66".repeat(28) } },
+              next: "Empty",
+              data: makeHeaderData(),
+            },
+            assetName: `Node${"66".repeat(28)}`,
+          }) as any,
+          FIXTURE_POLICY_ID_A,
+        );
+        const { lucid } = makeFakeLucid();
 
-      const tx = yield* incompleteStateQueueMergeTxProgram(
-        lucid as any,
-        {
-          stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
-          stateQueuePolicyId: FIXTURE_POLICY_ID_A,
-        },
-        {
-          confirmedUTxO: confirmed,
-          firstBlockUTxO: firstBlock,
-          stateQueueSpendingScript: FIXTURE_VALIDATOR.spendingScript,
-          stateQueueMintingScript: FIXTURE_VALIDATOR.mintingScript,
-        },
-      );
+        const tx = yield* incompleteStateQueueMergeTxProgram(
+          lucid as any,
+          {
+            stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+            stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+          },
+          {
+            confirmedUTxO: confirmed,
+            firstBlockUTxO: firstBlock,
+            stateQueueSpendingScript: FIXTURE_VALIDATOR.spendingScript,
+            stateQueueMintingScript: FIXTURE_VALIDATOR.mintingScript,
+          },
+        );
 
-      const calls = (tx as any).__calls;
-      expect(calls.collectFrom).toHaveLength(1);
-      expect(calls.mintAssets).toHaveLength(1);
-      expect(calls.payToContract).toHaveLength(1);
-      expect(calls.mintAssets[0][0][toUnit(FIXTURE_POLICY_ID_A, firstBlock.assetName)]).toBe(-1n);
-    }),
+        const calls = (tx as any).__calls;
+        expect(calls.collectFrom).toHaveLength(1);
+        expect(calls.mintAssets).toHaveLength(1);
+        expect(calls.payToContract).toHaveLength(1);
+        expect(
+          calls.mintAssets[0][0][
+            toUnit(FIXTURE_POLICY_ID_A, firstBlock.assetName)
+          ],
+        ).toBe(-1n);
+      }),
   );
 
   it.effect("non-root datum is rejected as confirmed-state node", () =>

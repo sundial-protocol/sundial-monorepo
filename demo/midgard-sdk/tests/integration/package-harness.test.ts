@@ -72,7 +72,9 @@ describe("SDK package and harness integration", () => {
   });
 
   it("effect programs can run through SDK helpers in test mode", async () => {
-    const value = await Effect.runPromise(sdk.hashHexWithBlake2b256("deadbeef"));
+    const value = await Effect.runPromise(
+      sdk.hashHexWithBlake2b256("deadbeef"),
+    );
     expect(typeof value).toBe("string");
     expect(value).toHaveLength(64);
   });

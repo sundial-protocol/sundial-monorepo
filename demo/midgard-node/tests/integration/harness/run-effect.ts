@@ -8,7 +8,10 @@
 //   yield* DBInitialization.program.pipe(Effect.provide(layers));
 
 import { makeTestSqlLayer } from "./pglite-sql-layer.js";
-import { makeTestNodeConfigLayer, type TestNodeConfigOptions } from "./node-config-layer.js";
+import {
+  makeTestNodeConfigLayer,
+  type TestNodeConfigOptions,
+} from "./node-config-layer.js";
 import { Globals } from "@/services/globals.js";
 import { Layer } from "effect";
 

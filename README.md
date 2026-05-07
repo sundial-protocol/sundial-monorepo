@@ -11,19 +11,19 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:quality:start -->
-<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
+<img alt="Quality" src="https://img.shields.io/badge/quality-failing-red?style=flat-square" />
 <!-- badge:quality:end -->
     </td>
     <td>
       <!-- badge:security:start -->
-<img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+<img alt="Security" src="https://img.shields.io/badge/security-failing-red?style=flat-square" />
 <!-- badge:security:end -->
     </td>
       </tr>
         <tr>
         <td>
       <!-- badge:unit:start -->
-<img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
+<img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-failing-red?style=flat-square" />
 <!-- badge:unit:end -->
     </td>
     <td>
@@ -43,7 +43,7 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:sdk-coverage:start -->
-<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-failing-red?style=flat-square" />
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-75.9%25-orange?style=flat-square" />
 <!-- badge:sdk-coverage:end -->
     </td>
     <td>
