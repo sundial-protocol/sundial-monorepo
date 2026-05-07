@@ -1,4 +1,5 @@
 import tsParser from '@typescript-eslint/parser';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
 import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
@@ -7,6 +8,9 @@ export default [
   },
   {
     files: ['**/*.ts', '**/*.tsx'],
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
     languageOptions: {
       parser: tsParser,
       ecmaVersion: 'latest',

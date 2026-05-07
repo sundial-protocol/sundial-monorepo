@@ -4,6 +4,11 @@ import { defineConfig } from "vitest/config";
 
 const demoRoot = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 
+// midgard-ts integration tests exercise the pure-TypeScript codec end-to-end,
+// including CML-backed Cardano round-trips.  No external network calls are made.
+//
+// How to run:
+//   npm --prefix demo run test:integration:ts
 export default defineConfig({
   resolve: {
     alias: {
@@ -14,18 +19,9 @@ export default defineConfig({
     include: ["midgard-ts/tests/**/*.test.ts"],
     environment: "node",
     globals: true,
+    reporters: [["default", { summary: false }]],
+    testTimeout: 30_000,
     coverage: {
-      provider: "v8",
-      reporter: [["text", { maxCols: 160 }], "html", "json-summary"],
-      reportsDirectory: "./coverage/ts",
-      include: ["midgard-ts/src/**/*.ts"],
-      exclude: [
-        "midgard-ts/tests/**",
-        // Pure type definitions + RejectCodes const (enum pattern) — no executable logic
-        "midgard-ts/src/validation/types.ts",
-        // Barrel re-export only
-        "midgard-ts/src/validation/index.ts",
-      ],
       thresholds: {
         lines: 0,
         statements: 0,

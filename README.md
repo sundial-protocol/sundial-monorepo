@@ -26,11 +26,13 @@ Submodules are listed below.
 <img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
 <!-- badge:unit:end -->
     </td>
-     <td>
-      &nbsp;
+    <td>
+      <!-- badge:integration:start -->
+<img alt="Integration Tests" src="https://img.shields.io/badge/integration%20tests-failing-red?style=flat-square" />
+<!-- badge:integration:end -->
     </td>
-     <td>
-     &nbsp;
+    <td>
+      &nbsp;
     </td>
   </tr>
   <tr>
@@ -46,7 +48,7 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:ts-coverage:start -->
-<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-66.1%25-orange?style=flat-square" />
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-failing-red?style=flat-square" />
 <!-- badge:ts-coverage:end -->
     </td>
   </tr>
