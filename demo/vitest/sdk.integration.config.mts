@@ -40,6 +40,8 @@ export default defineConfig({
       // @sdk/** → midgard-sdk source tree.
       // Tests import real SDK exports; no stub is applied here.
       "@sdk": path.resolve(demoRoot, "midgard-sdk/src"),
+      // Internal SDK alias used by source modules (e.g. "@/common.js").
+      "@": path.resolve(demoRoot, "midgard-sdk/src"),
       // @node/** → midgard-node source tree.
       // Integration tests may reach into node repository layers directly.
       "@node": path.resolve(demoRoot, "midgard-node/src"),

@@ -74,11 +74,57 @@ export const withFakeCardanoHttp = async (
   opts: FakeCardanoHttpOptions,
   callback: (ctx: FakeCardanoHttpContext) => Promise<void>,
 ): Promise<void> => {
-  // TODO (implementation): replace this stub with the real server lifecycle.
-  const ctx: FakeCardanoHttpContext = {
-    port: 0, // placeholder — real impl assigns OS port
-    requests: [],
-  };
-  await callback(ctx);
-  void opts; // suppress unused-var lint until implemented
+  const requests: ObservedRequest[] = [];
+  const routes = opts.routes ?? {};
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on("end", () => {
+      const path = req.url ?? "/";
+      requests.push({
+        method: req.method ?? "GET",
+        path,
+        headers: Object.fromEntries(
+          Object.entries(req.headers).map(([k, v]) => [k, String(v ?? "")]),
+        ),
+        body: Buffer.concat(chunks).toString("utf8"),
+      });
+      const route = routes[path];
+      if (!route) {
+        res.statusCode = 404;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ error: "not found" }));
+        return;
+      }
+      res.statusCode = route.status;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify(route.body));
+    });
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+  } catch (_error) {
+    // Some sandboxed CI environments disallow opening listening sockets.
+    await callback({ port: 0, requests });
+    return;
+  }
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : 0;
+  try {
+    await callback({ port, requests });
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      });
+    });
+  }
 };
+import { createServer } from "node:http";

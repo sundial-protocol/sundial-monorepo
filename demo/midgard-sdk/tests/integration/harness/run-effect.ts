@@ -39,6 +39,12 @@
 
 import type { FakeLucidOptions, SubmitRecorder } from "./fake-lucid.ts";
 import type { TestNodeConfigOptions } from "./node-config-layer.ts";
+import { makeFakeLucid } from "./fake-lucid.ts";
+import { makeTestSqlLayer } from "./pglite-sql-layer.ts";
+import { makeTestNodeConfigLayer } from "./node-config-layer.ts";
+import { Globals } from "@node/services/globals.ts";
+import { Lucid } from "@node/services/lucid.ts";
+import { Layer } from "effect";
 
 export type AnyLayer = any;
 
@@ -64,10 +70,23 @@ export type SdkIntegrationRuntime = {
  * This is the primary entry point for most SDK integration tests.
  */
 export const makeSdkIntegrationRuntime = (
-  _opts: SdkIntegrationRuntimeOptions = {},
+  opts: SdkIntegrationRuntimeOptions = {},
 ): SdkIntegrationRuntime => {
-  // TODO (implementation): compose real layers and return them.
-  throw new Error(
-    "makeSdkIntegrationRuntime: not yet implemented — implement layer composition after installing PGlite and wiring NodeConfig",
+  const { lucid, submitRecorder } = makeFakeLucid(opts.fakeLucid);
+  const sqlLayer = makeTestSqlLayer();
+  const nodeConfigLayer = makeTestNodeConfigLayer(opts.nodeConfig);
+  const globalsLayer = Globals.Default;
+  const fakeLucidLayer = Layer.succeed(Lucid, {
+    api: lucid as any,
+    switchToOperatorsMainWallet: () => undefined,
+    switchToOperatorsBlockCommitmentWallet: () => undefined,
+    switchToOperatorsMergingWallet: () => undefined,
+  } as any);
+  const layers = Layer.mergeAll(
+    sqlLayer,
+    nodeConfigLayer,
+    globalsLayer,
+    fakeLucidLayer,
   );
+  return { layers, lucid, submitRecorder };
 };

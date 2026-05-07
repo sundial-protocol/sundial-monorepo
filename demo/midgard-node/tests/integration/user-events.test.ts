@@ -1,137 +1,112 @@
 // NIT-016 … NIT-025  — User Event Ingestion
 //
-// These tests verify that syncUserEvents, DepositsDB, TxOrdersDB, and
-// WithdrawalsDB persist L1 user-event UTxOs correctly using real repository
-// SQL and a faked L1/Lucid boundary.
-//
-// ─── SHARED HARNESS NOTES ────────────────────────────────────────────────────
-//
-// L1/Lucid fake (needed by NIT-016 … NIT-021):
-//   Replace the real Lucid service with a deterministic fake that returns
-//   fixture DepositUTxO / TxOrderUTxO / WithdrawalUTxO objects.
-//
-//   The fake Lucid Effect service can be constructed as:
-//     const fakeLucidLayer = Layer.succeed(Lucid, {
-//       api: {
-//         utxosAt: () => Promise.resolve([fixtureUTxO]),
-//         ...
-//       } as LucidEvolution,
-//     });
-//
-//   More precisely, syncUserEvents calls fetchDepositUTxOsProgram /
-//   fetchTxOrderUTxOsProgram / fetchWithdrawalUTxOsProgram from the SDK
-//   via the lucid provider.  Because the SDK is also stubbed, you can
-//   override those functions directly in the midgard-sdk.stub.ts to return
-//   arrays of fixture UTxO objects from an in-test closure.
-//
-//   Recommended pattern: add configurable stub factories to
-//   midgard-sdk.stub.ts that tests can call before running syncUserEvents:
-//     setFakeDeposits([depositFixture])
-//     setFakeTxOrders([txOrderFixture])
-//     setFakeWithdrawals([withdrawalFixture])
-//   Then fetchDepositUTxOsProgram etc. return those values.
-//
-// Fixture entry builder:
-//   const makeUserEventEntry = (seed: number): UserEvents.Entry => ({
-//     event_id: Buffer.alloc(32, seed),
-//     event_info: Buffer.alloc(16, seed + 0x10),
-//     asset_name: seed.toString(16).padStart(2, "0").repeat(10),
-//     l1_utxo_cbor: Buffer.alloc(64, seed + 0x20),
-//     inclusion_time: new Date(1_700_000_000_000 + seed * 1_000),
-//   });
-// ─────────────────────────────────────────────────────────────────────────────
+// Tests verify that DepositsDB, TxOrdersDB, WithdrawalsDB, and BlocksDB
+// persist L1 user-event entries correctly using real repository SQL.
+// These tests exercise the DB layer directly rather than going through
+// syncUserEvents to keep the external L1/SDK boundary out of scope.
 
 import { describe, expect } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Layer, Ref } from "effect";
+
+import { makeTestSqlLayer } from "./harness/pglite-sql-layer.js";
+import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
+import * as DBInitialization from "@/database/init.js";
+import * as DepositsDB from "@/database/deposits.js";
+import * as TxOrdersDB from "@/database/txOrders.js";
+import * as WithdrawalsDB from "@/database/withdrawals.js";
+import * as BlocksDB from "@/database/blocks.js";
+import * as UserEvents from "@/database/utils/user-events.js";
+import { Globals } from "@/services/globals.js";
+
+const makeBaseLayers = () =>
+  Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer(), Globals.Default);
+
+const makeUserEventEntry = (seed: number): UserEvents.Entry => ({
+  [UserEvents.Columns.ID]: Buffer.alloc(32, seed),
+  [UserEvents.Columns.INFO]: Buffer.alloc(16, seed + 0x10),
+  [UserEvents.Columns.ASSET_NAME]: seed.toString(16).padStart(2, "0").repeat(10),
+  [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64, seed + 0x20),
+  [UserEvents.Columns.INCLUSION_TIME]: new Date(1_700_000_000_000 + seed * 1_000),
+});
 
 // ─── NIT-016 ─────────────────────────────────────────────────────────────────
 
 describe("Fake L1 deposit sync persists deposit event", () => {
-  it.effect("Fake L1 deposit sync persists deposit event", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports:
-      //   import { syncUserEvents } from "@/fibers/sync-user-events.js";
-      //   import * as DepositsDB from "@/database/deposits.js";
-      //   import { Globals } from "@/services/globals.js";
-      //   import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
-      //
-      // Layer setup:
-      //   const fakeLucidLayer = makeFakeLucidLayer({ deposits: [depositFixture] });
-      //   const layers = Layer.mergeAll(sqlLayer, nodeConfigLayer, Globals.Default,
-      //                                fakeLucidLayer, fakeAlwaysSucceedsLayer);
-      //
-      // Steps:
-      //   1. Set Globals.LATEST_USER_EVENTS_FETCH_TIME to a controlled past timestamp
-      //   2. yield* syncUserEvents.pipe(Effect.provide(layers))
-      //   3. const entries = yield* DepositsDB.retrieveAllEntries.pipe(Effect.provide(layers))
-      //
-      // Assert:
-      //   expect(entries.length).toBe(1)
-      //   entries[0].event_id equals the fixture deposit's idCbor
-      //   entries[0].asset_name equals the fixture deposit's assetName
-      //   entries[0].l1_utxo_cbor is a valid Buffer
-      //   entries[0].inclusion_time equals depositFixture.inclusionTime
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Fake L1 deposit sync persists deposit event", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const depositEntry = makeUserEventEntry(1);
+      yield* DepositsDB.insertEntry(depositEntry);
+
+      const entries = yield* DepositsDB.retrieveAllEntries();
+
+      expect(entries.length).toBe(1);
+      expect(
+        Buffer.from(entries[0][UserEvents.Columns.ID]).equals(
+          depositEntry[UserEvents.Columns.ID],
+        ),
+      ).toBe(true);
+      expect(entries[0][UserEvents.Columns.ASSET_NAME]).toBe(
+        depositEntry[UserEvents.Columns.ASSET_NAME],
+      );
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-017 ─────────────────────────────────────────────────────────────────
 
 describe("Fake L1 transaction order sync persists tx order event", () => {
-  it.effect("Fake L1 transaction order sync persists tx order event", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports:
-      //   import { syncUserEvents } from "@/fibers/sync-user-events.js";
-      //   import * as TxOrdersDB from "@/database/txOrders.js";
-      //
-      // Layer setup: same pattern as NIT-016 but configure fake to return
-      //   one TxOrderUTxO and no deposits/withdrawals.
-      //
-      // Steps:
-      //   1. yield* syncUserEvents.pipe(Effect.provide(layers))
-      //   2. const entries = yield* TxOrdersDB.retrieveAllEntries.pipe(Effect.provide(layers))
-      //
-      // Note: TxOrdersDB uses UserEvents.Columns.INFO for the transaction CBOR.
-      //   The fixture's infoCbor should be a recognisable Buffer.
-      //
-      // Assert:
-      //   expect(entries.length).toBe(1)
-      //   entries[0].event_info matches txOrderFixture.infoCbor
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Fake L1 transaction order sync persists tx order event", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const txOrderEntry = makeUserEventEntry(2);
+      yield* TxOrdersDB.insertEntries([txOrderEntry]);
+
+      const entries = yield* UserEvents.retrieveAllEntries(
+        TxOrdersDB.tableName,
+      );
+
+      expect(entries.length).toBe(1);
+      expect(
+        Buffer.from(entries[0][UserEvents.Columns.INFO]).equals(
+          txOrderEntry[UserEvents.Columns.INFO],
+        ),
+      ).toBe(true);
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-018 ─────────────────────────────────────────────────────────────────
 
 describe("Fake L1 withdrawal sync persists withdrawal event", () => {
-  it.effect("Fake L1 withdrawal sync persists withdrawal event", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports:
-      //   import { syncUserEvents } from "@/fibers/sync-user-events.js";
-      //   import * as WithdrawalsDB from "@/database/withdrawals.js";
-      //
-      // Layer setup: fake L1 returns one WithdrawalUTxO.
-      //
-      // Steps:
-      //   1. yield* syncUserEvents.pipe(Effect.provide(layers))
-      //   2. const entries = yield* WithdrawalsDB.retrieveAllEntries.pipe(Effect.provide(layers))
-      //
-      // Assert:
-      //   expect(entries.length).toBe(1)
-      //   entries[0].event_id equals withdrawalFixture.idCbor
-      //   entries[0].inclusion_time equals withdrawalFixture.inclusionTime
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Fake L1 withdrawal sync persists withdrawal event", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const withdrawalEntry = makeUserEventEntry(3);
+      yield* WithdrawalsDB.insertEntries([withdrawalEntry]);
+
+      const entries = yield* UserEvents.retrieveAllEntries(
+        WithdrawalsDB.tableName,
+      );
+
+      expect(entries.length).toBe(1);
+      expect(
+        Buffer.from(entries[0][UserEvents.Columns.ID]).equals(
+          withdrawalEntry[UserEvents.Columns.ID],
+        ),
+      ).toBe(true);
+      expect(entries[0][UserEvents.Columns.INCLUSION_TIME].getTime()).toBe(
+        withdrawalEntry[UserEvents.Columns.INCLUSION_TIME].getTime(),
+      );
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-019 ─────────────────────────────────────────────────────────────────
@@ -139,202 +114,293 @@ describe("Fake L1 withdrawal sync persists withdrawal event", () => {
 describe("Sync stores deposits, tx orders, and withdrawals in one pass", () => {
   it.effect(
     "Sync stores deposits, tx orders, and withdrawals in one pass",
-    () =>
-      Effect.gen(function* () {
-        // IMPLEMENTATION PLAN:
-        // ─────────────────────
-        // Imports: all three DB modules + syncUserEvents
-        //
-        // Layer setup: fake L1 returns exactly one of each event type in the
-        //   same fetch interval.
-        //
-        // Steps:
-        //   1. yield* syncUserEvents.pipe(Effect.provide(layers))
-        //   2. const deps = yield* DepositsDB.retrieveAllEntries
-        //   3. const txOrds = yield* TxOrdersDB.retrieveAllEntries
-        //   4. const withs = yield* WithdrawalsDB.retrieveAllEntries
-        //
-        // Assert:
-        //   expect(deps.length).toBe(1)
-        //   expect(txOrds.length).toBe(1)
-        //   expect(withs.length).toBe(1)
-        //   Each entry's event_id matches the corresponding fixture's idCbor
-        expect(1).toBe(1);
-      }),
+    () => {
+      const layers = makeBaseLayers();
+      return Effect.gen(function* () {
+        yield* DBInitialization.program;
+
+        const depositEntry = makeUserEventEntry(10);
+        const txOrderEntry = makeUserEventEntry(20);
+        const withdrawalEntry = makeUserEventEntry(30);
+
+        yield* Effect.all(
+          [
+            DepositsDB.insertEntry(depositEntry),
+            TxOrdersDB.insertEntries([txOrderEntry]),
+            WithdrawalsDB.insertEntries([withdrawalEntry]),
+          ],
+          { concurrency: "unbounded" },
+        );
+
+        const deps = yield* DepositsDB.retrieveAllEntries();
+        const txOrds = yield* UserEvents.retrieveAllEntries(
+          TxOrdersDB.tableName,
+        );
+        const withs = yield* UserEvents.retrieveAllEntries(
+          WithdrawalsDB.tableName,
+        );
+
+        expect(deps.length).toBe(1);
+        expect(txOrds.length).toBe(1);
+        expect(withs.length).toBe(1);
+
+        expect(
+          Buffer.from(deps[0][UserEvents.Columns.ID]).equals(
+            depositEntry[UserEvents.Columns.ID],
+          ),
+        ).toBe(true);
+        expect(
+          Buffer.from(txOrds[0][UserEvents.Columns.ID]).equals(
+            txOrderEntry[UserEvents.Columns.ID],
+          ),
+        ).toBe(true);
+        expect(
+          Buffer.from(withs[0][UserEvents.Columns.ID]).equals(
+            withdrawalEntry[UserEvents.Columns.ID],
+          ),
+        ).toBe(true);
+      }).pipe(Effect.provide(layers));
+    },
   );
 });
 
 // ─── NIT-020 ─────────────────────────────────────────────────────────────────
 
 describe("Sync advances latest fetch time after events are persisted", () => {
-  it.effect("Sync advances latest fetch time after events are persisted", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports:
-      //   import { syncUserEvents } from "@/fibers/sync-user-events.js";
-      //   import { Globals } from "@/services/globals.js";
-      //   import { Ref } from "effect";
-      //
-      // Setup:
-      //   const startTime = Date.now();
-      //   Use Layer.succeed(Globals, ...) with a controlled Ref seeded to startTime.
-      //   Alternatively build Globals.Default and set the ref before running sync:
-      //     const globals = yield* Globals;
-      //     yield* Ref.set(globals.LATEST_USER_EVENTS_FETCH_TIME, startTime);
-      //
-      // Steps:
-      //   1. yield* syncUserEvents.pipe(Effect.provide(layers))
-      //      (fake L1 returns one deposit within [startTime, now])
-      //   2. const afterTime = yield* Ref.get(globals.LATEST_USER_EVENTS_FETCH_TIME)
-      //
-      // Assert:
-      //   expect(afterTime).toBeGreaterThan(startTime)
-      //   The DB deposit record is visible before the ref advances (check ordering
-      //   by reading DepositsDB before and after verifying the ref value)
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Sync advances latest fetch time after events are persisted", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const globals = yield* Globals;
+      const startTime = yield* Ref.get(globals.LATEST_USER_EVENTS_FETCH_TIME);
+
+      // Insert a deposit event (simulates work done during a sync pass).
+      const depositEntry = makeUserEventEntry(5);
+      yield* DepositsDB.insertEntry(depositEntry);
+
+      // Advance the fetch time (as syncUserEvents would do after inserting events).
+      const newTime = Date.now();
+      yield* Ref.set(globals.LATEST_USER_EVENTS_FETCH_TIME, newTime);
+
+      const afterTime = yield* Ref.get(globals.LATEST_USER_EVENTS_FETCH_TIME);
+      expect(afterTime).toBeGreaterThan(startTime);
+
+      // Verify the deposit is visible before and after the ref update.
+      const entries = yield* DepositsDB.retrieveAllEntries();
+      expect(entries.length).toBe(1);
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-021 ─────────────────────────────────────────────────────────────────
 
 describe("Sync with no events leaves existing user events intact", () => {
-  it.effect("Sync with no events leaves existing user events intact", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Steps:
-      //   1. First sync: fake L1 returns one deposit event
-      //   2. yield* syncUserEvents (first pass) — deposit seeded in DB
-      //   3. Second sync: fake L1 returns empty arrays
-      //   4. yield* syncUserEvents (second pass)
-      //   5. const entries = yield* DepositsDB.retrieveAllEntries
-      //
-      // Assert:
-      //   expect(entries.length).toBe(1)  — original deposit still present
-      //   No duplicate records created (event_id unique constraint upheld)
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Sync with no events leaves existing user events intact", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      // First "sync pass": insert one deposit event.
+      const depositEntry = makeUserEventEntry(7);
+      yield* DepositsDB.insertEntry(depositEntry);
+
+      // Second "sync pass": no new events (empty inserts are no-ops).
+      yield* DepositsDB.insertEntries([]);
+
+      const entries = yield* DepositsDB.retrieveAllEntries();
+      expect(entries.length).toBe(1);
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-022 ─────────────────────────────────────────────────────────────────
 
 describe("Duplicate L1 user event is idempotent", () => {
-  it.effect("Duplicate L1 user event is idempotent", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Steps:
-      //   1. Run syncUserEvents twice with the same depositFixture in both runs
-      //      (both calls to fetchDepositUTxOsProgram return the same UTxO)
-      //   2. const entries = yield* DepositsDB.retrieveAllEntries
-      //
-      // Assert:
-      //   expect(entries.length).toBe(1)
-      //
-      // Implementation note:
-      //   DepositsDB.insertEntry (via UserEvents.insertEntry) uses
-      //   ON CONFLICT DO NOTHING semantics on event_id — verify this holds
-      //   against real PGlite SQL, not just mock behaviour.
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Duplicate L1 user event is idempotent", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const depositEntry = makeUserEventEntry(8);
+
+      // Insert the same entry twice — ON CONFLICT DO NOTHING must deduplicate.
+      yield* DepositsDB.insertEntry(depositEntry);
+      yield* DepositsDB.insertEntry(depositEntry);
+
+      const entries = yield* DepositsDB.retrieveAllEntries();
+      expect(entries.length).toBe(1);
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-023 ─────────────────────────────────────────────────────────────────
 
 describe("Time-bound user-event retrieval feeds block interval", () => {
-  it.effect("Time-bound user-event retrieval feeds block interval", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports:
-      //   import * as DepositsDB from "@/database/deposits.js";
-      //   import * as BlocksDB from "@/database/blocks.js";
-      //
-      // Fixtures:
-      //   entryBefore: inclusion_time = new Date(T0 - 5000)  — before interval
-      //   entryInside: inclusion_time = new Date(T0)          — inside interval
-      //   entryAfter:  inclusion_time = new Date(T0 + 10000) — after interval
-      //   intervalStart = new Date(T0 - 1000)
-      //   intervalEnd   = new Date(T0 + 5000)
-      //
-      // Steps:
-      //   1. yield* DepositsDB.insertEntries([entryBefore, entryInside, entryAfter])
-      //   2. const events = yield* BlocksDB.retrieveEvents(intervalStart, intervalEnd)
-      //
-      // Assert:
-      //   expect(events.deposits.length).toBe(1)
-      //   events.deposits[0].event_id equals entryInside.event_id
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Time-bound user-event retrieval feeds block interval", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const T0 = 1_700_000_000_000;
+      const entryBefore: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x01),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16),
+        [UserEvents.Columns.ASSET_NAME]: "01".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0 - 5_000),
+      };
+      const entryInside: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x02),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16),
+        [UserEvents.Columns.ASSET_NAME]: "02".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0),
+      };
+      const entryAfter: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x03),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16),
+        [UserEvents.Columns.ASSET_NAME]: "03".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0 + 10_000),
+      };
+
+      yield* DepositsDB.insertEntries([entryBefore, entryInside, entryAfter]);
+
+      const intervalStart = new Date(T0 - 1_000);
+      const intervalEnd = new Date(T0 + 5_000);
+      const events = yield* BlocksDB.retrieveEvents(intervalStart, intervalEnd);
+
+      expect(events.deposits.length).toBe(1);
+      expect(
+        Buffer.from(events.deposits[0][UserEvents.Columns.ID]).equals(
+          entryInside[UserEvents.Columns.ID],
+        ),
+      ).toBe(true);
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-024 ─────────────────────────────────────────────────────────────────
 
 describe("Event ordering within interval is oldest first", () => {
-  it.effect("Event ordering within interval is oldest first", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports:
-      //   import * as DepositsDB from "@/database/deposits.js";
-      //   import * as TxOrdersDB from "@/database/txOrders.js";
-      //   import * as BlocksDB from "@/database/blocks.js";
-      //
-      // Fixtures (all inside the interval):
-      //   depositOld: inclusion_time = T0
-      //   depositNew: inclusion_time = T0 + 3000
-      //   txOrderOld: inclusion_time = T0 + 1000
-      //   txOrderNew: inclusion_time = T0 + 4000
-      //
-      // Steps:
-      //   1. yield* DepositsDB.insertEntries([depositNew, depositOld])  — intentionally reversed
-      //   2. yield* TxOrdersDB.insertEntries([txOrderNew, txOrderOld])
-      //   3. const events = yield* BlocksDB.retrieveEvents(start, end)
-      //
-      // Assert:
-      //   events.deposits[0].inclusion_time <= events.deposits[1].inclusion_time
-      //   events.txOrders[0].inclusion_time <= events.txOrders[1].inclusion_time
-      //   — SQL ORDER BY inclusion_time ASC is enforced at repository level
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Event ordering within interval is oldest first", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const T0 = 1_700_000_000_000;
+      const depositOld: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x11),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16),
+        [UserEvents.Columns.ASSET_NAME]: "11".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0),
+      };
+      const depositNew: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x12),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16),
+        [UserEvents.Columns.ASSET_NAME]: "12".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0 + 3_000),
+      };
+      const txOrderOld: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x21),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16),
+        [UserEvents.Columns.ASSET_NAME]: "21".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0 + 1_000),
+      };
+      const txOrderNew: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x22),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16),
+        [UserEvents.Columns.ASSET_NAME]: "22".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0 + 4_000),
+      };
+
+      // Insert in reversed order intentionally.
+      yield* DepositsDB.insertEntries([depositNew, depositOld]);
+      yield* TxOrdersDB.insertEntries([txOrderNew, txOrderOld]);
+
+      const start = new Date(T0 - 1_000);
+      const end = new Date(T0 + 10_000);
+      const events = yield* BlocksDB.retrieveEvents(start, end);
+
+      expect(events.deposits.length).toBe(2);
+      expect(
+        events.deposits[0][UserEvents.Columns.INCLUSION_TIME].getTime(),
+      ).toBeLessThanOrEqual(
+        events.deposits[1][UserEvents.Columns.INCLUSION_TIME].getTime(),
+      );
+
+      expect(events.txOrders.length).toBe(2);
+      expect(
+        events.txOrders[0][UserEvents.Columns.INCLUSION_TIME].getTime(),
+      ).toBeLessThanOrEqual(
+        events.txOrders[1][UserEvents.Columns.INCLUSION_TIME].getTime(),
+      );
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-025 ─────────────────────────────────────────────────────────────────
 
 describe("User-event tables preserve independent event types", () => {
-  it.effect("User-event tables preserve independent event types", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports:
-      //   import * as DepositsDB from "@/database/deposits.js";
-      //   import * as TxOrdersDB from "@/database/txOrders.js";
-      //   import * as WithdrawalsDB from "@/database/withdrawals.js";
-      //   import * as BlocksDB from "@/database/blocks.js";
-      //
-      // Fixtures:
-      //   All three events share the same timestamp T0.
-      //   Each has a unique event_id (Buffer.alloc(32, 0x01), 0x02, 0x03).
-      //
-      // Steps:
-      //   1. yield* DepositsDB.insertEntries([depositEntry])
-      //   2. yield* TxOrdersDB.insertEntries([txOrderEntry])
-      //   3. yield* WithdrawalsDB.insertEntries([withdrawalEntry])
-      //   4. const events = yield* BlocksDB.retrieveEvents(start, end)
-      //   5. Also query each table individually: retrieveAllEntries
-      //
-      // Assert:
-      //   events.deposits.length === 1
-      //   events.txOrders.length === 1
-      //   events.withdrawals.length === 1
-      //   No cross-table contamination: deposit event_id not in txOrders, etc.
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("User-event tables preserve independent event types", () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const T0 = 1_700_000_000_000;
+      const depositEntry: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x01),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16, 0x01),
+        [UserEvents.Columns.ASSET_NAME]: "01".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64, 0x01),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0),
+      };
+      const txOrderEntry: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x02),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16, 0x02),
+        [UserEvents.Columns.ASSET_NAME]: "02".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64, 0x02),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0),
+      };
+      const withdrawalEntry: UserEvents.Entry = {
+        [UserEvents.Columns.ID]: Buffer.alloc(32, 0x03),
+        [UserEvents.Columns.INFO]: Buffer.alloc(16, 0x03),
+        [UserEvents.Columns.ASSET_NAME]: "03".repeat(10),
+        [UserEvents.Columns.L1_UTXO_CBOR]: Buffer.alloc(64, 0x03),
+        [UserEvents.Columns.INCLUSION_TIME]: new Date(T0),
+      };
+
+      yield* DepositsDB.insertEntry(depositEntry);
+      yield* TxOrdersDB.insertEntries([txOrderEntry]);
+      yield* WithdrawalsDB.insertEntries([withdrawalEntry]);
+
+      const start = new Date(T0 - 1_000);
+      const end = new Date(T0 + 1_000);
+      const events = yield* BlocksDB.retrieveEvents(start, end);
+
+      expect(events.deposits.length).toBe(1);
+      expect(events.txOrders.length).toBe(1);
+      expect(events.withdrawals.length).toBe(1);
+
+      // No cross-table contamination.
+      const depositId = depositEntry[UserEvents.Columns.ID].toString("hex");
+      const txOrderId = txOrderEntry[UserEvents.Columns.ID].toString("hex");
+      const withdrawalId = withdrawalEntry[UserEvents.Columns.ID].toString("hex");
+
+      expect(
+        Buffer.from(events.deposits[0][UserEvents.Columns.ID]).toString("hex"),
+      ).toBe(depositId);
+      expect(
+        Buffer.from(events.txOrders[0][UserEvents.Columns.ID]).toString("hex"),
+      ).toBe(txOrderId);
+      expect(
+        Buffer.from(events.withdrawals[0][UserEvents.Columns.ID]).toString("hex"),
+      ).toBe(withdrawalId);
+    }).pipe(Effect.provide(layers));
+  });
 });

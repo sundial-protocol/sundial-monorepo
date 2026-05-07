@@ -1,186 +1,187 @@
 // NIT-001 … NIT-005  — Harness and Initialization
-//
-// These tests prove that the integration harness itself is correctly wired
-// before moving on to business-logic tests.  All five tests must pass before
-// proceeding to the transaction/mempool group.
-//
-// ─── SHARED HARNESS NOTES ───────────────────────────────────────────────────
-//
-// SqlClient layer (needed by NIT-001, NIT-002, NIT-003, NIT-005):
-//   Replace the unit-style mockSql with a real PGlite-backed SqlClient.
-//   Required packages (add to midgard-node devDependencies):
-//     @electric-sql/pglite      — in-process Postgres engine
-//     @effect/sql-pglite        — Effect SQL adapter (or write a small
-//                                  Layer.scoped wrapper that opens PGlite
-//                                  and provides SqlClient.SqlClient)
-//
-//   Example layer factory (to be moved to a shared test helper):
-//     import { PGlite } from "@electric-sql/pglite";
-//     import { PgLiteClient } from "@effect/sql-pglite"; // hypothetical
-//     const makeTestSql = (): Layer.Layer<SqlClient.SqlClient> =>
-//       PgLiteClient.layer({ database: "memory://" });
-//
-// NodeConfig layer (needed by NIT-004, NIT-005):
-//   Use Layer.succeed(NodeConfig, NodeConfig.of({ ... })) with
-//   unique per-test LevelDB paths built from os.tmpdir() + randomUUID().
-//
-// MPT cleanup (needed by NIT-004, NIT-005):
-//   Use afterEach to call deleteMpt(path, name) so LevelDB files are
-//   removed after each test.  Use Effect.runPromise for async cleanup.
-// ────────────────────────────────────────────────────────────────────────────
 
-import { describe, expect } from "vitest";
+import { describe, expect, afterEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
+import * as path from "node:path";
+import * as os from "node:os";
+import { randomUUID } from "node:crypto";
+
+import { makeTestSqlLayer } from "./harness/pglite-sql-layer.js";
+import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
+import * as DBInitialization from "@/database/init.js";
+import * as MempoolDB from "@/database/mempool.js";
+import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
+import * as DepositsDB from "@/database/deposits.js";
+import * as AddressHistoryDB from "@/database/addressHistory.js";
+import * as BlocksDB from "@/database/blocks.js";
+import * as BlocksTxsDB from "@/database/blocksTxs.js";
+import * as LatestLedgerDB from "@/database/latestLedger.js";
+import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
+import * as Ledger from "@/database/utils/ledger.js";
+import { breakDownTx } from "@/utils.js";
+import { MidgardMpt, deleteMpt } from "@/workers/utils/mpt.js";
+
+// Shared deterministic fixtures.
+const txCborA = Buffer.alloc(64, 0xbb);
+const inputCborBytes = Buffer.from([0x82, 0x01, 0x02]); // spent outref from lucid stub
+const outrefCborBytes = Buffer.from([0x82, 0xab, 0xcd]); // produced outref from lucid stub
+const outputCborBytes = Buffer.alloc(16, 0xcc);
+// Address returned by the lucid stub for all produced outputs.
+const testAddress =
+  "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58";
+// Different address for the spent-input seed so (event_id, address) is unique.
+const spentAddress =
+  "addr_test1vz0p8k0ekk5xvms5jlqmajgddmqm4xp58yd8c92lvd63hwcv6znrl";
+
+const makeSeedLedgerEntry = (): Ledger.Entry => ({
+  [Ledger.Columns.TX_ID]: Buffer.alloc(32, 0xaa),
+  [Ledger.Columns.OUTREF]: inputCborBytes,
+  [Ledger.Columns.OUTPUT]: outputCborBytes,
+  [Ledger.Columns.ADDRESS]: spentAddress,
+});
 
 // ─── NIT-001 ─────────────────────────────────────────────────────────────────
 
 describe("Database initialization supports repository workflow", () => {
-  it.effect("Database initialization supports repository workflow", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports needed:
-      //   import * as DBInitialization from "@/database/init.js";
-      //   import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
-      //   import * as MempoolDB from "@/database/mempool.js";
-      //   import { NodeConfig } from "@/services/config.js";
-      //   import { SqlClient } from "@effect/sql";
-      //   import { Layer } from "effect";
-      //
-      // Layer setup:
-      //   const sqlLayer = makeTestSql(); // real PGlite SqlClient
-      //   const nodeConfigLayer = Layer.succeed(NodeConfig, NodeConfig.of({
-      //     ...<minimal test config>,
-      //     GENESIS_UTXOS: [],
-      //   }));
-      //   const layers = Layer.mergeAll(sqlLayer, nodeConfigLayer);
-      //
-      // Steps:
-      //   1. yield* DBInitialization.program.pipe(Effect.provide(layers))
-      //   2. Seed one UTxO entry through MempoolLedgerDB.insert([seedEntry])
-      //   3. Process one transaction CBOR through MempoolDB.insertMultiple([processedTx])
-      //   4. const txByHash = yield* MempoolDB.retrieveTxCborByHash(txId)
-      //   5. const ledger = yield* MempoolLedgerDB.retrieve
-      //
-      // Assert:
-      //   expect(txByHash).not.toBeUndefined()
-      //   expect(ledger.length).toBeGreaterThan(0)
-      //   Verify produced outref is present, spent outref is absent
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Database initialization supports repository workflow", () => {
+    const layers = Layer.mergeAll(
+      makeTestSqlLayer(),
+      makeTestNodeConfigLayer(),
+    );
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+      yield* MempoolLedgerDB.insert([makeSeedLedgerEntry()]);
+
+      const processedTx = yield* breakDownTx(txCborA);
+      yield* MempoolDB.insertMultiple([processedTx]);
+
+      const txByHash = yield* MempoolDB.retrieveTxCborByHash(processedTx.txId);
+      const ledger = yield* MempoolLedgerDB.retrieve;
+
+      expect(txByHash).not.toBeUndefined();
+      expect(Buffer.from(txByHash!).equals(txCborA)).toBe(true);
+      expect(ledger.length).toBeGreaterThan(0);
+      const outrefs = ledger.map((e) =>
+        Buffer.from(e[Ledger.Columns.OUTREF]).toString("hex"),
+      );
+      expect(outrefs.some((o) => o === outrefCborBytes.toString("hex"))).toBe(
+        true,
+      );
+      expect(outrefs.some((o) => o === inputCborBytes.toString("hex"))).toBe(
+        false,
+      );
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-002 ─────────────────────────────────────────────────────────────────
 
 describe("Initialization is idempotent for an existing schema", () => {
-  it.effect("Initialization is idempotent for an existing schema", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports needed:
-      //   import * as DBInitialization from "@/database/init.js";
-      //   import * as DepositsDB from "@/database/deposits.js";
-      //   import { NodeConfig } from "@/services/config.js";
-      //
-      // Layer setup: same as NIT-001.
-      //
-      // Steps:
-      //   1. yield* DBInitialization.program.pipe(Effect.provide(layers))
-      //   2. yield* DBInitialization.program.pipe(Effect.provide(layers))
-      //      (second run must NOT throw or drop tables)
-      //   3. Seed one deposit entry through DepositsDB.insertEntry(seedEntry)
-      //   4. const deposits = yield* DepositsDB.retrieveAllEntries
-      //
-      // Assert:
-      //   expect(deposits.length).toBe(1)  — data seeded after second init is visible
-      //   expect that no duplicate-table SQL errors were thrown
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Initialization is idempotent for an existing schema", () => {
+    const layers = Layer.mergeAll(
+      makeTestSqlLayer(),
+      makeTestNodeConfigLayer(),
+    );
+    return Effect.gen(function* () {
+      // Run init twice — second run must not throw or drop tables.
+      yield* DBInitialization.program;
+      yield* DBInitialization.program;
+
+      yield* DepositsDB.insertEntry({
+        event_id: Buffer.alloc(32, 0x01),
+        event_info: Buffer.alloc(16, 0x01),
+        asset_name: "01".repeat(10),
+        l1_utxo_cbor: Buffer.alloc(64, 0x01),
+        inclusion_time: new Date(1_700_000_000_000),
+      });
+
+      const deposits = yield* DepositsDB.retrieveAllEntries();
+      expect(deposits.length).toBe(1);
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-003 ─────────────────────────────────────────────────────────────────
 
 describe("Repository clear helpers produce a clean business state", () => {
-  it.effect("Repository clear helpers produce a clean business state", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports needed:
-      //   import * as DBInitialization from "@/database/init.js";
-      //   import * as MempoolDB from "@/database/mempool.js";
-      //   import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
-      //   import * as AddressHistoryDB from "@/database/addressHistory.js";
-      //   import * as BlocksDB from "@/database/blocks.js";
-      //   import * as BlocksTxsDB from "@/database/blocksTxs.js";
-      //   import * as LatestLedgerDB from "@/database/latestLedger.js";
-      //   import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
-      //
-      // Steps:
-      //   1. Initialise DB via DBInitialization.program
-      //   2. Seed mempool, immutable, address history, block mappings,
-      //      user events, mempool ledger, latest ledger, confirmed ledger
-      //      — all through repository insert/upsert APIs (no raw SQL)
-      //   3. Call each table's .clear effect:
-      //        yield* MempoolDB.clear, MempoolLedgerDB.clear,
-      //        AddressHistoryDB.clear, LatestLedgerDB.clear,
-      //        ConfirmedLedgerDB.clear, BlocksDB.clear, BlocksTxsDB.clear
-      //   4. Insert one NEW transaction through MempoolDB.insertMultiple
-      //
-      // Assert:
-      //   const count = yield* MempoolDB.retrieveTxCount
-      //   expect(count).toBe(1n)  — only the post-clear record remains
-      //   All ledger tables return empty or contain only the new tx's records
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Repository clear helpers produce a clean business state", () => {
+    const layers = Layer.mergeAll(
+      makeTestSqlLayer(),
+      makeTestNodeConfigLayer(),
+    );
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      yield* MempoolLedgerDB.insert([makeSeedLedgerEntry()]);
+      const processedTx = yield* breakDownTx(txCborA);
+      yield* MempoolDB.insertMultiple([processedTx]);
+
+      // Clear all tables.
+      yield* Effect.all(
+        [
+          MempoolDB.clear,
+          MempoolLedgerDB.clear,
+          AddressHistoryDB.clear,
+          LatestLedgerDB.clear,
+          ConfirmedLedgerDB.clear,
+          BlocksDB.clear,
+          BlocksTxsDB.clear,
+        ],
+        { concurrency: "unbounded" },
+      );
+
+      // Insert one new transaction after clearing.
+      yield* MempoolDB.insertMultiple([processedTx]);
+
+      const count = yield* MempoolDB.retrieveTxCount;
+      expect(count).toBe(1n);
+    }).pipe(Effect.provide(layers));
+  });
 });
 
 // ─── NIT-004 ─────────────────────────────────────────────────────────────────
 
 describe("Test NodeConfig layer drives MPT storage paths", () => {
+  let tmpLedgerPath: string | undefined;
+  let tmpMempoolPath: string | undefined;
+
+  afterEach(async () => {
+    if (tmpLedgerPath)
+      await Effect.runPromise(deleteMpt(tmpLedgerPath, "ledger"));
+    if (tmpMempoolPath)
+      await Effect.runPromise(deleteMpt(tmpMempoolPath, "mempool"));
+    tmpLedgerPath = undefined;
+    tmpMempoolPath = undefined;
+  });
+
   it.effect("Test NodeConfig layer drives MPT storage paths", () =>
     Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports needed:
-      //   import * as os from "os";
-      //   import * as path from "path";
-      //   import { randomUUID } from "crypto";
-      //   import { makeMpts, deleteMpt } from "@/workers/utils/mpt.js";
-      //   import { NodeConfig } from "@/services/config.js";
-      //   import { Layer } from "effect";
-      //
-      // Setup:
-      //   const ledgerPath = path.join(os.tmpdir(), `nit004-ledger-${randomUUID()}`);
-      //   const mempoolPath = path.join(os.tmpdir(), `nit004-mempool-${randomUUID()}`);
-      //   const nodeConfigLayer = Layer.succeed(NodeConfig, NodeConfig.of({
-      //     LEDGER_MPT_DB_PATH: ledgerPath,
-      //     MEMPOOL_MPT_DB_PATH: mempoolPath,
-      //     GENESIS_UTXOS: [],
-      //     ...rest of config
-      //   }));
-      //
-      // Steps:
-      //   1. const { ledgerTrie } = yield* makeMpts.pipe(Effect.provide(nodeConfigLayer))
-      //   2. yield* ledgerTrie.batch([{ type: "put", key: Buffer.alloc(32,0xaa), value: Buffer.alloc(16,0xbb) }])
-      //   3. const root1 = yield* ledgerTrie.getRootHex()
-      //   4. Close the LevelDB handle:
-      //        yield* Effect.tryPromise(() => ledgerTrie.databaseAndPath!.database._leveldb.close())
-      //   5. Reopen from the same path:
-      //        const { ledgerTrie: ledgerTrie2 } = yield* makeMpts.pipe(Effect.provide(nodeConfigLayer))
-      //        (second open reads from the configured path)
-      //   6. const root2 = yield* ledgerTrie2.getRootHex()
-      //
-      // Teardown (afterEach):
-      //   await Effect.runPromise(deleteMpt(ledgerPath, "ledger"))
-      //   await Effect.runPromise(deleteMpt(mempoolPath, "mempool"))
-      //
-      // Assert:
-      //   expect(root2).toBe(root1)  — reopen from configured path returns same root
-      expect(1).toBe(1);
+      tmpLedgerPath = path.join(os.tmpdir(), `nit004-ledger-${randomUUID()}`);
+      tmpMempoolPath = path.join(os.tmpdir(), `nit004-mempool-${randomUUID()}`);
+
+      const mpt1 = yield* MidgardMpt.create("nit004", tmpLedgerPath);
+      yield* mpt1.batch([
+        {
+          type: "put",
+          key: Buffer.alloc(32, 0xaa),
+          value: Buffer.alloc(16, 0xbb),
+        },
+      ]);
+      const root1 = yield* mpt1.getRootHex();
+
+      yield* Effect.tryPromise(() =>
+        mpt1.databaseAndPath!.database._leveldb.close(),
+      );
+
+      const mpt2 = yield* MidgardMpt.create("nit004", tmpLedgerPath);
+      const root2 = yield* mpt2.getRootHex();
+
+      expect(root2).toBe(root1);
+
+      yield* Effect.tryPromise(() =>
+        mpt2.databaseAndPath!.database._leveldb.close(),
+      );
     }),
   );
 });
@@ -188,43 +189,34 @@ describe("Test NodeConfig layer drives MPT storage paths", () => {
 // ─── NIT-005 ─────────────────────────────────────────────────────────────────
 
 describe("Real layers compose for a node action", () => {
-  it.effect("Real layers compose for a node action", () =>
-    Effect.gen(function* () {
-      // IMPLEMENTATION PLAN:
-      // ─────────────────────
-      // Imports needed:
-      //   import * as DBInitialization from "@/database/init.js";
-      //   import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
-      //   import * as MempoolDB from "@/database/mempool.js";
-      //   import { Globals } from "@/services/globals.js";
-      //   import { NodeConfig } from "@/services/config.js";
-      //   import { Layer } from "effect";
-      //
-      // Goal: prove that the full layer stack (SQL + NodeConfig + Globals +
-      // fake Lucid) can be composed and a multi-step action runs end-to-end.
-      //
-      // Layer setup:
-      //   const sqlLayer = makeTestSql();
-      //   const nodeConfigLayer = Layer.succeed(NodeConfig, NodeConfig.of({ ... }));
-      //   const globalsLayer = Globals.Default;
-      //   // Fake Lucid layer that returns no UTxOs (sufficient for this test)
-      //   const fakeLucidLayer = ...;
-      //   const allLayers = Layer.mergeAll(sqlLayer, nodeConfigLayer, globalsLayer, fakeLucidLayer);
-      //
-      // Steps:
-      //   1. yield* DBInitialization.program.pipe(Effect.provide(allLayers))
-      //   2. Seed one UTxO through MempoolLedgerDB.insert([seedEntry])
-      //   3. Create an Effect queue with one tx CBOR: Queue.unbounded<Buffer>
-      //   4. yield* Queue.offer(queue, txCbor)
-      //   5. Run one queue processor iteration (import from @/transactions/
-      //      or inline the drain-and-insert logic used by the real processor)
-      //   6. const count = yield* MempoolDB.retrieveTxCount
-      //
-      // Assert:
-      //   expect(count).toBe(1n)
-      //   Verify all expected DB projections: MempoolDB, MempoolLedgerDB (spent/produced),
-      //   AddressHistoryDB entries with SLATED status
-      expect(1).toBe(1);
-    }),
-  );
+  it.effect("Real layers compose for a node action", () => {
+    const layers = Layer.mergeAll(
+      makeTestSqlLayer(),
+      makeTestNodeConfigLayer(),
+    );
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      yield* MempoolLedgerDB.insert([makeSeedLedgerEntry()]);
+
+      const processedTx = yield* breakDownTx(txCborA);
+      yield* MempoolDB.insertMultiple([processedTx]);
+
+      const count = yield* MempoolDB.retrieveTxCount;
+      expect(count).toBe(1n);
+
+      const ledger = yield* MempoolLedgerDB.retrieve;
+      const outrefs = ledger.map((e) =>
+        Buffer.from(e[Ledger.Columns.OUTREF]).toString("hex"),
+      );
+      expect(outrefs.some((o) => o === outrefCborBytes.toString("hex"))).toBe(
+        true,
+      );
+
+      // Both spent (spentAddress) and produced (testAddress) should have entries.
+      const ahForProduced = yield* AddressHistoryDB.retrieve(testAddress);
+      const ahForSpent = yield* AddressHistoryDB.retrieve(spentAddress);
+      expect(ahForProduced.length + ahForSpent.length).toBeGreaterThan(0);
+    }).pipe(Effect.provide(layers));
+  });
 });

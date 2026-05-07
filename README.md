@@ -43,12 +43,12 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:sdk-coverage:start -->
-<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-42.0%25-red?style=flat-square" />
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-failing-red?style=flat-square" />
 <!-- badge:sdk-coverage:end -->
     </td>
     <td>
       <!-- badge:ts-coverage:start -->
-<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-failing-red?style=flat-square" />
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-66.1%25-orange?style=flat-square" />
 <!-- badge:ts-coverage:end -->
     </td>
   </tr>

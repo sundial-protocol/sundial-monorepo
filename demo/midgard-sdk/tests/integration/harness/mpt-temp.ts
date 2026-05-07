@@ -39,6 +39,7 @@
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
 
 export type TempMptPaths = {
   ledgerPath: string;
@@ -66,8 +67,10 @@ export const makeTempMptPaths = (label: string): TempMptPaths => {
   );
 
   const cleanup = async (): Promise<void> => {
-    // TODO (implementation): call deleteMpt for each path via Effect.runPromise.
-    // No-op until implemented — directories will be left in os.tmpdir().
+    await Promise.all([
+      rm(ledgerPath, { recursive: true, force: true }),
+      rm(mempoolPath, { recursive: true, force: true }),
+    ]);
   };
 
   return { ledgerPath, mempoolPath, cleanup };

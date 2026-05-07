@@ -75,35 +75,88 @@ export const makeFakeLucid = (opts: FakeLucidOptions = {}): FakeLucidResult => {
     lastTxId: "deadbeef".repeat(8),
   };
 
-  // TODO (implementation): replace this stub with the full fake implementation
-  // described in the JSDoc above.
+  const makeBuilderSpy = () => {
+    const calls = {
+      collectFrom: [] as unknown[][],
+      mintAssets: [] as unknown[][],
+      validTo: [] as unknown[][],
+      payToAddressWithData: [] as unknown[][],
+      payToAddress: [] as unknown[][],
+      payToContract: [] as unknown[][],
+      attachScript: [] as unknown[][],
+      attachMintingPolicy: [] as unknown[][],
+      compose: [] as unknown[][],
+      complete: [] as unknown[][],
+    };
+    const tx: Record<string, any> = {};
+    tx.collectFrom = (...args: unknown[]) => {
+      calls.collectFrom.push(args);
+      return tx;
+    };
+    tx.mintAssets = (...args: unknown[]) => {
+      calls.mintAssets.push(args);
+      return tx;
+    };
+    tx.validTo = (...args: unknown[]) => {
+      calls.validTo.push(args);
+      return tx;
+    };
+    tx.pay = {
+      ToAddressWithData: (...args: unknown[]) => {
+        calls.payToAddressWithData.push(args);
+        return tx;
+      },
+      ToAddress: (...args: unknown[]) => {
+        calls.payToAddress.push(args);
+        return tx;
+      },
+      ToContract: (...args: unknown[]) => {
+        calls.payToContract.push(args);
+        return tx;
+      },
+    };
+    tx.attach = {
+      Script: (...args: unknown[]) => {
+        calls.attachScript.push(args);
+        return tx;
+      },
+      MintingPolicy: (...args: unknown[]) => {
+        calls.attachMintingPolicy.push(args);
+        return tx;
+      },
+    };
+    tx.compose = (...args: unknown[]) => {
+      calls.compose.push(args);
+      return tx;
+    };
+    tx.complete = async (...args: unknown[]) => {
+      calls.complete.push(args);
+      return tx;
+    };
+    tx.completeProgram = () => Promise.resolve(tx);
+    tx.__calls = calls;
+    return tx;
+  };
+
   const lucid: unknown = {
     utxosAt: async (address: string) => (opts.utxosAt ?? {})[address] ?? [],
     wallet: () => ({
       getUtxos: async () => opts.walletUtxos ?? [],
       signTx: async (tx: unknown) => tx,
+      address: async () =>
+        credentialToAddress("Preview", {
+          type: "Key",
+          hash: "dd".repeat(28),
+        }),
       submitTx: async (cbor: string) => {
         submitRecorder.submitted.push(cbor);
         return submitRecorder.lastTxId;
       },
     }),
     config: () => ({ network: opts.network ?? "Preview" }),
-    // TODO (implementation): return a real builder spy with method chaining
-    newTx: () => ({
-      collectFrom: () => ({}) as unknown,
-      mintAssets: () => ({}) as unknown,
-      validTo: () => ({}) as unknown,
-      pay: {
-        ToAddressWithData: () => ({}) as unknown,
-        ToAddress: () => ({}) as unknown,
-        ToContract: () => ({}) as unknown,
-      },
-      attach: {
-        Script: () => ({}) as unknown,
-        MintingPolicy: () => ({}) as unknown,
-      },
-    }),
+    newTx: makeBuilderSpy,
   };
 
   return { lucid, submitRecorder };
 };
+import { credentialToAddress } from "@lucid-evolution/lucid";

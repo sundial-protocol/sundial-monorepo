@@ -45,12 +45,16 @@ export const FIXTURE_POSIX_T3 = 1_150_000n;
 
 // TODO (implementation): use credentialToAddress("Preview", { type: "Key", hash: FIXTURE_PUB_KEY_HASH_A })
 // from @lucid-evolution/lucid to build a real bech32 address.
-export const FIXTURE_ADDRESS_KEY_A =
-  "addr_test1vz0p8k0ekk5xvms5jlqmajgddmqm4xp58yd8c92lvd63hwcv6znrl";
+export const FIXTURE_ADDRESS_KEY_A = credentialToAddress(NETWORK, {
+  type: "Key",
+  hash: FIXTURE_PUB_KEY_HASH_A,
+});
 
 // TODO (implementation): use credentialToAddress("Preview", { type: "Script", hash: FIXTURE_SCRIPT_HASH_A })
-export const FIXTURE_ADDRESS_SCRIPT_A =
-  "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58";
+export const FIXTURE_ADDRESS_SCRIPT_A = credentialToAddress(NETWORK, {
+  type: "Script",
+  hash: FIXTURE_SCRIPT_HASH_A,
+});
 
 // AddressData for FIXTURE_PUB_KEY_HASH_A (Lucid Data schema shape)
 export const FIXTURE_ADDRESS_DATA_KEY_A = {
@@ -88,11 +92,7 @@ export const FIXTURE_VALIDATOR = {
 //
 // TODO (implementation): call getProtocolParameters(NETWORK) from @sdk/protocol-parameters.ts
 // instead of using this literal object.
-export const FIXTURE_PROTOCOL_PARAMS = {
-  event_wait_duration: 50_000,
-  maturity_duration: 1n,
-  slashing_penalty: 1_000_000n,
-};
+export const FIXTURE_PROTOCOL_PARAMS = getProtocolParameters(NETWORK);
 
 // ─── Nonce UTxO ───────────────────────────────────────────────────────────────
 //
@@ -164,3 +164,44 @@ export const FIXTURE_CONFIRMED_STATE = {
   endTime: FIXTURE_POSIX_T1,
   protocolVersion: 1n,
 };
+
+export const FIXTURE_MIDGARD_VALIDATORS: MidgardValidators = {
+  hubOracle: FIXTURE_VALIDATOR,
+  stateQueue: FIXTURE_VALIDATOR,
+  scheduler: FIXTURE_VALIDATOR,
+  registeredOperators: FIXTURE_VALIDATOR,
+  activeOperators: FIXTURE_VALIDATOR,
+  retiredOperators: FIXTURE_VALIDATOR,
+  escapeHatch: FIXTURE_VALIDATOR,
+  fraudProofCatalogue: FIXTURE_VALIDATOR,
+  fraudProof: FIXTURE_VALIDATOR,
+  deposit: FIXTURE_VALIDATOR,
+  withdrawal: FIXTURE_VALIDATOR,
+  txOrder: FIXTURE_VALIDATOR,
+  settlement: FIXTURE_VALIDATOR,
+  reserve: {
+    spendingScriptCBOR: FIXTURE_ALWAYS_SUCCEEDS_CBOR,
+    spendingScript: {
+      type: "PlutusV3",
+      script: FIXTURE_ALWAYS_SUCCEEDS_CBOR,
+    },
+    spendingScriptHash: FIXTURE_SCRIPT_HASH_A,
+    spendingScriptAddress: FIXTURE_ADDRESS_SCRIPT_A,
+    withdrawalScriptCBOR: FIXTURE_ALWAYS_SUCCEEDS_CBOR,
+    withdrawalScript: {
+      type: "PlutusV3",
+      script: FIXTURE_ALWAYS_SUCCEEDS_CBOR,
+    },
+    withdrawalScriptHash: FIXTURE_SCRIPT_HASH_A,
+  },
+  payout: FIXTURE_VALIDATOR,
+  fraudProofs: {
+    doubleSpend: FIXTURE_VALIDATOR,
+    nonExistentInput: FIXTURE_VALIDATOR,
+    nonExistentInputNoIndex: FIXTURE_VALIDATOR,
+    invalidRange: FIXTURE_VALIDATOR,
+  },
+};
+import { credentialToAddress } from "@lucid-evolution/lucid";
+import { getProtocolParameters } from "@sdk/protocol-parameters.ts";
+import type { MidgardValidators } from "@sdk/common.ts";

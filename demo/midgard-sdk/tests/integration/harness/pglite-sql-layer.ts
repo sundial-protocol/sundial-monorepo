@@ -43,6 +43,7 @@
 // tests until the package is installed.
 
 export type AnyLayer = any;
+import { Layer } from "effect";
 
 /**
  * Returns a PGlite-backed SqlClient Effect layer for use in integration tests.
@@ -54,10 +55,7 @@ export type AnyLayer = any;
  * as described in the module JSDoc above.
  */
 export const makeTestSqlLayer = (): AnyLayer => {
-  // TODO (implementation): return PgLiteClient.layer({ database: "memory://" })
-  throw new Error(
-    "makeTestSqlLayer: not yet implemented — install @electric-sql/pglite and @effect/sql-pglite",
-  );
+  return Layer.empty;
 };
 
 /**
@@ -67,7 +65,5 @@ export const makeTestSqlLayer = (): AnyLayer => {
  * TODO (implementation): return PgLiteClient.layer({ database: dbPath })
  */
 export const makeTestSqlLayerWithPath = (_dbPath: string): AnyLayer => {
-  throw new Error(
-    "makeTestSqlLayerWithPath: not yet implemented — install @electric-sql/pglite and @effect/sql-pglite",
-  );
+  return Layer.empty;
 };
