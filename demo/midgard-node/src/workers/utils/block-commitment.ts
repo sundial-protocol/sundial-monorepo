@@ -153,7 +153,7 @@ export const applyTxOrdersToLedger = (
     sizeOfTxOrders: number;
   },
   SDK.CmlDeserializationError | MptError | DatabaseError,
-  Database
+  never
 > =>
   Effect.gen(function* () {
     yield* Effect.logInfo(

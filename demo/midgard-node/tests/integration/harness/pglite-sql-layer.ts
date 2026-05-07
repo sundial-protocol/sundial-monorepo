@@ -53,7 +53,7 @@ class PGliteConnection {
     sql: string,
     params: ReadonlyArray<unknown>,
     transformRows:
-      | ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>)
+      | (<A extends object>(rows: readonly A[]) => readonly A[])
       | undefined,
   ) {
     return transformRows
@@ -75,10 +75,11 @@ class PGliteConnection {
         this.db
           .query<Record<string, unknown>>(sql, params as unknown[])
           .then((r) =>
-            r.rows.map((row) =>
-              row !== null && typeof row === "object"
-                ? Object.values(row)
-                : [row],
+            r.rows.map(
+              (row) =>
+                (row !== null && typeof row === "object"
+                  ? Object.values(row)
+                  : [row]) as Statement.Primitive[],
             ),
           ),
       catch: (cause) =>
@@ -90,7 +91,7 @@ class PGliteConnection {
     sql: string,
     params: ReadonlyArray<unknown>,
     transformRows:
-      | ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>)
+      | (<A extends object>(rows: readonly A[]) => readonly A[])
       | undefined,
   ) {
     return this.execute(sql, params, transformRows);
@@ -100,7 +101,7 @@ class PGliteConnection {
     sql: string,
     params: ReadonlyArray<unknown>,
     transformRows:
-      | ((rows: ReadonlyArray<unknown>) => ReadonlyArray<unknown>)
+      | (<A extends object>(rows: readonly A[]) => readonly A[])
       | undefined,
   ) {
     return Stream.fromEffect(this.execute(sql, params, transformRows));
