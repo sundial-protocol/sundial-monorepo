@@ -1,52 +1,28 @@
-// Shared Effect runtime composer for SDK integration tests.
-//
-// makeSdkIntegrationRuntime composes all layers needed by the full SDK
-// integration suite: PGlite SQL, NodeConfig, Globals, and fake Lucid.
-// Individual tests that need only a subset can compose layers directly.
-//
-// ─── Usage ────────────────────────────────────────────────────────────────────
-//
-//   const { layers, lucid, submitRecorder, cleanup } =
-//     makeSdkIntegrationRuntime({ ledgerMptPath, mempoolMptPath });
-//
-//   yield* DBInitialization.program.pipe(Effect.provide(layers));
-//   yield* someNodeAction.pipe(Effect.provide(layers));
-//
-// ─── Implementation notes ─────────────────────────────────────────────────────
-//
-// TODO (implementation):
-//   import { makeTestSqlLayer } from "./pglite-sql-layer.ts";
-//   import { makeTestNodeConfigLayer } from "./node-config-layer.ts";
-//   import { makeFakeLucid } from "./fake-lucid.ts";
-//   import { Globals } from "@node/services/globals.ts";
-//   import { Lucid } from "@node/services/lucid.ts";
-//   import { Layer } from "effect";
-//
-//   export const makeSdkIntegrationRuntime = (opts = {}) => {
-//     const { lucid, submitRecorder } = makeFakeLucid(opts.fakeLucid);
-//     const sqlLayer = makeTestSqlLayer();
-//     const nodeConfigLayer = makeTestNodeConfigLayer(opts.nodeConfig);
-//     const globalsLayer = Globals.Default;
-//     const fakeLucidLayer = Layer.succeed(Lucid, { api: lucid });
-//     const layers = Layer.mergeAll(
-//       sqlLayer, nodeConfigLayer, globalsLayer, fakeLucidLayer
-//     );
-//     return { layers, lucid, submitRecorder };
-//   };
-//
-// Each test file composes the subset of layers it needs.  Not every test needs
-// the full runtime (e.g., pure SDK encoding tests need no SQL or Lucid layers).
-
-import type { FakeLucidOptions, SubmitRecorder } from "./fake-lucid.ts";
+import { Context, Layer } from "effect";
+import type {
+  FakeLucid,
+  FakeLucidOptions,
+  SubmitRecorder,
+} from "./fake-lucid.ts";
 import type { TestNodeConfigOptions } from "./node-config-layer.ts";
 import { makeFakeLucid } from "./fake-lucid.ts";
 import { makeTestSqlLayer } from "./pglite-sql-layer.ts";
 import { makeTestNodeConfigLayer } from "./node-config-layer.ts";
-import { Globals } from "@node/services/globals.ts";
-import { Lucid } from "@node/services/lucid.ts";
-import { Layer } from "effect";
 
-export type AnyLayer = any;
+// Local tags used by the SDK integration harness runtime.
+// They model the dependencies expected by tests without coupling this package
+// to demo/midgard-node internals.
+type HarnessGlobals = Record<string, never>;
+type HarnessLucid = {
+  api: FakeLucid;
+  switchToOperatorsMainWallet: () => void;
+  switchToOperatorsBlockCommitmentWallet: () => void;
+  switchToOperatorsMergingWallet: () => void;
+};
+
+const HarnessGlobalsTag =
+  Context.GenericTag<HarnessGlobals>("sdk.tests/Globals");
+const HarnessLucidTag = Context.GenericTag<HarnessLucid>("sdk.tests/Lucid");
 
 export type SdkIntegrationRuntimeOptions = {
   fakeLucid?: FakeLucidOptions;
@@ -54,39 +30,37 @@ export type SdkIntegrationRuntimeOptions = {
 };
 
 export type SdkIntegrationRuntime = {
-  /** Composed Effect layer for use with Effect.provide. */
-  layers: AnyLayer;
+  /** Composed Effect layer for use with `Effect.provide(...)`. */
+  layers: Layer.Layer<unknown>;
   /** The fake Lucid object (also embedded in the layer). */
-  lucid: unknown;
+  lucid: FakeLucid;
   /** Submit recorder for asserting submitted CBOR. */
   submitRecorder: SubmitRecorder;
 };
 
-/**
- * Composes the full integration layer stack: PGlite SQL + NodeConfig +
- * Globals + fake Lucid.
- *
- * TODO (implementation): implement as described in the module JSDoc above.
- * This is the primary entry point for most SDK integration tests.
- */
+/** Composes SQL + NodeConfig + Globals + fake Lucid harness layers. */
 export const makeSdkIntegrationRuntime = (
   opts: SdkIntegrationRuntimeOptions = {},
 ): SdkIntegrationRuntime => {
   const { lucid, submitRecorder } = makeFakeLucid(opts.fakeLucid);
   const sqlLayer = makeTestSqlLayer();
   const nodeConfigLayer = makeTestNodeConfigLayer(opts.nodeConfig);
-  const globalsLayer = Globals.Default;
-  const fakeLucidLayer = Layer.succeed(Lucid, {
-    api: lucid as any,
+  const globalsLayer = Layer.succeed(HarnessGlobalsTag, {});
+  const fakeLucidLayer = Layer.succeed(HarnessLucidTag, {
+    api: lucid,
     switchToOperatorsMainWallet: () => undefined,
     switchToOperatorsBlockCommitmentWallet: () => undefined,
     switchToOperatorsMergingWallet: () => undefined,
-  } as any);
-  const layers = Layer.mergeAll(
-    sqlLayer,
-    nodeConfigLayer,
-    globalsLayer,
-    fakeLucidLayer,
-  );
-  return { layers, lucid, submitRecorder };
+  });
+
+  return {
+    layers: Layer.mergeAll(
+      sqlLayer,
+      nodeConfigLayer,
+      globalsLayer,
+      fakeLucidLayer,
+    ),
+    lucid,
+    submitRecorder,
+  };
 };

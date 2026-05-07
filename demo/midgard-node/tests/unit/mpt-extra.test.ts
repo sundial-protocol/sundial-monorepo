@@ -1,6 +1,6 @@
 import { describe, expect, afterEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import * as os from "os";
 import * as path from "path";
 import { randomUUID } from "crypto";
@@ -12,93 +12,32 @@ import {
   withTrieTransaction,
 } from "@/workers/utils/mpt.js";
 import { WorkerError } from "@/workers/utils/common.js";
-import { SqlClient } from "@effect/sql";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 const EMPTY_ROOT =
   "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421";
 
-const mockSql: any = Object.assign(
-  function (stringsOrStr: any, ..._values: unknown[]) {
-    if (Array.isArray(stringsOrStr) && "raw" in stringsOrStr) {
-      return Effect.succeed([]);
-    }
-    return stringsOrStr;
-  },
-  {
-    withTransaction: (eff: Effect.Effect<unknown>) => eff,
-    insert: (obj: unknown) => obj,
-    in: (_col: string, vals: unknown[]) => vals,
-    literal: (s: string) => s,
-  },
-);
+const mockDbLayer = createMockSqlHarness().layer;
 
-const mockDbLayer = Layer.succeed(
-  SqlClient.SqlClient,
-  mockSql as unknown as SqlClient.SqlClient,
-);
+describe("MptError constructors include trie name", () => {
+  const ctorCases = [
+    ["get", () => MptError.get("myTrie", new Error("cause"))],
+    ["put", () => MptError.put("myTrie", new Error("cause"))],
+    ["batch", () => MptError.batch("myTrie", new Error("cause"))],
+    ["del", () => MptError.del("myTrie", new Error("cause"))],
+    ["trieCreate", () => MptError.trieCreate("myTrie", new Error("cause"))],
+    ["trieCommit", () => MptError.trieCommit("myTrie", new Error("cause"))],
+    ["trieRevert", () => MptError.trieRevert("myTrie", new Error("cause"))],
+    ["rootNotSet", () => MptError.rootNotSet("myTrie", null)],
+  ] as const;
 
-describe("MptError.get creates error with trie name", () => {
-  it("MptError.get creates error with trie name", () => {
-    const err = MptError.get("myTrie", new Error("cause"));
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
-});
-
-describe("MptError.put creates error with trie name", () => {
-  it("MptError.put creates error with trie name", () => {
-    const err = MptError.put("myTrie", new Error("cause"));
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
-});
-
-describe("MptError.batch creates error with trie name", () => {
-  it("MptError.batch creates error with trie name", () => {
-    const err = MptError.batch("myTrie", new Error("cause"));
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
-});
-
-describe("MptError.del creates error with trie name", () => {
-  it("MptError.del creates error with trie name", () => {
-    const err = MptError.del("myTrie", new Error("cause"));
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
-});
-
-describe("MptError.trieCreate creates error", () => {
-  it("MptError.trieCreate creates error", () => {
-    const err = MptError.trieCreate("myTrie", new Error("cause"));
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
-});
-
-describe("MptError.trieCommit creates error", () => {
-  it("MptError.trieCommit creates error", () => {
-    const err = MptError.trieCommit("myTrie", new Error("cause"));
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
-});
-
-describe("MptError.trieRevert creates error", () => {
-  it("MptError.trieRevert creates error", () => {
-    const err = MptError.trieRevert("myTrie", new Error("cause"));
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
-});
-
-describe("MptError.rootNotSet creates error", () => {
-  it("MptError.rootNotSet creates error", () => {
-    const err = MptError.rootNotSet("myTrie", null);
-    expect(err).toBeInstanceOf(MptError);
-    expect(err.message).toContain("myTrie");
-  });
+  for (const [name, makeError] of ctorCases) {
+    it(`${name} creates MptError with trie name`, () => {
+      const err = makeError();
+      expect(err).toBeInstanceOf(MptError);
+      expect(err.message).toContain("myTrie");
+    });
+  }
 });
 
 describe("emptyRootHexProgram returns the canonical empty root", () => {
@@ -123,7 +62,9 @@ describe("MidgardMpt.databaseStats returns stats object", () => {
   it.effect("MidgardMpt.databaseStats returns stats object", () =>
     Effect.gen(function* () {
       const mpt = yield* MidgardMpt.create("stats-test");
-      const _stats = mpt.databaseStats();
+      const stats = mpt.databaseStats();
+      expect(typeof stats).toBe("object");
+      expect(stats).not.toBeNull();
     }),
   );
 });
@@ -166,8 +107,6 @@ describe("withTrieTransaction commits on success", () => {
   it.effect("withTrieTransaction commits on success", () =>
     Effect.gen(function* () {
       const mpt = yield* MidgardMpt.create("with-tx-test");
-      const txIdA = Buffer.alloc(32, 0xaa);
-      const txCborA = Buffer.alloc(32, 0xbb);
       const result = yield* withTrieTransaction(mpt, Effect.succeed("ok")).pipe(
         Effect.provide(mockDbLayer),
       );

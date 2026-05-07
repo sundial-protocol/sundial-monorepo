@@ -90,7 +90,8 @@ describe("SDK operator and initialization integration", () => {
       expect(calls.collectFrom).toHaveLength(1);
       expect(calls.validTo).toHaveLength(1);
       expect(calls.compose.length).toBeGreaterThanOrEqual(6);
-      expect(calls.compose[0][0]).toBeTruthy();
+      expect(calls.compose[0]).toHaveLength(1);
+      expect(calls.compose[0][0]).toEqual(expect.anything());
     }),
   );
 });

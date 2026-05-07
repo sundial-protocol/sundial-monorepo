@@ -4,6 +4,13 @@ import { Effect, Layer } from "effect";
 import type { MidgardMpt } from "@/workers/utils/mpt.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { makeTestNodeConfigLayer } from "../integration/harness/node-config-layer.js";
+import {
+  COMMON_ADDRESSES,
+  makeFakeTrie,
+  makeLedgerEntry,
+  makeTxEntryNoTimeStamp,
+  makeUserEventEntry,
+} from "./harness/fixtures.js";
 
 const breakDownTxMock = vi.hoisted(() => vi.fn());
 const withdrawalsEntryToOutRefMock = vi.hoisted(() => vi.fn());
@@ -62,22 +69,6 @@ import {
   applyDepositsToLedger,
 } from "@/workers/utils/block-commitment.js";
 
-type FakeBatchOp = {
-  type: "put" | "del";
-  key: Buffer;
-  value?: Buffer;
-};
-
-type FakeTrie = {
-  batch: ReturnType<typeof vi.fn>;
-  getRootHex: ReturnType<typeof vi.fn>;
-};
-
-const makeFakeTrie = (rootHex: string): FakeTrie => ({
-  batch: vi.fn((_ops: FakeBatchOp[]) => Effect.void),
-  getRootHex: vi.fn(() => Effect.succeed(rootHex)),
-});
-
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -97,16 +88,14 @@ describe("applyWithdrawalsToLedger applies all withdrawal events", () => {
         .mockReturnValueOnce(Effect.succeed(outRefA))
         .mockReturnValueOnce(Effect.succeed(outRefB));
 
-      const withdrawalEntries = [
-        {
-          [UserEvents.Columns.ID]: Buffer.alloc(32, 0x01),
-          [UserEvents.Columns.INFO]: Buffer.from([0x10, 0x11]),
-        },
-        {
-          [UserEvents.Columns.ID]: Buffer.alloc(32, 0x02),
-          [UserEvents.Columns.INFO]: Buffer.from([0x12, 0x13, 0x14]),
-        },
-      ] as unknown as UserEvents.Entry[];
+      const withdrawalEntries: UserEvents.Entry[] = [
+        makeUserEventEntry(0x01, {
+          event_info: Buffer.from([0x10, 0x11]),
+        }),
+        makeUserEventEntry(0x02, {
+          event_info: Buffer.from([0x12, 0x13, 0x14]),
+        }),
+      ];
 
       const result = yield* applyWithdrawalsToLedger(
         ledgerTrie as unknown as MidgardMpt,
@@ -131,20 +120,16 @@ describe("applyTxOrdersToLedger applies tx orders to the ledger trie", () => {
 
       const spentA = Buffer.from([0xa1]);
       const spentB = Buffer.from([0xb1]);
-      const producedA = {
-        [Ledger.Columns.TX_ID]: Buffer.alloc(32, 0xaa),
-        [Ledger.Columns.OUTREF]: Buffer.from([0xa2]),
-        [Ledger.Columns.OUTPUT]: Buffer.from([0xa3]),
-        [Ledger.Columns.ADDRESS]:
-          "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
-      };
-      const producedB = {
-        [Ledger.Columns.TX_ID]: Buffer.alloc(32, 0xbb),
-        [Ledger.Columns.OUTREF]: Buffer.from([0xb2]),
-        [Ledger.Columns.OUTPUT]: Buffer.from([0xb3]),
-        [Ledger.Columns.ADDRESS]:
-          "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
-      };
+      const producedA = makeLedgerEntry(0xaa, {
+        outref: Buffer.from([0xa2]),
+        output: Buffer.from([0xa3]),
+        address: COMMON_ADDRESSES.produced,
+      });
+      const producedB = makeLedgerEntry(0xbb, {
+        outref: Buffer.from([0xb2]),
+        output: Buffer.from([0xb3]),
+        address: COMMON_ADDRESSES.produced,
+      });
 
       breakDownTxMock
         .mockReturnValueOnce(
@@ -160,16 +145,12 @@ describe("applyTxOrdersToLedger applies tx orders to the ledger trie", () => {
           }),
         );
 
-      const txOrders = [
-        {
-          [UserEvents.Columns.ID]: Buffer.alloc(32, 0x11),
-          [UserEvents.Columns.INFO]: Buffer.from([0x21, 0x22]),
-        },
-        {
-          [UserEvents.Columns.ID]: Buffer.alloc(32, 0x12),
-          [UserEvents.Columns.INFO]: Buffer.from([0x23, 0x24, 0x25]),
-        },
-      ] as unknown as UserEvents.Entry[];
+      const txOrders: UserEvents.Entry[] = [
+        makeUserEventEntry(0x11, { event_info: Buffer.from([0x21, 0x22]) }),
+        makeUserEventEntry(0x12, {
+          event_info: Buffer.from([0x23, 0x24, 0x25]),
+        }),
+      ];
 
       const result = yield* applyTxOrdersToLedger(
         ledgerTrie as unknown as MidgardMpt,
@@ -201,11 +182,11 @@ describe("applyTxRequestsToLedger applies mempool tx requests", () => {
             spent: [Buffer.from([0xc1])],
             produced: [
               {
-                [Ledger.Columns.TX_ID]: Buffer.alloc(32, 0xc2),
-                [Ledger.Columns.OUTREF]: Buffer.from([0xc3]),
-                [Ledger.Columns.OUTPUT]: Buffer.from([0xc4]),
-                [Ledger.Columns.ADDRESS]:
-                  "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
+                ...makeLedgerEntry(0xc2, {
+                  outref: Buffer.from([0xc3]),
+                  output: Buffer.from([0xc4]),
+                  address: COMMON_ADDRESSES.produced,
+                }),
               },
             ],
           }),
@@ -215,26 +196,20 @@ describe("applyTxRequestsToLedger applies mempool tx requests", () => {
             spent: [Buffer.from([0xd1])],
             produced: [
               {
-                [Ledger.Columns.TX_ID]: Buffer.alloc(32, 0xd2),
-                [Ledger.Columns.OUTREF]: Buffer.from([0xd3]),
-                [Ledger.Columns.OUTPUT]: Buffer.from([0xd4]),
-                [Ledger.Columns.ADDRESS]:
-                  "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
+                ...makeLedgerEntry(0xd2, {
+                  outref: Buffer.from([0xd3]),
+                  output: Buffer.from([0xd4]),
+                  address: COMMON_ADDRESSES.produced,
+                }),
               },
             ],
           }),
         );
 
-      const mempoolTxs = [
-        {
-          [Tx.Columns.TX_ID]: Buffer.alloc(32, 0x31),
-          [Tx.Columns.TX]: Buffer.from([0x41, 0x42]),
-        },
-        {
-          [Tx.Columns.TX_ID]: Buffer.alloc(32, 0x32),
-          [Tx.Columns.TX]: Buffer.from([0x43, 0x44, 0x45]),
-        },
-      ] as unknown as Tx.Entry[];
+      const mempoolTxs: Tx.Entry[] = [
+        makeTxEntryNoTimeStamp(0x31, { tx: Buffer.from([0x41, 0x42]) }),
+        makeTxEntryNoTimeStamp(0x32, { tx: Buffer.from([0x43, 0x44, 0x45]) }),
+      ];
 
       const result = yield* applyTxRequestsToLedger(
         ledgerTrie as unknown as MidgardMpt,
@@ -270,19 +245,19 @@ describe("applyDepositsToLedger applies deposits and returns new root", () => {
         );
 
         const entryA = {
-          [Ledger.Columns.TX_ID]: Buffer.alloc(32, 0xe1),
-          [Ledger.Columns.OUTREF]: Buffer.from([0xe2]),
-          [Ledger.Columns.OUTPUT]: Buffer.from([0xe3]),
-          [Ledger.Columns.ADDRESS]:
-            "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
+          ...makeLedgerEntry(0xe1, {
+            outref: Buffer.from([0xe2]),
+            output: Buffer.from([0xe3]),
+            address: COMMON_ADDRESSES.produced,
+          }),
           [Ledger.Columns.TIMESTAMPTZ]: new Date("2025-01-01T00:00:00.000Z"),
         };
         const entryB = {
-          [Ledger.Columns.TX_ID]: Buffer.alloc(32, 0xf1),
-          [Ledger.Columns.OUTREF]: Buffer.from([0xf2]),
-          [Ledger.Columns.OUTPUT]: Buffer.from([0xf3]),
-          [Ledger.Columns.ADDRESS]:
-            "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
+          ...makeLedgerEntry(0xf1, {
+            outref: Buffer.from([0xf2]),
+            output: Buffer.from([0xf3]),
+            address: COMMON_ADDRESSES.produced,
+          }),
           [Ledger.Columns.TIMESTAMPTZ]: new Date("2025-01-01T00:00:01.000Z"),
         };
 
@@ -290,16 +265,12 @@ describe("applyDepositsToLedger applies deposits and returns new root", () => {
           .mockReturnValueOnce(Effect.succeed(entryA))
           .mockReturnValueOnce(Effect.succeed(entryB));
 
-        const deposits = [
-          {
-            [UserEvents.Columns.ID]: Buffer.alloc(32, 0x51),
-            [UserEvents.Columns.INFO]: Buffer.from([0x61, 0x62]),
-          },
-          {
-            [UserEvents.Columns.ID]: Buffer.alloc(32, 0x52),
-            [UserEvents.Columns.INFO]: Buffer.from([0x63, 0x64, 0x65]),
-          },
-        ] as unknown as UserEvents.Entry[];
+        const deposits: UserEvents.Entry[] = [
+          makeUserEventEntry(0x51, { event_info: Buffer.from([0x61, 0x62]) }),
+          makeUserEventEntry(0x52, {
+            event_info: Buffer.from([0x63, 0x64, 0x65]),
+          }),
+        ];
 
         const result = yield* applyDepositsToLedger(
           ledgerTrie as unknown as MidgardMpt,

@@ -1,7 +1,6 @@
 import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 vi.mock("@/database/utils/ledger.js", async () => {
   const { Effect: E } = await import("effect");
@@ -29,37 +28,17 @@ vi.mock("@/database/utils/ledger.js", async () => {
 
 import * as Ledger from "@/database/utils/ledger.js";
 import * as AddressHistoryDB from "@/database/addressHistory.js";
+import { COMMON_ADDRESSES, makeLedgerEntry } from "./harness/fixtures.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
-const testAddress =
-  "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58";
+const testAddress = COMMON_ADDRESSES.produced;
 const txIdA = Buffer.alloc(32, 0xaa);
 const txCborA = Buffer.alloc(64, 0xcc);
 const outrefA = Buffer.alloc(32, 0xbb);
-
-let mockSqlRows: any[] = [];
-
-const mockSql: any = Object.assign(
-  function (stringsOrStr: any, ..._values: unknown[]) {
-    if (Array.isArray(stringsOrStr) && "raw" in stringsOrStr) {
-      return Effect.succeed([...mockSqlRows]);
-    }
-    return stringsOrStr;
-  },
-  {
-    withTransaction: (eff: Effect.Effect<unknown>) => eff,
-    insert: (obj: unknown) => obj,
-    in: (_col: string, vals: unknown[]) => vals,
-    literal: (s: string) => s,
-  },
-);
-
-const mockDbLayer = Layer.succeed(
-  SqlClient.SqlClient,
-  mockSql as unknown as SqlClient.SqlClient,
-);
+const sqlHarness = createMockSqlHarness();
 
 beforeEach(() => {
-  mockSqlRows = [];
+  sqlHarness.reset();
   vi.clearAllMocks();
 });
 
@@ -75,9 +54,9 @@ describe("upsertEntries", () => {
     ];
     return AddressHistoryDB.upsertEntries(entries).pipe(
       Effect.map(() => {
-        expect(true).toBe(true);
+        expect(sqlHarness.getCallCount()).toBeGreaterThan(0);
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     );
   });
 });
@@ -97,28 +76,27 @@ describe("upsert updates status", () => {
         ]),
       ),
       Effect.map(() => {
-        expect(true).toBe(true);
+        expect(sqlHarness.getCallCount()).toBeGreaterThan(1);
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     );
   });
 });
 
 describe("aggregateProcessedTxs", () => {
   it.effect("aggregateProcessedTxs", () => {
-    const ledgerEntry = {
+    const ledgerEntry = makeLedgerEntry(0xbb, {
       tx_id: txIdA,
       outref: outrefA,
-      output: Buffer.alloc(16),
       address: testAddress,
-    };
-    mockSqlRows = [ledgerEntry];
+    });
+    sqlHarness.setRows([ledgerEntry]);
 
     const processedTx = {
       txId: txIdA,
       txCbor: txCborA,
       spent: [outrefA],
-      produced: [ledgerEntry as any],
+      produced: [ledgerEntry],
     };
 
     return AddressHistoryDB.aggregateProcessedTxs(
@@ -132,31 +110,32 @@ describe("aggregateProcessedTxs", () => {
         expect(result.collectiveProduced.length).toBe(1);
         expect(result.addressHistoryEntries.length).toBeGreaterThan(0);
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     );
   });
 });
 
 describe("retrieve from mempool", () => {
   it.effect("retrieve from mempool", () => {
-    mockSqlRows = [{ tx: txCborA }];
+    sqlHarness.setRows([{ tx: txCborA }]);
     return AddressHistoryDB.retrieve(testAddress).pipe(
       Effect.map((txCbors) => {
         expect(txCbors.length).toBe(1);
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     );
   });
 });
 
 describe("retrieve from immutable", () => {
   it.effect("retrieve from immutable", () => {
-    mockSqlRows = [{ tx: txCborA }];
+    sqlHarness.setRows([{ tx: txCborA }]);
     return AddressHistoryDB.retrieve(testAddress).pipe(
       Effect.map((txCbors) => {
-        expect(Array.isArray(txCbors)).toBe(true);
+        expect(txCbors).toHaveLength(1);
+        expect(txCbors[0]).toEqual(txCborA);
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     );
   });
 });

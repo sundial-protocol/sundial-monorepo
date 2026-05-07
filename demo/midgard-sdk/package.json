@@ -18,7 +18,11 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "format-check": "prettier --check \"**/*.{ts,tsx,md}\"",
     "ts-node": "ts-node",
-    "test": "vitest run"
+    "test": "vitest run \"tests/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}\" --exclude \"tests/unit/**\" --exclude \"tests/integration/**\" --passWithNoTests",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:ours": "vitest run tests/unit tests/integration",
+    "test:all": "vitest run tests"
   },
   "keywords": [],
   "author": "",

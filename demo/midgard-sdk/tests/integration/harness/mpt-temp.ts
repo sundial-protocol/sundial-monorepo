@@ -15,23 +15,6 @@
 //
 // ─── Implementation notes ─────────────────────────────────────────────────────
 //
-// TODO (implementation):
-//   import * as os from "node:os";
-//   import * as path from "node:path";
-//   import { randomUUID } from "node:crypto";
-//   import { deleteMpt } from "@node/workers/utils/mpt.ts";
-//   import { Effect } from "effect";
-//
-//   export const makeTempMptPaths = (label: string) => {
-//     const ledgerPath = path.join(os.tmpdir(), `${label}-ledger-${randomUUID()}`);
-//     const mempoolPath = path.join(os.tmpdir(), `${label}-mempool-${randomUUID()}`);
-//     const cleanup = async () => {
-//       await Effect.runPromise(deleteMpt(ledgerPath, "ledger"));
-//       await Effect.runPromise(deleteMpt(mempoolPath, "mempool"));
-//     };
-//     return { ledgerPath, mempoolPath, cleanup };
-//   };
-//
 // The cleanup function must be called in afterEach (or afterAll) of every
 // test that opens a real LevelDB handle.  Not calling cleanup leaks temp
 // directories but does not affect test correctness.
@@ -50,14 +33,6 @@ export type TempMptPaths = {
 
 /**
  * Creates unique temp LevelDB paths for ledger and mempool MPTs.
- *
- * TODO (implementation): replace the no-op cleanup with real deleteMpt calls:
- *   import { deleteMpt } from "@node/workers/utils/mpt.ts";
- *   import { Effect } from "effect";
- *   const cleanup = async () => {
- *     await Effect.runPromise(deleteMpt(ledgerPath, "ledger"));
- *     await Effect.runPromise(deleteMpt(mempoolPath, "mempool"));
- *   };
  */
 export const makeTempMptPaths = (label: string): TempMptPaths => {
   const ledgerPath = path.join(os.tmpdir(), `${label}-ledger-${randomUUID()}`);

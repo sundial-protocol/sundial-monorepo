@@ -1,7 +1,6 @@
 import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 vi.mock("@/database/addressHistory.js", async () => {
   const { Effect: E } = await import("effect");
@@ -63,51 +62,30 @@ import * as AddressHistoryDB from "@/database/addressHistory.js";
 import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as MempoolDB from "@/database/mempool.js";
+import {
+  COMMON_ADDRESSES,
+  makeLedgerEntry,
+  makeTxEntryNoTimeStamp,
+} from "./harness/fixtures.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
-const txIdA = Buffer.alloc(32, 0xaa);
-const txCborA = Buffer.alloc(64, 0xbb);
+const txEntry = makeTxEntryNoTimeStamp(0xaa);
+const txIdA = txEntry.tx_id;
+const txCborA = txEntry.tx;
 const outrefA = Buffer.alloc(32, 0xcc);
-const testAddress =
-  "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58";
+const testAddress = COMMON_ADDRESSES.produced;
 
 const processedTx = {
   txId: txIdA,
   txCbor: txCborA,
   spent: [outrefA],
-  produced: [
-    {
-      tx_id: txIdA,
-      outref: outrefA,
-      output: Buffer.alloc(16),
-      address: testAddress,
-    } as any,
-  ],
+  produced: [makeLedgerEntry(0xaa, { tx_id: txIdA, outref: outrefA })],
 };
 
-let mockSqlRows: any[] = [];
-
-const mockSql: any = Object.assign(
-  function (stringsOrStr: any, ..._values: unknown[]) {
-    if (Array.isArray(stringsOrStr) && "raw" in stringsOrStr) {
-      return Effect.succeed([...mockSqlRows]);
-    }
-    return stringsOrStr;
-  },
-  {
-    withTransaction: (eff: Effect.Effect<unknown>) => eff,
-    insert: (obj: unknown) => obj,
-    in: (_col: string, vals: unknown[]) => vals,
-    literal: (s: string) => s,
-  },
-);
-
-const mockDbLayer = Layer.succeed(
-  SqlClient.SqlClient,
-  mockSql as unknown as SqlClient.SqlClient,
-);
+const sqlHarness = createMockSqlHarness();
 
 beforeEach(() => {
-  mockSqlRows = [];
+  sqlHarness.reset();
   vi.clearAllMocks();
   vi.mocked(AddressHistoryDB.aggregateProcessedTxs).mockReturnValue(
     Effect.succeed({
@@ -141,7 +119,7 @@ describe("insertMultiple stores tx+ledger", () => {
         expect(vi.mocked(MempoolLedgerDB.insert)).toHaveBeenCalled();
         expect(vi.mocked(MempoolLedgerDB.clearUTxOs)).toHaveBeenCalled();
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     ),
   );
 });
@@ -154,7 +132,7 @@ describe("slated address history", () => {
           vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
         ).toHaveBeenCalledWith("mempool_ledger", [processedTx], 0);
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     ),
   );
 });
@@ -175,19 +153,19 @@ describe("time-bound retrieval", () => {
           end,
         );
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     );
   });
 });
 
 describe("count", () => {
   it.effect("count", () => {
-    mockSqlRows = [{ count: "7" }];
+    sqlHarness.setRows([{ count: "7" }]);
     return MempoolDB.retrieveTxCount.pipe(
       Effect.map((count) => {
         expect(count).toBe(7n);
       }),
-      Effect.provide(mockDbLayer),
+      Effect.provide(sqlHarness.layer),
     );
   });
 });

@@ -1,7 +1,6 @@
 import { describe, expect, vi } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 const retrieveTxHashesByHeaderHashMock = vi.hoisted(() => vi.fn());
 const retrieveTxCborsByHashesMock = vi.hoisted(() => vi.fn());
@@ -37,6 +36,7 @@ import {
   GenesisDepositError,
   fetchFirstBlockTxs,
 } from "@/transactions/utils.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 const mockTxHash = "aa".repeat(32);
 
@@ -60,17 +60,7 @@ const mockLucid: any = {
   }),
 };
 
-const mockDbLayer = Layer.succeed(
-  SqlClient.SqlClient,
-  Object.assign(
-    (s: any) => (Array.isArray(s) && "raw" in s ? Effect.succeed([]) : s),
-    {
-      withTransaction: (e: any) => e,
-      insert: (o: any) => o,
-      in: (_c: any, v: any) => v,
-    },
-  ) as unknown as SqlClient.SqlClient,
-);
+const mockDbLayer = createMockSqlHarness().layer;
 
 // ---------------------------------------------------------------------------
 // handleSignSubmitNoConfirmation

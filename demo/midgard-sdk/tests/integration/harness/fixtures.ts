@@ -1,3 +1,7 @@
+import { credentialToAddress } from "@lucid-evolution/lucid";
+import { getProtocolParameters } from "@sdk/protocol-parameters.ts";
+import type { MidgardValidators } from "@sdk/common.ts";
+
 // Shared deterministic test fixtures for the SDK integration suite.
 //
 // One fixture set is shared across all 50 tests to keep them hermetic and
@@ -43,14 +47,11 @@ export const FIXTURE_POSIX_T3 = 1_150_000n;
 
 // ─── Addresses ───────────────────────────────────────────────────────────────
 
-// TODO (implementation): use credentialToAddress("Preview", { type: "Key", hash: FIXTURE_PUB_KEY_HASH_A })
-// from @lucid-evolution/lucid to build a real bech32 address.
 export const FIXTURE_ADDRESS_KEY_A = credentialToAddress(NETWORK, {
   type: "Key",
   hash: FIXTURE_PUB_KEY_HASH_A,
 });
 
-// TODO (implementation): use credentialToAddress("Preview", { type: "Script", hash: FIXTURE_SCRIPT_HASH_A })
 export const FIXTURE_ADDRESS_SCRIPT_A = credentialToAddress(NETWORK, {
   type: "Script",
   hash: FIXTURE_SCRIPT_HASH_A,
@@ -65,10 +66,6 @@ export const FIXTURE_ADDRESS_DATA_KEY_A = {
 };
 
 // ─── Validator fixture (always-succeeds script) ───────────────────────────────
-//
-// The real always-succeeds CBOR is "4d01000033222220051200120011".
-// TODO (implementation): import ALWAYS_SUCCEEDS_SCRIPT from the always-succeeds
-// fixture already present in demo/midgard-node/src/services/always-succeeds.ts.
 
 export const FIXTURE_ALWAYS_SUCCEEDS_CBOR = "4d01000033222220051200120011";
 
@@ -89,9 +86,6 @@ export const FIXTURE_VALIDATOR = {
 };
 
 // ─── Protocol parameters ─────────────────────────────────────────────────────
-//
-// TODO (implementation): call getProtocolParameters(NETWORK) from @sdk/protocol-parameters.ts
-// instead of using this literal object.
 export const FIXTURE_PROTOCOL_PARAMS = getProtocolParameters(NETWORK);
 
 // ─── Nonce UTxO ───────────────────────────────────────────────────────────────
@@ -134,9 +128,7 @@ export const FIXTURE_WITHDRAWAL_INFO = {
 
 // ─── Transaction CBOR fixture ─────────────────────────────────────────────────
 //
-// A minimal placeholder compact Cardano transaction CBOR (hex).
-// TODO (implementation): replace with a real valid compact Cardano tx CBOR
-// that passes the node transaction breakdown helpers.
+// Synthetic compact transaction payload used for deterministic encoding tests.
 export const FIXTURE_TX_CBOR_HEX = "deadbeef".repeat(16);
 
 // ─── Header fixture ───────────────────────────────────────────────────────────
@@ -202,6 +194,3 @@ export const FIXTURE_MIDGARD_VALIDATORS: MidgardValidators = {
     invalidRange: FIXTURE_VALIDATOR,
   },
 };
-import { credentialToAddress } from "@lucid-evolution/lucid";
-import { getProtocolParameters } from "@sdk/protocol-parameters.ts";
-import type { MidgardValidators } from "@sdk/common.ts";

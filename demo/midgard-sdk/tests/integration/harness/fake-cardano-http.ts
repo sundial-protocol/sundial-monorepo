@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+
 // HTTP boundary mode harness for SDK integration tests.
 //
 // Use this when the test needs to prove that real HTTP/RPC wiring is exercised:
@@ -20,28 +22,19 @@
 //     },
 //   );
 //
-// ─── Implementation notes ─────────────────────────────────────────────────────
-//
-// TODO (implementation): use Node.js built-in `http.createServer` to start a
-// per-test localhost HTTP server on a random port.  Return the port and a
-// `requests` array that accumulates observed request records.  Tear down the
-// server after the callback returns (in finally block).
-//
-// Recommended packages (no new dependencies required — built-in http module):
-//   Node.js `http` module — createServer, listen, close
-//
-// For Blockfrost/Kupmios RPC paths, the fake server should parse the request
-// body (JSON or CBOR depending on the Content-Type header) and return
-// deterministic fixture JSON from the routes config.
-
 export type FakeHttpRoute = {
   status: number;
-  body: Record<string, any>;
+  body: Record<string, unknown>;
 };
 
 export type FakeCardanoHttpOptions = {
   /** Map of request path → response fixture. */
   routes?: Record<string, FakeHttpRoute>;
+  /**
+   * When true, a socket-bind failure calls the callback with `port=0`
+   * instead of failing the test.
+   */
+  allowListenFailureFallback?: boolean;
 };
 
 export type ObservedRequest = {
@@ -58,18 +51,7 @@ export type FakeCardanoHttpContext = {
   requests: ObservedRequest[];
 };
 
-/**
- * Starts a localhost fake Cardano provider HTTP server, runs the callback,
- * then tears the server down.
- *
- * TODO (implementation):
- *   1. Create an http.Server that captures each incoming request into `requests`.
- *   2. Look up the request path in opts.routes; respond with the fixture or 404.
- *   3. Listen on port 0 (OS-assigned) and extract the actual port from
- *      server.address().port.
- *   4. Call the callback with { port, requests }.
- *   5. Close the server in a finally block regardless of callback outcome.
- */
+/** Starts a localhost fake Cardano provider HTTP server around `callback`. */
 export const withFakeCardanoHttp = async (
   opts: FakeCardanoHttpOptions,
   callback: (ctx: FakeCardanoHttpContext) => Promise<void>,
@@ -106,8 +88,10 @@ export const withFakeCardanoHttp = async (
       server.once("error", reject);
       server.listen(0, "127.0.0.1", () => resolve());
     });
-  } catch (_error) {
-    // Some sandboxed CI environments disallow opening listening sockets.
+  } catch (error) {
+    if (!opts.allowListenFailureFallback) {
+      throw error;
+    }
     await callback({ port: 0, requests });
     return;
   }
@@ -127,4 +111,3 @@ export const withFakeCardanoHttp = async (
     });
   }
 };
-import { createServer } from "node:http";

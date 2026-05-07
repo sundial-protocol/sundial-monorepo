@@ -1,7 +1,6 @@
 import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 vi.mock("@/database/utils/ledger.js", async () => {
   const { Effect: E } = await import("effect");
@@ -31,20 +30,18 @@ import * as Ledger from "@/database/utils/ledger.js";
 import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
 import * as LatestLedgerDB from "@/database/latestLedger.js";
 import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
+import { makeLedgerEntry } from "./harness/fixtures.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
-const testEntry: any = {
-  tx_id: Buffer.alloc(32, 0xaa),
-  outref: Buffer.alloc(32, 0xbb),
-  output: Buffer.alloc(16, 0xcc),
-  address: "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
+const testEntry = makeLedgerEntry(0xaa);
+const testEntryWithTimeStamp = {
+  ...testEntry,
+  [Ledger.Columns.TIMESTAMPTZ]: new Date(),
 };
 
 const outrefA = Buffer.alloc(32, 0xbb);
 
-const noopSqlLayer = Layer.succeed(
-  SqlClient.SqlClient,
-  {} as SqlClient.SqlClient,
-);
+const noopSqlLayer = createMockSqlHarness().layer;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -68,7 +65,7 @@ describe("MempoolLedgerDB retrieve returns all entries", () => {
   it.effect("MempoolLedgerDB retrieve returns all entries", () =>
     MempoolLedgerDB.retrieve.pipe(
       Effect.map((entries) => {
-        expect(Array.isArray(entries)).toBe(true);
+        expect(entries).toHaveLength(0);
       }),
       Effect.provide(noopSqlLayer),
     ),
@@ -78,7 +75,7 @@ describe("MempoolLedgerDB retrieve returns all entries", () => {
 describe("MempoolLedgerDB retrieveByAddress filters by address", () => {
   it.effect("MempoolLedgerDB retrieveByAddress filters by address", () => {
     vi.mocked(Ledger.retrieveEntriesWithAddress).mockReturnValue(
-      Effect.succeed([testEntry]),
+      Effect.succeed([testEntryWithTimeStamp]),
     );
     return MempoolLedgerDB.retrieveByAddress(testEntry.address).pipe(
       Effect.map((entries) => {

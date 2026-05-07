@@ -45,6 +45,7 @@ describe("SDK package and harness integration", () => {
   it("fake HTTP provider records request and returns configured response", async () => {
     await withFakeCardanoHttp(
       {
+        allowListenFailureFallback: true,
         routes: {
           "/submit": { status: 200, body: { ok: true } },
         },

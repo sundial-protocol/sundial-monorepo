@@ -1,7 +1,6 @@
 import { describe, expect } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
-import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 import {
   retrieveNumberOfEntries,
@@ -11,25 +10,10 @@ import {
   sqlErrorToDatabaseError,
 } from "@/database/utils/common.js";
 import { batchProgram } from "@/utils.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
-const makeDbLayer = (rows: any[]) =>
-  Layer.succeed(
-    SqlClient.SqlClient,
-    Object.assign(
-      function (stringsOrStr: any) {
-        if (Array.isArray(stringsOrStr) && "raw" in stringsOrStr) {
-          return Effect.succeed(rows);
-        }
-        return stringsOrStr;
-      },
-      {
-        withTransaction: (eff: Effect.Effect<unknown>) => eff,
-        insert: (obj: unknown) => obj,
-        in: (_col: string, vals: unknown[]) => vals,
-        literal: (s: string) => s,
-      },
-    ) as unknown as SqlClient.SqlClient,
-  );
+const makeDbHarness = (count: string) =>
+  createMockSqlHarness([{ count }] as const);
 
 // ---------------------------------------------------------------------------
 // retrieveNumberOfEntries
@@ -41,7 +25,7 @@ describe("retrieveNumberOfEntries returns count as bigint", () => {
       Effect.map((count) => {
         expect(count).toBe(5n);
       }),
-      Effect.provide(makeDbLayer([{ count: "5" }])),
+      Effect.provide(makeDbHarness("5").layer),
     ),
   );
 });
@@ -52,10 +36,12 @@ describe("retrieveNumberOfEntries returns 0n when count is zero", () => {
       Effect.map((count) => {
         expect(count).toBe(0n);
       }),
-      Effect.provide(makeDbLayer([{ count: "0" }])),
+      Effect.provide(makeDbHarness("0").layer),
     ),
   );
 });
+
+const clearTableHarness = createMockSqlHarness();
 
 // ---------------------------------------------------------------------------
 // clearTable
@@ -64,8 +50,10 @@ describe("retrieveNumberOfEntries returns 0n when count is zero", () => {
 describe("clearTable succeeds with mock SQL", () => {
   it.effect("clearTable succeeds with mock SQL", () =>
     clearTable("test_table").pipe(
-      Effect.map(() => expect(true).toBe(true)),
-      Effect.provide(makeDbLayer([])),
+      Effect.map(() =>
+        expect(clearTableHarness.getCallCount()).toBeGreaterThan(0),
+      ),
+      Effect.provide(clearTableHarness.layer),
     ),
   );
 });

@@ -1,9 +1,9 @@
-import { describe, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
 import { Layer } from "effect";
-import { SqlClient } from "@effect/sql";
 import * as SDK from "@al-ft/midgard-sdk";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 // createTable in addressHistory/blocks/blocksTxs is an Effect property, not a function
 vi.mock("@/database/addressHistory.js", async () => {
@@ -178,19 +178,7 @@ vi.mock("@/database/utils/user-events.js", async () => {
 import * as DBInitialization from "@/database/init.js";
 import { NodeConfig } from "@/services/config.js";
 
-const mockSql: any = Object.assign(
-  (_strings: TemplateStringsArray, ..._values: unknown[]) => Effect.succeed([]),
-  {
-    withTransaction: (eff: Effect.Effect<unknown>) => eff,
-    insert: (obj: unknown) => obj,
-    in: (_col: string, vals: unknown[]) => vals,
-    literal: (s: string) => s,
-  },
-);
-const mockDbLayer = Layer.succeed(
-  SqlClient.SqlClient,
-  mockSql as unknown as SqlClient.SqlClient,
-);
+const sqlHarness = createMockSqlHarness();
 const mockNodeConfigLayer = Layer.succeed(
   NodeConfig,
   NodeConfig.of({
@@ -224,7 +212,8 @@ const mockNodeConfigLayer = Layer.succeed(
 describe("Database initialization creates schema", () => {
   it.effect("Database initialization creates schema", () =>
     DBInitialization.program.pipe(
-      Effect.provide(mockDbLayer),
+      Effect.map(() => expect(sqlHarness.getCallCount()).toBeGreaterThan(0)),
+      Effect.provide(sqlHarness.layer),
       Effect.provide(mockNodeConfigLayer),
     ),
   );

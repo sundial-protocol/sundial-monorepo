@@ -232,7 +232,7 @@ describe("SDK unit operator and initialization programs", () => {
       }),
     );
 
-    expect(hub.assetName).toBeDefined();
+    expect(hub.assetName.length).toBeGreaterThan(0);
     expect(scheduler.datum.operator).toBe(pubKeyHashA);
   });
 

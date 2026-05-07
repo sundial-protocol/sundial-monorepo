@@ -178,7 +178,7 @@ describe("SDK unit core helpers", () => {
     for (const value of values) {
       expect(typeof value).toBe("string");
       expect(value.length).toBeGreaterThan(0);
-      expect(value).toBe(value);
+      expect(/^[a-zA-Z0-9_]+$/.test(value)).toBe(true);
     }
   });
 });
