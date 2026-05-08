@@ -1,5 +1,3 @@
-// NIT-026 … NIT-035  — Ledger and Address Projection
-
 import { expect } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
@@ -29,8 +27,6 @@ import { breakDownTx } from "@/utils.js";
 const makeBaseLayers = () =>
   Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
 
-// ─── NIT-026 ─────────────────────────────────────────────────────────────────
-
 it.effect("Deposit event converts into ledger entry", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -48,8 +44,6 @@ it.effect("Deposit event converts into ledger entry", () => {
     ).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-027 ─────────────────────────────────────────────────────────────────
 
 it.effect("Deposit event creates deposit address history", () => {
   const layers = makeBaseLayers();
@@ -75,8 +69,6 @@ it.effect("Deposit event creates deposit address history", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-028 ─────────────────────────────────────────────────────────────────
-
 it.effect("Withdrawal event resolves against latest ledger", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -98,8 +90,6 @@ it.effect("Withdrawal event resolves against latest ledger", () => {
     ).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-029 ─────────────────────────────────────────────────────────────────
 
 it.effect("Withdrawal event creates submitted address history", () => {
   const layers = makeBaseLayers();
@@ -124,8 +114,6 @@ it.effect("Withdrawal event creates submitted address history", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-030 ─────────────────────────────────────────────────────────────────
-
 it.effect("Processed tx aggregation uses real ledger lookup", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -146,8 +134,6 @@ it.effect("Processed tx aggregation uses real ledger lookup", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-031 ─────────────────────────────────────────────────────────────────
-
 it.effect("Mempool transaction lookup by address joins real tables", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -164,8 +150,6 @@ it.effect("Mempool transaction lookup by address joins real tables", () => {
     expect(found).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-032 ─────────────────────────────────────────────────────────────────
 
 it.effect("Immutable transaction lookup by address joins real tables", () => {
   const layers = makeBaseLayers();
@@ -189,8 +173,6 @@ it.effect("Immutable transaction lookup by address joins real tables", () => {
     expect(found).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-033 ─────────────────────────────────────────────────────────────────
 
 it.effect(
   "Latest ledger applies produced entries and removes spent entries",
@@ -219,8 +201,6 @@ it.effect(
   },
 );
 
-// ─── NIT-034 ─────────────────────────────────────────────────────────────────
-
 it.effect("Confirmed ledger can receive submitted-state entries", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -245,8 +225,6 @@ it.effect("Confirmed ledger can receive submitted-state entries", () => {
     expect(allEntries.length).toBe(2);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-035 ─────────────────────────────────────────────────────────────────
 
 it.effect("Address history status upsert advances an event", () => {
   const layers = makeBaseLayers();

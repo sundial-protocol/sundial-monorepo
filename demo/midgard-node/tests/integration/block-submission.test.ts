@@ -1,5 +1,3 @@
-// NIT-045 … NIT-050  — Block and Submission Flow
-
 import { expect } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer, Option } from "effect";
@@ -67,8 +65,6 @@ const makeUserEventEntry = (seed: number): UserEvents.Entry => ({
 const makeBaseLayers = () =>
   Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
 
-// ─── NIT-045 ─────────────────────────────────────────────────────────────────
-
 it.effect("BlocksDB retrieves combined event interval", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -98,8 +94,6 @@ it.effect("BlocksDB retrieves combined event interval", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-046 ─────────────────────────────────────────────────────────────────
-
 it.effect("BlocksDB earliest unsubmitted block follows height order", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -125,8 +119,6 @@ it.effect("BlocksDB earliest unsubmitted block follows height order", () => {
     ).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-047 ─────────────────────────────────────────────────────────────────
 
 it.effect("BlocksDB latest entry follows newest height", () => {
   const layers = makeBaseLayers();
@@ -154,8 +146,6 @@ it.effect("BlocksDB latest entry follows newest height", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-048 ─────────────────────────────────────────────────────────────────
-
 it.effect("Submitted block status is persisted", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -182,8 +172,6 @@ it.effect("Submitted block status is persisted", () => {
     );
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-049 ─────────────────────────────────────────────────────────────────
 
 it.effect("Mempool transactions transfer to immutable block history", () => {
   const layers = makeBaseLayers();
@@ -227,8 +215,6 @@ it.effect("Mempool transactions transfer to immutable block history", () => {
     expect(blockTxHashes.length).toBe(1);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-050 ─────────────────────────────────────────────────────────────────
 
 it.effect("Submitted block updates latest ledger and address history", () => {
   const layers = makeBaseLayers();

@@ -1,5 +1,3 @@
-// NIT-001 … NIT-005  — Harness and Initialization
-
 import { describe, expect, afterEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
@@ -29,8 +27,6 @@ import * as Ledger from "@/database/utils/ledger.js";
 import { breakDownTx } from "@/utils.js";
 import { MidgardMpt, deleteMpt } from "@/workers/utils/mpt.js";
 
-// ─── NIT-001 ─────────────────────────────────────────────────────────────────
-
 it.effect("Database initialization supports repository workflow", () => {
   const layers = Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
   return Effect.gen(function* () {
@@ -55,8 +51,6 @@ it.effect("Database initialization supports repository workflow", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-002 ─────────────────────────────────────────────────────────────────
-
 it.effect("Initialization is idempotent for an existing schema", () => {
   const layers = Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
   return Effect.gen(function* () {
@@ -75,8 +69,6 @@ it.effect("Initialization is idempotent for an existing schema", () => {
     expect(deposits.length).toBe(1);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-003 ─────────────────────────────────────────────────────────────────
 
 it.effect("Repository clear helpers produce a clean business state", () => {
   const layers = Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
@@ -106,8 +98,6 @@ it.effect("Repository clear helpers produce a clean business state", () => {
     expect(count).toBe(1n);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-004 ─────────────────────────────────────────────────────────────────
 
 describe("TestNodeConfig layer", () => {
   let tmpLedgerPath: string | undefined;
@@ -154,8 +144,6 @@ describe("TestNodeConfig layer", () => {
     }),
   );
 });
-
-// ─── NIT-005 ─────────────────────────────────────────────────────────────────
 
 it.effect("Real layers compose for a node action", () => {
   const layers = Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());

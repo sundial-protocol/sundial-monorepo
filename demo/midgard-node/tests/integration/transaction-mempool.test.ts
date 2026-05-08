@@ -1,5 +1,3 @@
-// NIT-006 … NIT-015  — Transaction and Mempool Flow
-
 import { expect } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
@@ -26,8 +24,6 @@ const txCborB = Buffer.alloc(64, 0xcc);
 const makeBaseLayers = () =>
   Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
 
-// ─── NIT-006 ─────────────────────────────────────────────────────────────────
-
 it.effect("Queued transaction reaches MempoolDB", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -43,8 +39,6 @@ it.effect("Queued transaction reaches MempoolDB", () => {
     expect(Buffer.from(found!).equals(txCborA)).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-007 ─────────────────────────────────────────────────────────────────
 
 it.effect("Queued transaction updates MempoolLedgerDB", () => {
   const layers = makeBaseLayers();
@@ -71,8 +65,6 @@ it.effect("Queued transaction updates MempoolLedgerDB", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-008 ─────────────────────────────────────────────────────────────────
-
 it.effect("Queued transaction creates slated address history", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -89,8 +81,6 @@ it.effect("Queued transaction creates slated address history", () => {
     expect(producedHistory.length + spentHistory.length).toBeGreaterThan(0);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-009 ─────────────────────────────────────────────────────────────────
 
 it.effect("Multiple queued transactions are drained together", () => {
   const layers = makeBaseLayers();
@@ -133,8 +123,6 @@ it.effect("Multiple queued transactions are drained together", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-010 ─────────────────────────────────────────────────────────────────
-
 it.effect("Mempool retrieval by hash sees newly processed transaction", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -150,8 +138,6 @@ it.effect("Mempool retrieval by hash sees newly processed transaction", () => {
     expect(Buffer.from(cbor!).equals(txCborA)).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-011 ─────────────────────────────────────────────────────────────────
 
 it.effect("Mempool retrieval by hashes returns the processed set", () => {
   const layers = makeBaseLayers();
@@ -186,8 +172,6 @@ it.effect("Mempool retrieval by hashes returns the processed set", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-012 ─────────────────────────────────────────────────────────────────
-
 it.effect("Mempool count reflects processed transactions", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -215,8 +199,6 @@ it.effect("Mempool count reflects processed transactions", () => {
     expect(count2).toBe(2n);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-013 ─────────────────────────────────────────────────────────────────
 
 it.effect("Mempool time-bound query includes eligible requests", () => {
   const layers = makeBaseLayers();
@@ -249,8 +231,6 @@ it.effect("Mempool time-bound query includes eligible requests", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-014 ─────────────────────────────────────────────────────────────────
-
 it.effect("Address transaction lookup sees mempool transaction", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -268,8 +248,6 @@ it.effect("Address transaction lookup sees mempool transaction", () => {
     expect(found).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-015 ─────────────────────────────────────────────────────────────────
 
 it.effect("Empty transaction queue leaves storage unchanged", () => {
   const layers = makeBaseLayers();

@@ -1,10 +1,3 @@
-// NIT-016 … NIT-025  — User Event Ingestion
-//
-// Tests verify that DepositsDB, TxOrdersDB, WithdrawalsDB, and BlocksDB
-// persist L1 user-event entries correctly using real repository SQL.
-// These tests exercise the DB layer directly rather than going through
-// syncUserEvents to keep the external L1/SDK boundary out of scope.
-
 import { expect } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer, Ref } from "effect";
@@ -39,8 +32,6 @@ const makeUserEventEntry = (seed: number): UserEvents.Entry => ({
   ),
 });
 
-// ─── NIT-016 ─────────────────────────────────────────────────────────────────
-
 it.effect("Fake L1 deposit sync persists deposit event", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -63,8 +54,6 @@ it.effect("Fake L1 deposit sync persists deposit event", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-017 ─────────────────────────────────────────────────────────────────
-
 it.effect("Fake L1 transaction order sync persists tx order event", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -83,8 +72,6 @@ it.effect("Fake L1 transaction order sync persists tx order event", () => {
     ).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-018 ─────────────────────────────────────────────────────────────────
 
 it.effect("Fake L1 withdrawal sync persists withdrawal event", () => {
   const layers = makeBaseLayers();
@@ -109,8 +96,6 @@ it.effect("Fake L1 withdrawal sync persists withdrawal event", () => {
     );
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-019 ─────────────────────────────────────────────────────────────────
 
 it.effect(
   "Sync stores deposits, tx orders, and withdrawals in one pass",
@@ -161,8 +146,6 @@ it.effect(
   },
 );
 
-// ─── NIT-020 ─────────────────────────────────────────────────────────────────
-
 it.effect("Sync advances latest fetch time after events are persisted", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -188,8 +171,6 @@ it.effect("Sync advances latest fetch time after events are persisted", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-021 ─────────────────────────────────────────────────────────────────
-
 it.effect("Sync with no events leaves existing user events intact", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -207,8 +188,6 @@ it.effect("Sync with no events leaves existing user events intact", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-022 ─────────────────────────────────────────────────────────────────
-
 it.effect("Duplicate L1 user event is idempotent", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -224,8 +203,6 @@ it.effect("Duplicate L1 user event is idempotent", () => {
     expect(entries.length).toBe(1);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-023 ─────────────────────────────────────────────────────────────────
 
 it.effect("Time-bound user-event retrieval feeds block interval", () => {
   const layers = makeBaseLayers();
@@ -269,8 +246,6 @@ it.effect("Time-bound user-event retrieval feeds block interval", () => {
     ).toBe(true);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-024 ─────────────────────────────────────────────────────────────────
 
 it.effect("Event ordering within interval is oldest first", () => {
   const layers = makeBaseLayers();
@@ -330,8 +305,6 @@ it.effect("Event ordering within interval is oldest first", () => {
     );
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-025 ─────────────────────────────────────────────────────────────────
 
 it.effect("User-event tables preserve independent event types", () => {
   const layers = makeBaseLayers();

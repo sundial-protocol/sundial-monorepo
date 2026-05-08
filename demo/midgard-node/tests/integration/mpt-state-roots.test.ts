@@ -1,5 +1,3 @@
-// NIT-036 … NIT-044  — MPT and State Roots
-
 import { describe, expect, afterEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
@@ -38,8 +36,6 @@ const txIdA = Buffer.alloc(32, 0xaa);
 
 const makeBaseLayers = () =>
   Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
-
-// ─── NIT-036 ─────────────────────────────────────────────────────────────────
 
 describe("makeMpts", () => {
   let tmpLedgerPath: string | undefined;
@@ -93,8 +89,6 @@ describe("makeMpts", () => {
     }),
   );
 });
-
-// ─── NIT-037 ─────────────────────────────────────────────────────────────────
 
 describe("makeMpts on non-empty trie", () => {
   let tmpLedgerPath: string | undefined;
@@ -162,8 +156,6 @@ describe("makeMpts on non-empty trie", () => {
   );
 });
 
-// ─── NIT-038 ─────────────────────────────────────────────────────────────────
-
 describe("LevelDB-backed ledger MPT", () => {
   let tmpPath: string | undefined;
 
@@ -198,8 +190,6 @@ describe("LevelDB-backed ledger MPT", () => {
   );
 });
 
-// ─── NIT-039 ─────────────────────────────────────────────────────────────────
-
 it.effect("withTrieTransaction commits SQL and trie changes together", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -224,8 +214,6 @@ it.effect("withTrieTransaction commits SQL and trie changes together", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-040 ─────────────────────────────────────────────────────────────────
-
 it.effect("Applying deposits updates ledger and deposit roots", () => {
   const stubAlwaysSucceeds = Layer.succeed(AlwaysSucceedsContract, null as any);
   const layers = Layer.mergeAll(makeBaseLayers(), stubAlwaysSucceeds);
@@ -244,8 +232,6 @@ it.effect("Applying deposits updates ledger and deposit roots", () => {
   });
 });
 
-// ─── NIT-041 ─────────────────────────────────────────────────────────────────
-
 it.effect("Applying withdrawals updates ledger and withdrawals root", () =>
   Effect.gen(function* () {
     const ledgerTrie = yield* MidgardMpt.create("nit041-ledger");
@@ -259,8 +245,6 @@ it.effect("Applying withdrawals updates ledger and withdrawals root", () =>
     expect(yield* ledgerTrie.getRootHex()).toBe(initialLedgerRoot);
   }),
 );
-
-// ─── NIT-042 ─────────────────────────────────────────────────────────────────
 
 it.effect("Applying tx requests updates ledger and txs roots", () => {
   const layers = makeBaseLayers();
@@ -291,8 +275,6 @@ it.effect("Applying tx requests updates ledger and txs roots", () => {
   }).pipe(Effect.provide(layers));
 });
 
-// ─── NIT-043 ─────────────────────────────────────────────────────────────────
-
 it.effect("Applying tx orders updates ledger root", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
@@ -321,8 +303,6 @@ it.effect("Applying tx orders updates ledger root", () => {
     expect(yield* ledgerTrie.getRootHex()).not.toBe(initialLedgerRoot);
   }).pipe(Effect.provide(layers));
 });
-
-// ─── NIT-044 ─────────────────────────────────────────────────────────────────
 
 it.effect("Empty event roots are stable for an empty block", () => {
   const stubAlwaysSucceeds = Layer.succeed(AlwaysSucceedsContract, null as any);
