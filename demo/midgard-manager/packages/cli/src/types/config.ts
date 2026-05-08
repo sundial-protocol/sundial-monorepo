@@ -1,4 +1,4 @@
-import * as S from '@effect/schema/Schema';
+import * as S from 'effect/Schema';
 
 // Simple URL validation
 const isValidUrl = (url: string) => {
