@@ -50,7 +50,7 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:ts-coverage:start -->
-<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-66.1%25-orange?style=flat-square" />
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-81.2%25-yellowgreen?style=flat-square" />
 <!-- badge:ts-coverage:end -->
     </td>
   </tr>
