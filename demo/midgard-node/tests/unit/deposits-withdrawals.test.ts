@@ -16,34 +16,22 @@ beforeEach(() => {
 const testEntry = makeUserEventEntry(0xaa);
 const eventId = testEntry.event_id;
 
-// ---------------------------------------------------------------------------
-// Deposits — insertEntries
-// ---------------------------------------------------------------------------
-
-describe("Deposits.insertEntries with entries succeeds", () => {
-  it.effect("Deposits.insertEntries with entries succeeds", () =>
+describe("Deposits", () => {
+  it.effect("insertEntries with entries succeeds", () =>
     Deposits.insertEntries([testEntry]).pipe(
       Effect.map(() => expect(sqlHarness.getCallCount()).toBeGreaterThan(0)),
       Effect.provide(sqlHarness.layer),
     ),
   );
-});
 
-describe("Deposits.insertEntries with empty array is a no-op", () => {
-  it.effect("Deposits.insertEntries with empty array is a no-op", () =>
+  it.effect("insertEntries with empty array is a no-op", () =>
     Deposits.insertEntries([]).pipe(
       Effect.map(() => expect(sqlHarness.getCallCount()).toBe(0)),
       Effect.provide(sqlHarness.layer),
     ),
   );
-});
 
-// ---------------------------------------------------------------------------
-// Deposits — retrieveAllEntries
-// ---------------------------------------------------------------------------
-
-describe("Deposits.retrieveAllEntries returns rows from SQL", () => {
-  it.effect("Deposits.retrieveAllEntries returns rows from SQL", () => {
+  it.effect("retrieveAllEntries returns rows from SQL", () => {
     sqlHarness.setRows([testEntry]);
     return Deposits.retrieveAllEntries().pipe(
       Effect.map((rows) => {
@@ -53,10 +41,8 @@ describe("Deposits.retrieveAllEntries returns rows from SQL", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
-});
 
-describe("Deposits.retrieveAllEntries returns empty when no rows", () => {
-  it.effect("Deposits.retrieveAllEntries returns empty when no rows", () =>
+  it.effect("retrieveAllEntries returns empty when no rows", () =>
     Deposits.retrieveAllEntries().pipe(
       Effect.map((rows) => {
         expect(rows).toHaveLength(0);
@@ -64,23 +50,15 @@ describe("Deposits.retrieveAllEntries returns empty when no rows", () => {
       Effect.provide(sqlHarness.layer),
     ),
   );
-});
 
-// ---------------------------------------------------------------------------
-// Deposits — delEntries
-// ---------------------------------------------------------------------------
-
-describe("Deposits.delEntries succeeds", () => {
-  it.effect("Deposits.delEntries succeeds", () =>
+  it.effect("delEntries succeeds", () =>
     Deposits.delEntries([eventId]).pipe(
       Effect.map(() => expect(sqlHarness.getCallCount()).toBeGreaterThan(0)),
       Effect.provide(sqlHarness.layer),
     ),
   );
-});
 
-describe("Deposits.delEntries with empty ids is a no-op", () => {
-  it.effect("Deposits.delEntries with empty ids is a no-op", () =>
+  it.effect("delEntries with empty ids still succeeds", () =>
     Deposits.delEntries([]).pipe(
       Effect.map(() => expect(sqlHarness.getCallCount()).toBeGreaterThan(0)),
       Effect.provide(sqlHarness.layer),
@@ -88,34 +66,22 @@ describe("Deposits.delEntries with empty ids is a no-op", () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// Withdrawals — insertEntries
-// ---------------------------------------------------------------------------
-
-describe("Withdrawals.insertEntries with entries succeeds", () => {
-  it.effect("Withdrawals.insertEntries with entries succeeds", () =>
+describe("Withdrawals", () => {
+  it.effect("insertEntries with entries succeeds", () =>
     Withdrawals.insertEntries([testEntry]).pipe(
       Effect.map(() => expect(sqlHarness.getCallCount()).toBeGreaterThan(0)),
       Effect.provide(sqlHarness.layer),
     ),
   );
-});
 
-describe("Withdrawals.insertEntries with empty array is a no-op", () => {
-  it.effect("Withdrawals.insertEntries with empty array is a no-op", () =>
+  it.effect("insertEntries with empty array is a no-op", () =>
     Withdrawals.insertEntries([]).pipe(
       Effect.map(() => expect(sqlHarness.getCallCount()).toBe(0)),
       Effect.provide(sqlHarness.layer),
     ),
   );
-});
 
-// ---------------------------------------------------------------------------
-// Withdrawals — retrieveTimeBoundEntries
-// ---------------------------------------------------------------------------
-
-describe("Withdrawals.retrieveTimeBoundEntries returns rows", () => {
-  it.effect("Withdrawals.retrieveTimeBoundEntries returns rows", () => {
+  it.effect("retrieveTimeBoundEntries returns rows", () => {
     sqlHarness.setRows([testEntry]);
     const start = new Date("2024-01-01T00:00:00Z");
     const end = new Date("2024-12-31T00:00:00Z");
@@ -127,20 +93,15 @@ describe("Withdrawals.retrieveTimeBoundEntries returns rows", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
-});
 
-describe("Withdrawals.retrieveTimeBoundEntries returns empty when no rows", () => {
-  it.effect(
-    "Withdrawals.retrieveTimeBoundEntries returns empty when no rows",
-    () => {
-      const start = new Date("2024-01-01T00:00:00Z");
-      const end = new Date("2024-12-31T00:00:00Z");
-      return Withdrawals.retrieveTimeBoundEntries(start, end).pipe(
-        Effect.map((rows) => {
-          expect(rows).toHaveLength(0);
-        }),
-        Effect.provide(sqlHarness.layer),
-      );
-    },
-  );
+  it.effect("retrieveTimeBoundEntries returns empty when no rows", () => {
+    const start = new Date("2024-01-01T00:00:00Z");
+    const end = new Date("2024-12-31T00:00:00Z");
+    return Withdrawals.retrieveTimeBoundEntries(start, end).pipe(
+      Effect.map((rows) => {
+        expect(rows).toHaveLength(0);
+      }),
+      Effect.provide(sqlHarness.layer),
+    );
+  });
 });

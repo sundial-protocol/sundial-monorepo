@@ -6,7 +6,7 @@ import type {
 } from "./fake-lucid.ts";
 import type { TestNodeConfigOptions } from "./node-config-layer.ts";
 import { makeFakeLucid } from "./fake-lucid.ts";
-import { makeTestSqlLayer } from "./pglite-sql-layer.ts";
+import { makeTestSqlLayer } from "./test-sql-layer.ts";
 import { makeTestNodeConfigLayer } from "./node-config-layer.ts";
 
 // Local tags used by the SDK integration harness runtime.

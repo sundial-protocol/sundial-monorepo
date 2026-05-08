@@ -141,22 +141,20 @@ const mockUnspentOutput = {
   output: () => ({ to_cbor_bytes: () => outputCborBytes }),
 };
 
-describe("Convert trivial UTxO to transaction", () => {
-  it.effect("Convert trivial UTxO to transaction", () =>
-    Effect.gen(function* () {
-      const tx = yield* trivialTransactionFromCMLUnspentOutput(
-        mockUnspentOutput as any,
-      );
-      const body = tx.body();
-      expect(body.inputs().len()).toBe(0);
-      expect(body.outputs().len()).toBe(1);
-      expect(body.fee()).toBe(0n);
-    }),
-  );
-});
+it.effect("trivialTransactionFromCMLUnspentOutput wraps output in body", () =>
+  Effect.gen(function* () {
+    const tx = yield* trivialTransactionFromCMLUnspentOutput(
+      mockUnspentOutput as any,
+    );
+    const body = tx.body();
+    expect(body.inputs().len()).toBe(0);
+    expect(body.outputs().len()).toBe(1);
+    expect(body.fee()).toBe(0n);
+  }),
+);
 
-describe("Break down valid transaction", () => {
-  it.effect("Break down valid transaction", () =>
+describe("breakDownTx", () => {
+  it.effect("extracts txId, spent, and produced from valid CBOR", () =>
     Effect.gen(function* () {
       const result = yield* breakDownTx(txCborA);
       expect(result.txId).toBeInstanceOf(Buffer);
@@ -166,10 +164,8 @@ describe("Break down valid transaction", () => {
       expect(result.produced.length).toBe(1);
     }),
   );
-});
 
-describe("Produced ledger entries include output addresses", () => {
-  it.effect("Produced ledger entries include output addresses", () =>
+  it.effect("produced ledger entries include output address", () =>
     Effect.gen(function* () {
       const result = yield* breakDownTx(txCborA);
       const entry = result.produced[0] as any;
@@ -180,88 +176,8 @@ describe("Produced ledger entries include output addresses", () => {
       expect(typeof entry.address).toBe("string");
     }),
   );
-});
 
-describe("Minimal transaction breakdown uses supplied hash", () => {
-  it.effect("Minimal transaction breakdown uses supplied hash", () =>
-    Effect.gen(function* () {
-      const result = yield* breakDownTxMinimally(txCborA, txIdABytes);
-      expect(result.produced.length).toBe(1);
-      const produced = result.produced[0] as any;
-      expect(produced.outref).toBeInstanceOf(Buffer);
-    }),
-  );
-});
-
-describe("Serialize UTxOs for storage", () => {
-  it.effect("Serialize UTxOs for storage", () =>
-    Effect.gen(function* () {
-      const buf = yield* serializeUTxOsForStorage([utxoA as any, utxoB as any]);
-      expect(buf).toBeInstanceOf(Buffer);
-      expect(buf.length).toBeGreaterThan(0);
-    }),
-  );
-});
-
-describe("Deserialize UTxOs from storage", () => {
-  it.effect("Deserialize UTxOs from storage", () =>
-    Effect.gen(function* () {
-      const serialized = yield* serializeUTxOsForStorage([
-        utxoA as any,
-        utxoB as any,
-      ]);
-      const deserialized = yield* deserializeUTxOsFromStorage(serialized);
-      expect(deserialized.length).toBe(2);
-      const hashes = deserialized.map((u) => u.txHash);
-      expect(hashes).toContain(utxoA.txHash);
-      expect(hashes).toContain(utxoB.txHash);
-    }),
-  );
-});
-
-describe("breakDownTxMinimally without explicit txHash uses CML.hash_transaction", () => {
-  it.effect(
-    "breakDownTxMinimally without explicit txHash uses CML.hash_transaction",
-    () =>
-      Effect.gen(function* () {
-        const result = yield* breakDownTxMinimally(txCborA);
-        expect(result.spent.length).toBe(1);
-        expect(result.produced.length).toBe(1);
-        const produced = result.produced[0] as any;
-        expect(produced.outref).toBeInstanceOf(Buffer);
-      }),
-  );
-});
-
-describe("breakDownTxMinimally catches input CBOR serialization error", () => {
-  it.effect(
-    "breakDownTxMinimally catches input CBOR serialization error",
-    () => {
-      vi.mocked(CML.Transaction.from_cbor_bytes).mockReturnValueOnce({
-        body: () => ({
-          inputs: () => ({
-            len: () => 1,
-            get: () => ({
-              to_cbor_bytes: () => {
-                throw new Error("bad input cbor");
-              },
-            }),
-          }),
-          outputs: () => ({ len: () => 0 }),
-        }),
-      } as any);
-      return breakDownTxMinimally(txCborA, txIdABytes).pipe(
-        Effect.exit,
-        Effect.map((exit) => {
-          expect(exit._tag).toBe("Failure");
-        }),
-      );
-    },
-  );
-});
-
-describe("breakDownTx catches deserialization error", () => {
-  it.effect("breakDownTx catches deserialization error", () => {
+  it.effect("fails on deserialization error", () => {
     vi.mocked(CML.Transaction.from_cbor_bytes).mockImplementationOnce(() => {
       throw new Error("bad cbor bytes");
     });
@@ -272,4 +188,62 @@ describe("breakDownTx catches deserialization error", () => {
       }),
     );
   });
+});
+
+describe("breakDownTxMinimally", () => {
+  it.effect("uses the supplied hash for produced outputs", () =>
+    Effect.gen(function* () {
+      const result = yield* breakDownTxMinimally(txCborA, txIdABytes);
+      expect(result.produced.length).toBe(1);
+      const produced = result.produced[0] as any;
+      expect(produced.outref).toBeInstanceOf(Buffer);
+    }),
+  );
+
+  it.effect("falls back to CML.hash_transaction when no hash supplied", () =>
+    Effect.gen(function* () {
+      const result = yield* breakDownTxMinimally(txCborA);
+      expect(result.spent.length).toBe(1);
+      expect(result.produced.length).toBe(1);
+      const produced = result.produced[0] as any;
+      expect(produced.outref).toBeInstanceOf(Buffer);
+    }),
+  );
+
+  it.effect("fails when input CBOR serialization throws", () => {
+    vi.mocked(CML.Transaction.from_cbor_bytes).mockReturnValueOnce({
+      body: () => ({
+        inputs: () => ({
+          len: () => 1,
+          get: () => ({
+            to_cbor_bytes: () => {
+              throw new Error("bad input cbor");
+            },
+          }),
+        }),
+        outputs: () => ({ len: () => 0 }),
+      }),
+    } as any);
+    return breakDownTxMinimally(txCborA, txIdABytes).pipe(
+      Effect.exit,
+      Effect.map((exit) => {
+        expect(exit._tag).toBe("Failure");
+      }),
+    );
+  });
+});
+
+describe("UTxO storage serialization", () => {
+  it.effect("round trips a list of UTxOs through Buffer storage", () =>
+    Effect.gen(function* () {
+      const buf = yield* serializeUTxOsForStorage([utxoA as any, utxoB as any]);
+      expect(buf).toBeInstanceOf(Buffer);
+      expect(buf.length).toBeGreaterThan(0);
+      const deserialized = yield* deserializeUTxOsFromStorage(buf);
+      expect(deserialized.length).toBe(2);
+      const hashes = deserialized.map((u) => u.txHash);
+      expect(hashes).toContain(utxoA.txHash);
+      expect(hashes).toContain(utxoB.txHash);
+    }),
+  );
 });

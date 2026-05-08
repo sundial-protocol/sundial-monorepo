@@ -10,13 +10,11 @@ import {
   type Block,
 } from "../../src/types/block";
 
+import { bytesSeq } from "./helpers/cardano-fixtures.js";
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
-
-function bytesSeq(len: number): Uint8Array {
-  return Uint8Array.from({ length: len }, (_, i) => i & 0xff);
-}
 
 const hash28A = new Uint8Array(28).fill(0xaa);
 const hash32A = new Uint8Array(32).fill(0x11);

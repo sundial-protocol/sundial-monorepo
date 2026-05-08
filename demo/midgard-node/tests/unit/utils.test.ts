@@ -1,17 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { it as itEffect } from "@effect/vitest";
+import { it } from "vitest";
 import { Effect } from "effect";
 import { isHexString, batchProgram } from "@/utils.js";
 import { utxoToOutRef, outRefsAreEqual } from "@/transactions/utils.js";
 
-describe("Accept uppercase hex string", () => {
-  it("Accept uppercase hex string", () => {
+describe("isHexString", () => {
+  it("accepts lowercase hex string", () => {
+    expect(isHexString("deadbeef0123456789")).toBe(true);
+  });
+
+  it("accepts uppercase hex string", () => {
     expect(isHexString("DEADBEEF0123456789")).toBe(true);
   });
 });
 
-describe("Batch program uses expected ranges", () => {
-  itEffect("Batch program uses expected ranges", () =>
+describe("batchProgram", () => {
+  itEffect("uses expected ranges", () =>
     Effect.gen(function* () {
       const calls: [number, number][] = [];
       yield* batchProgram(2, 5, "test", (s, e) => {
@@ -25,10 +30,8 @@ describe("Batch program uses expected ranges", () => {
       ]);
     }),
   );
-});
 
-describe("Batch program returns continuation results", () => {
-  itEffect("Batch program returns continuation results", () =>
+  itEffect("returns continuation results", () =>
     Effect.gen(function* () {
       const results = yield* batchProgram(3, 7, "test", (s, _e) =>
         Effect.succeed(s),
@@ -38,8 +41,8 @@ describe("Batch program returns continuation results", () => {
   );
 });
 
-describe("UTxO converts to out ref", () => {
-  it("UTxO converts to out ref", () => {
+describe("UTxO utils", () => {
+  it("utxoToOutRef converts a UTxO to an out ref", () => {
     const utxo = {
       txHash: "aa".repeat(32),
       outputIndex: 2,
@@ -52,10 +55,8 @@ describe("UTxO converts to out ref", () => {
       outputIndex: utxo.outputIndex,
     });
   });
-});
 
-describe("Equal out refs compare true", () => {
-  it("Equal out refs compare true", () => {
+  it("outRefsAreEqual returns true for equal refs", () => {
     const ref = { txHash: "aa".repeat(32), outputIndex: 0 };
     expect(outRefsAreEqual(ref, { ...ref })).toBe(true);
   });

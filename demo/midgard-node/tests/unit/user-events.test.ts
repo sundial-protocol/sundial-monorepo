@@ -49,8 +49,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("deposits insert", () => {
-  it.effect("deposits insert", () =>
+describe("DepositsDB", () => {
+  it.effect("insertEntry delegates to user-events with deposits table", () =>
     DepositsDB.insertEntry(testEntry).pipe(
       Effect.map(() => {
         expect(vi.mocked(UserEvents.insertEntry)).toHaveBeenCalledWith(
@@ -61,10 +61,8 @@ describe("deposits insert", () => {
       Effect.provide(noopSqlLayer),
     ),
   );
-});
 
-describe("duplicate ignored", () => {
-  it.effect("duplicate ignored", () =>
+  it.effect("insertEntry called twice for duplicates", () =>
     DepositsDB.insertEntry(testEntry).pipe(
       Effect.andThen(() => DepositsDB.insertEntry(testEntry)),
       Effect.map(() => {
@@ -73,56 +71,63 @@ describe("duplicate ignored", () => {
       Effect.provide(noopSqlLayer),
     ),
   );
+
+  it.effect(
+    "retrieveTimeBoundEntries delegates to user-events with dates",
+    () => {
+      const start = new Date("2024-01-01T00:00:00Z");
+      const end = new Date("2024-12-31T23:59:59Z");
+      vi.mocked(UserEvents.retrieveTimeBoundEntries).mockReturnValue(
+        Effect.succeed([testEntry]),
+      );
+      return DepositsDB.retrieveTimeBoundEntries(start, end).pipe(
+        Effect.map((entries) => {
+          expect(entries.length).toBe(1);
+          expect(
+            vi.mocked(UserEvents.retrieveTimeBoundEntries),
+          ).toHaveBeenCalledWith("deposits_utxos", start, end);
+        }),
+        Effect.provide(noopSqlLayer),
+      );
+    },
+  );
 });
 
-describe("ordered retrieval", () => {
-  it.effect("ordered retrieval", () => {
-    const start = new Date("2024-01-01T00:00:00Z");
-    const end = new Date("2024-12-31T23:59:59Z");
-    vi.mocked(UserEvents.retrieveTimeBoundEntries).mockReturnValue(
-      Effect.succeed([testEntry]),
-    );
-    return DepositsDB.retrieveTimeBoundEntries(start, end).pipe(
-      Effect.map((entries) => {
-        expect(entries.length).toBe(1);
-        expect(
-          vi.mocked(UserEvents.retrieveTimeBoundEntries),
-        ).toHaveBeenCalledWith("deposits_utxos", start, end);
-      }),
-      Effect.provide(noopSqlLayer),
-    );
-  });
+describe("WithdrawalsDB", () => {
+  it.effect(
+    "insertEntries delegates to user-events with withdrawals table",
+    () => {
+      const entries = [
+        testEntry,
+        { ...testEntry, event_id: Buffer.alloc(32, 0xdd) },
+      ];
+      return WithdrawalsDB.insertEntries(entries).pipe(
+        Effect.map(() => {
+          expect(vi.mocked(UserEvents.insertEntries)).toHaveBeenCalledWith(
+            "withdrawal_order_utxos",
+            entries,
+          );
+        }),
+        Effect.provide(noopSqlLayer),
+      );
+    },
+  );
 });
 
-describe("withdrawals", () => {
-  it.effect("withdrawals", () => {
-    const entries = [
-      testEntry,
-      { ...testEntry, event_id: Buffer.alloc(32, 0xdd) },
-    ];
-    return WithdrawalsDB.insertEntries(entries).pipe(
-      Effect.map(() => {
-        expect(vi.mocked(UserEvents.insertEntries)).toHaveBeenCalledWith(
-          "withdrawal_order_utxos",
-          entries,
-        );
-      }),
-      Effect.provide(noopSqlLayer),
-    );
-  });
-});
-
-describe("tx orders", () => {
-  it.effect("tx orders", () => {
-    const entries = [testEntry];
-    return TxOrdersDB.insertEntries(entries).pipe(
-      Effect.map(() => {
-        expect(vi.mocked(UserEvents.insertEntries)).toHaveBeenCalledWith(
-          "transaction_order_utxos",
-          entries,
-        );
-      }),
-      Effect.provide(noopSqlLayer),
-    );
-  });
+describe("TxOrdersDB", () => {
+  it.effect(
+    "insertEntries delegates to user-events with tx orders table",
+    () => {
+      const entries = [testEntry];
+      return TxOrdersDB.insertEntries(entries).pipe(
+        Effect.map(() => {
+          expect(vi.mocked(UserEvents.insertEntries)).toHaveBeenCalledWith(
+            "transaction_order_utxos",
+            entries,
+          );
+        }),
+        Effect.provide(noopSqlLayer),
+      );
+    },
+  );
 });

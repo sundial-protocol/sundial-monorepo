@@ -1,4 +1,4 @@
-import { describe, expect, vi, beforeEach } from "vitest";
+import { expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
 
@@ -104,41 +104,38 @@ beforeEach(() => {
   );
 });
 
-describe("insertMultiple stores tx+ledger", () => {
-  it.effect("insertMultiple stores tx+ledger", () =>
-    MempoolDB.insertMultiple([processedTx]).pipe(
-      Effect.map(() => {
-        expect(
-          vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
-        ).toHaveBeenCalled();
-        expect(vi.mocked(Tx.insertEntries)).toHaveBeenCalledWith(
-          "mempool",
-          expect.any(Array),
-        );
-        expect(vi.mocked(AddressHistoryDB.upsertEntries)).toHaveBeenCalled();
-        expect(vi.mocked(MempoolLedgerDB.insert)).toHaveBeenCalled();
-        expect(vi.mocked(MempoolLedgerDB.clearUTxOs)).toHaveBeenCalled();
-      }),
-      Effect.provide(sqlHarness.layer),
-    ),
-  );
-});
+it.effect("insertMultiple stores tx and updates ledger", () =>
+  MempoolDB.insertMultiple([processedTx]).pipe(
+    Effect.map(() => {
+      expect(
+        vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
+      ).toHaveBeenCalled();
+      expect(vi.mocked(Tx.insertEntries)).toHaveBeenCalledWith(
+        "mempool",
+        expect.any(Array),
+      );
+      expect(vi.mocked(AddressHistoryDB.upsertEntries)).toHaveBeenCalled();
+      expect(vi.mocked(MempoolLedgerDB.insert)).toHaveBeenCalled();
+      expect(vi.mocked(MempoolLedgerDB.clearUTxOs)).toHaveBeenCalled();
+    }),
+    Effect.provide(sqlHarness.layer),
+  ),
+);
 
-describe("slated address history", () => {
-  it.effect("slated address history", () =>
-    MempoolDB.insertMultiple([processedTx]).pipe(
-      Effect.map(() => {
-        expect(
-          vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
-        ).toHaveBeenCalledWith("mempool_ledger", [processedTx], 0);
-      }),
-      Effect.provide(sqlHarness.layer),
-    ),
-  );
-});
+it.effect("insertMultiple aggregates address history as slated", () =>
+  MempoolDB.insertMultiple([processedTx]).pipe(
+    Effect.map(() => {
+      expect(
+        vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
+      ).toHaveBeenCalledWith("mempool_ledger", [processedTx], 0);
+    }),
+    Effect.provide(sqlHarness.layer),
+  ),
+);
 
-describe("time-bound retrieval", () => {
-  it.effect("time-bound retrieval", () => {
+it.effect(
+  "retrieveTimeBoundEntries delegates to tx table with correct args",
+  () => {
     const start = new Date("2024-01-01T00:00:00Z");
     const end = new Date("2024-01-02T00:00:00Z");
     vi.mocked(Tx.retrieveTimeBoundEntries).mockReturnValue(
@@ -155,17 +152,15 @@ describe("time-bound retrieval", () => {
       }),
       Effect.provide(sqlHarness.layer),
     );
-  });
-});
+  },
+);
 
-describe("count", () => {
-  it.effect("count", () => {
-    sqlHarness.setRows([{ count: "7" }]);
-    return MempoolDB.retrieveTxCount.pipe(
-      Effect.map((count) => {
-        expect(count).toBe(7n);
-      }),
-      Effect.provide(sqlHarness.layer),
-    );
-  });
+it.effect("retrieveTxCount returns parsed bigint from SQL count row", () => {
+  sqlHarness.setRows([{ count: "7" }]);
+  return MempoolDB.retrieveTxCount.pipe(
+    Effect.map((count) => {
+      expect(count).toBe(7n);
+    }),
+    Effect.provide(sqlHarness.layer),
+  );
 });

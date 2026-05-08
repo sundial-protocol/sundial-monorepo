@@ -15,12 +15,10 @@ import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 const makeDbHarness = (count: string) =>
   createMockSqlHarness([{ count }] as const);
 
-// ---------------------------------------------------------------------------
-// retrieveNumberOfEntries
-// ---------------------------------------------------------------------------
+const clearTableHarness = createMockSqlHarness();
 
-describe("retrieveNumberOfEntries returns count as bigint", () => {
-  it.effect("retrieveNumberOfEntries returns count as bigint", () =>
+describe("retrieveNumberOfEntries", () => {
+  it.effect("returns count as bigint", () =>
     retrieveNumberOfEntries("test_table").pipe(
       Effect.map((count) => {
         expect(count).toBe(5n);
@@ -28,10 +26,8 @@ describe("retrieveNumberOfEntries returns count as bigint", () => {
       Effect.provide(makeDbHarness("5").layer),
     ),
   );
-});
 
-describe("retrieveNumberOfEntries returns 0n when count is zero", () => {
-  it.effect("retrieveNumberOfEntries returns 0n when count is zero", () =>
+  it.effect("returns 0n when count is zero", () =>
     retrieveNumberOfEntries("test_table").pipe(
       Effect.map((count) => {
         expect(count).toBe(0n);
@@ -41,14 +37,8 @@ describe("retrieveNumberOfEntries returns 0n when count is zero", () => {
   );
 });
 
-const clearTableHarness = createMockSqlHarness();
-
-// ---------------------------------------------------------------------------
-// clearTable
-// ---------------------------------------------------------------------------
-
-describe("clearTable succeeds with mock SQL", () => {
-  it.effect("clearTable succeeds with mock SQL", () =>
+describe("clearTable", () => {
+  it.effect("succeeds with mock SQL", () =>
     clearTable("test_table").pipe(
       Effect.map(() =>
         expect(clearTableHarness.getCallCount()).toBeGreaterThan(0),
@@ -58,11 +48,7 @@ describe("clearTable succeeds with mock SQL", () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// DatabaseError and NotFoundError constructors
-// ---------------------------------------------------------------------------
-
-describe("DatabaseError has expected tag and table field", () => {
+describe("error constructors", () => {
   it("DatabaseError has expected tag and table field", () => {
     const err = new DatabaseError({
       message: "db error",
@@ -73,9 +59,7 @@ describe("DatabaseError has expected tag and table field", () => {
     expect(err.table).toBe("my_table");
     expect(err.message).toBe("db error");
   });
-});
 
-describe("NotFoundError has expected tag and table field", () => {
   it("NotFoundError has expected tag and table field", () => {
     const err = new NotFoundError({
       message: "not found",
@@ -87,9 +71,7 @@ describe("NotFoundError has expected tag and table field", () => {
     expect(err.table).toBe("my_table");
     expect(err.txIdHex).toBe("aabbcc");
   });
-});
 
-describe("sqlErrorToDatabaseError maps DatabaseError through unchanged", () => {
   it.effect(
     "sqlErrorToDatabaseError maps DatabaseError through unchanged",
     () => {
@@ -109,12 +91,8 @@ describe("sqlErrorToDatabaseError maps DatabaseError through unchanged", () => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// batchProgram
-// ---------------------------------------------------------------------------
-
-describe("batchProgram runs effectMaker for each batch", () => {
-  it.effect("batchProgram runs effectMaker for each batch", () =>
+describe("batchProgram", () => {
+  it.effect("runs effectMaker for each batch", () =>
     Effect.gen(function* () {
       const calls: [number, number][] = [];
       yield* batchProgram(10, 25, "test", (start, end) => {
@@ -127,10 +105,8 @@ describe("batchProgram runs effectMaker for each batch", () => {
       expect(calls[2]).toEqual([20, 30]);
     }),
   );
-});
 
-describe("batchProgram with zero totalCount runs no effects", () => {
-  it.effect("batchProgram with zero totalCount runs no effects", () =>
+  it.effect("with zero totalCount runs no effects", () =>
     Effect.gen(function* () {
       const calls: [number, number][] = [];
       yield* batchProgram(10, 0, "empty", (start, end) => {
@@ -140,10 +116,8 @@ describe("batchProgram with zero totalCount runs no effects", () => {
       expect(calls.length).toBe(0);
     }),
   );
-});
 
-describe("batchProgram collects results from all batches", () => {
-  it.effect("batchProgram collects results from all batches", () =>
+  it.effect("collects results from all batches", () =>
     Effect.gen(function* () {
       const results = yield* batchProgram(5, 10, "collect", (start, _end) =>
         Effect.succeed(start),

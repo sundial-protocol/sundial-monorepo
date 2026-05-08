@@ -9,13 +9,11 @@ import {
   decodeWithdrawalInfoCompact,
 } from "../../src/types/events";
 
+import { bytesSeq } from "./helpers/cardano-fixtures.js";
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
-
-function bytesSeq(len: number): Uint8Array {
-  return Uint8Array.from({ length: len }, (_, i) => i & 0xff);
-}
 
 const addressA = bytesSeq(29);
 const addressB = Uint8Array.from({ length: 29 }, (_, i) => (i + 50) & 0xff);

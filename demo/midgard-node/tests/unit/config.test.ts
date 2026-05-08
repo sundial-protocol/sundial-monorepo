@@ -1,6 +1,6 @@
 import { describe, expect, vi } from "vitest";
 import { it } from "@effect/vitest";
-import { ConfigProvider, Effect, Exit, Layer } from "effect";
+import { ConfigProvider, Effect, Layer } from "effect";
 
 vi.mock("@lucid-evolution/lucid", () => ({
   walletFromSeed: vi.fn(() => ({ address: "addr_test1mock" })),
@@ -32,9 +32,9 @@ const configLayer = NodeConfig.layer.pipe(
   Layer.provide(Layer.setConfigProvider(testConfigProvider)),
 );
 
-describe("NodeConfig resolves with valid env vars", () => {
+describe("NodeConfig", () => {
   it.effect(
-    "NodeConfig resolves with valid env vars",
+    "resolves with valid env vars",
     () =>
       Effect.gen(function* () {
         const config = yield* NodeConfig;
@@ -45,11 +45,9 @@ describe("NodeConfig resolves with valid env vars", () => {
       }).pipe(Effect.provide(configLayer)),
     { timeout: 10000 },
   );
-});
 
-describe("NodeConfig sets default values when optional vars are absent", () => {
   it.effect(
-    "NodeConfig sets default values when optional vars are absent",
+    "sets default values when optional vars are absent",
     () =>
       Effect.gen(function* () {
         const config = yield* NodeConfig;
@@ -59,11 +57,9 @@ describe("NodeConfig sets default values when optional vars are absent", () => {
       }).pipe(Effect.provide(configLayer)),
     { timeout: 10000 },
   );
-});
 
-describe("NodeConfig returns empty genesis UTxOs for Mainnet", () => {
   it.effect(
-    "NodeConfig returns empty genesis UTxOs for Mainnet",
+    "returns empty genesis UTxOs for Mainnet",
     () => {
       const mainnetProvider = ConfigProvider.fromMap(
         new Map([
@@ -94,8 +90,8 @@ describe("NodeConfig returns empty genesis UTxOs for Mainnet", () => {
   );
 });
 
-describe("ConfigError has expected tag", () => {
-  it("ConfigError has expected tag", () => {
+describe("ConfigError", () => {
+  it("has expected tag", () => {
     const err = new ConfigError({
       message: "bad config",
       cause: undefined,

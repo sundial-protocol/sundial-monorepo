@@ -1,4 +1,4 @@
-import { describe, expect, vi } from "vitest";
+import { expect, vi } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
 import { Layer } from "effect";
@@ -209,12 +209,10 @@ const mockNodeConfigLayer = Layer.succeed(
   }),
 );
 
-describe("Database initialization creates schema", () => {
-  it.effect("Database initialization creates schema", () =>
-    DBInitialization.program.pipe(
-      Effect.map(() => expect(sqlHarness.getCallCount()).toBeGreaterThan(0)),
-      Effect.provide(sqlHarness.layer),
-      Effect.provide(mockNodeConfigLayer),
-    ),
-  );
-});
+it.effect("Database initialization creates schema", () =>
+  DBInitialization.program.pipe(
+    Effect.map(() => expect(sqlHarness.getCallCount()).toBeGreaterThan(0)),
+    Effect.provide(sqlHarness.layer),
+    Effect.provide(mockNodeConfigLayer),
+  ),
+);

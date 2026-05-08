@@ -47,8 +47,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("MempoolLedgerDB insert stores entries", () => {
-  it.effect("MempoolLedgerDB insert stores entries", () =>
+describe("MempoolLedgerDB", () => {
+  it.effect("insert stores entries", () =>
     MempoolLedgerDB.insert([testEntry]).pipe(
       Effect.map(() => {
         expect(vi.mocked(Ledger.insertEntries)).toHaveBeenCalledWith(
@@ -59,10 +59,8 @@ describe("MempoolLedgerDB insert stores entries", () => {
       Effect.provide(noopSqlLayer),
     ),
   );
-});
 
-describe("MempoolLedgerDB retrieve returns all entries", () => {
-  it.effect("MempoolLedgerDB retrieve returns all entries", () =>
+  it.effect("retrieve returns all entries", () =>
     MempoolLedgerDB.retrieve.pipe(
       Effect.map((entries) => {
         expect(entries).toHaveLength(0);
@@ -70,10 +68,8 @@ describe("MempoolLedgerDB retrieve returns all entries", () => {
       Effect.provide(noopSqlLayer),
     ),
   );
-});
 
-describe("MempoolLedgerDB retrieveByAddress filters by address", () => {
-  it.effect("MempoolLedgerDB retrieveByAddress filters by address", () => {
+  it.effect("retrieveByAddress filters by address", () => {
     vi.mocked(Ledger.retrieveEntriesWithAddress).mockReturnValue(
       Effect.succeed([testEntryWithTimeStamp]),
     );
@@ -87,31 +83,24 @@ describe("MempoolLedgerDB retrieveByAddress filters by address", () => {
       Effect.provide(noopSqlLayer),
     );
   });
-});
 
-describe("MempoolLedgerDB retrieveByOutRefs returns matching entries", () => {
-  it.effect(
-    "MempoolLedgerDB retrieveByOutRefs returns matching entries",
-    () => {
-      vi.mocked(Ledger.retrieveByOutRefs).mockReturnValue(
-        Effect.succeed([testEntry]),
-      );
-      return MempoolLedgerDB.retrieveByOutRefs([outrefA]).pipe(
-        Effect.map((entries) => {
-          expect(entries.length).toBe(1);
-          expect(vi.mocked(Ledger.retrieveByOutRefs)).toHaveBeenCalledWith(
-            "mempool_ledger",
-            [outrefA],
-          );
-        }),
-        Effect.provide(noopSqlLayer),
-      );
-    },
-  );
-});
+  it.effect("retrieveByOutRefs returns matching entries", () => {
+    vi.mocked(Ledger.retrieveByOutRefs).mockReturnValue(
+      Effect.succeed([testEntry]),
+    );
+    return MempoolLedgerDB.retrieveByOutRefs([outrefA]).pipe(
+      Effect.map((entries) => {
+        expect(entries.length).toBe(1);
+        expect(vi.mocked(Ledger.retrieveByOutRefs)).toHaveBeenCalledWith(
+          "mempool_ledger",
+          [outrefA],
+        );
+      }),
+      Effect.provide(noopSqlLayer),
+    );
+  });
 
-describe("MempoolLedgerDB retrieveByOutRef returns single entry", () => {
-  it.effect("MempoolLedgerDB retrieveByOutRef returns single entry", () => {
+  it.effect("retrieveByOutRef returns single entry", () => {
     vi.mocked(Ledger.retrieveByOutRef).mockReturnValue(
       Effect.succeed(testEntry),
     );
@@ -126,10 +115,8 @@ describe("MempoolLedgerDB retrieveByOutRef returns single entry", () => {
       Effect.provide(noopSqlLayer),
     );
   });
-});
 
-describe("MempoolLedgerDB clearUTxOs removes entries", () => {
-  it.effect("MempoolLedgerDB clearUTxOs removes entries", () =>
+  it.effect("clearUTxOs removes entries", () =>
     MempoolLedgerDB.clearUTxOs([outrefA]).pipe(
       Effect.map(() => {
         expect(vi.mocked(Ledger.delEntries)).toHaveBeenCalledWith(
@@ -142,8 +129,8 @@ describe("MempoolLedgerDB clearUTxOs removes entries", () => {
   );
 });
 
-describe("LatestLedgerDB insertMultiple stores entries", () => {
-  it.effect("LatestLedgerDB insertMultiple stores entries", () =>
+describe("LatestLedgerDB", () => {
+  it.effect("insertMultiple stores entries", () =>
     LatestLedgerDB.insertMultiple([testEntry]).pipe(
       Effect.map(() => {
         expect(vi.mocked(Ledger.insertEntries)).toHaveBeenCalledWith(
@@ -154,10 +141,8 @@ describe("LatestLedgerDB insertMultiple stores entries", () => {
       Effect.provide(noopSqlLayer),
     ),
   );
-});
 
-describe("LatestLedgerDB retrieveByOutRef returns entry", () => {
-  it.effect("LatestLedgerDB retrieveByOutRef returns entry", () => {
+  it.effect("retrieveByOutRef returns entry", () => {
     vi.mocked(Ledger.retrieveByOutRef).mockReturnValue(
       Effect.succeed(testEntry),
     );
@@ -174,8 +159,8 @@ describe("LatestLedgerDB retrieveByOutRef returns entry", () => {
   });
 });
 
-describe("ConfirmedLedgerDB insertMultiple stores entries", () => {
-  it.effect("ConfirmedLedgerDB insertMultiple stores entries", () =>
+describe("ConfirmedLedgerDB", () => {
+  it.effect("insertMultiple stores entries", () =>
     ConfirmedLedgerDB.insertMultiple([testEntry]).pipe(
       Effect.map(() => {
         expect(vi.mocked(Ledger.insertEntries)).toHaveBeenCalledWith(

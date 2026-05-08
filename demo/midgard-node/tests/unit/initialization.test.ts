@@ -7,17 +7,15 @@ import {
   createFraudProofCatalogueMpt,
 } from "@/transactions/initialization.js";
 
-describe("uint32ToFraudProofID encodes index as big-endian uint32", () => {
-  it("uint32ToFraudProofID encodes index as big-endian uint32", () => {
+describe("uint32ToFraudProofID", () => {
+  it("encodes index as big-endian uint32", () => {
     const buf = uint32ToFraudProofID(0);
     expect(buf).toBeInstanceOf(Buffer);
     expect(buf.length).toBe(4);
     expect(buf.readUInt32BE(0)).toBe(0);
   });
-});
 
-describe("uint32ToFraudProofID encodes non-zero index correctly", () => {
-  it("uint32ToFraudProofID encodes non-zero index correctly", () => {
+  it("encodes non-zero index correctly", () => {
     const buf = uint32ToFraudProofID(1);
     expect(buf.readUInt32BE(0)).toBe(1);
 
@@ -26,8 +24,8 @@ describe("uint32ToFraudProofID encodes non-zero index correctly", () => {
   });
 });
 
-describe("fraudProofsToIndexedValidators returns indexed pairs", () => {
-  it("fraudProofsToIndexedValidators returns indexed pairs", () => {
+describe("fraudProofsToIndexedValidators", () => {
+  it("returns indexed pairs", () => {
     const fraudProofs = {
       fpA: { spendingScriptHash: "aabb" },
       fpB: { spendingScriptHash: "ccdd" },
@@ -40,17 +38,15 @@ describe("fraudProofsToIndexedValidators returns indexed pairs", () => {
     expect(pairs[1][0].readUInt32BE(0)).toBe(1);
     expect(pairs[1][1]).toEqual({ spendingScriptHash: "ccdd" });
   });
-});
 
-describe("fraudProofsToIndexedValidators with empty object returns empty array", () => {
-  it("fraudProofsToIndexedValidators with empty object returns empty array", () => {
+  it("with empty object returns empty array", () => {
     const pairs = fraudProofsToIndexedValidators({} as any);
     expect(pairs.length).toBe(0);
   });
 });
 
-describe("createFraudProofCatalogueMpt builds a trie with entries", () => {
-  it.effect("createFraudProofCatalogueMpt builds a trie with entries", () =>
+describe("createFraudProofCatalogueMpt", () => {
+  it.effect("builds a trie with entries", () =>
     Effect.gen(function* () {
       const pairs: [Buffer, any][] = [
         [uint32ToFraudProofID(0), { spendingScriptHash: "deadbeef" }],
@@ -63,16 +59,12 @@ describe("createFraudProofCatalogueMpt builds a trie with entries", () => {
       );
     }),
   );
-});
 
-describe("createFraudProofCatalogueMpt with no entries returns empty trie", () => {
-  it.effect(
-    "createFraudProofCatalogueMpt with no entries returns empty trie",
-    () =>
-      Effect.gen(function* () {
-        const trie = yield* createFraudProofCatalogueMpt([]);
-        const isEmpty = yield* trie.rootIsEmpty();
-        expect(isEmpty).toBe(true);
-      }),
+  it.effect("with no entries returns empty trie", () =>
+    Effect.gen(function* () {
+      const trie = yield* createFraudProofCatalogueMpt([]);
+      const isEmpty = yield* trie.rootIsEmpty();
+      expect(isEmpty).toBe(true);
+    }),
   );
 });

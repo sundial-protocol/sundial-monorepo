@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   logSuccess,
   logWarning,
@@ -7,32 +7,46 @@ import {
   FileSystemError,
 } from "@/utils.js";
 
-describe("logSuccess runs without error", () => {
-  it("logSuccess runs without error", () => {
-    expect(() => logSuccess("all good")).not.toThrow();
+describe("log helpers", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("logSuccess writes to console", () => {
+    logSuccess("all good");
+    expect(vi.mocked(console.log)).toHaveBeenCalled();
+  });
+
+  it("logWarning writes to console", () => {
+    logWarning("watch out");
+    const warned =
+      vi.mocked(console.warn).mock.calls.length > 0 ||
+      vi.mocked(console.log).mock.calls.length > 0;
+    expect(warned).toBe(true);
+  });
+
+  it("logAbort writes to console", () => {
+    logAbort("aborted");
+    const logged =
+      vi.mocked(console.error).mock.calls.length > 0 ||
+      vi.mocked(console.log).mock.calls.length > 0;
+    expect(logged).toBe(true);
+  });
+
+  it("logInfo writes to console", () => {
+    logInfo("info message");
+    expect(vi.mocked(console.log)).toHaveBeenCalled();
   });
 });
 
-describe("logWarning runs without error", () => {
-  it("logWarning runs without error", () => {
-    expect(() => logWarning("watch out")).not.toThrow();
-  });
-});
-
-describe("logAbort runs without error", () => {
-  it("logAbort runs without error", () => {
-    expect(() => logAbort("aborted")).not.toThrow();
-  });
-});
-
-describe("logInfo runs without error", () => {
-  it("logInfo runs without error", () => {
-    expect(() => logInfo("info message")).not.toThrow();
-  });
-});
-
-describe("FileSystemError has the expected tag", () => {
-  it("FileSystemError has the expected tag", () => {
+describe("FileSystemError", () => {
+  it("has the expected tag and message", () => {
     const err = new FileSystemError({
       message: "disk full",
       cause: new Error("ENOSPC"),
@@ -40,10 +54,8 @@ describe("FileSystemError has the expected tag", () => {
     expect(err._tag).toBe("FileSystemError");
     expect(err.message).toBe("disk full");
   });
-});
 
-describe("FileSystemError without cause", () => {
-  it("FileSystemError without cause", () => {
+  it("works without cause", () => {
     const err = new FileSystemError({ message: "no cause", cause: undefined });
     expect(err._tag).toBe("FileSystemError");
   });

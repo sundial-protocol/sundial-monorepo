@@ -4,6 +4,10 @@ export function filledBytes(length: number, fill: number): Uint8Array {
   return new Uint8Array(length).fill(fill);
 }
 
+export function bytesSeq(len: number): Uint8Array {
+  return Uint8Array.from({ length: len }, (_, i) => i & 0xff);
+}
+
 export type SimpleAdaTransferFixture = {
   cmlTx: CML.Transaction;
   txId: Uint8Array;

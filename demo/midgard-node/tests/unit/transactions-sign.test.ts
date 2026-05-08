@@ -62,78 +62,58 @@ const mockLucid: any = {
 
 const mockDbLayer = createMockSqlHarness().layer;
 
-// ---------------------------------------------------------------------------
-// handleSignSubmitNoConfirmation
-// ---------------------------------------------------------------------------
-
-describe("handleSignSubmitNoConfirmation returns the tx hash on success", () => {
-  it.effect(
-    "handleSignSubmitNoConfirmation returns the tx hash on success",
-    () =>
-      Effect.gen(function* () {
-        const result = yield* handleSignSubmitNoConfirmation(
-          mockLucid,
-          mockSignBuilder,
-        );
-        expect(result).toBe(mockTxHash);
-      }),
-  );
-});
-
-describe("handleSignSubmitNoConfirmation fails with TxSignError on sign failure", () => {
-  it.effect(
-    "handleSignSubmitNoConfirmation fails with TxSignError on sign failure",
-    () => {
-      const failingBuilder: any = {
-        toHash: () => mockTxHash,
-        sign: {
-          withWallet: () => ({
-            completeProgram: () =>
-              Effect.fail(
-                new TxSignError({
-                  message: "sign failed",
-                  cause: undefined,
-                  txHash: mockTxHash,
-                }),
-              ),
-          }),
-        },
-      };
-      return handleSignSubmitNoConfirmation(mockLucid, failingBuilder).pipe(
-        Effect.exit,
-        Effect.map((exit) => {
-          expect(exit._tag).toBe("Failure");
-        }),
+describe("handleSignSubmitNoConfirmation", () => {
+  it.effect("returns the tx hash on success", () =>
+    Effect.gen(function* () {
+      const result = yield* handleSignSubmitNoConfirmation(
+        mockLucid,
+        mockSignBuilder,
       );
-    },
+      expect(result).toBe(mockTxHash);
+    }),
   );
-});
 
-describe("handleSignSubmitNoConfirmation tolerates wallet address failure", () => {
-  it.effect(
-    "handleSignSubmitNoConfirmation tolerates wallet address failure",
-    () => {
-      const lucidNoWallet: any = {
-        wallet: () => ({
-          address: () => Promise.reject(new Error("no wallet")),
+  it.effect("fails with TxSignError on sign failure", () => {
+    const failingBuilder: any = {
+      toHash: () => mockTxHash,
+      sign: {
+        withWallet: () => ({
+          completeProgram: () =>
+            Effect.fail(
+              new TxSignError({
+                message: "sign failed",
+                cause: undefined,
+                txHash: mockTxHash,
+              }),
+            ),
         }),
-      };
-      return Effect.gen(function* () {
-        const result = yield* handleSignSubmitNoConfirmation(
-          lucidNoWallet,
-          mockSignBuilder,
-        );
-        expect(result).toBe(mockTxHash);
-      });
-    },
-  );
+      },
+    };
+    return handleSignSubmitNoConfirmation(mockLucid, failingBuilder).pipe(
+      Effect.exit,
+      Effect.map((exit) => {
+        expect(exit._tag).toBe("Failure");
+      }),
+    );
+  });
+
+  it.effect("tolerates wallet address failure", () => {
+    const lucidNoWallet: any = {
+      wallet: () => ({
+        address: () => Promise.reject(new Error("no wallet")),
+      }),
+    };
+    return Effect.gen(function* () {
+      const result = yield* handleSignSubmitNoConfirmation(
+        lucidNoWallet,
+        mockSignBuilder,
+      );
+      expect(result).toBe(mockTxHash);
+    });
+  });
 });
 
-// ---------------------------------------------------------------------------
-// Error class constructors
-// ---------------------------------------------------------------------------
-
-describe("TxSignError has expected tag and fields", () => {
+describe("error constructors", () => {
   it("TxSignError has expected tag and fields", () => {
     const err = new TxSignError({
       message: "sign err",
@@ -143,9 +123,7 @@ describe("TxSignError has expected tag and fields", () => {
     expect(err._tag).toBe("TxSignError");
     expect(err.txHash).toBe("abc");
   });
-});
 
-describe("TxSubmitError has expected tag and fields", () => {
   it("TxSubmitError has expected tag and fields", () => {
     const err = new TxSubmitError({
       message: "submit err",
@@ -155,9 +133,7 @@ describe("TxSubmitError has expected tag and fields", () => {
     expect(err._tag).toBe("TxSubmitError");
     expect(err.txHash).toBe("def");
   });
-});
 
-describe("TxConfirmError has expected tag and fields", () => {
   it("TxConfirmError has expected tag and fields", () => {
     const err = new TxConfirmError({
       message: "confirm err",
@@ -167,9 +143,7 @@ describe("TxConfirmError has expected tag and fields", () => {
     expect(err._tag).toBe("TxConfirmError");
     expect(err.txHash).toBe("ghi");
   });
-});
 
-describe("GenesisDepositError has expected tag", () => {
   it("GenesisDepositError has expected tag", () => {
     const err = new GenesisDepositError({
       message: "genesis err",
@@ -179,35 +153,26 @@ describe("GenesisDepositError has expected tag", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// fetchFirstBlockTxs
-// ---------------------------------------------------------------------------
+describe("fetchFirstBlockTxs", () => {
+  it.effect("returns empty txs for genesis header hash", () => {
+    const genesisHash =
+      "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421";
+    headerHashFromStateQueueUTxOMock.mockReturnValue(
+      Effect.succeed(genesisHash),
+    );
+    retrieveTxHashesByHeaderHashMock.mockReturnValue(Effect.succeed([]));
 
-describe("fetchFirstBlockTxs returns empty txs for genesis header hash", () => {
-  it.effect(
-    "fetchFirstBlockTxs returns empty txs for genesis header hash",
-    () => {
-      const genesisHash =
-        "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421";
-      headerHashFromStateQueueUTxOMock.mockReturnValue(
-        Effect.succeed(genesisHash),
-      );
-      retrieveTxHashesByHeaderHashMock.mockReturnValue(Effect.succeed([]));
+    const fakeUTxO: any = {};
+    return fetchFirstBlockTxs(fakeUTxO).pipe(
+      Effect.map(({ txs, headerHash }) => {
+        expect(txs.length).toBe(0);
+        expect(headerHash).toBeInstanceOf(Buffer);
+      }),
+      Effect.provide(mockDbLayer),
+    );
+  });
 
-      const fakeUTxO: any = {};
-      return fetchFirstBlockTxs(fakeUTxO).pipe(
-        Effect.map(({ txs, headerHash }) => {
-          expect(txs.length).toBe(0);
-          expect(headerHash).toBeInstanceOf(Buffer);
-        }),
-        Effect.provide(mockDbLayer),
-      );
-    },
-  );
-});
-
-describe("fetchFirstBlockTxs fetches tx CBORs for non-genesis block", () => {
-  it.effect("fetchFirstBlockTxs fetches tx CBORs for non-genesis block", () => {
+  it.effect("fetches tx CBORs for non-genesis block", () => {
     const nonGenesisHash = "bb".repeat(32);
     const txHash1 = Buffer.alloc(32, 0x11);
     const txCbor1 = Buffer.alloc(64, 0x22);

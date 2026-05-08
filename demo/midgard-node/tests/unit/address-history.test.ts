@@ -42,8 +42,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("upsertEntries", () => {
-  it.effect("upsertEntries", () => {
+describe("AddressHistoryDB", () => {
+  it.effect("upsertEntries inserts a new entry", () => {
     const entries: AddressHistoryDB.Entry[] = [
       {
         event_id: txIdA,
@@ -59,10 +59,8 @@ describe("upsertEntries", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
-});
 
-describe("upsert updates status", () => {
-  it.effect("upsert updates status", () => {
+  it.effect("upsertEntries updates status on second call", () => {
     const entry: AddressHistoryDB.Entry = {
       event_id: txIdA,
       address: testAddress,
@@ -81,10 +79,8 @@ describe("upsert updates status", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
-});
 
-describe("aggregateProcessedTxs", () => {
-  it.effect("aggregateProcessedTxs", () => {
+  it.effect("aggregateProcessedTxs returns grouped entries", () => {
     const ledgerEntry = makeLedgerEntry(0xbb, {
       tx_id: txIdA,
       outref: outrefA,
@@ -113,10 +109,8 @@ describe("aggregateProcessedTxs", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
-});
 
-describe("retrieve from mempool", () => {
-  it.effect("retrieve from mempool", () => {
+  it.effect("retrieve returns one tx when one row present", () => {
     sqlHarness.setRows([{ tx: txCborA }]);
     return AddressHistoryDB.retrieve(testAddress).pipe(
       Effect.map((txCbors) => {
@@ -125,10 +119,8 @@ describe("retrieve from mempool", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
-});
 
-describe("retrieve from immutable", () => {
-  it.effect("retrieve from immutable", () => {
+  it.effect("retrieve returns correct cbor buffer", () => {
     sqlHarness.setRows([{ tx: txCborA }]);
     return AddressHistoryDB.retrieve(testAddress).pipe(
       Effect.map((txCbors) => {

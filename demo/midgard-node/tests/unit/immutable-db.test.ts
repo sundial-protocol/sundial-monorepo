@@ -31,8 +31,8 @@ const noopSqlLayer = Layer.succeed(
   {} as SqlClient.SqlClient,
 );
 
-describe("ImmutableDB inserts one tx", () => {
-  it.effect("ImmutableDB inserts one tx", () => {
+describe("ImmutableDB", () => {
+  it.effect("insertTx inserts one tx", () => {
     const entry = { tx_id: txIdA, tx: txCborA };
     return ImmutableDB.insertTx(entry as any).pipe(
       Effect.map(() => {
@@ -44,10 +44,8 @@ describe("ImmutableDB inserts one tx", () => {
       Effect.provide(noopSqlLayer),
     );
   });
-});
 
-describe("inserts multiple txs", () => {
-  it.effect("inserts multiple txs", () => {
+  it.effect("insertTxs inserts multiple txs", () => {
     const entries = [
       { tx_id: txIdA, tx: txCborA },
       { tx_id: txIdB, tx: txCborB },
@@ -62,10 +60,8 @@ describe("inserts multiple txs", () => {
       Effect.provide(noopSqlLayer),
     );
   });
-});
 
-describe("retrieves by hash list", () => {
-  it.effect("retrieves by hash list", () => {
+  it.effect("retrieveTxCborsByHashes retrieves by hash list", () => {
     vi.mocked(Tx.retrieveValues).mockReturnValue(
       Effect.succeed([txCborA, txCborB]),
     );

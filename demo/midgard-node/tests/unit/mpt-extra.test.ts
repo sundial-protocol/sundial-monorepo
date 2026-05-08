@@ -13,9 +13,7 @@ import {
 } from "@/workers/utils/mpt.js";
 import { WorkerError } from "@/workers/utils/common.js";
 import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
-
-const EMPTY_ROOT =
-  "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421";
+import { EMPTY_ROOT } from "../constants.js";
 
 const mockDbLayer = createMockSqlHarness().layer;
 
@@ -40,48 +38,40 @@ describe("MptError constructors include trie name", () => {
   }
 });
 
-describe("emptyRootHexProgram returns the canonical empty root", () => {
-  it.effect("emptyRootHexProgram returns the canonical empty root", () =>
-    Effect.gen(function* () {
-      const root = yield* emptyRootHexProgram;
-      expect(root).toBe(EMPTY_ROOT);
-    }),
-  );
-});
+it.effect("emptyRootHexProgram returns the canonical empty root", () =>
+  Effect.gen(function* () {
+    const root = yield* emptyRootHexProgram;
+    expect(root).toBe(EMPTY_ROOT);
+  }),
+);
 
-describe("MidgardMpt.delete on in-memory trie succeeds", () => {
-  it.effect("MidgardMpt.delete on in-memory trie succeeds", () =>
-    Effect.gen(function* () {
-      const mpt = yield* MidgardMpt.create("delete-test");
-      yield* mpt.delete();
-    }),
-  );
-});
+it.effect("MidgardMpt.delete on in-memory trie succeeds", () =>
+  Effect.gen(function* () {
+    const mpt = yield* MidgardMpt.create("delete-test");
+    yield* mpt.delete();
+  }),
+);
 
-describe("MidgardMpt.databaseStats returns stats object", () => {
-  it.effect("MidgardMpt.databaseStats returns stats object", () =>
-    Effect.gen(function* () {
-      const mpt = yield* MidgardMpt.create("stats-test");
-      const stats = mpt.databaseStats();
-      expect(typeof stats).toBe("object");
-      expect(stats).not.toBeNull();
-    }),
-  );
-});
+it.effect("MidgardMpt.databaseStats returns stats object", () =>
+  Effect.gen(function* () {
+    const mpt = yield* MidgardMpt.create("stats-test");
+    const stats = mpt.databaseStats();
+    expect(typeof stats).toBe("object");
+    expect(stats).not.toBeNull();
+  }),
+);
 
-describe("deleteMpt on nonexistent path succeeds with force", () => {
-  it.effect("deleteMpt on nonexistent path succeeds with force", () =>
-    Effect.gen(function* () {
-      const tmpPath = path.join(
-        os.tmpdir(),
-        `midgard-del-nonexistent-${randomUUID()}`,
-      );
-      yield* deleteMpt(tmpPath, "test");
-    }),
-  );
-});
+it.effect("deleteMpt on nonexistent path succeeds with force", () =>
+  Effect.gen(function* () {
+    const tmpPath = path.join(
+      os.tmpdir(),
+      `midgard-del-nonexistent-${randomUUID()}`,
+    );
+    yield* deleteMpt(tmpPath, "test");
+  }),
+);
 
-describe("deleteMpt on existing directory removes it", () => {
+describe("deleteMpt on existing directory", () => {
   let tmpPath: string;
 
   afterEach(async () => {
@@ -90,7 +80,7 @@ describe("deleteMpt on existing directory removes it", () => {
     }
   });
 
-  it.effect("deleteMpt on existing directory removes it", () =>
+  it.effect("removes the directory", () =>
     Effect.gen(function* () {
       tmpPath = path.join(os.tmpdir(), `midgard-del-exists-${randomUUID()}`);
       const mpt = yield* MidgardMpt.create("del-exists", tmpPath);
@@ -103,29 +93,25 @@ describe("deleteMpt on existing directory removes it", () => {
   );
 });
 
-describe("withTrieTransaction commits on success", () => {
-  it.effect("withTrieTransaction commits on success", () =>
-    Effect.gen(function* () {
-      const mpt = yield* MidgardMpt.create("with-tx-test");
-      const result = yield* withTrieTransaction(mpt, Effect.succeed("ok")).pipe(
-        Effect.provide(mockDbLayer),
-      );
-      expect(result).toBe("ok");
-      const isEmpty = yield* mpt.rootIsEmpty();
-      expect(isEmpty).toBe(true);
-    }),
-  );
-});
+it.effect("withTrieTransaction commits on success", () =>
+  Effect.gen(function* () {
+    const mpt = yield* MidgardMpt.create("with-tx-test");
+    const result = yield* withTrieTransaction(mpt, Effect.succeed("ok")).pipe(
+      Effect.provide(mockDbLayer),
+    );
+    expect(result).toBe("ok");
+    const isEmpty = yield* mpt.rootIsEmpty();
+    expect(isEmpty).toBe(true);
+  }),
+);
 
-describe("WorkerError has expected tag and worker field", () => {
-  it("WorkerError has expected tag and worker field", () => {
-    const err = new WorkerError({
-      message: "something went wrong",
-      cause: undefined,
-      worker: "block-commitment",
-    });
-    expect(err._tag).toBe("WorkerError");
-    expect(err.message).toBe("something went wrong");
-    expect(err.worker).toBe("block-commitment");
+it("WorkerError has expected tag and worker field", () => {
+  const err = new WorkerError({
+    message: "something went wrong",
+    cause: undefined,
+    worker: "block-commitment",
   });
+  expect(err._tag).toBe("WorkerError");
+  expect(err.message).toBe("something went wrong");
+  expect(err.worker).toBe("block-commitment");
 });

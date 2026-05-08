@@ -24,16 +24,14 @@ import {
   readVarBytesDynamic,
 } from "../../src/codec";
 
+import { bytesSeq } from "./helpers/cardano-fixtures.js";
+
 // ---------------------------------------------------------------------------
 // Test fixtures
 // ---------------------------------------------------------------------------
 
 function bytes(fill: number, len: number): Uint8Array {
   return new Uint8Array(len).fill(fill);
-}
-
-function bytesSeq(len: number): Uint8Array {
-  return Uint8Array.from({ length: len }, (_, i) => i & 0xff);
 }
 
 const hash28A = bytes(0xaa, 28);
