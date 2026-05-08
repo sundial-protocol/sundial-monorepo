@@ -66,8 +66,7 @@ const minimalTransaction: Transaction = {
   is_valid: true,
 };
 
-describe("Witness set compact with all fields absent round trips", () => {
-  it("Witness set compact with all fields absent round trips", () => {
+it("Witness set compact with all fields absent round trips", () => {
     const compact: TransactionWitnessSetCompact = {
       vkey_witnesses_hash: undefined,
       native_scripts_hash: undefined,
@@ -80,11 +79,9 @@ describe("Witness set compact with all fields absent round trips", () => {
     expect(decoded.native_scripts_hash).toBeUndefined();
     expect(decoded.redeemers_hash).toBeUndefined();
     expect(decoded.plutus_v3_scripts_hash).toBeUndefined();
-  });
 });
 
-describe("Witness set compact with all fields present round trips", () => {
-  it("Witness set compact with all fields present round trips", () => {
+it("Witness set compact with all fields present round trips", () => {
     const compact: TransactionWitnessSetCompact = {
       vkey_witnesses_hash: hash32A,
       native_scripts_hash: hash32B,
@@ -97,11 +94,9 @@ describe("Witness set compact with all fields present round trips", () => {
     expect(decoded.native_scripts_hash).toEqual(hash32B);
     expect(decoded.redeemers_hash).toEqual(hash32C);
     expect(decoded.plutus_v3_scripts_hash).toEqual(hash32D);
-  });
 });
 
-describe("Minimal transaction body round trips", () => {
-  it("Minimal transaction body round trips", () => {
+it("Minimal transaction body round trips", () => {
     const encoded = encodeTransactionBody(minimalTransactionBody);
     const decoded = decodeTransactionBody(encoded);
     expect(decoded.inputs.length).toBe(1);
@@ -112,11 +107,9 @@ describe("Minimal transaction body round trips", () => {
     expect(decoded.ttl).toBeUndefined();
     expect(decoded.mint).toBeUndefined();
     expect(decoded.required_signers).toBeUndefined();
-  });
 });
 
-describe("Transaction body with optional fields round trips", () => {
-  it("Transaction body with optional fields round trips", () => {
+it("Transaction body with optional fields round trips", () => {
     const body: TransactionBody = {
       ...minimalTransactionBody,
       ttl: 9_999,
@@ -134,11 +127,9 @@ describe("Transaction body with optional fields round trips", () => {
     expect(decoded.network_id).toBe(1);
     expect(decoded.reference_inputs?.length).toBe(1);
     expect(decoded.required_observers?.length).toBe(1);
-  });
 });
 
-describe("Transaction body compact with no optional hashes round trips", () => {
-  it("Transaction body compact with no optional hashes round trips", () => {
+it("Transaction body compact with no optional hashes round trips", () => {
     const compact: TransactionBodyCompact = {
       inputs_hash: hash32A,
       outputs_hash: hash32B,
@@ -160,11 +151,9 @@ describe("Transaction body compact with no optional hashes round trips", () => {
     expect(decoded.fee).toBe(170_000n);
     expect(decoded.ttl).toBeUndefined();
     expect(decoded.mint_hash).toBeUndefined();
-  });
 });
 
-describe("Transaction body compact with optional hashes round trips", () => {
-  it("Transaction body compact with optional hashes round trips", () => {
+it("Transaction body compact with optional hashes round trips", () => {
     const compact: TransactionBodyCompact = {
       inputs_hash: hash32A,
       outputs_hash: hash32B,
@@ -188,11 +177,9 @@ describe("Transaction body compact with optional hashes round trips", () => {
     expect(decoded.required_observers_hash).toEqual(
       new Uint8Array(32).fill(0xf),
     );
-  });
 });
 
-describe("Minimal full transaction round trips", () => {
-  it("Minimal full transaction round trips", () => {
+it("Minimal full transaction round trips", () => {
     const encoded = encodeTransaction(minimalTransaction);
     const decoded = decodeTransaction(encoded);
     expect(decoded.is_valid).toBe(true);
@@ -205,11 +192,9 @@ describe("Minimal full transaction round trips", () => {
     const txFalse = { ...minimalTransaction, is_valid: false };
     const decoded2 = decodeTransaction(encodeTransaction(txFalse));
     expect(decoded2.is_valid).toBe(false);
-  });
 });
 
-describe("Compact transaction round trips valid flag", () => {
-  it("Compact transaction round trips valid flag", () => {
+it("Compact transaction round trips valid flag", () => {
     const compact: TransactionCompact = {
       transaction_body_hash: hash32A,
       transaction_witness_set_hash: hash32B,
@@ -227,5 +212,4 @@ describe("Compact transaction round trips valid flag", () => {
     expect(
       decodeTransactionCompact(encodeTransactionCompact(compactFalse)).is_valid,
     ).toBe(false);
-  });
 });

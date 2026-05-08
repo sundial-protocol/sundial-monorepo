@@ -25,28 +25,23 @@ const hash32B = new Uint8Array(32).fill(0x22);
 const outRefA = { tx_id: hash32A, index: 0 };
 const outRefB = { tx_id: hash32B, index: 1 };
 
-describe("Deposit info without datum round trips", () => {
-  it("Deposit info without datum round trips", () => {
+it("Deposit info without datum round trips", () => {
     const input = { l2_address: addressA, l2_datum: undefined };
     const encoded = encodeDepositInfo(input);
     const decoded = decodeDepositInfo(encoded);
     expect(decoded.l2_address).toEqual(addressA);
     expect(decoded.l2_datum).toBeUndefined();
-  });
 });
 
-describe("Deposit info with datum round trips", () => {
-  it("Deposit info with datum round trips", () => {
+it("Deposit info with datum round trips", () => {
     const input = { l2_address: addressA, l2_datum: datumA };
     const encoded = encodeDepositInfo(input);
     const decoded = decodeDepositInfo(encoded);
     expect(decoded.l2_address).toEqual(addressA);
     expect(decoded.l2_datum).toEqual(datumA);
-  });
 });
 
-describe("Deposit compact info with datum hash round trips", () => {
-  it("Deposit compact info with datum hash round trips", () => {
+it("Deposit compact info with datum hash round trips", () => {
     const input = { l2_address: addressA, l2_datum: hash32A };
     const encoded = encodeDepositInfoCompact(input);
     const decoded = decodeDepositInfoCompact(encoded);
@@ -57,11 +52,9 @@ describe("Deposit compact info with datum hash round trips", () => {
     const nodatum = { l2_address: addressA, l2_datum: undefined };
     const decoded2 = decodeDepositInfoCompact(encodeDepositInfoCompact(nodatum));
     expect(decoded2.l2_datum).toBeUndefined();
-  });
 });
 
-describe("Withdrawal info without datum round trips", () => {
-  it("Withdrawal info without datum round trips", () => {
+it("Withdrawal info without datum round trips", () => {
     const input = {
       l2_outref: outRefA,
       l1_address: addressB,
@@ -73,11 +66,9 @@ describe("Withdrawal info without datum round trips", () => {
     expect(decoded.l2_outref.index).toBe(outRefA.index);
     expect(decoded.l1_address).toEqual(addressB);
     expect(decoded.l1_datum).toBeUndefined();
-  });
 });
 
-describe("Withdrawal info with datum round trips", () => {
-  it("Withdrawal info with datum round trips", () => {
+it("Withdrawal info with datum round trips", () => {
     const input = {
       l2_outref: outRefA,
       l1_address: addressB,
@@ -89,11 +80,9 @@ describe("Withdrawal info with datum round trips", () => {
     expect(decoded.l2_outref.index).toBe(outRefA.index);
     expect(decoded.l1_address).toEqual(addressB);
     expect(decoded.l1_datum).toEqual(datumA);
-  });
 });
 
-describe("Withdrawal compact info with datum hash round trips", () => {
-  it("Withdrawal compact info with datum hash round trips", () => {
+it("Withdrawal compact info with datum hash round trips", () => {
     const input = {
       l2_outref: outRefB,
       l1_address: addressB,
@@ -105,5 +94,4 @@ describe("Withdrawal compact info with datum hash round trips", () => {
     expect(decoded.l2_outref.index).toBe(outRefB.index);
     expect(decoded.l1_address).toEqual(addressB);
     expect(decoded.l1_datum).toEqual(hash32B);
-  });
 });

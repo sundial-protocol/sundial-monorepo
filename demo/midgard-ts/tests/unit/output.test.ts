@@ -51,8 +51,7 @@ const multiassetOutputA: TransactionOutput = {
   script_ref: undefined,
 };
 
-describe("VKey witness codec round trips", () => {
-  it("VKey witness codec round trips", () => {
+it("VKey witness codec round trips", () => {
     const w = new Writer();
     writeVKeyWitness(w, { vkey: vkeyA, signature: signatureA });
     const encoded = w.toBytes();
@@ -61,11 +60,9 @@ describe("VKey witness codec round trips", () => {
     const decoded = readVKeyWitness(r);
     expect(decoded.vkey).toEqual(vkeyA);
     expect(decoded.signature).toEqual(signatureA);
-  });
 });
 
-describe("Coin transaction output round trips", () => {
-  it("Coin transaction output round trips", () => {
+it("Coin transaction output round trips", () => {
     const encoded = encodeTransactionOutput(coinOutputA);
     const decoded = decodeTransactionOutput(encoded);
     expect(decoded.address).toEqual(addressA);
@@ -73,11 +70,9 @@ describe("Coin transaction output round trips", () => {
     if (decoded.value.type === "Coin") expect(decoded.value.coin).toBe(2_000_000n);
     expect(decoded.datum).toBeUndefined();
     expect(decoded.script_ref).toBeUndefined();
-  });
 });
 
-describe("Coin transaction output with datum and script reference round trips", () => {
-  it("Coin transaction output with datum and script reference round trips", () => {
+it("Coin transaction output with datum and script reference round trips", () => {
     const input: TransactionOutput = {
       ...coinOutputA,
       datum: datumA,
@@ -87,11 +82,9 @@ describe("Coin transaction output with datum and script reference round trips", 
     const decoded = decodeTransactionOutput(encoded);
     expect(decoded.datum).toEqual(datumA);
     expect(decoded.script_ref).toEqual(scriptRefA);
-  });
 });
 
-describe("Multiasset transaction output round trips", () => {
-  it("Multiasset transaction output round trips", () => {
+it("Multiasset transaction output round trips", () => {
     const encoded = encodeTransactionOutput(multiassetOutputA);
     const decoded = decodeTransactionOutput(encoded);
     expect(decoded.value.type).toBe("MultiAsset");
@@ -103,11 +96,9 @@ describe("Multiasset transaction output round trips", () => {
       expect(decodedName).toEqual(assetNameA);
       expect(decodedQty).toBe(500n);
     }
-  });
 });
 
-describe("Mint static and dynamic sections round trip", () => {
-  it("Mint static and dynamic sections round trip", () => {
+it("Mint static and dynamic sections round trip", () => {
     const mint: [Uint8Array, [Uint8Array, bigint][]][] = [
       [hash28A, [[assetNameA, 10n]]],
       [new Uint8Array(28).fill(0xbb), [[bytesSeq(4), -3n]]],
@@ -130,11 +121,9 @@ describe("Mint static and dynamic sections round trip", () => {
     expect(decoded.length).toBe(2);
     expect(decoded[0][1][0][1]).toBe(10n);   // minting quantity
     expect(decoded[1][1][0][1]).toBe(-3n);   // burning quantity
-  });
 });
 
-describe("Compact coin output round trips", () => {
-  it("Compact coin output round trips", () => {
+it("Compact coin output round trips", () => {
     const compact: TransactionOutputCompact = {
       address: addressA,
       value: { type: "Coin", coin: 1_000_000n },
@@ -147,11 +136,9 @@ describe("Compact coin output round trips", () => {
     if (decoded.value.type === "Coin") expect(decoded.value.coin).toBe(1_000_000n);
     expect(decoded.datum_hash).toBeUndefined();
     expect(decoded.script_ref_hash).toBeUndefined();
-  });
 });
 
-describe("Compact multiasset output with hashes round trips", () => {
-  it("Compact multiasset output with hashes round trips", () => {
+it("Compact multiasset output with hashes round trips", () => {
     const compact: TransactionOutputCompact = {
       address: addressA,
       value: { type: "MultiAsset", coin: 500_000n, hash: hash32A },
@@ -167,5 +154,4 @@ describe("Compact multiasset output with hashes round trips", () => {
     }
     expect(decoded.datum_hash).toEqual(hash32B);
     expect(decoded.script_ref_hash).toEqual(hash32C);
-  });
 });

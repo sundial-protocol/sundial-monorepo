@@ -83,117 +83,110 @@ const minimalTx = {
   is_valid: true,
 };
 
-describe("Header without previous hash round trips", () => {
-  it("Header without previous hash round trips", () => {
-    const header = mkHeader();
-    const encoded = encodeHeader(header);
-    // 5 × 32 (roots) + 3 × 8 (times) + 8 (presence flag) + 32 (vkey) + 8 (version) = 232
-    expect(encoded.length).toBe(232);
-    const decoded = decodeHeader(encoded);
-    expect(decoded.prev_header_hash).toBeUndefined();
-    expect(decoded.utxos_root).toEqual(hash32B);
-    expect(decoded.start_time).toBe(1000);
-    expect(decoded.protocol_version).toBe(1);
-    expect(decoded.operator_vkey).toEqual(hash32F);
-  });
+it("round trips header without previous hash", () => {
+  const header = mkHeader();
+  const encoded = encodeHeader(header);
+  // 5 × 32 (roots) + 3 × 8 (times) + 8 (presence flag) + 32 (vkey) + 8 (version) = 232
+  expect(encoded.length).toBe(232);
+  const decoded = decodeHeader(encoded);
+  expect(decoded.prev_header_hash).toBeUndefined();
+  expect(decoded.utxos_root).toEqual(hash32B);
+  expect(decoded.start_time).toBe(1000);
+  expect(decoded.protocol_version).toBe(1);
+  expect(decoded.operator_vkey).toEqual(hash32F);
 });
 
-describe("Header with previous hash round trips", () => {
-  it("Header with previous hash round trips", () => {
-    const header = mkHeader({ prev_header_hash: hash28A });
-    const encoded = encodeHeader(header);
-    // 232 (base) + 32 (hash28 padded to 32) = 264
-    expect(encoded.length).toBe(264);
-    const decoded = decodeHeader(encoded);
-    expect(decoded.prev_header_hash).toEqual(hash28A);
-  });
+it("round trips header with previous hash", () => {
+  const header = mkHeader({ prev_header_hash: hash28A });
+  const encoded = encodeHeader(header);
+  // 232 (base) + 32 (hash28 padded to 32) = 264
+  expect(encoded.length).toBe(264);
+  const decoded = decodeHeader(encoded);
+  expect(decoded.prev_header_hash).toEqual(hash28A);
 });
 
-describe("Empty block body round trips", () => {
-  it("Empty block body round trips", () => {
-    const encoded = encodeBlockBody(emptyBlockBody);
-    const decoded = decodeBlockBody(encoded);
-    expect(decoded.utxos.length).toBe(0);
-    expect(decoded.transactions.length).toBe(0);
-    expect(decoded.deposits.length).toBe(0);
-    expect(decoded.withdrawals.length).toBe(0);
-  });
+it("round trips an empty block body", () => {
+  const encoded = encodeBlockBody(emptyBlockBody);
+  const decoded = decodeBlockBody(encoded);
+  expect(decoded.utxos.length).toBe(0);
+  expect(decoded.transactions.length).toBe(0);
+  expect(decoded.deposits.length).toBe(0);
+  expect(decoded.withdrawals.length).toBe(0);
 });
 
-describe("Populated block body round trips", () => {
-  it("Populated block body round trips", () => {
-    const body: BlockBody = {
+it("round trips a populated block body", () => {
+  const body: BlockBody = {
+    utxos: [
+      [
+        { tx_id: hash32A, index: 0 },
+        {
+          address: addressA,
+          value: { type: "Coin", coin: 1_000_000n },
+          datum: undefined,
+          script_ref: undefined,
+        },
+      ],
+    ],
+    transactions: [[hash32B, minimalTx]],
+    deposits: [
+      [
+        { tx_id: hash32C, index: 0 },
+        { l2_address: addressA, l2_datum: undefined },
+      ],
+    ],
+    withdrawals: [
+      [
+        { tx_id: hash32D, index: 0 },
+        {
+          l2_outref: { tx_id: hash32A, index: 0 },
+          l1_address: addressA,
+          l1_datum: undefined,
+        },
+      ],
+    ],
+  };
+
+  const encoded = encodeBlockBody(body);
+  const decoded = decodeBlockBody(encoded);
+  expect(decoded.utxos.length).toBe(1);
+  expect(decoded.transactions.length).toBe(1);
+  expect(decoded.deposits.length).toBe(1);
+  expect(decoded.withdrawals.length).toBe(1);
+  expect(decoded.utxos[0][0].tx_id).toEqual(hash32A);
+  const decodedUtxoValue = decoded.utxos[0][1].value;
+  expect(decodedUtxoValue.type).toBe("Coin");
+  if (decodedUtxoValue.type !== "Coin") {
+    throw new Error("Expected coin value in decoded UTxO");
+  }
+  expect(decodedUtxoValue.coin).toBe(1_000_000n);
+});
+
+it("round trips a full block", () => {
+  const block: Block = {
+    header_hash: hash28A,
+    header: mkHeader(),
+    block_body: {
       utxos: [
         [
           { tx_id: hash32A, index: 0 },
           {
             address: addressA,
-            value: { type: "Coin", coin: 1_000_000n },
+            value: { type: "Coin", coin: 500_000n },
             datum: undefined,
             script_ref: undefined,
           },
         ],
       ],
-      transactions: [[hash32B, minimalTx]],
-      deposits: [
-        [
-          { tx_id: hash32C, index: 0 },
-          { l2_address: addressA, l2_datum: undefined },
-        ],
-      ],
-      withdrawals: [
-        [
-          { tx_id: hash32D, index: 0 },
-          {
-            l2_outref: { tx_id: hash32A, index: 0 },
-            l1_address: addressA,
-            l1_datum: undefined,
-          },
-        ],
-      ],
-    };
+      transactions: [],
+      deposits: [],
+      withdrawals: [],
+    },
+  };
 
-    const encoded = encodeBlockBody(body);
-    const decoded = decodeBlockBody(encoded);
-    expect(decoded.utxos.length).toBe(1);
-    expect(decoded.transactions.length).toBe(1);
-    expect(decoded.deposits.length).toBe(1);
-    expect(decoded.withdrawals.length).toBe(1);
-    expect(decoded.utxos[0][0].tx_id).toEqual(hash32A);
-    if (decoded.utxos[0][1].value.type === "Coin") {
-      expect(decoded.utxos[0][1].value.coin).toBe(1_000_000n);
-    }
-  });
-});
-
-describe("Full block round trips", () => {
-  it("Full block round trips", () => {
-    const block: Block = {
-      header_hash: hash28A,
-      header: mkHeader(),
-      block_body: {
-        utxos: [
-          [
-            { tx_id: hash32A, index: 0 },
-            {
-              address: addressA,
-              value: { type: "Coin", coin: 500_000n },
-              datum: undefined,
-              script_ref: undefined,
-            },
-          ],
-        ],
-        transactions: [],
-        deposits: [],
-        withdrawals: [],
-      },
-    };
-
-    const encoded = encodeBlock(block);
-    const decoded = decodeBlock(encoded);
-    expect(decoded.header_hash).toEqual(hash28A);
-    expect(decoded.header.utxos_root).toEqual(hash32B);
-    expect(decoded.block_body.utxos.length).toBe(1);
-    expect(decoded.block_body.transactions.length).toBe(0);
-  });
+  const encoded = encodeBlock(block);
+  const decoded = decodeBlock(encoded);
+  expect(decoded.header_hash).toEqual(hash28A);
+  expect(decoded.header.utxos_root).toEqual(hash32B);
+  expect(decoded.block_body.utxos.length).toBe(1);
+  expect(decoded.block_body.transactions.length).toBe(0);
 });
