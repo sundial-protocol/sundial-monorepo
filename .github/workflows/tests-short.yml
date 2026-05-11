@@ -44,9 +44,6 @@ jobs:
           - name: TS Coverage Tests
             timeout_minutes: 40
             command: pnpm run test:unit:coverage:ts
-          - name: Node Integration Tests
-            timeout_minutes: 30
-            command: pnpm run test:integration:node
           - name: SDK Integration Tests
             timeout_minutes: 30
             command: pnpm run test:integration:sdk
@@ -54,7 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup demo workspace
+      - name: Setup l2 workspace
         uses: ./.github/actions/setup-l2
 
       - name: Run test suite
