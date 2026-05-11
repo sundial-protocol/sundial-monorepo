@@ -1,0 +1,34 @@
+# OSV Scanner configuration
+# https://google.github.io/osv-scanner/configuration/
+
+# License overrides for packages whose license cannot be resolved from the
+# public registry (private/internal packages or packages missing a license
+# field despite having a LICENSE file on disk).
+
+[[PackageOverrides]]
+name = "@lucid-evolution/uplc"
+version = "0.2.20"
+ecosystem = "npm"
+license.override = ["MIT"]
+reason = "MIT confirmed in the bundled LICENSE file; package.json omits the license field"
+
+[[PackageOverrides]]
+name = "i"
+version = "0.3.7"
+ecosystem = "npm"
+license.override = ["MIT"]
+reason = "MIT confirmed in the bundled LICENSE file; package.json omits the license field"
+
+[[PackageOverrides]]
+name = "@al-ft/midgard-sdk"
+version = "0.1.0"
+ecosystem = "npm"
+license.override = ["ISC"]
+reason = "ISC declared in package.json; not resolvable from the public registry as this is a local workspace package"
+
+[[PackageOverrides]]
+name = "exit"
+version = "0.1.2"
+ecosystem = "npm"
+license.override = ["MIT"]
+reason = "MIT in the legacy licenses array in package.json; OSV scanner does not parse the legacy array format"

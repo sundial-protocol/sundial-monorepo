@@ -1,0 +1,30 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "*.tgz"]
+    },
+    "midgard-manager#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["packages/*/dist/**", "packages/*/*.tgz"]
+    },
+    "type-check": {
+      "dependsOn": ["^type-check"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "format": {
+      "cache": false
+    },
+    "format-check": {
+      "outputs": []
+    }
+  }
+}

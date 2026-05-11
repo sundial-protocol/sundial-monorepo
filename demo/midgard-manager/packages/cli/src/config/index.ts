@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import * as S from '@effect/schema/Schema';
+import * as S from 'effect/Schema';
 import { Effect } from 'effect';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';

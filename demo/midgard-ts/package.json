@@ -4,6 +4,7 @@
   "description": "Pure TypeScript port of the Midgard binary codec",
   "main": "dist/index.js",
   "scripts": {
+    "type-check": "tsc --noEmit -p tsconfig.quality.json --skipLibCheck",
     "test": "jest",
     "build": "tsc"
   },
