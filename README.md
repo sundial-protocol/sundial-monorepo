@@ -16,7 +16,7 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:security:start -->
-<img alt="Security" src="https://img.shields.io/badge/security-failing-red?style=flat-square" />
+<img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
 <!-- badge:security:end -->
     </td>
       </tr>
