@@ -64,7 +64,10 @@ describe("NodeConfig", () => {
       const mainnetProvider = ConfigProvider.fromMap(
         new Map([
           ["L1_PROVIDER", "Blockfrost"],
-          ["L1_BLOCKFROST_API_URL", "https://cardano-mainnet.blockfrost.io/api/v0"],
+          [
+            "L1_BLOCKFROST_API_URL",
+            "https://cardano-mainnet.blockfrost.io/api/v0",
+          ],
           ["L1_BLOCKFROST_KEY", "key"],
           ["L1_OGMIOS_KEY", "ogmios"],
           ["L1_KUPO_KEY", "kupo"],
