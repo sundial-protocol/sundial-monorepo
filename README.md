@@ -12,7 +12,7 @@ Submodules are listed below.
     <td>
       <!-- badge:quality:start -->
 <img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
-<!-- badge:quality:end -->
+<!-- badge:quality:end --> 
     </td>
     <td>
       <!-- badge:security:start -->
