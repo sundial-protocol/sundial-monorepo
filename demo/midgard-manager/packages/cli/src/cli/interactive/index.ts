@@ -103,7 +103,7 @@ class ManualCommandImpl {
     if (this._abortController) {
       try {
         this._abortController.abort();
-      } catch (e) {
+      } catch {
         // Ignore errors on cleanup
       }
     }
@@ -132,7 +132,7 @@ class ManualCommandImpl {
         const sectionMenu = menu.sections.find((s) => s.name === section);
         if (!sectionMenu) continue;
 
-        while (true) {
+        for (;;) {
           displayHeader(`${sectionMenu.name}`);
           displayKeyboardHints();
 

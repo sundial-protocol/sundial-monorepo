@@ -259,8 +259,8 @@ export const retrieve = (
     ) AS tx_union
     INNER JOIN ${sql(
       tableName,
-    )} ON tx_union.${sql(Tx.Columns.TX_ID)} = ${sql(tableName)}.${sql(Ledger.Columns.TX_ID)}
-    WHERE ${sql(Ledger.Columns.ADDRESS)} = ${address};`;
+    )} ON tx_union.${sql(Tx.Columns.TX_ID)} = ${sql(tableName)}.${sql(Columns.EVENT_ID)}
+    WHERE ${sql(tableName)}.${sql(Columns.ADDRESS)} = ${address};`;
 
     return result.map((r) => r[Tx.Columns.TX]);
   }).pipe(

@@ -1,0 +1,74 @@
+name: Quality
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - demo/**
+      - .github/actions/setup-l2/**
+      - .github/workflows/quality.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  OSV_SCANNER_VERSION: 2.3.8
+
+jobs:
+  checks:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-slim
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Format Check
+            timeout_minutes: 20
+            command: pnpm run quality:format:check:all
+          - name: Lint Check
+            timeout_minutes: 20
+            command: pnpm run quality:lint:check:all
+          - name: Type Check
+            timeout_minutes: 20
+            command: pnpm run quality:type:all
+          - name: Build
+            timeout_minutes: 30
+            command: pnpm run build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup l2 workspace
+        uses: ./.github/actions/setup-l2
+
+      - name: Run check
+        run: ${{ matrix.command }}
+        working-directory: demo
+
+  osv-check:
+    name: OSV Check
+    runs-on: ubuntu-slim
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup l2 workspace
+        uses: ./.github/actions/setup-l2
+
+      - name: Install OSV-Scanner
+        run: |
+          curl -sSfL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64" -o "$RUNNER_TEMP/osv-scanner"
+          chmod +x "$RUNNER_TEMP/osv-scanner"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Run OSV check
+        run: pnpm run quality:osv:check
+        working-directory: demo

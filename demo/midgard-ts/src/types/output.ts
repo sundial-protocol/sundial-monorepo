@@ -397,7 +397,10 @@ export interface TransactionOutputPartial {
 
 // fuel: fuel-types/src/canonical.rs:101 — Serialize::encode_static
 // fuel: fuel-types/src/canonical.rs:301 — Vec<u8>::encode_static (address len + datum/script_ref lens)
-export function writeTransactionOutputStatic(w: Writer, o: TransactionOutput): void {
+export function writeTransactionOutputStatic(
+  w: Writer,
+  o: TransactionOutput,
+): void {
   writeAddressStatic(w, o.address);
   writeValueStatic(w, o.value);
   // datum: Option<Vec<u8>>
@@ -418,7 +421,10 @@ export function writeTransactionOutputStatic(w: Writer, o: TransactionOutput): v
 
 // fuel: fuel-types/src/canonical.rs:106 — Serialize::encode_dynamic
 // fuel: fuel-types/src/canonical.rs:309 — Vec<u8>::encode_dynamic (bytes + tail alignment pad)
-export function writeTransactionOutputDynamic(w: Writer, o: TransactionOutput): void {
+export function writeTransactionOutputDynamic(
+  w: Writer,
+  o: TransactionOutput,
+): void {
   writeAddressDynamic(w, o.address);
   writeValueDynamic(w, o.value);
   if (o.datum !== undefined) writeVarBytesDynamic(w, o.datum);
@@ -427,7 +433,9 @@ export function writeTransactionOutputDynamic(w: Writer, o: TransactionOutput): 
 
 // fuel: fuel-types/src/canonical.rs:167 — Deserialize::decode_static
 // fuel: fuel-types/src/canonical.rs:332 — Vec<u8>::decode_static (reads lens, stores as capacity)
-export function readTransactionOutputStatic(r: Reader): TransactionOutputPartial {
+export function readTransactionOutputStatic(
+  r: Reader,
+): TransactionOutputPartial {
   const addrLen = readAddressLen(r);
   const value = readValueStatic(r);
   const datumPresent = readU64(r) !== 0;

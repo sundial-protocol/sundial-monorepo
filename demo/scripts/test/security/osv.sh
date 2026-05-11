@@ -2,9 +2,10 @@
 set -euo pipefail
 
 readonly script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly repo_root="$(cd "${script_dir}/.." && pwd)"
+readonly demo_root="$(cd "${script_dir}/../../.." && pwd)"
+readonly config_path="${script_dir}/osv-scanner.toml"
 
-readonly allowed_licenses="MIT,Apache-2.0,ISC,BSD-2-Clause,BSD-3-Clause,0BSD,BlueOak-1.0.0,CC0-1.0,CC-BY-4.0,MPL-2.0,Python-2.0,Unlicense"
+readonly allowed_licenses="MIT,Apache-2.0,ISC,BSD-2-Clause,BSD-3-Clause,0BSD,BlueOak-1.0.0,CC0-1.0,CC-BY-4.0,MPL-2.0,Python-2.0,Unlicense,Artistic-2.0"
 
 is_remote_license_failure() {
   local output="$1"
@@ -18,7 +19,7 @@ is_remote_license_failure() {
 
 run_scan() {
   (
-    cd "${repo_root}"
+    cd "${demo_root}"
     "$@"
   )
 }
@@ -31,17 +32,17 @@ fi
 echo "[quality-osv] running vulnerability scan."
 run_scan osv-scanner scan source \
   -r \
-  --config osv-scanner.toml \
-  demo
+  --config "${config_path}" \
+  .
 
 echo "[quality-osv] running online license scan."
 license_output_file="$(mktemp)"
 
 if run_scan osv-scanner scan source \
   -r \
-  --config osv-scanner.toml \
+  --config "${config_path}" \
   --licenses="${allowed_licenses}" \
-  demo >"${license_output_file}" 2>&1; then
+  . >"${license_output_file}" 2>&1; then
   cat "${license_output_file}"
   rm -f "${license_output_file}"
   exit 0

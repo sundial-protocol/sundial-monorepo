@@ -1,0 +1,32 @@
+name: Setup L2 Workspace
+description: Setup pnpm+node, install L2 dependencies, and build SDK declarations
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: pnpm
+        cache-dependency-path: demo/pnpm-lock.yaml
+
+    - name: Install workspace dependencies
+      shell: bash
+      working-directory: demo
+      run: pnpm install --frozen-lockfile
+
+    - name: Install midgard-manager workspace dependencies
+      shell: bash
+      working-directory: demo/midgard-manager
+      run: pnpm install --frozen-lockfile
+
+    - name: Build SDK declarations for workspace consumers
+      shell: bash
+      working-directory: demo
+      run: pnpm --filter @al-ft/midgard-sdk run build

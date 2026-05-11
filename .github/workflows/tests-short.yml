@@ -1,0 +1,59 @@
+name: Tests / Short
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - demo/**
+      - .github/actions/setup-l2/**
+      - .github/workflows/tests-short.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-short-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  short-tests:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-slim
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Node Unit Tests
+            timeout_minutes: 20
+            command: pnpm run test:unit:node
+          - name: SDK Unit Tests
+            timeout_minutes: 20
+            command: pnpm run test:unit:sdk
+          - name: TS Unit Tests
+            timeout_minutes: 20
+            command: pnpm run test:unit:ts
+          - name: Node Coverage Tests
+            timeout_minutes: 40
+            command: pnpm run test:unit:coverage:node
+          - name: SDK Coverage Tests
+            timeout_minutes: 40
+            command: pnpm run test:unit:coverage:sdk
+          - name: TS Coverage Tests
+            timeout_minutes: 40
+            command: pnpm run test:unit:coverage:ts
+          - name: SDK Integration Tests
+            timeout_minutes: 30
+            command: pnpm run test:integration:sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup l2 workspace
+        uses: ./.github/actions/setup-l2
+
+      - name: Run test suite
+        run: ${{ matrix.command }}
+        working-directory: demo

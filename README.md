@@ -2,6 +2,60 @@
 A collection of tools and libraries comprising the Sundial Layer 2 blockchain.
 Submodules are listed below.
 
+<table>
+  <tr>
+    <td>
+      <!-- badge:build:start -->
+<img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" />
+<!-- badge:build:end -->
+    </td>
+    <td>
+      <!-- badge:quality:start -->
+<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
+<!-- badge:quality:end -->
+    </td>
+    <td>
+      <!-- badge:security:start -->
+<img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+<!-- badge:security:end -->
+    </td>
+      </tr>
+        <tr>
+        <td>
+      <!-- badge:unit:start -->
+<img alt="Unit Tests" src="https://img.shields.io/badge/unit%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:unit:end -->
+    </td>
+    <td>
+      <!-- badge:integration:start -->
+<img alt="Integration Tests" src="https://img.shields.io/badge/integration%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:integration:end -->
+    </td>
+    <td>
+      <!-- badge:e2e:start -->
+<img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-passing-brightgreen?style=flat-square" />
+<!-- badge:e2e:end -->
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <!-- badge:node-coverage:start -->
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-66.3%25-orange?style=flat-square" />
+<!-- badge:node-coverage:end -->
+    </td>
+    <td>
+      <!-- badge:sdk-coverage:start -->
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-75.9%25-orange?style=flat-square" />
+<!-- badge:sdk-coverage:end -->
+    </td>
+    <td>
+      <!-- badge:ts-coverage:start -->
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-81.2%25-yellowgreen?style=flat-square" />
+<!-- badge:ts-coverage:end -->
+    </td>
+  </tr>
+</table>
+
 # Documentation
 `/internal-docs` - Internal documentation for Sundial developers.
 

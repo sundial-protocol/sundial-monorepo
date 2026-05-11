@@ -1,0 +1,41 @@
+name: Tests / Long
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - demo/**
+      - .github/actions/setup-l2/**
+      - .github/workflows/tests-long.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-long-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  long-tests:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: E2E Tests
+            timeout_minutes: 60
+            command: pnpm run test:e2e:all
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup l2 workspace
+        uses: ./.github/actions/setup-l2
+
+      - name: Run test suite
+        run: ${{ matrix.command }}
+        working-directory: demo

@@ -656,7 +656,10 @@ export function readTransactionStatic(r: Reader): TransactionPartial {
 }
 
 // fuel: fuel-types/src/canonical.rs:172 — Deserialize::decode_dynamic
-export function readTransactionDynamic(r: Reader, p: TransactionPartial): Transaction {
+export function readTransactionDynamic(
+  r: Reader,
+  p: TransactionPartial,
+): Transaction {
   const body = readTransactionBodyDynamic(r, p.bodyPartial);
   const witness_set = readTransactionWitnessSetDynamic(r, p.wsMask);
   return { body, witness_set, is_valid: p.is_valid };

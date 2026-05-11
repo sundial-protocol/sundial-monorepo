@@ -11,7 +11,7 @@ on:
 
 jobs:
   generate_pdf:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     
     # Add permissions for GitHub Pages
     permissions:

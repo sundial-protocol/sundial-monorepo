@@ -1,5 +1,5 @@
 import { Args, Command, Options } from '@effect/cli';
-import { startGenerator, stopGenerator } from '@midgard-manager/tx-generator';
+import { startGenerator } from '@midgard-manager/tx-generator';
 import chalk from 'chalk';
 import { Effect, pipe } from 'effect';
 import fs from 'fs/promises';
@@ -68,7 +68,7 @@ const loadSchedules = async (): Promise<ScheduleConfig> => {
     try {
       const data = await fs.readFile(SCHEDULE_CONFIG_PATH, 'utf-8');
       return JSON.parse(data);
-    } catch (error) {
+    } catch {
       // If file doesn't exist, create empty config
       const emptyConfig: ScheduleConfig = { schedules: [] };
       await fs.writeFile(SCHEDULE_CONFIG_PATH, JSON.stringify(emptyConfig, null, 2));

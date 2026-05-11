@@ -14,7 +14,6 @@ import {
 import { waitWritable } from '../../utils/common.js';
 import { MidgardNodeClient } from '../client/node-client.js';
 import { SerializedMidgardTransaction } from '../client/types.js';
-import { Int } from 'effect/Schema';
 
 /**
  * Configuration for generating one-to-one transactions.
@@ -100,7 +99,7 @@ const initializeLucid = async (emulator: Emulator, network: Network): Promise<Lu
 const generateOneToOneTransactions = async (
   config: OneToOneTransactionConfig
 ): Promise<SerializedMidgardTransaction[]> => {
-  const { network, initialUTxO, txsCount, writable, nodeClient, walletSeedOrPrivateKey } = config;
+  const { network, initialUTxO, txsCount, writable, walletSeedOrPrivateKey } = config;
 
   // Validate configuration
   validateConfig(config);
@@ -130,8 +129,9 @@ const generateOneToOneTransactions = async (
   try {
     // First transaction to move away from genesis UTxO
     const initialTxBuilder = lucid.newTx();
-    const [initialNewWalletUTxOs, initialDerivedOutputs, initialTxSignBuilder] =
-      await initialTxBuilder.pay.ToAddress(initialUTxO.address, initialUTxO.assets).chain();
+    const [, , initialTxSignBuilder] = await initialTxBuilder.pay
+      .ToAddress(initialUTxO.address, initialUTxO.assets)
+      .chain();
 
     const initialTxSigned = await initialTxSignBuilder.sign
       .withPrivateKey(walletSeedOrPrivateKey)
@@ -151,7 +151,7 @@ const generateOneToOneTransactions = async (
     for (let i = 0; i < txsCount; i++) {
       const txBuilder = lucid.newTx();
 
-      const [newWalletUTxOs, derivedOutputs, txSignBuilder] = await txBuilder.pay
+      const [newWalletUTxOs, , txSignBuilder] = await txBuilder.pay
         .ToAddressWithData(
           initialUTxO.address,
           { kind: 'inline', value: Data.to(generateUniqueHexDatum(i)) },

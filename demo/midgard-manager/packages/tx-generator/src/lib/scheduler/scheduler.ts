@@ -1,9 +1,9 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { Network, UTxO } from '@lucid-evolution/lucid';
+import { UTxO } from '@lucid-evolution/lucid';
 import pLimit from 'p-limit';
 
 import { MidgardNodeClient } from '../client/node-client.js';
