@@ -2,4 +2,3 @@ packages:
   - midgard-node
   - midgard-sdk
   - midgard-ts
-  - midgard-manager

@@ -11,8 +11,8 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:quality:start -->
-<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
-<!-- badge:quality:end -->
+<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" /> 
+<!-- badge:quality:end --> 
     </td>
     <td>
       <!-- badge:security:start -->

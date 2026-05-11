@@ -1,6 +1,8 @@
 repository cardano-haskell-packages
   url: https://chap.intersectmbo.org/
   secure: True
+  -- Public TUF root key fingerprints for repository metadata verification.
+  -- These are trust anchors, not private credentials.
   root-keys:
     3e0cce471cf09815f930210f7827266fd09045445d65923e6d0238a6cd15126f
     443abb7fb497a134c343faf52f0b659bd7999bc06b7f63fa76dc99d631f9bea1

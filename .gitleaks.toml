@@ -1,0 +1,11 @@
+title = "Sundial Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore generic-api-key false positives in archived demo logs"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)demo/midgard-node/logs/.*\.log$'''
+]
