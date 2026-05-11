@@ -1,4 +1,4 @@
-import * as S from '@effect/schema/Schema';
+import * as S from 'effect/Schema';
 
 // URL validation schema
 export const URLSchema = S.String.pipe(
