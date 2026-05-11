@@ -4,12 +4,21 @@ import { resolve } from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
 
-const DEFAULT_DATABASE_PATHS = ['.tmp/codeql/database', '.tmp/codeql-probe-db'];
+const PROJECTS = ['midgard-ts', 'midgard-sdk', 'midgard-node', 'midgard-manager'];
+const DEFAULT_DATABASE_PATHS = [
+  ...PROJECTS.map((p) => `.tmp/codeql/database-${p}`),
+  '.tmp/codeql/database',
+  '.tmp/codeql-probe-db',
+];
 const QUERY_PACK = 'codeql/javascript-queries';
 
 function resolveDatabasePath(pathArg) {
   if (pathArg) {
-    return resolve(process.cwd(), pathArg);
+    // Accept a bare project name (e.g. "midgard-ts") or a full path.
+    const candidate = pathArg.includes('/')
+      ? resolve(process.cwd(), pathArg)
+      : resolve(process.cwd(), `.tmp/codeql/database-${pathArg}`);
+    return candidate;
   }
 
   for (const candidate of DEFAULT_DATABASE_PATHS) {
@@ -20,7 +29,7 @@ function resolveDatabasePath(pathArg) {
   }
 
   throw new Error(
-    `No CodeQL database found. Tried: ${DEFAULT_DATABASE_PATHS.join(', ')}. Run npm run codeql:check first, or pass a database path explicitly.`,
+    `No CodeQL database found. Tried: ${DEFAULT_DATABASE_PATHS.join(', ')}. Run a security:codeql:check:<project> script first, or pass a project name (e.g. midgard-ts) or database path explicitly.`,
   );
 }
 

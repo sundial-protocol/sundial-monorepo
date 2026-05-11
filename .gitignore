@@ -13,8 +13,7 @@ utils.log
 # temp directory
 .temp
 .tmp
-/test/fixtures/bitcoind/artifacts
-/test/fixtures/bitcoind/work
+audits
 .terraform/
 *.tfstate
 *.tfstate.*
@@ -40,4 +39,32 @@ audits/raw
 /.vscode
 
 # local security scan reports
-/gitleaks-report.json
+gitleaks-report.json
+
+# build and package manager artifacts
+node_modules/
+dist/
+out/
+.turbo/
+.pnp
+.pnp.js
+
+# local env overrides
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# runtime output
+temp/
+logs/
+error.json
+error.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# framework/tooling caches
+.vercel/
+.next/
+.DS_Store
