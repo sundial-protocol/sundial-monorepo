@@ -20,7 +20,7 @@ concurrency:
 env:
   GITLEAKS_VERSION: 8.30.1
   GITLEAKS_REPORT_PATH: temp/gitleaks-report.json
-  TRIVY_VERSION: 0.58.2
+  TRIVY_VERSION: 0.70.0
 
 jobs:
   audit:

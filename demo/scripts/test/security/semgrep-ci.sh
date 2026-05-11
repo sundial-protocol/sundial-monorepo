@@ -22,19 +22,19 @@ if ! command -v semgrep >/dev/null 2>&1; then
   exit 1
 fi
 
+readonly SEMGREP_TARGET="${1:-${DEFAULT_SEMGREP_TARGET}}"
+
 echo "[security-semgrep-ci] starting semgrep ci timeout_seconds=${SEMGREP_CI_TIMEOUT_SECONDS}" >&2
 
-if [[ $# -eq 0 ]]; then
-  set -- "${DEFAULT_SEMGREP_TARGET}"
-fi
+cd "${SEMGREP_TARGET}"
 
 if ! command -v timeout >/dev/null 2>&1; then
   echo "[security-semgrep-ci] timeout command unavailable; running semgrep without outer timeout guard." >&2
-  exec semgrep ci --disable-version-check --no-suppress-errors "$@"
+  exec semgrep ci --disable-version-check --no-suppress-errors
 fi
 
 set +e
-timeout --foreground "${SEMGREP_CI_TIMEOUT_SECONDS}s" semgrep ci --disable-version-check --no-suppress-errors "$@"
+timeout --foreground "${SEMGREP_CI_TIMEOUT_SECONDS}s" semgrep ci --disable-version-check --no-suppress-errors
 semgrep_exit_code=$?
 set -e
 
