@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - demo/**
+      - .github/actions/setup-demo/**
       - .github/workflows/quality.yml
   workflow_dispatch:
 
@@ -20,116 +21,38 @@ env:
   OSV_SCANNER_VERSION: 2.3.8
 
 jobs:
-  format-check:
-    name: Format Check
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-slim
-    timeout-minutes: 20
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Format Check
+            timeout_minutes: 20
+            command: pnpm run quality:format:check:all
+          - name: Lint Check
+            timeout_minutes: 20
+            command: pnpm run quality:lint:check:all
+          - name: Type Check
+            timeout_minutes: 20
+            command: pnpm run quality:type:all
+          - name: Knip Check
+            timeout_minutes: 20
+            command: pnpm run quality:knip:check
+          - name: Build
+            timeout_minutes: 30
+            command: pnpm run build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      - name: Setup demo workspace
+        uses: ./.github/actions/setup-demo
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run format check
-        run: pnpm run quality:format:check:all
-        working-directory: demo
-
-  lint-check:
-    name: Lint Check
-    runs-on: ubuntu-slim
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run lint check
-        run: pnpm run quality:lint:check:all
-        working-directory: demo
-
-  type-check:
-    name: Type Check
-    runs-on: ubuntu-slim
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run type checks
-        run: pnpm run quality:type:all
-        working-directory: demo
-
-  build:
-    name: Build
-    runs-on: ubuntu-slim
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run build
-        run: pnpm run build
+      - name: Run check
+        run: ${{ matrix.command }}
         working-directory: demo
 
   osv-check:
@@ -140,21 +63,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
+      - name: Setup demo workspace
+        uses: ./.github/actions/setup-demo
 
       - name: Install OSV-Scanner
         run: |

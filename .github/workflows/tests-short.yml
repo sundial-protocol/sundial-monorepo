@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - demo/**
+      - .github/actions/setup-demo/**
       - .github/workflows/tests-short.yml
   workflow_dispatch:
 
@@ -17,142 +18,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  node-unit-tests:
-    name: Node Unit Tests
+  short-tests:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-slim
-    timeout-minutes: 20
+    timeout-minutes: ${{ matrix.timeout_minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Node Unit Tests
+            timeout_minutes: 20
+            command: pnpm run test:unit:node
+          - name: SDK Unit Tests
+            timeout_minutes: 20
+            command: pnpm run test:unit:sdk
+          - name: TS Unit Tests
+            timeout_minutes: 20
+            command: pnpm run test:unit:ts
+          - name: Node Integration Tests
+            timeout_minutes: 30
+            command: pnpm run test:integration:node
+          - name: SDK Integration Tests
+            timeout_minutes: 30
+            command: pnpm run test:integration:sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      - name: Setup demo workspace
+        uses: ./.github/actions/setup-demo
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run node unit tests
-        run: pnpm run test:unit:node
-        working-directory: demo
-
-  sdk-unit-tests:
-    name: SDK Unit Tests
-    runs-on: ubuntu-slim
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run SDK unit tests
-        run: pnpm run test:unit:sdk
-        working-directory: demo
-
-  ts-unit-tests:
-    name: TS Unit Tests
-    runs-on: ubuntu-slim
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run TS unit tests
-        run: pnpm run test:unit:ts
-        working-directory: demo
-
-  node-integration-tests:
-    name: Node Integration Tests
-    runs-on: ubuntu-slim
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run node integration tests
-        run: pnpm run test:integration:node
-        working-directory: demo
-
-  sdk-integration-tests:
-    name: SDK Integration Tests
-    runs-on: ubuntu-slim
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: demo/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: demo
-
-      - name: Run SDK integration tests
-        run: pnpm run test:integration:sdk
+      - name: Run test suite
+        run: ${{ matrix.command }}
         working-directory: demo

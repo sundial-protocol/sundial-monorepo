@@ -1,0 +1,29 @@
+name: Setup Demo Workspace
+description: Setup pnpm+node, bootstrap SDK tarball, and install demo workspace dependencies
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: pnpm
+        cache-dependency-path: demo/pnpm-lock.yaml
+
+    - name: Bootstrap SDK package tarball
+      shell: bash
+      working-directory: demo
+      run: |
+        pnpm install --frozen-lockfile --filter @al-ft/midgard-sdk
+        pnpm --filter @al-ft/midgard-sdk run repack
+
+    - name: Install workspace dependencies
+      shell: bash
+      working-directory: demo
+      run: pnpm install --frozen-lockfile
