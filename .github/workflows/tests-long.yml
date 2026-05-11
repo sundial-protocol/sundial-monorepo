@@ -1,0 +1,130 @@
+name: Tests / Long
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - demo/**
+      - .github/workflows/tests-long.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-long-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-coverage-tests:
+    name: Node Coverage Tests
+    runs-on: ubuntu-slim
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: demo/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: demo
+
+      - name: Run node coverage tests
+        run: pnpm run test:unit:coverage:node
+        working-directory: demo
+
+  sdk-coverage-tests:
+    name: SDK Coverage Tests
+    runs-on: ubuntu-slim
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: demo/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: demo
+
+      - name: Run SDK coverage tests
+        run: pnpm run test:unit:coverage:sdk
+        working-directory: demo
+
+  ts-coverage-tests:
+    name: TS Coverage Tests
+    runs-on: ubuntu-slim
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: demo/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: demo
+
+      - name: Run TS coverage tests
+        run: pnpm run test:unit:coverage:ts
+        working-directory: demo
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-slim
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: demo/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: demo
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e:all
+        working-directory: demo
