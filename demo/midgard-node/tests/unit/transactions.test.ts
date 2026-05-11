@@ -1,6 +1,16 @@
 import { describe, expect, vi } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
+import { CML } from "@lucid-evolution/lucid";
+import {
+  deserializeUTxOsFromStorage,
+  serializeUTxOsForStorage,
+} from "@/database/utils/common.js";
+import {
+  breakDownTx,
+  breakDownTxMinimally,
+  trivialTransactionFromCMLUnspentOutput,
+} from "@/utils.js";
 
 // Deterministic fixtures
 const txIdABytes = Buffer.alloc(32, 0xaa);
@@ -125,17 +135,6 @@ vi.mock("@lucid-evolution/lucid", () => {
     }),
   };
 });
-
-import {
-  trivialTransactionFromCMLUnspentOutput,
-  breakDownTx,
-  breakDownTxMinimally,
-} from "@/utils.js";
-import {
-  serializeUTxOsForStorage,
-  deserializeUTxOsFromStorage,
-} from "@/database/utils/common.js";
-import { CML } from "@lucid-evolution/lucid";
 
 const mockUnspentOutput = {
   output: () => ({ to_cbor_bytes: () => outputCborBytes }),

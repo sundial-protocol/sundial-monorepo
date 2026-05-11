@@ -1,6 +1,16 @@
 import { expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
+import * as AddressHistoryDB from "@/database/addressHistory.js";
+import * as MempoolDB from "@/database/mempool.js";
+import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
+import * as Tx from "@/database/utils/tx.js";
+import {
+  COMMON_ADDRESSES,
+  makeLedgerEntry,
+  makeTxEntryNoTimeStamp,
+} from "./harness/fixtures.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 vi.mock("@/database/addressHistory.js", async () => {
   const { Effect: E } = await import("effect");
@@ -57,17 +67,6 @@ vi.mock("@/database/utils/tx.js", async () => {
     delMultiple: vi.fn(() => E.succeed(undefined)),
   };
 });
-
-import * as AddressHistoryDB from "@/database/addressHistory.js";
-import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
-import * as Tx from "@/database/utils/tx.js";
-import * as MempoolDB from "@/database/mempool.js";
-import {
-  COMMON_ADDRESSES,
-  makeLedgerEntry,
-  makeTxEntryNoTimeStamp,
-} from "./harness/fixtures.js";
-import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 const txEntry = makeTxEntryNoTimeStamp(0xaa);
 const txIdA = txEntry.tx_id;

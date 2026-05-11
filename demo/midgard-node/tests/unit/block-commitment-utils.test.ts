@@ -1,6 +1,15 @@
 import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
+import * as Ledger from "@/database/utils/ledger.js";
+import * as Tx from "@/database/utils/tx.js";
+import * as UserEvents from "@/database/utils/user-events.js";
+import {
+  applyDepositsToLedger,
+  applyTxOrdersToLedger,
+  applyTxRequestsToLedger,
+  applyWithdrawalsToLedger,
+} from "@/workers/utils/block-commitment.js";
 import type { MidgardMpt } from "@/workers/utils/mpt.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
@@ -58,16 +67,6 @@ vi.mock("@/database/index.js", () => ({
   },
   BlocksDB: {},
 }));
-
-import * as Tx from "@/database/utils/tx.js";
-import * as UserEvents from "@/database/utils/user-events.js";
-import * as Ledger from "@/database/utils/ledger.js";
-import {
-  applyWithdrawalsToLedger,
-  applyTxOrdersToLedger,
-  applyTxRequestsToLedger,
-  applyDepositsToLedger,
-} from "@/workers/utils/block-commitment.js";
 
 beforeEach(() => {
   vi.clearAllMocks();

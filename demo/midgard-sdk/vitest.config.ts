@@ -15,5 +15,6 @@ export default defineConfig({
   test: {
     reporters: "verbose",
     include: ["./tests/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+    setupFiles: [resolve(__dirname, "../vitest/sdk.unit.setup.mjs")],
   },
 });

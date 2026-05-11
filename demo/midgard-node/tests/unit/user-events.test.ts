@@ -2,6 +2,10 @@ import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { SqlClient } from "@effect/sql";
+import * as DepositsDB from "@/database/deposits.js";
+import * as TxOrdersDB from "@/database/txOrders.js";
+import * as UserEvents from "@/database/utils/user-events.js";
+import * as WithdrawalsDB from "@/database/withdrawals.js";
 
 vi.mock("@/database/utils/user-events.js", async () => {
   const { Effect: E } = await import("effect");
@@ -21,11 +25,6 @@ vi.mock("@/database/utils/user-events.js", async () => {
     delEntries: vi.fn(() => E.succeed(undefined)),
   };
 });
-
-import * as UserEvents from "@/database/utils/user-events.js";
-import * as DepositsDB from "@/database/deposits.js";
-import * as TxOrdersDB from "@/database/txOrders.js";
-import * as WithdrawalsDB from "@/database/withdrawals.js";
 
 const eventId = Buffer.alloc(32, 0xaa);
 const eventInfo = Buffer.alloc(32, 0xbb);

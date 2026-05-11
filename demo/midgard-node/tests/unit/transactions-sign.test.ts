@@ -1,6 +1,15 @@
 import { describe, expect, vi } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
+import {
+  fetchFirstBlockTxs,
+  GenesisDepositError,
+  handleSignSubmitNoConfirmation,
+  TxConfirmError,
+  TxSignError,
+  TxSubmitError,
+} from "@/transactions/utils.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 const retrieveTxHashesByHeaderHashMock = vi.hoisted(() => vi.fn());
 const retrieveTxCborsByHashesMock = vi.hoisted(() => vi.fn());
@@ -27,16 +36,6 @@ vi.mock("@al-ft/midgard-sdk", () => ({
   },
   GenericErrorFields: {},
 }));
-
-import {
-  handleSignSubmitNoConfirmation,
-  TxSignError,
-  TxSubmitError,
-  TxConfirmError,
-  GenesisDepositError,
-  fetchFirstBlockTxs,
-} from "@/transactions/utils.js";
-import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 const mockTxHash = "aa".repeat(32);
 

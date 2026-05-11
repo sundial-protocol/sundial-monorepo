@@ -1,6 +1,12 @@
 import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
+import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
+import * as LatestLedgerDB from "@/database/latestLedger.js";
+import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
+import * as Ledger from "@/database/utils/ledger.js";
+import { makeLedgerEntry } from "./harness/fixtures.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 vi.mock("@/database/utils/ledger.js", async () => {
   const { Effect: E } = await import("effect");
@@ -25,13 +31,6 @@ vi.mock("@/database/utils/ledger.js", async () => {
     applyTx: vi.fn(() => E.succeed([])),
   };
 });
-
-import * as Ledger from "@/database/utils/ledger.js";
-import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
-import * as LatestLedgerDB from "@/database/latestLedger.js";
-import * as ConfirmedLedgerDB from "@/database/confirmedLedger.js";
-import { makeLedgerEntry } from "./harness/fixtures.js";
-import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 const testEntry = makeLedgerEntry(0xaa);
 const testEntryWithTimeStamp = {

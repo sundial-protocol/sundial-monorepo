@@ -110,7 +110,7 @@ class ManualCommandImpl {
   }
 
   async loop() {
-    for (;;) {
+    while (true) {
       try {
         displayHeader('Main Menu');
         await displayStatus(this._config);

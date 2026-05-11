@@ -10,6 +10,7 @@ readonly query_pack="codeql/javascript-queries"
 readonly sarif_output="${codeql_root}/results.sarif"
 readonly analysis_category="javascript-typescript"
 readonly high_security_threshold="4.0"
+readonly parser_script="${script_dir}/codeql-threshold-check.mjs"
 
 if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
   echo "[security-codeql] skipped in GitHub Actions: local-only due to licensing constraints." >&2
@@ -89,54 +90,4 @@ codeql database analyze "${database_root}" \
   --threads=0 \
   --no-download
 
-node --input-type=module -e '
-  import fs from "node:fs";
-
-  const sarifPath = process.argv[1];
-  const highSecurityThreshold = Number(process.argv[2]);
-  const sarif = JSON.parse(fs.readFileSync(sarifPath, "utf8"));
-  const run = sarif.runs?.[0];
-  const rules = [
-    ...(run?.tool?.driver?.rules ?? []),
-    ...((run?.tool?.extensions ?? []).flatMap((extension) => extension.rules ?? [])),
-  ];
-  const ruleMap = new Map(rules.map((rule) => [rule.id, rule]));
-  const results = run?.results ?? [];
-
-  const highOrHigherFindings = results.flatMap((result) => {
-    const rule = ruleMap.get(result.ruleId) ?? {};
-    const level = result.level ?? rule.defaultConfiguration?.level ?? "warning";
-    const securitySeverity = Number.parseFloat(rule.properties?.["security-severity"] ?? "0");
-    const uri = result.locations?.[0]?.physicalLocation?.artifactLocation?.uri ?? "unknown";
-
-    if (level !== "error" && securitySeverity < highSecurityThreshold) {
-      return [];
-    }
-
-    return [{
-      level,
-      ruleId: result.ruleId,
-      securitySeverity,
-      uri,
-    }];
-  });
-
-  if (highOrHigherFindings.length > 0) {
-    console.error(
-      `[security-codeql] analysis failed with ${highOrHigherFindings.length} fintech-threshold result(s). Review ${sarifPath}.`
-    );
-    for (const finding of highOrHigherFindings.slice(0, 10)) {
-      const securitySeverityText = Number.isFinite(finding.securitySeverity)
-        ? finding.securitySeverity.toFixed(1)
-        : "n/a";
-      console.error(
-        `[security-codeql] fintech_threshold ruleId=${finding.ruleId} level=${finding.level} security_severity=${securitySeverityText} location=${finding.uri}`
-      );
-    }
-    process.exit(1);
-  }
-
-  console.log(
-    `[security-codeql] analysis passed with ${results.length} total result(s) and 0 fintech-threshold result(s). Report: ${sarifPath}`
-  );
-' "${sarif_output}" "${high_security_threshold}"
+node "${parser_script}" "${sarif_output}" "${high_security_threshold}"

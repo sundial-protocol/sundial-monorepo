@@ -56,6 +56,7 @@ export default defineConfig({
   },
   test: {
     include: ["midgard-sdk/tests/integration/**/*.test.ts"],
+    setupFiles: ["vitest/sdk.unit.setup.mjs"],
     environment: "node",
     reporters: [["default", { summary: false }]],
     // Integration tests may open LevelDB or temporary directories; allow
