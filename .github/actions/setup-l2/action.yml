@@ -1,5 +1,5 @@
 name: Setup L2 Workspace
-description: Setup pnpm+node and install L2 workspace dependencies
+description: Setup pnpm+node, install L2 dependencies, and build SDK declarations
 
 runs:
   using: composite
@@ -25,3 +25,8 @@ runs:
       shell: bash
       working-directory: demo/midgard-manager
       run: pnpm install --frozen-lockfile
+
+    - name: Build SDK declarations for workspace consumers
+      shell: bash
+      working-directory: demo
+      run: pnpm --filter @al-ft/midgard-sdk run build

@@ -20,21 +20,12 @@ concurrency:
 jobs:
   long-tests:
     name: ${{ matrix.name }}
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
     timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Node Coverage Tests
-            timeout_minutes: 40
-            command: pnpm run test:unit:coverage:node
-          - name: SDK Coverage Tests
-            timeout_minutes: 40
-            command: pnpm run test:unit:coverage:sdk
-          - name: TS Coverage Tests
-            timeout_minutes: 40
-            command: pnpm run test:unit:coverage:ts
           - name: E2E Tests
             timeout_minutes: 60
             command: pnpm run test:e2e:all

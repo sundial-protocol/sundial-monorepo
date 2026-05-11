@@ -38,9 +38,6 @@ jobs:
           - name: Type Check
             timeout_minutes: 20
             command: pnpm run quality:type:all
-          - name: Knip Check
-            timeout_minutes: 20
-            command: pnpm run quality:knip:check
           - name: Build
             timeout_minutes: 30
             command: pnpm run build

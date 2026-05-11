@@ -35,6 +35,15 @@ jobs:
           - name: TS Unit Tests
             timeout_minutes: 20
             command: pnpm run test:unit:ts
+          - name: Node Coverage Tests
+            timeout_minutes: 40
+            command: pnpm run test:unit:coverage:node
+          - name: SDK Coverage Tests
+            timeout_minutes: 40
+            command: pnpm run test:unit:coverage:sdk
+          - name: TS Coverage Tests
+            timeout_minutes: 40
+            command: pnpm run test:unit:coverage:ts
           - name: Node Integration Tests
             timeout_minutes: 30
             command: pnpm run test:integration:node
