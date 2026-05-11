@@ -108,8 +108,8 @@ importers:
         specifier: ^1.3.1
         version: 1.3.1
       '@al-ft/midgard-sdk':
-        specifier: file:../midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz
-        version: file:midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
+        specifier: workspace:*
+        version: link:../midgard-sdk
       '@effect/cluster':
         specifier: ^0.58.2
         version: 0.58.2(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/sql@0.51.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/workflow@0.18.1(@effect/experimental@0.60.0(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(@effect/platform@0.96.1(effect@3.21.2))(@effect/rpc@0.75.1(@effect/platform@0.96.1(effect@3.21.2))(effect@3.21.2))(effect@3.21.2))(effect@3.21.2)
@@ -301,10 +301,6 @@ packages:
 
   '@aiken-lang/merkle-patricia-forestry@1.3.1':
     resolution: {integrity: sha512-vKypwCNMH7SgP8JQ/fQyXjhDC16DqTiW9x9dLK6AXe2tEWVouNy2GMKmOaS4l6ZF7pTjty5XCD+MqnsxXJBIgg==}
-
-  '@al-ft/midgard-sdk@file:midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-mNtNEFlY5Z8K6jrqqQA2yqdimQ33SoRlmnT4TqrPa1UuCIWxs5Pva3EF5XbfomGkWCnJ4y4GTi7mzf9/EElFcg==, tarball: file:midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz}
-    version: 0.1.0
 
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
@@ -4254,26 +4250,6 @@ snapshots:
       level: 8.0.1
     transitivePeerDependencies:
       - react-native-b4a
-
-  '@al-ft/midgard-sdk@file:midgard-sdk/al-ft-midgard-sdk-0.1.0.tgz(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)':
-    dependencies:
-      '@harmoniclabs/crypto': 0.3.0
-      '@lucid-evolution/lucid': 0.4.30(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)
-      '@noble/hashes': 1.8.0
-      effect: 3.21.2
-    transitivePeerDependencies:
-      - '@dcspark/cardano-multiplatform-lib-asmjs'
-      - '@dcspark/cardano-multiplatform-lib-browser'
-      - '@dcspark/cardano-multiplatform-lib-nodejs'
-      - '@harmoniclabs/bytestring'
-      - '@harmoniclabs/cbor'
-      - '@harmoniclabs/pair'
-      - bufferutil
-      - encoding
-      - fast-check
-      - react-native-b4a
-      - rxjs
-      - utf-8-validate
 
   '@ampproject/remapping@2.3.0':
     dependencies:
