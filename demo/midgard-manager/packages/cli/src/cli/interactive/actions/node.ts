@@ -36,7 +36,7 @@ export const configureNodeEndpoint: Action = {
               try {
                 new URL(value);
                 return true;
-              } catch (e) {
+              } catch {
                 return 'Please enter a valid URL (e.g. http://localhost:3000)';
               }
             },

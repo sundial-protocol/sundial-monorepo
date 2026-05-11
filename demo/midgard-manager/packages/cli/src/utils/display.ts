@@ -39,7 +39,7 @@ export async function displayStatus(config: MidgardConfig) {
     // Use a quick timeout of 500ms for better UI responsiveness
     const timeoutMs = 500;
     nodeConnected = await nodeClient.isAvailable(timeoutMs);
-  } catch (error) {
+  } catch {
     // On errors, assume disconnected
     nodeConnected = false;
   }

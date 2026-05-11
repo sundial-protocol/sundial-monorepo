@@ -59,7 +59,7 @@ export class MidgardNodeClient {
 
         throw error; // Re-throw other errors to be caught by the outer try/catch
       }
-    } catch (error) {
+    } catch {
       return false;
     }
   }

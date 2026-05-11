@@ -68,7 +68,7 @@ const loadSchedules = async (): Promise<ScheduleConfig> => {
     try {
       const data = await fs.readFile(SCHEDULE_CONFIG_PATH, 'utf-8');
       return JSON.parse(data);
-    } catch (error) {
+    } catch {
       // If file doesn't exist, create empty config
       const emptyConfig: ScheduleConfig = { schedules: [] };
       await fs.writeFile(SCHEDULE_CONFIG_PATH, JSON.stringify(emptyConfig, null, 2));

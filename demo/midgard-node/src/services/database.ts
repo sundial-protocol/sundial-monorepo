@@ -21,23 +21,10 @@ const createPgLayerEffect = Effect.gen(function* () {
     connectTimeout: Duration.seconds(2),
   });
   return Layer.mapError(pgClientLayer, (e) => {
-    switch (e._tag) {
-      case "ConfigError":
-        return new ConfigError({
-          message: "Improper config file provided",
-          cause: e,
-          fieldsAndValues: [
-            ["POSTGRES_HOST", nodeConfig.POSTGRES_HOST],
-            ["POSTGRES_USER", nodeConfig.POSTGRES_USER],
-            ["POSTGRES_DB", nodeConfig.POSTGRES_DB],
-          ],
-        });
-      case "SqlError":
-        return new DatabaseInitializationError({
-          message: `Failed to initialize the database`,
-          cause: e,
-        });
-    }
+    return new DatabaseInitializationError({
+      message: "Failed to initialize the database",
+      cause: e,
+    });
   });
 }).pipe(Effect.orDie);
 

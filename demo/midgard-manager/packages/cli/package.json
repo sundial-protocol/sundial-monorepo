@@ -14,7 +14,7 @@
     "type-check": "tsc -b tsconfig.json",    
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint . --max-warnings=0",
     "start": "node dist/bin.js",
-    "copy-package-json": "tsx scripts/copy-package-json.ts",
+    "copy-package-json": "node scripts/copy-package-json.mjs",
     "test": "echo 'No tests yet' && exit 0"
   },
   "dependencies": {

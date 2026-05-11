@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly DEMO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+readonly DEFAULT_SEMGREP_TARGET="${DEMO_ROOT}"
 readonly SEMGREP_CI_TIMEOUT_DEFAULT_SECONDS=900
 readonly SEMGREP_CI_TIMEOUT_SECONDS="${SEMGREP_CI_TIMEOUT_SECONDS:-${SEMGREP_CI_TIMEOUT_DEFAULT_SECONDS}}"
 
@@ -20,6 +23,10 @@ if ! command -v semgrep >/dev/null 2>&1; then
 fi
 
 echo "[security-semgrep-ci] starting semgrep ci timeout_seconds=${SEMGREP_CI_TIMEOUT_SECONDS}" >&2
+
+if [[ $# -eq 0 ]]; then
+  set -- "${DEFAULT_SEMGREP_TARGET}"
+fi
 
 if ! command -v timeout >/dev/null 2>&1; then
   echo "[security-semgrep-ci] timeout command unavailable; running semgrep without outer timeout guard." >&2

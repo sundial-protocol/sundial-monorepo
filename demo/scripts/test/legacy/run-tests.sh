@@ -6,8 +6,8 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../../" && pwd)"
 cd "${REPO_ROOT}"
 
 PG_CONT=midgard-legacy-pg
-NODE_ENV_FILE="demo/midgard-node/.env"
-BACKUP_ENV_FILE="demo/midgard-node/.env.bak.legacy"
+NODE_ENV_FILE="midgard-node/.env"
+BACKUP_ENV_FILE="midgard-node/.env.bak.legacy"
 OGMIOS_MOCK_PORT=1337
 OGMIOS_MOCK_HOST=127.0.0.1
 OGMIOS_MOCK_PID=""
@@ -57,13 +57,13 @@ rm -f "$BACKUP_ENV_FILE"
 if [ -f "$NODE_ENV_FILE" ]; then
   cp "$NODE_ENV_FILE" "$BACKUP_ENV_FILE"
 fi
-cp demo/midgard-node/.env.example "$NODE_ENV_FILE"
+cp midgard-node/.env.example "$NODE_ENV_FILE"
 sed -i 's/^POSTGRES_HOST=.*/POSTGRES_HOST=localhost/' "$NODE_ENV_FILE"
 sed -i 's|^L1_OGMIOS_KEY=.*|L1_OGMIOS_KEY=http://127.0.0.1:1337|' "$NODE_ENV_FILE"
 sed -i 's|^L1_KUPO_KEY=.*|L1_KUPO_KEY=http://127.0.0.1:1442|' "$NODE_ENV_FILE"
 
 set +e
-npm --prefix demo run test:legacy:all
+npm run test:legacy:all
 TEST_EXIT_CODE=$?
 set -e
 

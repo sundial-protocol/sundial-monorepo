@@ -74,14 +74,7 @@ class PGliteConnection {
       try: () =>
         this.db
           .query<Record<string, unknown>>(sql, params as unknown[])
-          .then((r) =>
-            r.rows.map(
-              (row) =>
-                (row !== null && typeof row === "object"
-                  ? Object.values(row)
-                  : [row]) as Statement.Primitive[],
-            ),
-          ),
+          .then((r) => r.rows.map((row) => Object.values(row))),
       catch: (cause) =>
         new SqlError({ cause, message: "PGlite: Failed to execute values" }),
     });

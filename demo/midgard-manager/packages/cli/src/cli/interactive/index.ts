@@ -103,7 +103,7 @@ class ManualCommandImpl {
     if (this._abortController) {
       try {
         this._abortController.abort();
-      } catch (e) {
+      } catch {
         // Ignore errors on cleanup
       }
     }
