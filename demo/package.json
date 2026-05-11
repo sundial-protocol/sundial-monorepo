@@ -11,11 +11,11 @@
     "repack-sdk": "pnpm --filter midgard-sdk repack"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
-    "knip": "^5.63.0",
-    "prettier": "^3.5.2",
-    "turbo": "2.9.9",
     "@vitest/coverage-v8": "3.2.4",
+    "cross-env": "^7.0.3",
+    "knip": "^5.88.1",
+    "prettier": "^3.8.3",
+    "turbo": "2.9.9",
     "vitest": "3.2.4"
   },
   "engines": {
@@ -51,7 +51,14 @@
       "js-yaml@4": "4.1.1",
       "postcss": "8.5.14",
       "@eslint/plugin-kit": "0.7.1",
-      "diff@4": "4.0.4"
+      "diff@4": "4.0.4",
+      "glob": "^13.0.6",
+      "uuid": "^11.1.1"
+    },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "@harmoniclabs/crypto": "0.2.5"
+      }
     },
     "onlyBuiltDependencies": [
       "@parcel/watcher",

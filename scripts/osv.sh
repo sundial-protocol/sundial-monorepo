@@ -4,7 +4,7 @@ set -euo pipefail
 readonly script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly repo_root="$(cd "${script_dir}/.." && pwd)"
 
-readonly allowed_licenses="MIT,Apache-2.0,ISC,BSD-2-Clause,BSD-3-Clause,0BSD,BlueOak-1.0.0,CC0-1.0,MPL-2.0,Python-2.0,Unlicense"
+readonly allowed_licenses="MIT,Apache-2.0,ISC,BSD-2-Clause,BSD-3-Clause,0BSD,BlueOak-1.0.0,CC0-1.0,CC-BY-4.0,MPL-2.0,Python-2.0,Unlicense"
 
 is_remote_license_failure() {
   local output="$1"
