@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - demo/**
-      - .github/actions/setup-demo/**
+      - .github/actions/setup-l2/**
       - .github/workflows/security.yml
   workflow_dispatch:
 
@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup demo workspace
-        uses: ./.github/actions/setup-demo
+        uses: ./.github/actions/setup-l2
 
       - name: Run security audit
         run: pnpm run security:audit:all

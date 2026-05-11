@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - demo/**
-      - .github/actions/setup-demo/**
+      - .github/actions/setup-l2/**
       - .github/workflows/tests-long.yml
   workflow_dispatch:
 
@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup demo workspace
-        uses: ./.github/actions/setup-demo
+        uses: ./.github/actions/setup-l2
 
       - name: Run test suite
         run: ${{ matrix.command }}
