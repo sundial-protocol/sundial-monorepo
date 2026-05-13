@@ -9,10 +9,8 @@ x-logging:
 services:
   midgard-node:
     build:
-      context: .
-      additional_contexts:
-        - sdk=../midgard-sdk
-      dockerfile: ./Dockerfile
+      context: ..
+      dockerfile: ./midgard-node/Dockerfile
     env_file:
       - .env
     labels:
