@@ -77,7 +77,7 @@ const txCounter = Metric.counter("tx_count", {
   description: "A counter for tracking submit transactions",
   bigint: true,
   incremental: true,
-});
+}).register();
 
 const failWith500Helper = (
   logLabel: string,
@@ -613,7 +613,7 @@ export const runNode = (withMonitoring?: boolean) =>
         ),
         mergeFiber(mkSchedule(nodeConfig.WAIT_BETWEEN_MERGE_TXS)),
         withMonitoring ? monitorMempoolFiber(mkSchedule(1000)) : Effect.void,
-        txQueueProcessorFiber(mkSchedule(500), txQueue),
+        txQueueProcessorFiber(mkSchedule(500), txQueue, withMonitoring),
       ],
       {
         concurrency: "unbounded",

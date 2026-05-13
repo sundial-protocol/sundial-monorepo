@@ -10,25 +10,25 @@ const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
     "A gauge for tracking the current number of transactions in the commit block",
   bigint: true,
-});
+}).register();
 
 const totalTxSizeGauge = Metric.gauge("total_tx_size", {
   description:
     "A gauge for tracking the total size of transactions in committed blocks",
-});
+}).register();
 
 const commitBlockCounter = Metric.counter("commit_block_count", {
   description: "A counter for tracking the number of committed blocks",
   bigint: true,
   incremental: true,
-});
+}).register();
 
 const commitBlockTxCounter = Metric.counter("commit_block_tx_count", {
   description:
     "A counter for tracking the number of transactions in committed blocks",
   bigint: true,
   incremental: true,
-});
+}).register();
 
 const blockCommitmentUserEventsCountGauge = Metric.gauge(
   "block_total_user_events_count",
@@ -36,7 +36,7 @@ const blockCommitmentUserEventsCountGauge = Metric.gauge(
     description:
       "A gauge for tracking the number of user events (deposits, withdrawals and tx orders) in committed blocks",
   },
-);
+).register();
 
 export const buildAndSubmitCommitmentBlockAction = () =>
   Effect.gen(function* () {
@@ -101,27 +101,24 @@ export const buildAndSubmitCommitmentBlockAction = () =>
       case "SuccessfulCommitmentOutput": {
         yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n + 1);
 
-        yield* blockCommitmentUserEventsCountGauge(
-          Effect.succeed(
-            workerOutput.stats[BlocksDB.Columns.DEPOSITS_COUNT] +
-              workerOutput.stats[BlocksDB.Columns.WITHDRAWALS_COUNT] +
-              workerOutput.stats[BlocksDB.Columns.TX_ORDERS_COUNT],
-          ),
+        yield* Metric.set(
+          blockCommitmentUserEventsCountGauge,
+          workerOutput.stats[BlocksDB.Columns.DEPOSITS_COUNT] +
+            workerOutput.stats[BlocksDB.Columns.WITHDRAWALS_COUNT] +
+            workerOutput.stats[BlocksDB.Columns.TX_ORDERS_COUNT],
         );
-        yield* commitBlockNumTxGauge(
-          Effect.succeed(
-            BigInt(workerOutput.stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
-          ),
+        yield* Metric.set(
+          commitBlockNumTxGauge,
+          BigInt(workerOutput.stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
+        );
+        yield* Metric.set(
+          totalTxSizeGauge,
+          workerOutput.stats[BlocksDB.Columns.TOTAL_EVENTS_SIZE],
         );
         yield* Metric.increment(commitBlockCounter);
         yield* Metric.incrementBy(
           commitBlockTxCounter,
           BigInt(workerOutput.stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
-        );
-        yield* totalTxSizeGauge(
-          Effect.succeed(
-            workerOutput.stats[BlocksDB.Columns.TOTAL_EVENTS_SIZE],
-          ),
         );
         yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
         break;
@@ -155,6 +152,12 @@ export const blockCommitmentFiber = (
 ): Effect.Effect<void, never, Globals> =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔵 Block commitment fiber started.");
+    // Initialize metrics so panels have a visible baseline before first commit.
+    yield* Metric.set(commitBlockNumTxGauge, 0n);
+    yield* Metric.set(totalTxSizeGauge, 0);
+    yield* Metric.set(blockCommitmentUserEventsCountGauge, 0);
+    yield* Metric.incrementBy(commitBlockCounter, 0n);
+    yield* Metric.incrementBy(commitBlockTxCounter, 0n);
     const action = blockCommitmentAction.pipe(
       Effect.withSpan("block-commitment-fiber"),
       Effect.catchAllCause(Effect.logWarning),

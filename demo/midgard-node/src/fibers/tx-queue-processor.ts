@@ -9,7 +9,7 @@ import { Database } from "@/services/database.js";
 const txQueueSizeGauge = Metric.gauge("tx_queue_size", {
   description: "A tracker for the size of the tx queue before processing",
   bigint: true,
-});
+}).register();
 
 const txQueueProcessorAction = (
   txQueue: Queue.Dequeue<string>,
@@ -23,7 +23,7 @@ const txQueueProcessorAction = (
     const queueSize = yield* txQueue.size;
 
     if (withMonitoring) {
-      yield* txQueueSizeGauge(Effect.succeed(BigInt(queueSize)));
+      yield* Metric.set(txQueueSizeGauge, BigInt(queueSize));
     }
 
     const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(txQueue);
@@ -44,10 +44,15 @@ export const txQueueProcessorFiber = (
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 Tx queue processor fiber started.");
+      if (withMonitoring) {
+        // Ensure metric series is initialized before the first queue sample.
+        yield* Metric.set(txQueueSizeGauge, 0n);
+      }
       yield* Effect.repeat(
-        txQueueProcessorAction(txQueue, withMonitoring),
+        txQueueProcessorAction(txQueue, withMonitoring).pipe(
+          Effect.catchAllCause(Effect.logWarning),
+        ),
         schedule,
       );
     }),
-    Effect.catchAllCause(Effect.logWarning),
   );

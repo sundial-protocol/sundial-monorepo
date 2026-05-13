@@ -15,7 +15,10 @@
     "format-check": "prettier --check \"**/*.{ts,tsx,md}\"",
     "listen": "pnpm run build && node dist/index.js listen",
     "init": "pnpm run build && node dist/index.js init",
-    "test": "NODE_ENV=emulator vitest run --config vitest.config.ts"
+    "test": "NODE_ENV=emulator vitest run --config vitest.config.ts",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down -v",
+    "docker:restart": "pnpm run docker:down && docker compose up -d --build"
   },
   "keywords": [
     "cardano",

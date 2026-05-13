@@ -7,12 +7,12 @@ const mempoolTxGauge = Metric.gauge("mempool_tx_count", {
   description:
     "A gauge for tracking the current number of transactions in the mempool",
   bigint: true,
-});
+}).register();
 
 const monitorMempoolAction: Effect.Effect<void, DatabaseError, SqlClient> =
   Effect.gen(function* () {
     const numTx = yield* MempoolDB.retrieveTxCount;
-    yield* mempoolTxGauge(Effect.succeed(BigInt(numTx)));
+    yield* Metric.set(mempoolTxGauge, numTx);
   });
 
 export const monitorMempoolFiber = (
@@ -21,7 +21,11 @@ export const monitorMempoolFiber = (
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🟢 Mempool monitor fiber started.");
-      yield* Effect.repeat(monitorMempoolAction, schedule);
+      // Initialize with zero so dashboards don't start with missing series.
+      yield* Metric.set(mempoolTxGauge, 0n);
+      yield* Effect.repeat(
+        monitorMempoolAction.pipe(Effect.catchAllCause(Effect.logWarning)),
+        schedule,
+      );
     }),
-    Effect.catchAllCause(Effect.logWarning),
   );
