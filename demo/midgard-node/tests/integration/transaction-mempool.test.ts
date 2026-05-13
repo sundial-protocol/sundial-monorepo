@@ -123,6 +123,45 @@ it.effect("Multiple queued transactions are drained together", () => {
   }).pipe(Effect.provide(layers));
 });
 
+it.effect(
+  "Queued transaction can produce multiple outputs to one address",
+  () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const txId = Buffer.alloc(32, 0xdd);
+      const processedTx = {
+        txId,
+        txCbor: txCborB,
+        spent: [] as Buffer[],
+        produced: [
+          {
+            [Ledger.Columns.TX_ID]: txId,
+            [Ledger.Columns.OUTREF]: Buffer.alloc(32, 0xde),
+            [Ledger.Columns.OUTPUT]: Buffer.alloc(16, 0xdf),
+            [Ledger.Columns.ADDRESS]: testAddress,
+          },
+          {
+            [Ledger.Columns.TX_ID]: txId,
+            [Ledger.Columns.OUTREF]: Buffer.alloc(32, 0xe0),
+            [Ledger.Columns.OUTPUT]: Buffer.alloc(16, 0xe1),
+            [Ledger.Columns.ADDRESS]: testAddress,
+          },
+        ],
+      };
+
+      yield* MempoolDB.insertMultiple([processedTx]);
+
+      const count = yield* MempoolDB.retrieveTxCount;
+      const txCbors = yield* AddressHistoryDB.retrieve(testAddress);
+
+      expect(count).toBe(1n);
+      expect(txCbors.length).toBe(1);
+    }).pipe(Effect.provide(layers));
+  },
+);
+
 it.effect("Mempool retrieval by hash sees newly processed transaction", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {

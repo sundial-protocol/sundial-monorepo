@@ -50,6 +50,7 @@ export const makeTestNodeConfigLayer = (opts: TestNodeConfigOptions = {}) => {
       WAIT_BETWEEN_BLOCK_SUBMISSIONS: 1000,
       WAIT_BETWEEN_USER_EVENT_FETCHES: 1000,
       WAIT_BETWEEN_MERGE_TXS: 1000,
+      COMMITMENT_WORKER_TIMEOUT_MS: 30_000,
       PROM_METRICS_PORT: 9464,
       OLTP_EXPORTER_URL: "http://127.0.0.1:4318/v1/traces",
       POSTGRES_USER: "postgres",
