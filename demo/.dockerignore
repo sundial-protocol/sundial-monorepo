@@ -1,0 +1,12 @@
+# Workspace-level installed deps and build artifacts — rebuilt fresh inside Docker
+node_modules
+*/node_modules
+*/dist
+*/*.tgz
+
+# Packages and dirs not needed for the midgard-node image build
+midgard-manager
+coverage
+.tmp
+temp
+gitleaks-report.json

@@ -73,11 +73,11 @@
     "test:unit:coverage:all": "npm run test:unit:coverage:node && npm run test:unit:coverage:sdk && npm run test:unit:coverage:ts"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "3.2.4",
     "cross-env": "^7.0.3",
     "knip": "^5.88.1",
     "prettier": "^3.8.3",
     "turbo": "2.9.12",
-    "@vitest/coverage-v8": "3.2.4",
     "vitest": "3.2.4"
   },
   "engines": {
@@ -91,8 +91,8 @@
     "overrides": {
       "effect": "3.21.2",
       "test-exclude": "^8.0.0",
-      "libsodium-wrappers-sumo": "0.7.16",
-      "libsodium-sumo": "0.7.16",
+      "libsodium-wrappers-sumo": "0.8.4",
+      "libsodium-sumo": "0.8.4",
       "@cardano-sdk/core": "0.46.12",
       "@cardano-sdk/crypto": "0.4.5",
       "ip-address": "10.2.0",
