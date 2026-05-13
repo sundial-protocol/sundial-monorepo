@@ -261,6 +261,10 @@ export class MidgardMpt {
           LEVELDB_ENCODING_OPTS,
         );
         const db = new LevelDB(level);
+        yield* Effect.tryPromise({
+          try: () => db.open(),
+          catch: (e) => MptError.trieCreate(trieName, e),
+        });
         databaseAndPath = { database: db, databaseFilePath: levelDBFilePath };
         valueEncoding = LEVELDB_ENCODING_OPTS.valueEncoding;
       }

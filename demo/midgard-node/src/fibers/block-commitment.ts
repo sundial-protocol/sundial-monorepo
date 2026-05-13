@@ -1,4 +1,4 @@
-import { Globals } from "@/services/index.js";
+import { Globals, NodeConfig } from "@/services/index.js";
 import { Effect, Ref, Schedule } from "effect";
 import { WorkerError } from "@/workers/utils/common.js";
 import { WorkerInput, WorkerOutput } from "@/workers/utils/block-commitment.js";
@@ -41,17 +41,39 @@ const blockCommitmentUserEventsCountGauge = Metric.gauge(
 export const buildAndSubmitCommitmentBlockAction = () =>
   Effect.gen(function* () {
     const globals = yield* Globals;
+    const { COMMITMENT_WORKER_TIMEOUT_MS } = yield* NodeConfig;
 
     const worker = Effect.async<WorkerOutput, WorkerError, never>((resume) => {
+      let isDone = false;
+      const complete = (effect: Effect.Effect<WorkerOutput, WorkerError>) => {
+        if (!isDone) {
+          isDone = true;
+          clearTimeout(timeoutId);
+          resume(effect);
+        }
+      };
+
       Effect.runSync(Effect.logInfo(`👷 Starting block commitment worker...`));
       const workerInputData: WorkerInput = { data: {} };
       const worker = new Worker(
         new URL("./block-commitment.js", import.meta.url),
         { workerData: workerInputData },
       );
+      const timeoutId = setTimeout(() => {
+        complete(
+          Effect.fail(
+            new WorkerError({
+              worker: "commit-block-header",
+              message: `Commitment worker timed out after ${COMMITMENT_WORKER_TIMEOUT_MS}ms`,
+              cause: "Timed out waiting for worker output",
+            }),
+          ),
+        );
+        worker.terminate();
+      }, COMMITMENT_WORKER_TIMEOUT_MS);
       worker.on("message", (output: WorkerOutput) => {
         if (output.type === "FailureOutput") {
-          resume(
+          complete(
             Effect.fail(
               new WorkerError({
                 worker: "commit-block-header",
@@ -61,12 +83,12 @@ export const buildAndSubmitCommitmentBlockAction = () =>
             ),
           );
         } else {
-          resume(Effect.succeed(output));
+          complete(Effect.succeed(output));
         }
         worker.terminate();
       });
       worker.on("error", (e: Error) => {
-        resume(
+        complete(
           Effect.fail(
             new WorkerError({
               worker: "commit-block-header",
@@ -79,7 +101,7 @@ export const buildAndSubmitCommitmentBlockAction = () =>
       });
       worker.on("exit", (code: number) => {
         if (code !== 0) {
-          resume(
+          complete(
             Effect.fail(
               new WorkerError({
                 worker: "commit-block-header",
@@ -91,6 +113,7 @@ export const buildAndSubmitCommitmentBlockAction = () =>
         }
       });
       return Effect.sync(() => {
+        clearTimeout(timeoutId);
         worker.terminate();
       });
     });
@@ -135,21 +158,24 @@ export const buildAndSubmitCommitmentBlockAction = () =>
     }
   });
 
-export const blockCommitmentAction: Effect.Effect<void, WorkerError, Globals> =
-  Effect.gen(function* () {
-    const globals = yield* Globals;
-    const RESET_IN_PROGRESS = yield* Ref.get(globals.RESET_IN_PROGRESS);
-    if (!RESET_IN_PROGRESS) {
-      yield* Effect.logInfo("🔹 New block commitment process started.");
-      yield* buildAndSubmitCommitmentBlockAction().pipe(
-        Effect.withSpan("buildAndSubmitCommitmentBlockAction"),
-      );
-    }
-  });
+export const blockCommitmentAction: Effect.Effect<
+  void,
+  WorkerError,
+  Globals | NodeConfig
+> = Effect.gen(function* () {
+  const globals = yield* Globals;
+  const RESET_IN_PROGRESS = yield* Ref.get(globals.RESET_IN_PROGRESS);
+  if (!RESET_IN_PROGRESS) {
+    yield* Effect.logInfo("🔹 New block commitment process started.");
+    yield* buildAndSubmitCommitmentBlockAction().pipe(
+      Effect.withSpan("buildAndSubmitCommitmentBlockAction"),
+    );
+  }
+});
 
 export const blockCommitmentFiber = (
   schedule: Schedule.Schedule<number>,
-): Effect.Effect<void, never, Globals> =>
+): Effect.Effect<void, never, Globals | NodeConfig> =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔵 Block commitment fiber started.");
     // Initialize metrics so panels have a visible baseline before first commit.

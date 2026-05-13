@@ -68,10 +68,19 @@ export const upsertEntries = (
   entries: Entry[],
 ): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
-    if (entries.length > 0) {
+    const uniqueEntries = Array.from(
+      new Map(
+        entries.map((entry) => [
+          `${entry[Columns.EVENT_ID].toString("hex")}:${entry[Columns.ADDRESS]}`,
+          entry,
+        ]),
+      ).values(),
+    );
+
+    if (uniqueEntries.length > 0) {
       const sql = yield* SqlClient.SqlClient;
       yield* sql`
-        INSERT INTO ${sql(tableName)} ${sql.insert(entries)}
+        INSERT INTO ${sql(tableName)} ${sql.insert(uniqueEntries)}
         ON CONFLICT (${sql(Columns.EVENT_ID)}, ${sql(Columns.ADDRESS)})
         DO UPDATE SET ${sql(Columns.STATUS)} = EXCLUDED.${sql(Columns.STATUS)}`;
     }

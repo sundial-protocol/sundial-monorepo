@@ -669,7 +669,7 @@ export const fetchLatestCommittedBlockProgram = (
       return yield* Effect.fail(
         new StateQueueError({
           message: errorMessage,
-          cause: "Latest block not found",
+          cause: `Expected exactly 1 tail node, found ${filtered.length} among ${allBlocks.length} authentic state-queue UTxOs`,
         }),
       );
     }

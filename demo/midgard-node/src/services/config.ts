@@ -20,6 +20,7 @@ type NodeConfigDep = {
   WAIT_BETWEEN_BLOCK_SUBMISSIONS: number;
   WAIT_BETWEEN_USER_EVENT_FETCHES: number;
   WAIT_BETWEEN_MERGE_TXS: number;
+  COMMITMENT_WORKER_TIMEOUT_MS: number;
   PROM_METRICS_PORT: number;
   OLTP_EXPORTER_URL: string;
   POSTGRES_USER: string;
@@ -63,6 +64,9 @@ const makeConfig = Effect.gen(function* () {
   const waitBetweenMergeTxs = yield* Config.integer(
     "WAIT_BETWEEN_MERGE_TXS",
   ).pipe(Config.withDefault(10000));
+  const commitmentWorkerTimeoutMs = yield* Config.integer(
+    "COMMITMENT_WORKER_TIMEOUT_MS",
+  ).pipe(Config.withDefault(30_000));
   const waitBetweenUserEventFetches = yield* Config.integer(
     "WAIT_BETWEEN_USER_EVENT_FETCHES",
   ).pipe(Config.withDefault(10000));
@@ -174,6 +178,7 @@ const makeConfig = Effect.gen(function* () {
     WAIT_BETWEEN_BLOCK_SUBMISSIONS: waitBetweenBlockSubmissions,
     WAIT_BETWEEN_MERGE_TXS: waitBetweenMergeTxs,
     WAIT_BETWEEN_USER_EVENT_FETCHES: waitBetweenUserEventFetches,
+    COMMITMENT_WORKER_TIMEOUT_MS: commitmentWorkerTimeoutMs,
     PROM_METRICS_PORT: promMetricsPort,
     OLTP_EXPORTER_URL: oltpExporterUrl,
     POSTGRES_HOST: postgresHost,

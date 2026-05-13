@@ -18,7 +18,7 @@
     "test": "NODE_ENV=emulator vitest run --config vitest.config.ts",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down -v",
-    "docker:restart": "pnpm run docker:down && docker compose up -d --build"
+    "docker:restart": "docker compose up -d --no-deps --build --force-recreate midgard-node"
   },
   "keywords": [
     "cardano",
@@ -46,7 +46,7 @@
     "@lucid-evolution/lucid": "^0.4.30",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-prometheus": "^0.217.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.217.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
     "@opentelemetry/sdk-trace-base": "^2.7.1",
     "@opentelemetry/sdk-trace-node": "^2.7.1",
     "@opentelemetry/sdk-trace-web": "^2.7.1",
