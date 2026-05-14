@@ -18,7 +18,8 @@
     "test": "NODE_ENV=emulator vitest run --config vitest.config.ts",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down -v",
-    "docker:restart": "docker compose up -d --no-deps --build --force-recreate midgard-node"
+    "docker:restart": "docker compose up -d --no-deps --build --force-recreate midgard-node",
+    "wallet:topup-block-commitment": "node scripts/fund-bc-wallet.mjs"
   },
   "keywords": [
     "cardano",

@@ -24,8 +24,8 @@
   },
   "dependencies": {
     "@lucid-evolution/lucid": "^0.4.30",
-    "chalk": "^4.1.2",
-    "commander": "^11.1.0",
+    "chalk": "^5.6.2",
+    "commander": "^13.1.0",
     "effect": "^3.21.2",
     "p-limit": "^5.0.0"
   },

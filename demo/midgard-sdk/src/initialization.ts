@@ -67,7 +67,7 @@ export const incompleteInitializationTxProgram = (
 
     const nonceUtxo = utxos[0];
     const genesisTime = BigInt(Date.now() + VALIDITY_RANGE_BUFFER);
-    let tx = lucid
+    const tx = lucid
       .newTx()
       .collectFrom([nonceUtxo])
       .validTo(Number(genesisTime));

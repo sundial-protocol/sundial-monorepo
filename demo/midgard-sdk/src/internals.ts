@@ -81,7 +81,7 @@ export type AuthenticUTxO<TDatum, TExtra = undefined> = {
 
 export const getDatumFromUTxO = <TDatum>(
   nodeUTxO: UTxO,
-  schema: any,
+  schema: unknown,
 ): Effect.Effect<TDatum, DataCoercionError> =>
   Effect.gen(function* () {
     const datumCBOR = nodeUTxO.datum;
@@ -95,7 +95,7 @@ export const getDatumFromUTxO = <TDatum>(
     }
 
     const datum: TDatum = yield* Effect.try({
-      try: () => Data.from(datumCBOR, schema),
+      try: () => Data.from(datumCBOR, schema) as TDatum,
       catch: (e) =>
         new DataCoercionError({
           message: `Could not coerce UTxO's datum to the expected datum type`,
@@ -115,7 +115,7 @@ type AuthenticUTxOBase<TDatum> = {
 const utxoToAuthenticUTxOBase = <TDatum>(
   utxo: UTxO,
   nftPolicy: string,
-  schema: any,
+  schema: unknown,
 ): Effect.Effect<
   AuthenticUTxOBase<TDatum>,
   DataCoercionError | UnauthenticUtxoError
@@ -138,7 +138,7 @@ const utxoToAuthenticUTxOBase = <TDatum>(
 const utxoToAuthenticUTxONoExtra = <TDatum>(
   utxo: UTxO,
   nftPolicy: string,
-  schema: any,
+  schema: unknown,
 ): Effect.Effect<
   AuthenticUTxO<TDatum>,
   DataCoercionError | UnauthenticUtxoError
@@ -154,7 +154,7 @@ const utxoToAuthenticUTxONoExtra = <TDatum>(
 const utxoToAuthenticUTxOWithExtra = <TDatum, TExtra>(
   utxo: UTxO,
   nftPolicy: string,
-  schema: any,
+  schema: unknown,
   extraFields: (datum: TDatum) => TExtra,
 ): Effect.Effect<
   AuthenticUTxO<TDatum, TExtra>,
@@ -176,7 +176,7 @@ export const authenticateUTxO: {
   <TDatum>(
     utxo: UTxO,
     nftPolicy: string,
-    schema: any,
+    schema: unknown,
   ): Effect.Effect<
     AuthenticUTxO<TDatum>,
     DataCoercionError | UnauthenticUtxoError
@@ -184,7 +184,7 @@ export const authenticateUTxO: {
   <TDatum, TExtra>(
     utxo: UTxO,
     nftPolicy: string,
-    schema: any,
+    schema: unknown,
     extraFields: (datum: TDatum) => TExtra,
   ): Effect.Effect<
     AuthenticUTxO<TDatum, TExtra>,
@@ -193,7 +193,7 @@ export const authenticateUTxO: {
 } = <TDatum, TExtra>(
   utxo: UTxO,
   nftPolicy: string,
-  schema: any,
+  schema: unknown,
   extraFields?: (datum: TDatum) => TExtra,
 ) => {
   if (extraFields === undefined) {
@@ -215,18 +215,18 @@ export const authenticateUTxOs: {
   <TDatum>(
     utxos: UTxO[],
     nftPolicy: string,
-    schema: any,
+    schema: unknown,
   ): Effect.Effect<AuthenticUTxO<TDatum>[]>;
   <TDatum, TExtra>(
     utxos: UTxO[],
     nftPolicy: string,
-    schema: any,
+    schema: unknown,
     extraFields: (datum: TDatum) => TExtra,
   ): Effect.Effect<AuthenticUTxO<TDatum, TExtra>[]>;
 } = <TDatum, TExtra>(
   utxos: UTxO[],
   nftPolicy: string,
-  schema: any,
+  schema: unknown,
   extraFields?: (datum: TDatum) => TExtra,
 ) => {
   if (extraFields === undefined) {

@@ -392,6 +392,26 @@ export const buildNewBlockEntry = (
     const [newWalletUTxOs, producedUTxOs, txSignBuilder] = yield* txBuilder
       .chainProgram()
       .pipe(
+        Effect.catchAll((_firstErr) =>
+          Effect.gen(function* () {
+            yield* Effect.logWarning(
+              "🔹 chainProgram() failed with stored wallet UTxOs; refreshing wallet from provider and retrying...",
+            );
+            const freshUTxOs = yield* Effect.tryPromise({
+              try: () => lucidAPI.wallet().getUtxos(),
+              catch: (e) =>
+                new SDK.LucidError({
+                  message: "Failed to fetch fresh wallet UTxOs for retry",
+                  cause: e,
+                }),
+            });
+            yield* Effect.logInfo(
+              `🔹 Refreshed wallet has ${freshUTxOs.length} UTxO(s); retrying chainProgram()...`,
+            );
+            yield* Effect.sync(() => lucidAPI.overrideUTxOs(freshUTxOs));
+            return yield* txBuilder.chainProgram();
+          }),
+        ),
         Effect.tapError((e) =>
           Effect.logError(
             `chainProgram() failure detail: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`,

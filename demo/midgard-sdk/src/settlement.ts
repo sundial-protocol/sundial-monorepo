@@ -796,7 +796,7 @@ export const incompleteResolveSettlementProgram = (
   params: ResolveSettlementParams,
 ): Effect.Effect<
   TxBuilder,
-  HashingError | DataCoercionError | LucidError | AssetError
+  HashingError | DataCoercionError | LucidError | SettlementError | AssetError
 > =>
   Effect.gen(function* () {
     const spendRedeemer: SettlementSpendRedeemer = {
@@ -815,11 +815,19 @@ export const incompleteResolveSettlementProgram = (
     };
     const mintRedeemerCBOR = Data.to(mintRedeemer, SettlementMintRedeemer);
 
-    const resolutionTime = Number(
-      params.settlementUTxO.datum.resolutionClaim?.resolutionTime ?? 0n,
-    );
+    const resolutionClaim = params.settlementUTxO.datum.resolutionClaim;
+    if (resolutionClaim === null) {
+      return yield* Effect.fail(
+        new SettlementError({
+          message: "Cannot resolve settlement without a resolution claim",
+          cause: params.settlementId,
+        }),
+      );
+    }
+
+    const resolutionTime = Number(resolutionClaim.resolutionTime);
     const txLowerBound = resolutionTime + 1 * 60_000;
-    const txSigner = params.settlementUTxO.datum.resolutionClaim?.operator!;
+    const txSigner = resolutionClaim.operator;
     const changeAmount = 1_000_000n;
 
     const settlementNFT = toUnit(
