@@ -40,12 +40,12 @@ Submodules are listed below.
   <tr>
     <td>
       <!-- badge:node-coverage:start -->
-<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-66.5%25-orange?style=flat-square" />
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-65.9%25-orange?style=flat-square" />
 <!-- badge:node-coverage:end -->
     </td>
     <td>
       <!-- badge:sdk-coverage:start -->
-<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-75.9%25-orange?style=flat-square" />
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-74.8%25-orange?style=flat-square" />
 <!-- badge:sdk-coverage:end -->
     </td>
     <td>

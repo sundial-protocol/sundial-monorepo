@@ -21,6 +21,7 @@ vi.mock("@/database/utils/ledger.js", async () => {
     createTable: vi.fn(() => E.succeed(undefined)),
     insertEntry: vi.fn(() => E.succeed(undefined)),
     insertEntries: vi.fn(() => E.succeed(undefined)),
+    insertEntriesOrIgnore: vi.fn(() => E.succeed(undefined)),
     retrieveAllEntries: vi.fn(() => E.succeed([])),
     retrieveAllEntriesNoTimeStamps: vi.fn(() => E.succeed([])),
     retrieveByOutRef: vi.fn(() => E.succeed({})),
@@ -50,7 +51,7 @@ describe("MempoolLedgerDB", () => {
   it.effect("insert stores entries", () =>
     MempoolLedgerDB.insert([testEntry]).pipe(
       Effect.map(() => {
-        expect(vi.mocked(Ledger.insertEntries)).toHaveBeenCalledWith(
+        expect(vi.mocked(Ledger.insertEntriesOrIgnore)).toHaveBeenCalledWith(
           "mempool_ledger",
           [testEntry],
         );

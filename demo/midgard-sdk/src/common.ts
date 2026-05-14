@@ -54,6 +54,48 @@ export type BeaconUTxO = {
 };
 
 /**
+ * Fetches the single UTxO at `addressOrCred` that carries `unit`.
+ *
+ * Uses `lucid.utxosAtWithUnit` — a single provider request regardless of how
+ * many other UTxOs live at the address (O(1) for NFTs).  Fails when the
+ * provider returns anything other than exactly one matching UTxO.
+ */
+export const utxoAtByNFTUnit = (
+  lucid: LucidEvolution,
+  addressOrCred: Address | Credential,
+  unit: string,
+): Effect.Effect<BeaconUTxO, LucidError> =>
+  Effect.gen(function* () {
+    const utxos = yield* Effect.tryPromise({
+      try: () => lucid.utxosAtWithUnit(addressOrCred, unit),
+      catch: (e) =>
+        new LucidError({
+          message: `Failed to fetch UTxO by unit ${unit} at ${addressOrCred}`,
+          cause: e,
+        }),
+    });
+    if (utxos.length !== 1) {
+      return yield* Effect.fail(
+        new LucidError({
+          message: `Expected 1 UTxO for unit ${unit} at ${addressOrCred}, got ${utxos.length}`,
+          cause: "unit lookup returned unexpected count",
+        }),
+      );
+    }
+    const policyId = unit.slice(0, 56);
+    const assetName = unit.slice(56);
+    return { utxo: utxos[0], policyId, assetName };
+  }).pipe(
+    Effect.catchAllDefect(
+      (d) =>
+        new LucidError({
+          message: `Unexpected error while fetching UTxO by unit ${unit}`,
+          cause: d,
+        }),
+    ),
+  );
+
+/**
  * Silently drops the UTxOs without proper authentication NFTs.
  */
 export const utxosAtByNFTPolicyId = (

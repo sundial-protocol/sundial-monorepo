@@ -9,8 +9,10 @@ import { Database } from "@/services/database.js";
 
 export const tableName = "mempool_ledger";
 
+// ON CONFLICT DO NOTHING: genesis seeding and deposit application can both
+// try to insert the same outref; the second insert is a correct no-op.
 export const insert = (entries: Ledger.Entry[]) =>
-  Ledger.insertEntries(tableName, entries);
+  Ledger.insertEntriesOrIgnore(tableName, entries);
 
 export const retrieve: Effect.Effect<
   readonly Ledger.Entry[],

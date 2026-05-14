@@ -4,6 +4,9 @@ import { Data, toUnit } from "@lucid-evolution/lucid";
 import { Effect, Either } from "effect";
 import {
   StateQueueDatum,
+  fetchConfirmedStateAndItsLinkByUnitProgram,
+  fetchConfirmedStateAndItsLinkProgram,
+  fetchLatestCommittedBlockByUnitProgram,
   fetchLatestCommittedBlockProgram,
   getConfirmedStateFromStateQueueDatum,
   incompleteCommitBlockHeaderTxProgram,
@@ -13,6 +16,7 @@ import {
   updateLatestBlocksDatumAndGetTheNewHeaderProgram,
   utxoToStateQueueUTxO,
 } from "@sdk/state-queue.ts";
+import { NODE_ASSET_NAME } from "@sdk/linked-list.ts";
 import { ConfirmedState, Header } from "@sdk/ledger-state.ts";
 import { makeFakeLucid } from "./harness/fake-lucid.ts";
 import {
@@ -331,4 +335,294 @@ describe("SDK state-queue integration", () => {
       expect(Either.isLeft(result)).toBe(true);
     }),
   );
+
+  describe("fetchConfirmedStateAndItsLinkByUnitProgram (O(1) merge fetch)", () => {
+    const firstBlockHashHex = "55".repeat(28);
+    const firstBlockAssetName = `${NODE_ASSET_NAME}${firstBlockHashHex}`;
+    const firstBlockUnit = toUnit(FIXTURE_POLICY_ID_A, firstBlockAssetName);
+    const rootUnit = toUnit(FIXTURE_POLICY_ID_A, NODE_ASSET_NAME);
+
+    const rootUtxoRaw = (nextHash?: string) =>
+      makeStateQueueUtxo({
+        txHash: "a0".repeat(32),
+        outputIndex: 0,
+        datum: {
+          key: "Empty",
+          next: nextHash ? { Key: { key: nextHash } } : "Empty",
+          data: makeConfirmedStateData(),
+        },
+        assetName: NODE_ASSET_NAME,
+      });
+
+    const firstBlockUtxoRaw = makeStateQueueUtxo({
+      txHash: "b0".repeat(32),
+      outputIndex: 0,
+      datum: {
+        key: { Key: { key: firstBlockHashHex } },
+        next: "Empty",
+        data: makeHeaderData(),
+      },
+      assetName: firstBlockAssetName,
+    });
+
+    it.effect(
+      "returns confirmed root and first block when queue has blocks",
+      () =>
+        Effect.gen(function* () {
+          const { lucid } = makeFakeLucid({
+            utxosAtWithUnit: {
+              [rootUnit]: [rootUtxoRaw(firstBlockHashHex)],
+              [firstBlockUnit]: [firstBlockUtxoRaw],
+            },
+          });
+
+          const { confirmed, link } =
+            yield* fetchConfirmedStateAndItsLinkByUnitProgram(lucid as any, {
+              stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+              stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+            });
+
+          expect(confirmed.utxo.txHash).toBe("a0".repeat(32));
+          expect(confirmed.datum.key).toBe("Empty");
+          expect(link).toBeDefined();
+          expect(link!.utxo.txHash).toBe("b0".repeat(32));
+          expect(link!.datum.next).toBe("Empty");
+        }),
+    );
+
+    it.effect(
+      "returns confirmed root with undefined link when queue is empty",
+      () =>
+        Effect.gen(function* () {
+          const { lucid } = makeFakeLucid({
+            utxosAtWithUnit: {
+              [rootUnit]: [rootUtxoRaw()],
+            },
+          });
+
+          const { confirmed, link } =
+            yield* fetchConfirmedStateAndItsLinkByUnitProgram(lucid as any, {
+              stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+              stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+            });
+
+          expect(confirmed.datum.key).toBe("Empty");
+          expect(link).toBeUndefined();
+        }),
+    );
+
+    it.effect("fails with LucidError when root unit has no UTxO", () =>
+      Effect.gen(function* () {
+        const { lucid } = makeFakeLucid({ utxosAtWithUnit: {} });
+
+        const result = yield* Effect.either(
+          fetchConfirmedStateAndItsLinkByUnitProgram(lucid as any, {
+            stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+            stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+          }),
+        );
+
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left._tag).toBe("LucidError");
+        }
+      }),
+    );
+
+    it.effect("does not call utxosAt — uses utxosAtWithUnit exclusively", () =>
+      Effect.gen(function* () {
+        const { lucid } = makeFakeLucid({
+          utxosAt: {},
+          utxosAtWithUnit: {
+            [rootUnit]: [rootUtxoRaw(firstBlockHashHex)],
+            [firstBlockUnit]: [firstBlockUtxoRaw],
+          },
+        });
+
+        const { confirmed, link } =
+          yield* fetchConfirmedStateAndItsLinkByUnitProgram(lucid as any, {
+            stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+            stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+          });
+
+        expect(confirmed.datum.key).toBe("Empty");
+        expect(link).toBeDefined();
+      }),
+    );
+
+    it.effect(
+      "returns same result as fetchConfirmedStateAndItsLinkProgram from equivalent fixtures",
+      () =>
+        Effect.gen(function* () {
+          const { lucid: lucidFull } = makeFakeLucid({
+            utxosAt: {
+              [FIXTURE_ADDRESS_SCRIPT_A]: [
+                rootUtxoRaw(firstBlockHashHex),
+                firstBlockUtxoRaw,
+              ],
+            },
+          });
+          const { lucid: lucidUnit } = makeFakeLucid({
+            utxosAtWithUnit: {
+              [rootUnit]: [rootUtxoRaw(firstBlockHashHex)],
+              [firstBlockUnit]: [firstBlockUtxoRaw],
+            },
+          });
+
+          const fromFullScan = yield* fetchConfirmedStateAndItsLinkProgram(
+            lucidFull as any,
+            {
+              stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+              stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+            },
+          );
+          const fromUnit = yield* fetchConfirmedStateAndItsLinkByUnitProgram(
+            lucidUnit as any,
+            {
+              stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+              stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+            },
+          );
+
+          expect(fromUnit.confirmed.utxo.txHash).toBe(
+            fromFullScan.confirmed.utxo.txHash,
+          );
+          expect(fromUnit.link?.utxo.txHash).toBe(
+            fromFullScan.link?.utxo.txHash,
+          );
+        }),
+    );
+  });
+
+  describe("fetchLatestCommittedBlockByUnitProgram (O(1) tail fetch)", () => {
+    const tailHashHex = "44".repeat(28);
+    const tailAssetName = `${NODE_ASSET_NAME}${tailHashHex}`;
+    const tailUnit = toUnit(FIXTURE_POLICY_ID_A, tailAssetName);
+
+    const tailUtxoRaw = makeStateQueueUtxo({
+      txHash: "ff".repeat(32),
+      outputIndex: 1,
+      datum: {
+        key: { Key: { key: tailHashHex } },
+        next: "Empty",
+        data: makeHeaderData(),
+      },
+      assetName: tailAssetName,
+    });
+
+    it.effect("returns the tail node when unit resolves to a valid UTxO", () =>
+      Effect.gen(function* () {
+        const { lucid } = makeFakeLucid({
+          utxosAtWithUnit: { [tailUnit]: [tailUtxoRaw] },
+        });
+
+        const result = yield* fetchLatestCommittedBlockByUnitProgram(
+          lucid as any,
+          {
+            stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+            stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+          },
+          tailUnit,
+        );
+
+        expect(result.utxo.txHash).toBe("ff".repeat(32));
+        expect(result.datum.next).toBe("Empty");
+        expect(result.assetName).toBe(tailAssetName);
+      }),
+    );
+
+    it.effect("does not call utxosAt — uses utxosAtWithUnit exclusively", () =>
+      Effect.gen(function* () {
+        const { lucid } = makeFakeLucid({
+          utxosAt: {},
+          utxosAtWithUnit: { [tailUnit]: [tailUtxoRaw] },
+        });
+
+        const result = yield* fetchLatestCommittedBlockByUnitProgram(
+          lucid as any,
+          {
+            stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+            stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+          },
+          tailUnit,
+        );
+
+        expect(result.datum.next).toBe("Empty");
+      }),
+    );
+
+    it.effect("fails with LucidError when unit has no UTxO", () =>
+      Effect.gen(function* () {
+        const { lucid } = makeFakeLucid({
+          utxosAtWithUnit: {},
+        });
+
+        const result = yield* Effect.either(
+          fetchLatestCommittedBlockByUnitProgram(
+            lucid as any,
+            {
+              stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+              stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+            },
+            tailUnit,
+          ),
+        );
+
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left._tag).toBe("LucidError");
+        }
+      }),
+    );
+
+    it.effect(
+      "returns the same tail node as fetchLatestCommittedBlockProgram from equivalent fixtures",
+      () =>
+        Effect.gen(function* () {
+          const nonTailHashHex = "33".repeat(28);
+          const nonTailAssetName = `${NODE_ASSET_NAME}${nonTailHashHex}`;
+          const nonTailUtxo = makeStateQueueUtxo({
+            txHash: "ee".repeat(32),
+            outputIndex: 0,
+            datum: {
+              key: { Key: { key: nonTailHashHex } },
+              next: { Key: { key: tailHashHex } },
+              data: makeHeaderData(),
+            },
+            assetName: nonTailAssetName,
+          });
+
+          const { lucid: lucidFull } = makeFakeLucid({
+            utxosAt: {
+              [FIXTURE_ADDRESS_SCRIPT_A]: [nonTailUtxo, tailUtxoRaw],
+            },
+          });
+
+          const { lucid: lucidUnit } = makeFakeLucid({
+            utxosAtWithUnit: { [tailUnit]: [tailUtxoRaw] },
+          });
+
+          const fromFullScan = yield* fetchLatestCommittedBlockProgram(
+            lucidFull as any,
+            {
+              stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+              stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+            },
+          );
+
+          const fromUnit = yield* fetchLatestCommittedBlockByUnitProgram(
+            lucidUnit as any,
+            {
+              stateQueueAddress: FIXTURE_ADDRESS_SCRIPT_A,
+              stateQueuePolicyId: FIXTURE_POLICY_ID_A,
+            },
+            tailUnit,
+          );
+
+          expect(fromUnit.utxo.txHash).toBe(fromFullScan.utxo.txHash);
+          expect(fromUnit.datum.next).toBe(fromFullScan.datum.next);
+          expect(fromUnit.assetName).toBe(fromFullScan.assetName);
+        }),
+    );
+  });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 
 import * as sdk from "../../src/index.ts";
 import {
@@ -9,8 +9,10 @@ import {
 } from "../../src/index.ts";
 import {
   addressKeyA,
+  addressScriptA,
   assetNameA,
   hexA,
+  makeLucidMock,
   makeUtxo,
   policyIdA,
   posixT2,
@@ -180,5 +182,83 @@ describe("SDK unit core helpers", () => {
       expect(value.length).toBeGreaterThan(0);
       expect(/^[a-zA-Z0-9_]+$/.test(value)).toBe(true);
     }
+  });
+
+  describe("utxoAtByNFTUnit", () => {
+    const unit = `${policyIdA}${assetNameA}`;
+    const utxo = makeUtxo({ txHash: txHashA, outputIndex: 0 });
+
+    it("succeeds when provider returns exactly one UTxO", async () => {
+      const lucid = makeLucidMock();
+      lucid.utxosAtWithUnit.mockResolvedValue([utxo]);
+
+      const result = await Effect.runPromise(
+        sdk.utxoAtByNFTUnit(lucid as any, addressScriptA, unit),
+      );
+
+      expect(result.policyId).toBe(policyIdA);
+      expect(result.assetName).toBe(assetNameA);
+      expect(result.utxo.txHash).toBe(txHashA);
+      expect(lucid.utxosAtWithUnit).toHaveBeenCalledWith(addressScriptA, unit);
+    });
+
+    it("fails with LucidError when provider returns no UTxOs", async () => {
+      const lucid = makeLucidMock();
+      lucid.utxosAtWithUnit.mockResolvedValue([]);
+
+      const result = await Effect.runPromise(
+        Effect.either(sdk.utxoAtByNFTUnit(lucid as any, addressScriptA, unit)),
+      );
+
+      expect(Either.isLeft(result)).toBe(true);
+      if (Either.isLeft(result)) {
+        expect(result.left._tag).toBe("LucidError");
+        expect(result.left.message).toContain("got 0");
+      }
+    });
+
+    it("fails with LucidError when provider returns more than one UTxO", async () => {
+      const lucid = makeLucidMock();
+      lucid.utxosAtWithUnit.mockResolvedValue([utxo, utxo]);
+
+      const result = await Effect.runPromise(
+        Effect.either(sdk.utxoAtByNFTUnit(lucid as any, addressScriptA, unit)),
+      );
+
+      expect(Either.isLeft(result)).toBe(true);
+      if (Either.isLeft(result)) {
+        expect(result.left._tag).toBe("LucidError");
+        expect(result.left.message).toContain("got 2");
+      }
+    });
+
+    it("fails with LucidError when provider throws", async () => {
+      const lucid = makeLucidMock();
+      lucid.utxosAtWithUnit.mockRejectedValue(new Error("network failure"));
+
+      const result = await Effect.runPromise(
+        Effect.either(sdk.utxoAtByNFTUnit(lucid as any, addressScriptA, unit)),
+      );
+
+      expect(Either.isLeft(result)).toBe(true);
+      if (Either.isLeft(result)) {
+        expect(result.left._tag).toBe("LucidError");
+      }
+    });
+
+    it("parses policyId and assetName from unit correctly", async () => {
+      const expectedPolicy = "aa".repeat(28);
+      const expectedAsset = "4e6f6465" + "bb".repeat(28);
+      const testUnit = `${expectedPolicy}${expectedAsset}`;
+      const lucid = makeLucidMock();
+      lucid.utxosAtWithUnit.mockResolvedValue([utxo]);
+
+      const result = await Effect.runPromise(
+        sdk.utxoAtByNFTUnit(lucid as any, addressScriptA, testUnit),
+      );
+
+      expect(result.policyId).toBe(expectedPolicy);
+      expect(result.assetName).toBe(expectedAsset);
+    });
   });
 });

@@ -392,6 +392,11 @@ export const buildNewBlockEntry = (
     const [newWalletUTxOs, producedUTxOs, txSignBuilder] = yield* txBuilder
       .chainProgram()
       .pipe(
+        Effect.tapError((e) =>
+          Effect.logError(
+            `chainProgram() failure detail: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`,
+          ),
+        ),
         Effect.mapError(
           (e) =>
             new SDK.LucidError({

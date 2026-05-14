@@ -10,9 +10,10 @@ export const mergeAction: Effect.Effect<
   | SDK.CmlDeserializationError
   | SDK.DataCoercionError
   | SDK.HashingError
-  | SDK.LinkedListError
   | SDK.LucidError
+  | SDK.MissingDatumError
   | SDK.StateQueueError
+  | SDK.UnauthenticUtxoError
   | DatabaseError
   | TxSubmitError
   | TxSignError,

@@ -5,6 +5,7 @@ import { WorkerInput, WorkerOutput } from "@/workers/utils/block-commitment.js";
 import { Metric } from "effect";
 import { Worker } from "worker_threads";
 import { BlocksDB } from "@/database/index.js";
+import { performance } from "node:perf_hooks";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
   description:
@@ -37,6 +38,11 @@ const blockCommitmentUserEventsCountGauge = Metric.gauge(
       "A gauge for tracking the number of user events (deposits, withdrawals and tx orders) in committed blocks",
   },
 ).register();
+
+const commitBlockDurationGauge = Metric.gauge("commit_block_duration_seconds", {
+  description:
+    "Duration in seconds of the last block commitment worker run (success or failure)",
+}).register();
 
 export const buildAndSubmitCommitmentBlockAction = () =>
   Effect.gen(function* () {
@@ -118,7 +124,21 @@ export const buildAndSubmitCommitmentBlockAction = () =>
       });
     });
 
-    const workerOutput: WorkerOutput = yield* worker;
+    const workerStartMs = performance.now();
+    const workerOutput: WorkerOutput = yield* worker.pipe(
+      Effect.tapBoth({
+        onFailure: (_) =>
+          Metric.set(
+            commitBlockDurationGauge,
+            (performance.now() - workerStartMs) / 1000,
+          ),
+        onSuccess: (_) =>
+          Metric.set(
+            commitBlockDurationGauge,
+            (performance.now() - workerStartMs) / 1000,
+          ),
+      }),
+    );
 
     switch (workerOutput.type) {
       case "SuccessfulCommitmentOutput": {
@@ -182,6 +202,7 @@ export const blockCommitmentFiber = (
     yield* Metric.set(commitBlockNumTxGauge, 0n);
     yield* Metric.set(totalTxSizeGauge, 0);
     yield* Metric.set(blockCommitmentUserEventsCountGauge, 0);
+    yield* Metric.set(commitBlockDurationGauge, 0);
     yield* Metric.incrementBy(commitBlockCounter, 0n);
     yield* Metric.incrementBy(commitBlockTxCounter, 0n);
     const action = blockCommitmentAction.pipe(

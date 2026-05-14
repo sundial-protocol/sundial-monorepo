@@ -91,7 +91,10 @@ export const deleteMpt = (
   name: string,
 ): Effect.Effect<void, FileSystemError> =>
   Effect.try({
-    try: () => FS.rmSync(path, { recursive: true, force: true }),
+    try: () => {
+      FS.rmSync(path, { recursive: true, force: true });
+      FS.mkdirSync(path, { recursive: true });
+    },
     catch: (e) =>
       new FileSystemError({
         message: `Failed to delete ${name}'s LevelDB file from disk`,

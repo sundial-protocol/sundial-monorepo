@@ -108,9 +108,10 @@ export const buildAndSubmitMergeTx = (
   | SDK.CmlDeserializationError
   | SDK.DataCoercionError
   | SDK.HashingError
-  | SDK.LinkedListError
   | SDK.LucidError
+  | SDK.MissingDatumError
   | SDK.StateQueueError
+  | SDK.UnauthenticUtxoError
   | DatabaseError
   | TxSubmitError
   | TxSignError,
@@ -141,7 +142,7 @@ export const buildAndSubmitMergeTx = (
       "🔸 Fetching confirmed state and the first block in queue from L1...",
     );
     const { confirmed: confirmedUTxO, link: firstBlockUTxO } =
-      yield* SDK.fetchConfirmedStateAndItsLinkProgram(lucid, fetchConfig);
+      yield* SDK.fetchConfirmedStateAndItsLinkByUnitProgram(lucid, fetchConfig);
     if (firstBlockUTxO) {
       yield* Effect.logInfo(
         `🔸 First block found: ${firstBlockUTxO.utxo.txHash}#${firstBlockUTxO.utxo.outputIndex}`,

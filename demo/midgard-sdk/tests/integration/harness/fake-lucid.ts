@@ -8,6 +8,8 @@ import { credentialToAddress } from "@lucid-evolution/lucid";
 export type FakeLucidOptions = {
   /** UTxOs returned by `utxosAt`, keyed by address string. */
   utxosAt?: Record<string, unknown[]>;
+  /** UTxOs returned by `utxosAtWithUnit`, keyed by asset unit string. */
+  utxosAtWithUnit?: Record<string, unknown[]>;
   /** UTxOs returned by `wallet().getUtxos()`. */
   walletUtxos?: unknown[];
   /** Network returned by `config().network`. */
@@ -55,6 +57,7 @@ type FakeBuilder = {
 
 export type FakeLucid = {
   utxosAt: (address: string) => Promise<unknown[]>;
+  utxosAtWithUnit: (address: string, unit: string) => Promise<unknown[]>;
   wallet: () => {
     getUtxos: () => Promise<unknown[]>;
     signTx: (tx: unknown) => Promise<unknown>;
@@ -146,6 +149,8 @@ export const makeFakeLucid = (opts: FakeLucidOptions = {}): FakeLucidResult => {
 
   const lucid: FakeLucid = {
     utxosAt: async (address: string) => (opts.utxosAt ?? {})[address] ?? [],
+    utxosAtWithUnit: async (_address: string, unit: string) =>
+      (opts.utxosAtWithUnit ?? {})[unit] ?? [],
     wallet: () => ({
       getUtxos: async () => opts.walletUtxos ?? [],
       signTx: async (tx: unknown) => tx,
