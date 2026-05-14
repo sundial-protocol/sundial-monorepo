@@ -168,10 +168,12 @@ const mainProgram: Effect.Effect<
             .withTransaction(
               Effect.gen(function* () {
                 yield* BlocksDB.upsert(newBlockEntry);
-                yield* MempoolLedgerDB.insert([
-                  ...depositLedgerEntries,
-                  ...producedByTxOrders,
-                ]);
+                // Insert separately: depositLedgerEntries carry time_stamp_tz
+                // but producedByTxOrders do not; mixing them in one sql.insert()
+                // causes @effect/sql to pad missing fields with NULL, violating
+                // the NOT NULL constraint on time_stamp_tz.
+                yield* MempoolLedgerDB.insert(depositLedgerEntries);
+                yield* MempoolLedgerDB.insert(producedByTxOrders);
                 yield* MempoolLedgerDB.clearUTxOs([
                   ...withdrawnOutRefs,
                   ...spentByTxOrders,
@@ -221,12 +223,31 @@ const program = pipe(
   Effect.provide(NodeConfig.layer),
 );
 
+const serializeError = (e: unknown, depth = 0): string => {
+  if (depth > 5 || e == null) return String(e);
+  if (e instanceof Error) {
+    const errCause = (e as unknown as Record<string, unknown>).cause;
+    const causeStr =
+      errCause != null
+        ? `\n  cause: ${serializeError(errCause, depth + 1)}`
+        : "";
+    return `${e.constructor?.name ?? "Error"}: ${e.message}${causeStr}`;
+  }
+  if (typeof e === "object" && "message" in e) {
+    const cause = (e as Record<string, unknown>).cause;
+    const causeStr =
+      cause != null ? `\n  cause: ${serializeError(cause, depth + 1)}` : "";
+    return `${String((e as Record<string, unknown>).message)}${causeStr}`;
+  }
+  return String(e);
+};
+
 Effect.runPromise(
   program.pipe(
     Effect.catchAllCause((cause) =>
       Effect.succeed({
         type: "FailureOutput",
-        error: `Block commitment worker failure: ${Cause.pretty(cause)}`,
+        error: `Block commitment worker failure: ${serializeError(Cause.squash(cause))}`,
       }),
     ),
   ),

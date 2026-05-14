@@ -325,9 +325,6 @@ const getMergeHandler = Effect.gen(function* () {
   Effect.catchTag("DataCoercionError", (e) =>
     handleGenericGetFailure(MERGE_ENDPOINT, e),
   ),
-  Effect.catchTag("LinkedListError", (e) =>
-    handleGenericGetFailure(MERGE_ENDPOINT, e),
-  ),
   Effect.catchTag("HashingError", (e) =>
     handleGenericGetFailure(MERGE_ENDPOINT, e),
   ),

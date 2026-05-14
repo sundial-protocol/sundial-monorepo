@@ -274,6 +274,7 @@ export const makeLucidMock = (
   return {
     newTx: vi.fn(() => selectedBuilder),
     utxosAt: vi.fn(async () => []),
+    utxosAtWithUnit: vi.fn(async () => []),
     wallet: vi.fn(() => ({
       getUtxos: vi.fn(async () => []),
       address: vi.fn(async () => addressKeyA),

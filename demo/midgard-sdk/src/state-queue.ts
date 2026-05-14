@@ -26,6 +26,7 @@ import {
   hashHexWithBlake2b224,
   AuthenticatedValidator,
   utxosAtByNFTPolicyId,
+  utxoAtByNFTUnit,
 } from "@/common.js";
 import { LucidError, makeReturn } from "@/common.js";
 import { getStateToken } from "@/internals.js";
@@ -633,6 +634,73 @@ export const fetchConfirmedStateAndItsLink = (
 ) =>
   makeReturn(fetchConfirmedStateAndItsLinkProgram(lucid, config)).unsafeRun();
 
+/**
+ * O(1) variant of `fetchConfirmedStateAndItsLinkProgram`.
+ *
+ * Uses two sequential `lucid.utxosAtWithUnit` calls instead of a full address
+ * scan, making it independent of queue depth:
+ *
+ * 1. Fetch the confirmed-state root by its fixed unit
+ *    (`policyId + NODE_ASSET_NAME`), which is constant for the lifetime of the
+ *    contract.
+ * 2. Read `datum.next` from the root to derive the first queued block's unit
+ *    (`policyId + NODE_ASSET_NAME + nextHashHex`), then fetch it.
+ *
+ * Total provider requests: 1 (queue empty) or 2 (queue has blocks).
+ */
+export const fetchConfirmedStateAndItsLinkByUnitProgram = (
+  lucid: LucidEvolution,
+  config: StateQueueFetchConfig,
+): Effect.Effect<
+  { confirmed: StateQueueUTxO; link?: StateQueueUTxO },
+  LucidError | DataCoercionError | MissingDatumError | UnauthenticUtxoError
+> =>
+  Effect.gen(function* () {
+    const rootUnit = config.stateQueuePolicyId + NODE_ASSET_NAME;
+    const confirmedBeacon = yield* utxoAtByNFTUnit(
+      lucid,
+      config.stateQueueAddress,
+      rootUnit,
+    );
+    const confirmed = yield* utxoToStateQueueUTxO(
+      confirmedBeacon.utxo,
+      config.stateQueuePolicyId,
+    );
+
+    const { link } = yield* getConfirmedStateFromStateQueueDatum(
+      confirmed.datum,
+    );
+
+    if (link === "Empty") {
+      return { confirmed, link: undefined };
+    }
+
+    const firstBlockUnit =
+      config.stateQueuePolicyId + NODE_ASSET_NAME + link.Key.key;
+    const firstBlockBeacon = yield* utxoAtByNFTUnit(
+      lucid,
+      config.stateQueueAddress,
+      firstBlockUnit,
+    );
+    const firstBlock = yield* utxoToStateQueueUTxO(
+      firstBlockBeacon.utxo,
+      config.stateQueuePolicyId,
+    );
+
+    return { confirmed, link: firstBlock };
+  });
+
+/**
+ * Promise-returning wrapper for `fetchConfirmedStateAndItsLinkByUnitProgram`.
+ */
+export const fetchConfirmedStateAndItsLinkByUnit = (
+  lucid: LucidEvolution,
+  config: StateQueueFetchConfig,
+) =>
+  makeReturn(
+    fetchConfirmedStateAndItsLinkByUnitProgram(lucid, config),
+  ).unsafeRun();
+
 export const fetchLatestCommittedBlockProgram = (
   lucid: LucidEvolution,
   config: StateQueueFetchConfig,
@@ -687,6 +755,48 @@ export const fetchLatestCommittedBlock = (
   lucid: LucidEvolution,
   config: StateQueueFetchConfig,
 ) => makeReturn(fetchLatestCommittedBlockProgram(lucid, config)).unsafeRun();
+
+/**
+ * O(1) tail fetch using a known asset unit.
+ *
+ * Instead of scanning all UTxOs at the state-queue address, this fetches only
+ * the UTxO carrying `tailUnit` via `lucid.utxosAtWithUnit`.  One provider
+ * request regardless of queue depth.  Use this on the hot path once the tail
+ * unit is known from local DB state.
+ *
+ * @param lucid - The `LucidEvolution` API object.
+ * @param config - Configuration values for address and policy ID validation.
+ * @param tailUnit - Full Cardano asset unit (`policyId + assetName`) of the known tail node.
+ * @returns The tail `StateQueueUTxO`.
+ */
+export const fetchLatestCommittedBlockByUnitProgram = (
+  lucid: LucidEvolution,
+  config: StateQueueFetchConfig,
+  tailUnit: string,
+): Effect.Effect<
+  StateQueueUTxO,
+  LucidError | DataCoercionError | MissingDatumError | UnauthenticUtxoError
+> =>
+  Effect.gen(function* () {
+    const beacon = yield* utxoAtByNFTUnit(
+      lucid,
+      config.stateQueueAddress,
+      tailUnit,
+    );
+    return yield* utxoToStateQueueUTxO(beacon.utxo, config.stateQueuePolicyId);
+  });
+
+/**
+ * Promise-returning wrapper for `fetchLatestCommittedBlockByUnitProgram`.
+ */
+export const fetchLatestCommittedBlockByUnit = (
+  lucid: LucidEvolution,
+  config: StateQueueFetchConfig,
+  tailUnit: string,
+) =>
+  makeReturn(
+    fetchLatestCommittedBlockByUnitProgram(lucid, config, tailUnit),
+  ).unsafeRun();
 
 /**
  * Init

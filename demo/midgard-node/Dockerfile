@@ -15,9 +15,10 @@ RUN pnpm --filter midgard-node run build
 RUN pnpm --filter midgard-node deploy --prod --legacy /deploy
 
 FROM base AS final
+RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
-COPY --from=build /deploy .
-COPY --from=build /workspace/midgard-node/dist ./dist
+COPY --chown=node:node --from=build /deploy .
+COPY --chown=node:node --from=build /workspace/midgard-node/dist ./dist
 ENV NODE_ENV=production
 USER node
 CMD ["node", "./dist/index.js", "listen"]
