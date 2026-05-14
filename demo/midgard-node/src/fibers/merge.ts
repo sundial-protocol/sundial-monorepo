@@ -48,11 +48,17 @@ export const mergeFiber = (
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🟠 Merge fiber started.");
-      // Initialize merge metric so dashboards show a baseline series.
-      yield* StateQueueTx.initializeMergeMetric;
+      // Initialize merge metrics so dashboards show a baseline series.
+      yield* StateQueueTx.initializeMergeMetrics;
       const action = mergeAction.pipe(
         Effect.withSpan("merge-confirmed-state-fiber"),
-        Effect.catchAllCause(Effect.logWarning),
+        Effect.tapErrorCause((cause) =>
+          Effect.gen(function* () {
+            yield* StateQueueTx.incrementMergeFailure;
+            yield* Effect.logWarning(cause);
+          }),
+        ),
+        Effect.catchAllCause(() => Effect.void),
       );
       yield* Effect.repeat(action, schedule);
     }),

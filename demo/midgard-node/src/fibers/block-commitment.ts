@@ -7,16 +7,19 @@ import { Worker } from "worker_threads";
 import { BlocksDB } from "@/database/index.js";
 import { performance } from "node:perf_hooks";
 
-const commitBlockNumTxGauge = Metric.gauge("commit_block_num_tx_count", {
+const commitBlockNumTxGauge = Metric.gauge("commit_block_txs_per_block", {
   description:
-    "A gauge for tracking the current number of transactions in the commit block",
+    "A gauge for tracking the number of transactions in the most recently committed block",
   bigint: true,
 }).register();
 
-const totalTxSizeGauge = Metric.gauge("total_tx_size", {
-  description:
-    "A gauge for tracking the total size of transactions in committed blocks",
-}).register();
+const commitBlockEventsSizeGauge = Metric.gauge(
+  "commit_block_events_size_bytes",
+  {
+    description:
+      "A gauge for tracking the total byte size of all events (deposits, withdrawals, tx orders, tx requests) in the most recently committed block",
+  },
+).register();
 
 const commitBlockCounter = Metric.counter("commit_block_count", {
   description: "A counter for tracking the number of committed blocks",
@@ -31,11 +34,21 @@ const commitBlockTxCounter = Metric.counter("commit_block_tx_count", {
   incremental: true,
 }).register();
 
-const blockCommitmentUserEventsCountGauge = Metric.gauge(
-  "block_total_user_events_count",
+const commitBlockL1UserEventsGauge = Metric.gauge(
+  "commit_block_l1_user_events",
   {
     description:
-      "A gauge for tracking the number of user events (deposits, withdrawals and tx orders) in committed blocks",
+      "A gauge for tracking the number of L1 user events (deposits, withdrawals, and tx orders) in the most recently committed block",
+  },
+).register();
+
+const commitBlockCommitmentFailuresCounter = Metric.counter(
+  "commit_block_commitment_failures",
+  {
+    description:
+      "A counter for tracking the number of block commitment worker failures (timeouts, crashes, and SDK/CML errors)",
+    bigint: true,
+    incremental: true,
   },
 ).register();
 
@@ -145,7 +158,7 @@ export const buildAndSubmitCommitmentBlockAction = () =>
         yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n + 1);
 
         yield* Metric.set(
-          blockCommitmentUserEventsCountGauge,
+          commitBlockL1UserEventsGauge,
           workerOutput.stats[BlocksDB.Columns.DEPOSITS_COUNT] +
             workerOutput.stats[BlocksDB.Columns.WITHDRAWALS_COUNT] +
             workerOutput.stats[BlocksDB.Columns.TX_ORDERS_COUNT],
@@ -155,7 +168,7 @@ export const buildAndSubmitCommitmentBlockAction = () =>
           BigInt(workerOutput.stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
         );
         yield* Metric.set(
-          totalTxSizeGauge,
+          commitBlockEventsSizeGauge,
           workerOutput.stats[BlocksDB.Columns.TOTAL_EVENTS_SIZE],
         );
         yield* Metric.increment(commitBlockCounter);
@@ -173,6 +186,7 @@ export const buildAndSubmitCommitmentBlockAction = () =>
         break;
       }
       case "FailureOutput": {
+        yield* Metric.increment(commitBlockCommitmentFailuresCounter);
         break;
       }
     }
@@ -200,11 +214,12 @@ export const blockCommitmentFiber = (
     yield* Effect.logInfo("🔵 Block commitment fiber started.");
     // Initialize metrics so panels have a visible baseline before first commit.
     yield* Metric.set(commitBlockNumTxGauge, 0n);
-    yield* Metric.set(totalTxSizeGauge, 0);
-    yield* Metric.set(blockCommitmentUserEventsCountGauge, 0);
+    yield* Metric.set(commitBlockEventsSizeGauge, 0);
+    yield* Metric.set(commitBlockL1UserEventsGauge, 0);
     yield* Metric.set(commitBlockDurationGauge, 0);
     yield* Metric.incrementBy(commitBlockCounter, 0n);
     yield* Metric.incrementBy(commitBlockTxCounter, 0n);
+    yield* Metric.incrementBy(commitBlockCommitmentFailuresCounter, 0n);
     const action = blockCommitmentAction.pipe(
       Effect.withSpan("block-commitment-fiber"),
       Effect.catchAllCause(Effect.logWarning),

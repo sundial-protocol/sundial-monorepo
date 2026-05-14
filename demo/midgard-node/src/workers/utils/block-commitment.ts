@@ -409,7 +409,16 @@ export const buildNewBlockEntry = (
               `🔹 Refreshed wallet has ${freshUTxOs.length} UTxO(s); retrying chainProgram()...`,
             );
             yield* Effect.sync(() => lucidAPI.overrideUTxOs(freshUTxOs));
-            return yield* txBuilder.chainProgram();
+            // Rebuild from scratch: re-calling chainProgram() on the same
+            // TxBuilder after a failure causes "Duplicate Mint Asset" because
+            // the CML layer processes mintAssets eagerly on the first attempt.
+            const freshTxBuilder =
+              yield* SDK.incompleteCommitBlockHeaderTxProgram(
+                lucidAPI,
+                fetchConfig,
+                commitBlockParams,
+              );
+            return yield* freshTxBuilder.chainProgram();
           }),
         ),
         Effect.tapError((e) =>

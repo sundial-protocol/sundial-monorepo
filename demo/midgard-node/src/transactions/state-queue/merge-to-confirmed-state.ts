@@ -39,7 +39,24 @@ const mergeBlockCounter = Metric.counter("merge_block_count", {
   incremental: true,
 }).register();
 
+const mergeBlockFailuresCounter = Metric.counter("merge_block_failures", {
+  description:
+    "A counter for tracking the number of merge transaction failures (L1 submission errors, state-queue fetch errors, and signing errors)",
+  bigint: true,
+  incremental: true,
+}).register();
+
+export const initializeMergeMetrics = Effect.gen(function* () {
+  yield* Metric.incrementBy(mergeBlockCounter, 0n);
+  yield* Metric.incrementBy(mergeBlockFailuresCounter, 0n);
+});
+
+/** @deprecated use initializeMergeMetrics */
 export const initializeMergeMetric = Metric.incrementBy(mergeBlockCounter, 0n);
+
+export const incrementMergeFailure = Metric.increment(
+  mergeBlockFailuresCounter,
+);
 
 // 30 minutes.
 const MAX_LIFE_OF_LOCAL_SYNC: number = 1_800_000;
@@ -155,10 +172,11 @@ export const buildAndSubmitMergeTx = (
         firstBlockUTxO,
       ).pipe(Effect.withSpan("fetchFirstBlockTxs"));
       if (firstBlockTxs.length === 0) {
-        yield* Effect.logInfo(
-          "🔸 ❌ Failed to find first block's transactions in BlocksTxsDB.",
+        yield* Effect.logWarning(
+          `🔸 No transactions found in BlocksTxsDB for block ${headerHash.toString("hex")}; ` +
+            `block was likely seeded from chain or committed with no mempool txs. ` +
+            `Proceeding with merge; ConfirmedLedgerDB will not be updated for this block.`,
         );
-        return;
       }
       yield* Effect.logInfo("🔸 Building merge transaction...");
       // Build the transaction

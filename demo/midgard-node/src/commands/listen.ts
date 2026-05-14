@@ -73,8 +73,16 @@ const RESET_ENDPOINT: string = "reset";
 const SUBMIT_ENDPOINT: string = "submit";
 const STATE_QUEUE_ENDPOINT: string = "stateQueue";
 
-const txCounter = Metric.counter("tx_count", {
-  description: "A counter for tracking submit transactions",
+const txAcceptedCounter = Metric.counter("tx_submissions_accepted", {
+  description:
+    "A counter for tracking L2 transaction submissions that passed validation and were enqueued",
+  bigint: true,
+  incremental: true,
+}).register();
+
+const txRejectedCounter = Metric.counter("tx_submissions_rejected", {
+  description:
+    "A counter for tracking L2 transaction submissions rejected due to malformed or non-hex CBOR",
   bigint: true,
   incremental: true,
 }).register();
@@ -521,6 +529,7 @@ const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
     const txStringParam = params["tx_cbor"];
     if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
       yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
+      yield* Metric.increment(txRejectedCounter);
       return yield* HttpServerResponse.json(
         { error: `Invalid CBOR provided` },
         { status: 400 },
@@ -528,7 +537,7 @@ const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
     } else {
       const txString = txStringParam;
       yield* txQueue.offer(txString);
-      Effect.runSync(Metric.increment(txCounter));
+      yield* Metric.increment(txAcceptedCounter);
       return yield* HttpServerResponse.json({
         message: `Successfully added the transaction to the queue`,
       });
