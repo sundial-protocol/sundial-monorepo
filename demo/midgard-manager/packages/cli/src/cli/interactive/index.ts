@@ -24,6 +24,11 @@ const BACK_OPTION = {
   description: '',
 };
 
+const PROMPT_EXIT_ERROR_NAMES = new Set(['AbortPromptError', 'ExitPromptError']);
+
+const isPromptExitError = (error: unknown): error is Error =>
+  error instanceof Error && PROMPT_EXIT_ERROR_NAMES.has(error.name);
+
 export const interactiveCommand = Command.make('interactive', {}, () => {
   return pipe(
     Effect.tryPromise(async () => {
@@ -183,7 +188,7 @@ class ManualCommandImpl {
             await waitForKeypress();
           } catch (error) {
             this._isPromptActive = false;
-            if (error instanceof Error && error.name === 'AbortPromptError') {
+            if (isPromptExitError(error)) {
               // Show a clearer message when a prompt is cancelled
               console.log(`\n\n${chalk.green('✓ Action cancelled')} - Returning to menu\n`);
               // Wait a moment before returning to the menu for better UX
@@ -198,11 +203,9 @@ class ManualCommandImpl {
         }
       } catch (error) {
         this._isPromptActive = false;
-        if (error instanceof Error && error.name === 'AbortPromptError') {
-          // Show a clearer message when a prompt is cancelled
-          console.log(`\n\n${chalk.green('✓ Action cancelled')} - Returning to menu\n`);
-          // Wait a moment before returning to the menu for better UX
-          await sleep(500);
+        if (isPromptExitError(error)) {
+          console.log('\n\nExiting Midgard CLI...\n');
+          return;
         } else {
           displayError('Error in command loop', error);
         }
