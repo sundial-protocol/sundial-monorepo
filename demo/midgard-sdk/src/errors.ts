@@ -2,7 +2,7 @@ import { Data as EffectData } from "effect";
 
 export type GenericErrorFields = {
   readonly message: string;
-  readonly cause: any;
+  readonly cause: unknown;
 };
 
 export class AssetError extends EffectData.TaggedError(

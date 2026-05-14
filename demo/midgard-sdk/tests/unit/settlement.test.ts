@@ -139,6 +139,41 @@ describe("SDK unit settlement programs", () => {
     expect(retiredNft).toBe(toUnit("bb".repeat(28), assetNameA));
   });
 
+  it("Resolve settlement fails without a resolution claim", async () => {
+    const builder = makeBuilderSpy();
+    const lucid = makeLucidMock(builder);
+    const settlementUTxO = {
+      utxo: makeUtxo({ txHash: txHashA, outputIndex: 0 }),
+      datum: {
+        depositsRoot: merkleRootA,
+        withdrawalsRoot: merkleRootB,
+        transactionsRoot: merkleRootA,
+        resolutionClaim: null,
+      },
+      assetName: assetNameA,
+    };
+
+    const result = await Effect.runPromise(
+      Effect.either(
+        incompleteResolveSettlementProgram(lucid as any, {
+          settlementAddress: addressScriptA,
+          resolutionClaimOperator: pubKeyHashA,
+          settlementId: merkleRootA,
+          changeAddress: addressKeyA,
+          settlementPolicyId: policyIdA,
+          settlementMintingPolicy: validatorA.mintingScript as any,
+          settlementUTxO: settlementUTxO as any,
+        }),
+      ),
+    );
+
+    expect(result._tag).toBe("Left");
+    if (result._tag === "Left") {
+      expect(result.left._tag).toBe("SettlementError");
+    }
+    expect(builder.addSignerKey).not.toHaveBeenCalled();
+  });
+
   it("Settlement fetchUserEventRefUTxO handles deposit, tx-order, and withdrawal", async () => {
     const lucid = makeLucidMock();
 
