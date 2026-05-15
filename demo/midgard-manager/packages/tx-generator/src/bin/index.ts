@@ -17,6 +17,8 @@ interface GeneratorOptions {
   privateKey?: string;
   network?: string;
   outputDir?: string;
+  seed?: string;
+  replayCorpusPath?: string;
 }
 
 const program = new Command();
@@ -44,6 +46,11 @@ program
     '-o, --output-dir <dir>',
     'Directory to save transactions when node is unavailable',
     'generated-transactions'
+  )
+  .option('--seed <seed>', 'Deterministic seed for reproducible transaction generation')
+  .option(
+    '--replay-corpus-path <path>',
+    'Replay transactions from a JSON corpus (array or { transactions: [] })'
   )
   .action(async (options: GeneratorOptions) => {
     try {
@@ -84,6 +91,12 @@ program
       console.log(chalk.gray(`Batch Size: ${options.batchSize}`));
       console.log(chalk.gray(`Interval: ${options.interval} seconds`));
       console.log(chalk.gray(`Concurrency: ${options.concurrency}\n`));
+      if (options.seed) {
+        console.log(chalk.gray(`Generation Seed: ${options.seed}`));
+      }
+      if (options.replayCorpusPath) {
+        console.log(chalk.gray(`Replay Corpus Path: ${options.replayCorpusPath}`));
+      }
 
       await startGenerator({
         nodeEndpoint: options.endpoint,
@@ -96,6 +109,8 @@ program
         interval: parseInt(options.interval),
         concurrency: parseInt(options.concurrency),
         outputDir: options.outputDir,
+        generationSeed: options.seed,
+        replayCorpusPath: options.replayCorpusPath,
       });
 
       console.log(chalk.green('\nGenerator started successfully!'));

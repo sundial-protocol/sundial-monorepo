@@ -31,6 +31,8 @@ export interface OneToOneTransactionConfig {
     retryDelay?: number;
     enableLogs?: boolean;
   };
+  random?: () => number;
+  deterministicStartMs?: number;
 }
 
 // Constants for transaction generation
@@ -41,13 +43,17 @@ const MIN_LOVELACE_OUTPUT = 1_000_000n; // Minimum lovelace per output
  * Generates a unique hex string for transaction datum
  * Combines timestamp and random values into a valid hex string
  */
-const generateUniqueHexDatum = (counter: number): string => {
-  const timestamp = Date.now().toString(16).padStart(12, '0');
-  const random = Math.floor(Math.random() * 16777215)
+const generateUniqueHexDatum = (
+  counter: number,
+  random: () => number,
+  deterministicStartMs: number
+): string => {
+  const timestamp = (deterministicStartMs + counter).toString(16).padStart(12, '0');
+  const randomHex = Math.floor(random() * 16777215)
     .toString(16)
     .padStart(6, '0');
   const count = counter.toString(16).padStart(6, '0');
-  return timestamp + random + count;
+  return timestamp + randomHex + count;
 };
 
 /**
@@ -99,7 +105,15 @@ const initializeLucid = async (emulator: Emulator, network: Network): Promise<Lu
 const generateOneToOneTransactions = async (
   config: OneToOneTransactionConfig
 ): Promise<SerializedMidgardTransaction[]> => {
-  const { network, initialUTxO, txsCount, writable, walletSeedOrPrivateKey } = config;
+  const {
+    network,
+    initialUTxO,
+    txsCount,
+    writable,
+    walletSeedOrPrivateKey,
+    random = Math.random,
+    deterministicStartMs = Date.now(),
+  } = config;
 
   // Validate configuration
   validateConfig(config);
@@ -154,7 +168,10 @@ const generateOneToOneTransactions = async (
       const [newWalletUTxOs, , txSignBuilder] = await txBuilder.pay
         .ToAddressWithData(
           initialUTxO.address,
-          { kind: 'inline', value: Data.to(generateUniqueHexDatum(i)) },
+          {
+            kind: 'inline',
+            value: Data.to(generateUniqueHexDatum(i, random, deterministicStartMs)),
+          },
           initialUTxO.assets
         )
         .chain();

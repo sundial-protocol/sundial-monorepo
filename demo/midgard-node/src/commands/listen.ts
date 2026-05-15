@@ -73,9 +73,9 @@ const RESET_ENDPOINT: string = "reset";
 const SUBMIT_ENDPOINT: string = "submit";
 const STATE_QUEUE_ENDPOINT: string = "stateQueue";
 
-const txAcceptedCounter = Metric.counter("tx_submissions_accepted", {
+const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
-    "A counter for tracking L2 transaction submissions that passed validation and were enqueued",
+    "A counter for tracking L2 transaction submissions that passed hex validation and were enqueued into the in-memory processing queue",
   bigint: true,
   incremental: true,
 }).register();

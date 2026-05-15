@@ -1,5 +1,5 @@
 import { fromHex } from "@lucid-evolution/lucid";
-import { Chunk, Effect, Metric, pipe, Queue, Schedule } from "effect";
+import { Chunk, Effect, Metric, pipe, Queue, Ref, Schedule } from "effect";
 import { MempoolDB } from "@/database/index.js";
 import { ProcessedTx, breakDownTx } from "@/utils.js";
 import { DatabaseError } from "@/database/utils/common.js";
@@ -7,13 +7,40 @@ import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "@/services/database.js";
 
 const txQueueSizeGauge = Metric.gauge("tx_queue_size", {
-  description: "A tracker for the size of the tx queue before processing",
+  description: "Tx queue size sampled before each drain cycle",
   bigint: true,
 }).register();
 
-const txQueueProcessorAction = (
+const txQueuePeakSizeGauge = Metric.gauge("tx_queue_peak_size", {
+  description:
+    "High-water mark of tx queue size since fiber startup; never decreases on drain so Prometheus scrapes capture burst spikes between polling cycles",
+  bigint: true,
+}).register();
+
+const txMempoolAcceptedCounter = Metric.counter(
+  "tx_submissions_mempool_accepted",
+  {
+    description:
+      "A counter for tracking L2 transactions durably inserted into the mempool after CBOR deserialization and semantic breakdown",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const txProcessingFailedCounter = Metric.counter(
+  "tx_submissions_processing_failed",
+  {
+    description:
+      "A counter for tracking L2 transaction processing batch failures (CBOR deserialization or mempool insertion errors)",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+export const txQueueProcessorAction = (
   txQueue: Queue.Dequeue<string>,
   withMonitoring?: boolean,
+  peakRef?: Ref.Ref<bigint>,
 ): Effect.Effect<
   void,
   DatabaseError | SDK.CmlDeserializationError | SDK.DataCoercionError,
@@ -24,6 +51,12 @@ const txQueueProcessorAction = (
 
     if (withMonitoring) {
       yield* Metric.set(txQueueSizeGauge, BigInt(queueSize));
+      if (peakRef !== undefined) {
+        const newPeak = yield* Ref.updateAndGet(peakRef, (prev) =>
+          prev >= BigInt(queueSize) ? prev : BigInt(queueSize),
+        );
+        yield* Metric.set(txQueuePeakSizeGauge, newPeak);
+      }
     }
 
     const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(txQueue);
@@ -34,7 +67,19 @@ const txQueueProcessorAction = (
       }),
     );
     yield* MempoolDB.insertMultiple(processedTxs);
-  });
+    if (withMonitoring && processedTxs.length > 0) {
+      yield* Metric.incrementBy(
+        txMempoolAcceptedCounter,
+        BigInt(processedTxs.length),
+      );
+    }
+  }).pipe(
+    Effect.tapErrorCause(() =>
+      withMonitoring
+        ? Metric.increment(txProcessingFailedCounter)
+        : Effect.void,
+    ),
+  );
 
 export const txQueueProcessorFiber = (
   schedule: Schedule.Schedule<number>,
@@ -44,14 +89,20 @@ export const txQueueProcessorFiber = (
   pipe(
     Effect.gen(function* () {
       yield* Effect.logInfo("🔶 Tx queue processor fiber started.");
+      const peakRef = yield* Ref.make(0n);
       if (withMonitoring) {
-        // Ensure metric series is initialized before the first queue sample.
+        // Ensure metric series are initialized before the first queue sample.
         yield* Metric.set(txQueueSizeGauge, 0n);
+        yield* Metric.set(txQueuePeakSizeGauge, 0n);
+        yield* Metric.incrementBy(txMempoolAcceptedCounter, 0n);
+        yield* Metric.incrementBy(txProcessingFailedCounter, 0n);
       }
       yield* Effect.repeat(
-        txQueueProcessorAction(txQueue, withMonitoring).pipe(
-          Effect.catchAllCause(Effect.logWarning),
-        ),
+        txQueueProcessorAction(
+          txQueue,
+          withMonitoring,
+          withMonitoring ? peakRef : undefined,
+        ).pipe(Effect.catchAllCause(Effect.logWarning)),
         schedule,
       );
     }),

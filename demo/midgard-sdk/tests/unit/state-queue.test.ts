@@ -27,6 +27,64 @@ afterEach(() => {
 });
 
 describe("SDK unit state queue programs", () => {
+  it("fetchConfirmedStateAndItsLinkByUnitProgram uses unit lookups and never scans by address", async () => {
+    const lucid = makeLucidMock();
+    const stateQueueKey = "ab".repeat(28);
+    const confirmedNodeDatum = {
+      key: "Empty",
+      next: { Key: { key: stateQueueKey } },
+      data: Data.castTo(confirmedStateFixture, ConfirmedState),
+    };
+    const blockNodeDatum = {
+      key: { Key: { key: stateQueueKey } },
+      next: "Empty",
+      data: Data.castTo(headerFixture, Header),
+    };
+    const rootUnit = toUnit(policyIdA, sdk.NODE_ASSET_NAME);
+    const firstBlockUnit = toUnit(
+      policyIdA,
+      `${sdk.NODE_ASSET_NAME}${stateQueueKey}`,
+    );
+    const confirmedUtxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: Data.to(confirmedNodeDatum, sdk.StateQueueDatum),
+      unit: rootUnit,
+    });
+    const blockUtxo = makeUtxo({
+      txHash: txHashB,
+      outputIndex: 1,
+      datum: Data.to(blockNodeDatum, sdk.StateQueueDatum),
+      unit: firstBlockUnit,
+    });
+
+    lucid.utxosAtWithUnit
+      .mockResolvedValueOnce([confirmedUtxo])
+      .mockResolvedValueOnce([blockUtxo]);
+
+    const result = await Effect.runPromise(
+      sdk.fetchConfirmedStateAndItsLinkByUnitProgram(lucid as any, {
+        stateQueueAddress: addressScriptA,
+        stateQueuePolicyId: policyIdA,
+      }),
+    );
+
+    expect(lucid.utxosAt).not.toHaveBeenCalled();
+    expect(lucid.utxosAtWithUnit).toHaveBeenCalledTimes(2);
+    expect(lucid.utxosAtWithUnit).toHaveBeenNthCalledWith(
+      1,
+      addressScriptA,
+      rootUnit,
+    );
+    expect(lucid.utxosAtWithUnit).toHaveBeenNthCalledWith(
+      2,
+      addressScriptA,
+      firstBlockUnit,
+    );
+    expect(result.confirmed.utxo.txHash).toBe(txHashA);
+    expect(result.link?.utxo.txHash).toBe(txHashB);
+  });
+
   it("State queue helpers and transaction programs work", async () => {
     const builder = makeBuilderSpy();
     const lucid = makeLucidMock(builder);

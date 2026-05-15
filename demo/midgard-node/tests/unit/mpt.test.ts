@@ -104,4 +104,18 @@ describe("LevelDB-backed MPT", () => {
       expect(reopenedRoot).toBe(rootAfterPut);
     }),
   );
+
+  it.effect("opens LevelDB during trie creation", () =>
+    Effect.gen(function* () {
+      tmpPath = path.join(os.tmpdir(), `midgard-unit-open-${randomUUID()}`);
+      const mpt = yield* MidgardMpt.create("unit-test-leveldb-open", tmpPath);
+      const leveldb = mpt.databaseAndPath?.database.getDatabase();
+      expect(leveldb).toBeDefined();
+      expect(leveldb!.status).toBe("open");
+      yield* Effect.tryPromise({
+        try: () => leveldb!.close(),
+        catch: (e) => new Error(`${e}`),
+      });
+    }),
+  );
 });

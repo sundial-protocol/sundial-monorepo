@@ -5,6 +5,7 @@ import * as Ledger from "@/database/utils/ledger.js";
 import * as Tx from "@/database/utils/tx.js";
 import * as UserEvents from "@/database/utils/user-events.js";
 import {
+  applyBlockCommitmentLedgerProjection,
   applyDepositsToLedger,
   applyTxOrdersToLedger,
   applyTxRequestsToLedger,
@@ -13,6 +14,7 @@ import {
 import type { MidgardMpt } from "@/workers/utils/mpt.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 import {
   COMMON_ADDRESSES,
   makeFakeTrie,
@@ -25,6 +27,8 @@ const breakDownTxMock = vi.hoisted(() => vi.fn());
 const withdrawalsEntryToOutRefMock = vi.hoisted(() => vi.fn());
 const depositsEntryToLedgerEntryMock = vi.hoisted(() => vi.fn());
 const midgardMptCreateMock = vi.hoisted(() => vi.fn());
+const mempoolLedgerInsertMock = vi.hoisted(() => vi.fn());
+const mempoolLedgerClearUTxOsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/utils.js", () => ({
   breakDownTx: breakDownTxMock,
@@ -65,12 +69,18 @@ vi.mock("@/database/index.js", () => ({
   DepositsDB: {
     entryToLedgerEntry: depositsEntryToLedgerEntryMock,
   },
+  MempoolLedgerDB: {
+    insert: mempoolLedgerInsertMock,
+    clearUTxOs: mempoolLedgerClearUTxOsMock,
+  },
   BlocksDB: {},
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
+
+const mockSqlLayer = createMockSqlHarness().layer;
 
 it.effect("applyWithdrawalsToLedger applies all withdrawal events", () =>
   Effect.gen(function* () {
@@ -274,3 +284,43 @@ it.effect("applyDepositsToLedger applies deposits and returns new root", () => {
     expect(depositsTrie.batch).toHaveBeenCalledOnce();
   }).pipe(Effect.provide(stubLayer));
 });
+
+it.effect(
+  "applyBlockCommitmentLedgerProjection inserts timestamped and non-timestamped entries separately",
+  () =>
+    Effect.gen(function* () {
+      const depositEntry = {
+        ...makeLedgerEntry(0xa1),
+        [Ledger.Columns.TIMESTAMPTZ]: new Date("2025-01-01T00:00:00.000Z"),
+      };
+      const txOrderProducedEntry = makeLedgerEntry(0xb1);
+      const withdrawnOutRef = Buffer.from([0xc1]);
+      const spentOutRef = Buffer.from([0xd1]);
+
+      mempoolLedgerInsertMock.mockReturnValue(Effect.succeed(undefined));
+      mempoolLedgerClearUTxOsMock.mockReturnValue(Effect.succeed(undefined));
+
+      yield* applyBlockCommitmentLedgerProjection(
+        [depositEntry],
+        [txOrderProducedEntry],
+        [withdrawnOutRef],
+        [spentOutRef],
+      );
+
+      expect(mempoolLedgerInsertMock).toHaveBeenCalledTimes(2);
+      expect(mempoolLedgerInsertMock).toHaveBeenNthCalledWith(1, [
+        depositEntry,
+      ]);
+      expect(mempoolLedgerInsertMock).toHaveBeenNthCalledWith(2, [
+        txOrderProducedEntry,
+      ]);
+      expect(mempoolLedgerInsertMock).not.toHaveBeenCalledWith([
+        depositEntry,
+        txOrderProducedEntry,
+      ]);
+      expect(mempoolLedgerClearUTxOsMock).toHaveBeenCalledWith([
+        withdrawnOutRef,
+        spentOutRef,
+      ]);
+    }).pipe(Effect.provide(mockSqlLayer)),
+);

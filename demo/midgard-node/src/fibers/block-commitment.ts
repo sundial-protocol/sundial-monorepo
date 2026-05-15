@@ -1,8 +1,7 @@
 import { Globals, NodeConfig } from "@/services/index.js";
-import { Effect, Ref, Schedule } from "effect";
+import { Effect, Metric, MetricBoundaries, Ref, Schedule } from "effect";
 import { WorkerError } from "@/workers/utils/common.js";
 import { WorkerInput, WorkerOutput } from "@/workers/utils/block-commitment.js";
-import { Metric } from "effect";
 import { Worker } from "worker_threads";
 import { BlocksDB } from "@/database/index.js";
 import { performance } from "node:perf_hooks";
@@ -52,10 +51,14 @@ const commitBlockCommitmentFailuresCounter = Metric.counter(
   },
 ).register();
 
-const commitBlockDurationGauge = Metric.gauge("commit_block_duration_seconds", {
-  description:
-    "Duration in seconds of the last block commitment worker run (success or failure)",
-}).register();
+export const commitBlockDurationHistogramBoundaries =
+  MetricBoundaries.exponential({ start: 0.1, factor: 2, count: 13 });
+
+const commitBlockDurationHistogram = Metric.histogram(
+  "commit_block_duration_seconds",
+  commitBlockDurationHistogramBoundaries,
+  "Histogram of block commitment worker duration in seconds (success or failure)",
+).register();
 
 export const buildAndSubmitCommitmentBlockAction = () =>
   Effect.gen(function* () {
@@ -141,13 +144,16 @@ export const buildAndSubmitCommitmentBlockAction = () =>
     const workerOutput: WorkerOutput = yield* worker.pipe(
       Effect.tapBoth({
         onFailure: (_) =>
-          Metric.set(
-            commitBlockDurationGauge,
-            (performance.now() - workerStartMs) / 1000,
-          ),
+          Effect.all([
+            Metric.update(
+              commitBlockDurationHistogram,
+              (performance.now() - workerStartMs) / 1000,
+            ),
+            Metric.increment(commitBlockCommitmentFailuresCounter),
+          ]),
         onSuccess: (_) =>
-          Metric.set(
-            commitBlockDurationGauge,
+          Metric.update(
+            commitBlockDurationHistogram,
             (performance.now() - workerStartMs) / 1000,
           ),
       }),
@@ -185,10 +191,6 @@ export const buildAndSubmitCommitmentBlockAction = () =>
         );
         break;
       }
-      case "FailureOutput": {
-        yield* Metric.increment(commitBlockCommitmentFailuresCounter);
-        break;
-      }
     }
   });
 
@@ -216,7 +218,7 @@ export const blockCommitmentFiber = (
     yield* Metric.set(commitBlockNumTxGauge, 0n);
     yield* Metric.set(commitBlockEventsSizeGauge, 0);
     yield* Metric.set(commitBlockL1UserEventsGauge, 0);
-    yield* Metric.set(commitBlockDurationGauge, 0);
+    yield* Metric.update(commitBlockDurationHistogram, 0);
     yield* Metric.incrementBy(commitBlockCounter, 0n);
     yield* Metric.incrementBy(commitBlockTxCounter, 0n);
     yield* Metric.incrementBy(commitBlockCommitmentFailuresCounter, 0n);

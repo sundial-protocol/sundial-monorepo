@@ -10,6 +10,7 @@ import {
   applyTxOrdersToLedger,
   buildNewBlockEntry,
   SeededOutput,
+  applyBlockCommitmentLedgerProjection,
 } from "./utils/block-commitment.js";
 import {
   Database,
@@ -168,16 +169,12 @@ const mainProgram: Effect.Effect<
             .withTransaction(
               Effect.gen(function* () {
                 yield* BlocksDB.upsert(newBlockEntry);
-                // Insert separately: depositLedgerEntries carry time_stamp_tz
-                // but producedByTxOrders do not; mixing them in one sql.insert()
-                // causes @effect/sql to pad missing fields with NULL, violating
-                // the NOT NULL constraint on time_stamp_tz.
-                yield* MempoolLedgerDB.insert(depositLedgerEntries);
-                yield* MempoolLedgerDB.insert(producedByTxOrders);
-                yield* MempoolLedgerDB.clearUTxOs([
-                  ...withdrawnOutRefs,
-                  ...spentByTxOrders,
-                ]);
+                yield* applyBlockCommitmentLedgerProjection(
+                  depositLedgerEntries,
+                  producedByTxOrders,
+                  withdrawnOutRefs,
+                  spentByTxOrders,
+                );
               }),
             )
             .pipe(
