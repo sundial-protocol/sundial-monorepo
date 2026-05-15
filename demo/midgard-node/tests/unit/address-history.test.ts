@@ -110,6 +110,64 @@ describe("AddressHistoryDB", () => {
     );
   });
 
+  // H-01: duplicate (event_id, address) pairs within a single batch must be
+  // deduplicated before the upsert so PostgreSQL never sees two rows with the
+  // same conflict key in the same INSERT statement.
+  it.effect(
+    "upsertEntries deduplicates entries with the same event_id and address within a batch",
+    () => {
+      const txIdB = Buffer.alloc(32, 0xbb);
+      const entries: AddressHistoryDB.Entry[] = [
+        {
+          event_id: txIdA,
+          address: testAddress,
+          event_type: AddressHistoryDB.EventType.TX,
+          status: AddressHistoryDB.Status.SLATED,
+        },
+        {
+          // Same (event_id, address) – last writer wins; should replace the first.
+          event_id: txIdA,
+          address: testAddress,
+          event_type: AddressHistoryDB.EventType.TX,
+          status: AddressHistoryDB.Status.SUBMITTED,
+        },
+        {
+          // Different event_id – must survive deduplication as a distinct entry.
+          event_id: txIdB,
+          address: testAddress,
+          event_type: AddressHistoryDB.EventType.TX,
+          status: AddressHistoryDB.Status.SLATED,
+        },
+      ];
+      return AddressHistoryDB.upsertEntries(entries).pipe(
+        Effect.map(() => {
+          const calls = sqlHarness.getCalls();
+          expect(calls).toHaveLength(1);
+          const inserted = calls[0].values.find(
+            Array.isArray,
+          ) as AddressHistoryDB.Entry[];
+          expect(inserted).toHaveLength(2);
+          const deduped = inserted.find(
+            (e) => e[AddressHistoryDB.Columns.EVENT_ID] === txIdA,
+          );
+          expect(deduped?.[AddressHistoryDB.Columns.STATUS]).toBe(
+            AddressHistoryDB.Status.SUBMITTED,
+          );
+        }),
+        Effect.provide(sqlHarness.layer),
+      );
+    },
+  );
+
+  it.effect("upsertEntries skips SQL for an empty entry list", () => {
+    return AddressHistoryDB.upsertEntries([]).pipe(
+      Effect.map(() => {
+        expect(sqlHarness.getCallCount()).toBe(0);
+      }),
+      Effect.provide(sqlHarness.layer),
+    );
+  });
+
   it.effect("retrieve returns one tx when one row present", () => {
     sqlHarness.setRows([{ tx: txCborA }]);
     return AddressHistoryDB.retrieve(testAddress).pipe(

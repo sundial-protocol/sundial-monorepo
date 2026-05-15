@@ -10,6 +10,7 @@ import {
   Ledger,
   WithdrawalsDB,
   BlocksDB,
+  MempoolLedgerDB,
 } from "@/database/index.js";
 import {
   DatabaseError,
@@ -301,6 +302,23 @@ export const applyDepositsToLedger = (
       depositsRoot,
       sizeOfDeposits,
     };
+  });
+
+export const applyBlockCommitmentLedgerProjection = (
+  depositLedgerEntries: readonly Ledger.Entry[],
+  producedByTxOrders: readonly Ledger.Entry[],
+  withdrawnOutRefs: readonly Buffer[],
+  spentByTxOrders: readonly Buffer[],
+): Effect.Effect<void, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    // Keep inserts homogeneous by key set: deposits include time_stamp_tz,
+    // tx-order-produced entries do not.
+    yield* MempoolLedgerDB.insert(depositLedgerEntries);
+    yield* MempoolLedgerDB.insert(producedByTxOrders);
+    yield* MempoolLedgerDB.clearUTxOs([
+      ...withdrawnOutRefs,
+      ...spentByTxOrders,
+    ]);
   });
 
 const prepareLucidForBlockCommitment = (

@@ -4,6 +4,7 @@ import { Effect } from "effect";
 import * as os from "os";
 import * as path from "path";
 import { randomUUID } from "crypto";
+import * as FS from "fs";
 import {
   MptError,
   MidgardMpt,
@@ -80,16 +81,29 @@ describe("deleteMpt on existing directory", () => {
     }
   });
 
-  it.effect("removes the directory", () =>
-    Effect.gen(function* () {
-      tmpPath = path.join(os.tmpdir(), `midgard-del-exists-${randomUUID()}`);
-      const mpt = yield* MidgardMpt.create("del-exists", tmpPath);
-      yield* Effect.tryPromise({
-        try: () => mpt.databaseAndPath!.database._leveldb.close(),
-        catch: (e) => new Error(`${e}`),
-      });
-      yield* deleteMpt(tmpPath, "del-exists");
-    }),
+  it.effect(
+    "recreates an empty directory and allows immediate LevelDB reopen",
+    () =>
+      Effect.gen(function* () {
+        tmpPath = path.join(os.tmpdir(), `midgard-del-exists-${randomUUID()}`);
+        const mpt = yield* MidgardMpt.create("del-exists", tmpPath);
+        yield* Effect.tryPromise({
+          try: () => mpt.databaseAndPath!.database._leveldb.close(),
+          catch: (e) => new Error(`${e}`),
+        });
+        yield* deleteMpt(tmpPath, "del-exists");
+        const stat = FS.statSync(tmpPath);
+        expect(stat.isDirectory()).toBe(true);
+        expect(FS.readdirSync(tmpPath)).toStrictEqual([]);
+
+        const reopened = yield* MidgardMpt.create("del-exists-reopen", tmpPath);
+        const rootIsEmpty = yield* reopened.rootIsEmpty();
+        expect(rootIsEmpty).toBe(true);
+        yield* Effect.tryPromise({
+          try: () => reopened.databaseAndPath!.database._leveldb.close(),
+          catch: (e) => new Error(`${e}`),
+        });
+      }),
   );
 });
 

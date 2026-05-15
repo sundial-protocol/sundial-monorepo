@@ -30,6 +30,7 @@ export interface MultiOutputTransactionConfig {
   finalUtxosCount: number;
   walletSeedOrPrivateKey: string;
   nodeClient?: MidgardNodeClient;
+  random?: () => number;
 }
 
 // Constants
@@ -112,7 +113,14 @@ const calculateOutputLovelace = (totalLovelace: bigint, utxosCount: number): big
 export const generateMultiOutputTransactions = async (
   config: MultiOutputTransactionConfig
 ): Promise<SerializedMidgardTransaction[]> => {
-  const { network, initialUTxO, utxosCount, finalUtxosCount, walletSeedOrPrivateKey } = config;
+  const {
+    network,
+    initialUTxO,
+    utxosCount,
+    finalUtxosCount,
+    walletSeedOrPrivateKey,
+    random = Math.random,
+  } = config;
 
   validateConfig(config);
   const privateKey = parseUnknownKeytoBech32PrivateKey(walletSeedOrPrivateKey);
@@ -163,7 +171,7 @@ export const generateMultiOutputTransactions = async (
         throw new Error('Output counter limit reached. Please start a new generation batch.');
       }
 
-      const randomAccount = accounts[Math.floor(Math.random() * TOTAL_ACCOUNT_COUNT)];
+      const randomAccount = accounts[Math.floor(random() * TOTAL_ACCOUNT_COUNT)];
       const txBuilder = lucid.newTx();
 
       // create multiple outputs in single transaction

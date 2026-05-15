@@ -7,7 +7,7 @@ import {
   NodeConfig,
 } from "@/services/index.js";
 import { TxSignError, TxSubmitError } from "@/transactions/utils.js";
-import { Effect, Option, Schedule } from "effect";
+import { Effect, Metric, Option, Schedule } from "effect";
 import {
   DepositsDB,
   LatestLedgerDB,
@@ -22,6 +22,18 @@ import {
   AddressHistoryDB,
 } from "@/database/index.js";
 import { batchProgram, breakDownTx, ProcessedTx } from "@/utils.js";
+
+const submitBlockCounter = Metric.counter("submit_block_count", {
+  description:
+    "A counter for blocks successfully submitted to L1 and marked SUBMITTED in BlocksDB",
+  bigint: true,
+  incremental: true,
+}).register();
+
+export const initializeSubmissionMetrics = Metric.incrementBy(
+  submitBlockCounter,
+  0n,
+);
 
 // For database operations.
 const BATCH_SIZE = 100;
@@ -231,7 +243,7 @@ const processEventsForLedgerApplication = (
     };
   });
 
-const submitEarliestBlock = Effect.gen(function* () {
+export const submitEarliestBlock = Effect.gen(function* () {
   const optUnsubmittedBlock = yield* BlocksDB.retrieveEarliestUnsubmittedEntry;
   yield* Option.match(optUnsubmittedBlock, {
     onNone: () => Effect.logInfo("No unsubmitted blocks in queue."),
@@ -322,6 +334,7 @@ const submitEarliestBlock = Effect.gen(function* () {
           ],
           { concurrency: "unbounded" },
         );
+        yield* Metric.increment(submitBlockCounter);
       }),
   });
 });
@@ -335,6 +348,7 @@ export const blockSubmissionFiber = (
 > =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔗 Block submission fiber started.");
+    yield* initializeSubmissionMetrics;
     const action = submitEarliestBlock.pipe(
       Effect.withSpan("submit-blocks-fiber"),
       Effect.catchAllCause(Effect.logWarning),

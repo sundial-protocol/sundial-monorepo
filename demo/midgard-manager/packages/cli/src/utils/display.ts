@@ -76,6 +76,7 @@ export async function displayStatus(config: MidgardConfig) {
       console.log(`│  ${chalk.dim('Transactions')}`);
       console.log(`│  Generated: ${generatorStatus.transactionsGenerated}`);
       console.log(`│  Submitted: ${generatorStatus.transactionsSubmitted}`);
+      console.log(`│  Failed:    ${generatorStatus.transactionsFailed}`);
     }
   } else {
     console.log('│  Configure options from the menu to get started');

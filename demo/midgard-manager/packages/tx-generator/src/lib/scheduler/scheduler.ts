@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { UTxO } from '@lucid-evolution/lucid';
 import pLimit from 'p-limit';
 
 import { MidgardNodeClient } from '../client/node-client.js';
+import { SerializedMidgardTransaction } from '../client/types.js';
 import {
   generateMultiOutputTransactions,
   generateOneToOneTransactions,
@@ -17,10 +18,24 @@ import {
   TransactionGeneratorConfig,
   validateGeneratorConfig,
 } from '../types.js';
+import {
+  GeneratorManifest,
+  toEvidenceEntry,
+  TransactionEvidenceEntry,
+} from './artifact-metadata.js';
+import { createSeededRandom, randomHex, randomInt } from './deterministic-random.js';
+import { inspectGeneratedTransaction } from './transaction-inspector.js';
+
+const GENERATED_TX_PREFIX_ONE_TO_ONE = 'one-to-one';
+const GENERATED_TX_PREFIX_MULTI_OUTPUT = 'multi-output';
+const GENERATED_TX_PREFIX_REPLAY = 'replay';
+const OUTPUT_INDEX_UPPER_EXCLUSIVE = 1001;
+const PROJECT_ROOT_RELATIVE_PATH = '../../../..';
 
 // Get the directory path for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, PROJECT_ROOT_RELATIVE_PATH);
 
 /**
  * Generator State Manager
@@ -34,6 +49,7 @@ class TxGeneratorState {
   private _stats = {
     transactionsGenerated: 0,
     transactionsSubmitted: 0,
+    transactionsFailed: 0,
     lastError: null as string | null,
     startTime: null as Date | null,
   };
@@ -71,6 +87,7 @@ class TxGeneratorState {
     this._stats = {
       transactionsGenerated: 0,
       transactionsSubmitted: 0,
+      transactionsFailed: 0,
       lastError: null,
       startTime: new Date(),
     };
@@ -81,8 +98,274 @@ class TxGeneratorState {
   }
 }
 
+type GenerationMode = 'generated' | 'replay';
+
+interface TaskPlan {
+  initialUTxO: UTxO;
+  useOneToOne: boolean;
+}
+
+interface ReplayCorpusFile {
+  transactions: SerializedMidgardTransaction[];
+}
+
 // Get the shared instance
 const state = TxGeneratorState.getInstance();
+
+const buildFilenamePrefix = (useOneToOne: boolean, mode: GenerationMode): string => {
+  if (mode === 'replay') {
+    return GENERATED_TX_PREFIX_REPLAY;
+  }
+  return useOneToOne ? GENERATED_TX_PREFIX_ONE_TO_ONE : GENERATED_TX_PREFIX_MULTI_OUTPUT;
+};
+
+const getNormalizedSeed = (seed: string | undefined): string => {
+  if (seed !== undefined) {
+    return seed.trim();
+  }
+  return randomBytes(16).toString('hex');
+};
+
+const getDeterministicStartMs = (seed: string): number => {
+  const seedPrefix = seed.slice(0, 12).padEnd(12, '0');
+  return Number.parseInt(seedPrefix, 16);
+};
+
+const generateUniqueUTxOs = (baseUTxO: UTxO, count: number, random: () => number): UTxO[] =>
+  Array.from({ length: count }, () => ({
+    ...baseUTxO,
+    txHash: randomHex(random, 64).toUpperCase(),
+    outputIndex: randomInt(random, OUTPUT_INDEX_UPPER_EXCLUSIVE),
+  }));
+
+const parseReplayCorpusContent = (
+  replayCorpusPath: string,
+  rawContent: string
+): SerializedMidgardTransaction[] => {
+  const parsed = JSON.parse(rawContent) as SerializedMidgardTransaction[] | ReplayCorpusFile;
+  const transactions = Array.isArray(parsed) ? parsed : parsed.transactions;
+
+  if (!Array.isArray(transactions)) {
+    throw new Error(`Replay corpus "${replayCorpusPath}" must be an array or { transactions: [] }`);
+  }
+
+  for (const [index, tx] of transactions.entries()) {
+    if (
+      tx === null ||
+      typeof tx !== 'object' ||
+      typeof tx.txId !== 'string' ||
+      typeof tx.cborHex !== 'string' ||
+      typeof tx.description !== 'string' ||
+      typeof tx.type !== 'string'
+    ) {
+      throw new Error(
+        `Replay corpus "${replayCorpusPath}" has invalid transaction at index ${index}`
+      );
+    }
+  }
+
+  return transactions;
+};
+
+const loadReplayCorpus = async (
+  replayCorpusPath: string | undefined
+): Promise<SerializedMidgardTransaction[] | null> => {
+  if (replayCorpusPath === undefined) {
+    return null;
+  }
+
+  const resolvedPath = isAbsolute(replayCorpusPath)
+    ? replayCorpusPath
+    : join(projectRoot, replayCorpusPath);
+  const raw = await readFile(resolvedPath, 'utf8');
+  return parseReplayCorpusContent(replayCorpusPath, raw);
+};
+
+const writeTransactionsWithManifest = async ({
+  outputDir,
+  filenamePrefix,
+  transactions,
+  manifestTransactions,
+  generationSeed,
+  fullConfig,
+  mode,
+  replayCorpusPath,
+}: {
+  outputDir: string;
+  filenamePrefix: string;
+  transactions: SerializedMidgardTransaction[];
+  manifestTransactions: TransactionEvidenceEntry[];
+  generationSeed: string;
+  fullConfig: TransactionGeneratorConfig;
+  mode: GenerationMode;
+  replayCorpusPath: string | undefined;
+}): Promise<string> => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `${filenamePrefix}-${timestamp}.json`;
+  const transactionsPath = join(projectRoot, outputDir, filename);
+  const manifestPath = `${transactionsPath}.manifest.json`;
+
+  await writeFile(transactionsPath, JSON.stringify(transactions, null, 2));
+  const manifest: GeneratorManifest = {
+    mode,
+    generationSeed,
+    replayCorpusPath,
+    profile: {
+      transactionType: fullConfig.transactionType,
+      oneToOneRatio: fullConfig.oneToOneRatio,
+      batchSize: fullConfig.batchSize,
+      concurrency: fullConfig.concurrency,
+      intervalSeconds: fullConfig.interval,
+    },
+    generatedAt: new Date().toISOString(),
+    transactionCount: transactions.length,
+    transactions: manifestTransactions,
+  };
+
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+  return transactionsPath;
+};
+
+const submitTransactions = async ({
+  txs,
+  nodeClient,
+  outputDir,
+  filenamePrefix,
+  generationSeed,
+  fullConfig,
+  mode,
+  replayCorpusPath,
+}: {
+  txs: SerializedMidgardTransaction[];
+  nodeClient: MidgardNodeClient;
+  outputDir?: string;
+  filenamePrefix: string;
+  generationSeed: string;
+  fullConfig: TransactionGeneratorConfig;
+  mode: GenerationMode;
+  replayCorpusPath: string | undefined;
+}): Promise<void> => {
+  const manifestTransactions = txs.map((tx) =>
+    toEvidenceEntry(inspectGeneratedTransaction(tx, fullConfig.network), mode)
+  );
+  const validTransactions = manifestTransactions.filter(
+    (entry) => entry.validation.status === 'accepted'
+  );
+  const rejectedCount = manifestTransactions.length - validTransactions.length;
+  const nodeAvailable = await nodeClient.isAvailable();
+
+  if (!nodeAvailable) {
+    for (const tx of validTransactions) {
+      tx.submission.status = 'NODE_UNAVAILABLE';
+    }
+    if (outputDir) {
+      const outputPath = await writeTransactionsWithManifest({
+        outputDir,
+        filenamePrefix,
+        transactions: txs,
+        manifestTransactions,
+        generationSeed,
+        fullConfig,
+        mode,
+        replayCorpusPath,
+      });
+      console.log(`Node unavailable - transactions written to ${outputPath}`);
+    }
+    state.stats.transactionsGenerated += txs.length;
+    state.stats.transactionsFailed += rejectedCount;
+    return;
+  }
+
+  try {
+    const submissionStart = Date.now();
+    let submitted = 0;
+    let failed = rejectedCount;
+    let nodeUnavailable = false;
+    let nodeUnavailableAnnounced = false;
+
+    for (const tx of validTransactions) {
+      const sourceTx = txs.find((item) => item.txId === tx.txId);
+      if (sourceTx === undefined) {
+        tx.submission.status = 'ERROR';
+        tx.submission.error = 'transaction evidence entry not found in source list';
+        failed++;
+        continue;
+      }
+
+      const result = await nodeClient.submitTransaction(sourceTx.cborHex);
+
+      if (result && result.status === 'NODE_UNAVAILABLE') {
+        tx.submission.status = 'NODE_UNAVAILABLE';
+        nodeUnavailable = true;
+        if (!nodeUnavailableAnnounced) {
+          nodeUnavailableAnnounced = true;
+          console.log('Node became unavailable during submission.');
+        }
+        break;
+      } else if (result && result.status === 'ERROR') {
+        tx.submission.status = 'ERROR';
+        tx.submission.error = result.error;
+        failed++;
+      } else {
+        tx.submission.status = 'SUBMITTED';
+        submitted++;
+      }
+    }
+
+    if (nodeUnavailable) {
+      for (const tx of validTransactions) {
+        if (tx.submission.status === 'NOT_ATTEMPTED') {
+          tx.submission.status = 'NODE_UNAVAILABLE';
+        }
+      }
+    }
+
+    const submissionEnd = Date.now();
+    state.stats.transactionsGenerated += txs.length;
+    state.stats.transactionsSubmitted += submitted;
+    state.stats.transactionsFailed += failed;
+
+    if (outputDir) {
+      const outputPath = await writeTransactionsWithManifest({
+        outputDir,
+        filenamePrefix,
+        transactions: txs,
+        manifestTransactions,
+        generationSeed,
+        fullConfig,
+        mode,
+        replayCorpusPath,
+      });
+      console.log(`Transactions and manifest written to ${outputPath}`);
+    }
+
+    if (!nodeUnavailable) {
+      console.log(
+        `Submitted ${submitted} transactions (${failed} failed) in ${submissionEnd - submissionStart}ms`
+      );
+    }
+  } catch (submitError) {
+    console.error('Failed to submit transactions:', submitError);
+
+    if (outputDir) {
+      const outputPath = await writeTransactionsWithManifest({
+        outputDir,
+        filenamePrefix,
+        transactions: txs,
+        manifestTransactions,
+        generationSeed,
+        fullConfig,
+        mode,
+        replayCorpusPath,
+      });
+      console.log(`Failed submission - transactions written to ${outputPath}`);
+    }
+
+    state.stats.transactionsGenerated += txs.length;
+    state.stats.transactionsFailed += rejectedCount;
+  }
+};
 
 /**
  * Starts a transaction generator with the given configuration
@@ -107,6 +390,11 @@ export const startGenerator = async (
   // Validate the configuration
   validateGeneratorConfig(fullConfig);
 
+  const generationSeed = getNormalizedSeed(fullConfig.generationSeed);
+  const deterministicStartMs = getDeterministicStartMs(generationSeed);
+  const random = createSeededRandom(generationSeed);
+  const replayCorpus = await loadReplayCorpus(fullConfig.replayCorpusPath);
+
   // Set up node client with the new configuration structure
   const nodeClient = new MidgardNodeClient({
     baseUrl: fullConfig.nodeEndpoint,
@@ -123,7 +411,6 @@ export const startGenerator = async (
 
   // Create output directory if needed
   if (fullConfig.outputDir) {
-    const projectRoot = join(__dirname, '../../../..');
     const outputPath = join(projectRoot, fullConfig.outputDir);
     await mkdir(outputPath, { recursive: true });
   }
@@ -138,109 +425,79 @@ export const startGenerator = async (
   console.log(`• Interval: ${fullConfig.interval}s`);
   console.log(`• Concurrency: ${fullConfig.concurrency}`);
   console.log(`• Node Endpoint: ${fullConfig.nodeEndpoint}`);
+  console.log(`• Generation Seed: ${generationSeed}`);
+  if (fullConfig.replayCorpusPath) {
+    console.log(`• Replay Corpus Path: ${fullConfig.replayCorpusPath}`);
+  }
   if (fullConfig.autoStopAfterBatch) {
     console.log('• Auto-stop: Enabled (will stop after one batch)');
   }
   console.log();
 
-  const generateUniqueUTxOs = (baseUTxO: UTxO, count: number) =>
-    Array.from({ length: count }, () => ({
-      ...baseUTxO,
-      txHash: randomBytes(32).toString('hex').toUpperCase(),
-      outputIndex: Math.floor(Math.random() * 1001), // Random outputIndex 0 -> 1000
-    }));
-
   // Define the transaction generation function
   const generateTransactions = async () => {
     try {
-      const uniqueUTxOs = generateUniqueUTxOs(fullConfig.initialUTxO, fullConfig.batchSize);
+      if (replayCorpus !== null) {
+        await submitTransactions({
+          txs: replayCorpus,
+          nodeClient,
+          outputDir: fullConfig.outputDir,
+          filenamePrefix: GENERATED_TX_PREFIX_REPLAY,
+          generationSeed,
+          fullConfig,
+          mode: 'replay',
+          replayCorpusPath: fullConfig.replayCorpusPath,
+        });
+        return;
+      }
 
-      const tasks = Array(fullConfig.batchSize)
-        .fill(null)
-        .map(async (_, index) => {
-          // ← Add index parameter
-          return concurrencyLimiter(async () => {
-            const taskUTxO = uniqueUTxOs[index];
-            const useOneToOne =
-              fullConfig.transactionType === 'one-to-one' ||
-              (fullConfig.transactionType === 'mixed' &&
-                Math.random() * 100 < (fullConfig.oneToOneRatio ?? 70));
+      const uniqueUTxOs = generateUniqueUTxOs(fullConfig.initialUTxO, fullConfig.batchSize, random);
+      const taskPlans: TaskPlan[] = uniqueUTxOs.map((taskUTxO) => ({
+        initialUTxO: taskUTxO,
+        useOneToOne:
+          fullConfig.transactionType === 'one-to-one' ||
+          (fullConfig.transactionType === 'mixed' &&
+            random() * 100 < (fullConfig.oneToOneRatio ?? 70)),
+      }));
 
-            const txs = useOneToOne
-              ? await generateOneToOneTransactions({
-                  network: fullConfig.network,
-                  initialUTxO: taskUTxO,
-                  txsCount: 1,
-                  walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
-                  nodeClient,
-                })
-              : await generateMultiOutputTransactions({
-                  network: fullConfig.network,
-                  initialUTxO: taskUTxO,
-                  utxosCount: TRANSACTION_CONSTANTS.OUTPUTS_PER_DISTRIBUTION,
-                  finalUtxosCount: 1,
-                  walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
-                  nodeClient,
-                });
+      const tasks = taskPlans.map(async (taskPlan) => {
+        return concurrencyLimiter(async () => {
+          const txs = taskPlan.useOneToOne
+            ? await generateOneToOneTransactions({
+                network: fullConfig.network,
+                initialUTxO: taskPlan.initialUTxO,
+                txsCount: 1,
+                walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
+                nodeClient,
+                random,
+                deterministicStartMs,
+              })
+            : await generateMultiOutputTransactions({
+                network: fullConfig.network,
+                initialUTxO: taskPlan.initialUTxO,
+                utxosCount: TRANSACTION_CONSTANTS.OUTPUTS_PER_DISTRIBUTION,
+                finalUtxosCount: 1,
+                walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
+                nodeClient,
+                random,
+              });
 
-            if (!txs || !Array.isArray(txs)) {
-              throw new Error('Failed to generate transactions');
-            }
+          if (!txs || !Array.isArray(txs)) {
+            throw new Error('Failed to generate transactions');
+          }
 
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const nodeAvailable = await nodeClient.isAvailable();
-
-            if (!nodeAvailable && fullConfig.outputDir) {
-              const projectRoot = join(__dirname, '../../../..');
-              const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
-              const filepath = join(projectRoot, fullConfig.outputDir, filename);
-              await writeFile(filepath, JSON.stringify(txs, null, 2));
-              console.log(`Node unavailable - transactions written to ${filepath}`);
-              state.stats.transactionsGenerated += txs.length;
-            } else {
-              try {
-                const submissionStart = Date.now();
-                for (const tx of txs) {
-                  const result = await nodeClient.submitTransaction(tx.cborHex);
-
-                  // Handle node unavailability gracefully
-                  if (result && result.status === 'NODE_UNAVAILABLE') {
-                    if (fullConfig.outputDir) {
-                      const projectRoot = join(__dirname, '../../../..');
-                      const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
-                      const filepath = join(projectRoot, fullConfig.outputDir, filename);
-                      await writeFile(filepath, JSON.stringify(txs, null, 2));
-                      console.log(`Node unavailable - transactions written to ${filepath}`);
-                    }
-                    state.stats.transactionsGenerated += txs.length;
-                    break; // Exit the loop since node is unavailable
-                  }
-                }
-                const submissionEnd = Date.now();
-
-                state.stats.transactionsGenerated += txs.length;
-                state.stats.transactionsSubmitted += txs.length;
-                console.log(
-                  `Submitted ${txs.length} transactions in ${submissionEnd - submissionStart}ms`
-                );
-              } catch (submitError) {
-                console.error('Failed to submit transactions:', submitError);
-
-                if (fullConfig.outputDir) {
-                  const projectRoot = join(__dirname, '../../../..');
-                  const filename = `${useOneToOne ? 'one-to-one' : 'multi-output'}-${timestamp}.json`;
-                  const filepath = join(projectRoot, fullConfig.outputDir, filename);
-                  await writeFile(filepath, JSON.stringify(txs, null, 2));
-                  console.log(`Failed submission - transactions written to ${filepath}`);
-                }
-
-                state.stats.transactionsGenerated += txs.length;
-              }
-            }
-
-            return txs;
+          await submitTransactions({
+            txs,
+            nodeClient,
+            outputDir: fullConfig.outputDir,
+            filenamePrefix: buildFilenamePrefix(taskPlan.useOneToOne, 'generated'),
+            generationSeed,
+            fullConfig,
+            mode: 'generated',
+            replayCorpusPath: undefined,
           });
         });
+      });
 
       await Promise.all(tasks);
     } catch (error) {
@@ -300,6 +557,7 @@ export const getGeneratorStatus = (): {
   running: boolean;
   transactionsGenerated: number;
   transactionsSubmitted: number;
+  transactionsFailed: number;
   lastError: string | null;
   uptime: number | null;
 } => {
@@ -307,6 +565,7 @@ export const getGeneratorStatus = (): {
     running: state.isRunning(),
     transactionsGenerated: state.stats.transactionsGenerated,
     transactionsSubmitted: state.stats.transactionsSubmitted,
+    transactionsFailed: state.stats.transactionsFailed,
     lastError: state.stats.lastError,
     uptime: state.stats.startTime
       ? Math.floor((new Date().getTime() - state.stats.startTime.getTime()) / 1000)

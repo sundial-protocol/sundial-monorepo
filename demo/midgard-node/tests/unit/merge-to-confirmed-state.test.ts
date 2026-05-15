@@ -6,6 +6,12 @@ import type * as SDK from "@al-ft/midgard-sdk";
 
 const sdkMocks = vi.hoisted(() => ({
   fetchConfirmedStateAndItsLinkByUnitProgram: vi.fn(),
+  mergeToConfirmedStateProgram: vi.fn(),
+}));
+
+const utilsMocks = vi.hoisted(() => ({
+  fetchFirstBlockTxs: vi.fn(),
+  handleSignSubmit: vi.fn(),
 }));
 
 vi.mock("@al-ft/midgard-sdk", () => {
@@ -20,6 +26,18 @@ vi.mock("@al-ft/midgard-sdk", () => {
     LucidError,
     fetchConfirmedStateAndItsLinkByUnitProgram:
       sdkMocks.fetchConfirmedStateAndItsLinkByUnitProgram,
+    mergeToConfirmedStateProgram: sdkMocks.mergeToConfirmedStateProgram,
+  };
+});
+
+vi.mock("@/transactions/utils.js", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/transactions/utils.js")
+  >("@/transactions/utils.js");
+  return {
+    ...actual,
+    fetchFirstBlockTxs: utilsMocks.fetchFirstBlockTxs,
+    handleSignSubmit: utilsMocks.handleSignSubmit,
   };
 });
 
@@ -171,6 +189,56 @@ describe("merge-to-confirmed-state", () => {
           sdkMocks.fetchConfirmedStateAndItsLinkByUnitProgram,
         ).toHaveBeenCalledWith(lucid, fetchConfig);
         expect(queueLength).toBe(0);
+      }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect(
+    "continues merge when first queued block has no transactions in BlocksTxsDB",
+    () =>
+      Effect.gen(function* () {
+        const lucid = makeLucid();
+        const globals = yield* Globals;
+        const firstBlock = {
+          utxo: makeStateQueueUtxo(1),
+        };
+        const txBuilder = {
+          toHash: () => "merge-hash",
+        };
+
+        yield* Ref.set(globals.BLOCKS_IN_QUEUE, 8);
+        yield* Ref.set(
+          globals.LATEST_SYNC_TIME_OF_STATE_QUEUE_LENGTH,
+          Date.now(),
+        );
+        sdkMocks.fetchConfirmedStateAndItsLinkByUnitProgram.mockReturnValue(
+          Effect.succeed({
+            confirmed: { utxo: makeStateQueueUtxo(0) },
+            link: firstBlock,
+          }),
+        );
+        utilsMocks.fetchFirstBlockTxs.mockReturnValue(
+          Effect.succeed({
+            txs: [],
+            headerHash: Buffer.alloc(32, 1),
+          }),
+        );
+        sdkMocks.mergeToConfirmedStateProgram.mockReturnValue(
+          Effect.succeed(txBuilder),
+        );
+        utilsMocks.handleSignSubmit.mockReturnValue(
+          Effect.succeed("merge-hash"),
+        );
+
+        yield* buildWithLucid(lucid);
+
+        const queueLength = yield* Ref.get(globals.BLOCKS_IN_QUEUE);
+        expect(utilsMocks.fetchFirstBlockTxs).toHaveBeenCalledWith(firstBlock);
+        expect(sdkMocks.mergeToConfirmedStateProgram).toHaveBeenCalledTimes(1);
+        expect(utilsMocks.handleSignSubmit).toHaveBeenCalledWith(
+          lucid,
+          txBuilder,
+        );
+        expect(queueLength).toBe(7);
       }).pipe(Effect.provide(testLayer)),
   );
 });

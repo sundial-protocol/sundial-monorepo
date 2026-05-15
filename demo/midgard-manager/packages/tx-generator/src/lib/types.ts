@@ -29,6 +29,8 @@ export interface TransactionGeneratorConfig {
   // Transaction settings
   transactionType: TransactionType;
   oneToOneRatio?: number;
+  generationSeed?: string;
+  replayCorpusPath?: string;
 
   // Batch settings
   batchSize: number;
@@ -74,6 +76,8 @@ export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
   // Transaction defaults
   transactionType: 'mixed',
   oneToOneRatio: 70,
+  generationSeed: undefined,
+  replayCorpusPath: undefined,
 
   // Batch defaults
   batchSize: 10,
@@ -129,6 +133,12 @@ export const validateGeneratorConfig = (config: TransactionGeneratorConfig): voi
     if (config.oneToOneRatio < 0 || config.oneToOneRatio > 100) {
       throw new Error('One-to-one ratio must be between 0 and 100');
     }
+  }
+  if (config.generationSeed !== undefined && config.generationSeed.trim().length === 0) {
+    throw new Error('Generation seed must not be empty when provided');
+  }
+  if (config.replayCorpusPath !== undefined && config.replayCorpusPath.trim().length === 0) {
+    throw new Error('Replay corpus path must not be empty when provided');
   }
 
   // Batch validation

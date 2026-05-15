@@ -45,6 +45,25 @@ it.effect("Deposit event converts into ledger entry", () => {
   }).pipe(Effect.provide(layers));
 });
 
+it.effect("Mempool ledger insert is idempotent for duplicate outrefs", () => {
+  const layers = makeBaseLayers();
+  return Effect.gen(function* () {
+    yield* DBInitialization.program;
+
+    const seed = makeSeedEntry();
+    yield* MempoolLedgerDB.insert([seed]);
+    yield* MempoolLedgerDB.insert([seed]);
+
+    const allEntries = yield* MempoolLedgerDB.retrieve;
+    expect(allEntries.length).toBe(1);
+    expect(
+      Buffer.from(allEntries[0][Ledger.Columns.OUTREF]).equals(
+        seed[Ledger.Columns.OUTREF],
+      ),
+    ).toBe(true);
+  }).pipe(Effect.provide(layers));
+});
+
 it.effect("Deposit event creates deposit address history", () => {
   const layers = makeBaseLayers();
   return Effect.gen(function* () {
