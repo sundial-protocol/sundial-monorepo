@@ -20,6 +20,12 @@ readonly project_dir="${repo_root}/${project}"
 readonly source_root="${codeql_root}/source-${project}"
 readonly database_root="${codeql_root}/database-${project}"
 readonly sarif_output="${codeql_root}/results-${project}.sarif"
+readonly sarif_targets=(
+  "${codeql_root}/results-midgard-manager.sarif"
+  "${codeql_root}/results-midgard-node.sarif"
+  "${codeql_root}/results-midgard-sdk.sarif"
+  "${codeql_root}/results-midgard-ts.sarif"
+)
 
 if [[ ! -d "${project_dir}" ]]; then
   echo "[security-codeql] project directory not found: ${project_dir}" >&2
@@ -89,8 +95,13 @@ cleanup_probe_artifacts() {
   find "${tmp_root}" -mindepth 1 -maxdepth 1 -type d -name "codeql-probe-*" -exec rm -rf {} +
 }
 
+cleanup_sarif_reports() {
+  rm -f "${sarif_targets[@]}"
+}
+
 mkdir -p "${codeql_root}"
 cleanup_probe_artifacts
+cleanup_sarif_reports
 
 bootstrap_query_pack
 refresh_source_snapshot

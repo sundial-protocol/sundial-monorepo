@@ -10,6 +10,24 @@ export type L1ProviderMode = (typeof L1_PROVIDER_MODES)[number];
 
 export const WALLET_MODES = ['test-wallet', 'external-key'] as const;
 export type WalletMode = (typeof WALLET_MODES)[number];
+export const GRAFANA_SCREENSHOT_THEMES = ['light', 'dark'] as const;
+export type GrafanaScreenshotTheme = (typeof GRAFANA_SCREENSHOT_THEMES)[number];
+
+export interface GrafanaScreenshotsConfig {
+  enabled: boolean;
+  grafanaBaseUrl: string;
+  dashboardJsonPath: string;
+  dashboardUid?: string;
+  timezone?: string;
+  theme?: GrafanaScreenshotTheme;
+  lookbackMinutes?: number;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  waitForPanelsMs?: number;
+  peakCaptureCooldownSeconds?: number;
+  capturePeakEvents?: boolean;
+  captureFinalPanelSet?: boolean;
+}
 
 export interface StopConditions {
   maxConsecutiveNodeProbeFailures: number;
@@ -99,6 +117,7 @@ export interface ScalabilityScenario {
   retryAttempts: number;
   retryDelayMs: number;
   requestEvents?: RequestEventsMode;
+  grafanaScreenshots?: GrafanaScreenshotsConfig;
   runClassificationPolicy?: RunClassificationPolicyConfig;
   stopConditions: StopConditions;
 }
@@ -235,6 +254,91 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     if (typeof s.tempoServiceName !== 'string' || s.tempoServiceName.trim().length === 0) {
       throw new ScenarioValidationError(
         'tempoServiceName must be a non-empty string when provided'
+      );
+    }
+  }
+
+  if (s.grafanaScreenshots !== undefined) {
+    if (typeof s.grafanaScreenshots !== 'object' || s.grafanaScreenshots === null) {
+      throw new ScenarioValidationError('grafanaScreenshots must be an object when provided');
+    }
+
+    const gs = s.grafanaScreenshots as Record<string, unknown>;
+    assertPresent(gs.enabled, 'grafanaScreenshots.enabled');
+    if (typeof gs.enabled !== 'boolean') {
+      throw new ScenarioValidationError('grafanaScreenshots.enabled must be a boolean');
+    }
+
+    if (gs.enabled) {
+      assertUrl(gs.grafanaBaseUrl, 'grafanaScreenshots.grafanaBaseUrl');
+
+      assertPresent(gs.dashboardJsonPath, 'grafanaScreenshots.dashboardJsonPath');
+      if (typeof gs.dashboardJsonPath !== 'string' || gs.dashboardJsonPath.trim().length === 0) {
+        throw new ScenarioValidationError(
+          'grafanaScreenshots.dashboardJsonPath must be a non-empty string'
+        );
+      }
+
+      if (gs.dashboardUid !== undefined) {
+        if (typeof gs.dashboardUid !== 'string' || gs.dashboardUid.trim().length === 0) {
+          throw new ScenarioValidationError(
+            'grafanaScreenshots.dashboardUid must be a non-empty string when provided'
+          );
+        }
+      }
+    }
+
+    if (gs.timezone !== undefined) {
+      if (typeof gs.timezone !== 'string' || gs.timezone.trim().length === 0) {
+        throw new ScenarioValidationError(
+          'grafanaScreenshots.timezone must be a non-empty string when provided'
+        );
+      }
+    }
+
+    if (gs.theme !== undefined) {
+      if (
+        typeof gs.theme !== 'string' ||
+        !(GRAFANA_SCREENSHOT_THEMES as readonly string[]).includes(gs.theme)
+      ) {
+        throw new ScenarioValidationError(
+          `grafanaScreenshots.theme must be one of: ${GRAFANA_SCREENSHOT_THEMES.join(', ')}, got: ${gs.theme}`
+        );
+      }
+    }
+
+    if (gs.lookbackMinutes !== undefined) {
+      assertPositiveFiniteNumber(gs.lookbackMinutes, 'grafanaScreenshots.lookbackMinutes');
+    }
+
+    if (gs.viewportWidth !== undefined) {
+      assertPositiveFiniteNumber(gs.viewportWidth, 'grafanaScreenshots.viewportWidth');
+    }
+
+    if (gs.viewportHeight !== undefined) {
+      assertPositiveFiniteNumber(gs.viewportHeight, 'grafanaScreenshots.viewportHeight');
+    }
+
+    if (gs.waitForPanelsMs !== undefined) {
+      assertPositiveFiniteNumber(gs.waitForPanelsMs, 'grafanaScreenshots.waitForPanelsMs');
+    }
+
+    if (gs.peakCaptureCooldownSeconds !== undefined) {
+      assertPositiveFiniteNumber(
+        gs.peakCaptureCooldownSeconds,
+        'grafanaScreenshots.peakCaptureCooldownSeconds'
+      );
+    }
+
+    if (gs.capturePeakEvents !== undefined && typeof gs.capturePeakEvents !== 'boolean') {
+      throw new ScenarioValidationError(
+        'grafanaScreenshots.capturePeakEvents must be a boolean when provided'
+      );
+    }
+
+    if (gs.captureFinalPanelSet !== undefined && typeof gs.captureFinalPanelSet !== 'boolean') {
+      throw new ScenarioValidationError(
+        'grafanaScreenshots.captureFinalPanelSet must be a boolean when provided'
       );
     }
   }

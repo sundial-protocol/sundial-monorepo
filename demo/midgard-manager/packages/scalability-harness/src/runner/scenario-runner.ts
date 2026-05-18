@@ -16,6 +16,7 @@ import { buildTierSummary } from '../analysis/tier-summary.js';
 import type { ScalabilityScenario, StopConditions } from '../config/scenario.js';
 import type { LoadTier } from '../config/tiers.js';
 import type { ArtifactWriter, RunManifest } from '../evidence/artifacts.js';
+import { GrafanaScreenshotService } from '../evidence/grafana-screenshots.js';
 import type { LokiTierCapture } from '../evidence/loki.js';
 import { LokiClient } from '../evidence/loki.js';
 import type { TempoTierCapture } from '../evidence/tempo.js';
@@ -116,6 +117,16 @@ export async function runScenario(
     scenario.lokiEndpoint !== undefined ? new LokiClient(scenario.lokiEndpoint) : undefined;
   const tempoClient =
     scenario.tempoEndpoint !== undefined ? new TempoClient(scenario.tempoEndpoint) : undefined;
+  let screenshotService: GrafanaScreenshotService | null = null;
+  try {
+    screenshotService = await GrafanaScreenshotService.createForScenario(
+      scenario,
+      scenarioPath,
+      writer.runDir
+    );
+  } catch (err) {
+    console.error(chalk.red(`  Failed to initialize Grafana screenshot service: ${String(err)}`));
+  }
 
   const analysisSummaries: AnalysisTierSummary[] = [];
   const prometheusWindows: TierMetricWindow[] = [];
@@ -160,6 +171,21 @@ export async function runScenario(
     if (result.metricWindow !== null) prometheusWindows.push(result.metricWindow);
     if (result.lokiCapture !== null) lokiCaptures.push(result.lokiCapture);
     if (result.tempoCapture !== null) tempoCaptures.push(result.tempoCapture);
+    if (screenshotService !== null) {
+      try {
+        await screenshotService.captureTierEvents({
+          tierIndex: result.tierIndex,
+          startedAt: result.startedAt,
+          stoppedAt: result.stoppedAt,
+          recoveryStoppedAt: result.recoveryStoppedAt,
+          metricWindow: result.metricWindow,
+          metricStopReason: result.metricStopCondition?.reason ?? null,
+          stopConditions: scenario.stopConditions,
+        });
+      } catch (err) {
+        console.error(chalk.red(`  Grafana screenshot capture failed: ${String(err)}`));
+      }
+    }
 
     try {
       await writer.writePrometheusSamples({
@@ -271,6 +297,14 @@ export async function runScenario(
   } catch (err) {
     console.error(chalk.red(`  Failed to write report: ${String(err)}`));
     harnessErrorOccurred = true;
+  }
+
+  if (screenshotService !== null) {
+    try {
+      await screenshotService.close();
+    } catch (err) {
+      console.error(chalk.red(`  Failed to finalize Grafana screenshots: ${String(err)}`));
+    }
   }
 
   return { tierSummaries: analysisSummaries, conclusion, harnessErrorOccurred };
