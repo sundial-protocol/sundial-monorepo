@@ -1,0 +1,27 @@
+{
+  "runId": "spike",
+  "nodeEndpoint": "http://localhost:3000",
+  "prometheusEndpoint": "http://localhost:9090",
+  "outputDir": "benchmark-runs",
+  "seed": "spike-2026-05-18",
+  "transactionType": "mixed",
+  "oneToOneRatio": 70,
+  "tierDurationSeconds": 300,
+  "recoverySeconds": 300,
+  "startTps": 49970,
+  "maxTps": 49970,
+  "stepMultiplier": 2,
+  "batchSize": 5000,
+  "concurrency": 12,
+  "retryAttempts": 1,
+  "retryDelayMs": 150,
+  "stopConditions": {
+    "maxConsecutiveNodeProbeFailures": 5,
+    "stopOnPrometheusDown": true,
+    "stopOnCommitmentFailure": true,
+    "stopOnMergeFailure": true,
+    "maxRecoveryQueueSize": 1200000,
+    "maxRecoveryMempoolSize": 800000,
+    "minUsefulThroughputRatio": 0.25
+  }
+}

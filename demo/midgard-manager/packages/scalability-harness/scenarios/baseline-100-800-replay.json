@@ -1,0 +1,27 @@
+{
+  "runId": "baseline-100-800-replay",
+  "nodeEndpoint": "http://localhost:3000",
+  "prometheusEndpoint": "http://localhost:9090",
+  "outputDir": "benchmark-runs",
+  "seed": "baseline-replay-2026-05-18",
+  "replayCorpusPath": "corpora/replay-baseline.json",
+  "transactionType": "one-to-one",
+  "tierDurationSeconds": 60,
+  "recoverySeconds": 30,
+  "startTps": 100,
+  "maxTps": 800,
+  "stepMultiplier": 2,
+  "batchSize": 50,
+  "concurrency": 4,
+  "retryAttempts": 3,
+  "retryDelayMs": 500,
+  "stopConditions": {
+    "maxConsecutiveNodeProbeFailures": 5,
+    "stopOnPrometheusDown": false,
+    "stopOnCommitmentFailure": true,
+    "stopOnMergeFailure": false,
+    "maxRecoveryQueueSize": 10000,
+    "maxRecoveryMempoolSize": 5000,
+    "minUsefulThroughputRatio": 0.5
+  }
+}

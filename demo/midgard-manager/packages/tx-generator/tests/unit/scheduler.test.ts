@@ -57,7 +57,14 @@ describe('Scheduler submission outcome counting (H-31)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsAvailable.mockResolvedValue(true);
-    mockSubmitTransaction.mockResolvedValue({ txId: 'default_success' });
+    mockSubmitTransaction.mockResolvedValue({
+      status: 'SUBMITTED',
+      responseClass: 'submitted',
+      txId: 'default_success',
+      latencyMs: 5,
+      attempts: 1,
+      retriesUsed: 0,
+    });
     mockInspectGeneratedTransaction.mockImplementation((tx) => ({
       transaction: tx,
       inspection: {
@@ -76,8 +83,22 @@ describe('Scheduler submission outcome counting (H-31)', () => {
 
   it('counts all successful submissions as submitted and none as failed', async () => {
     mockSubmitTransaction
-      .mockResolvedValueOnce({ txId: 'success_1' })
-      .mockResolvedValueOnce({ txId: 'success_2' });
+      .mockResolvedValueOnce({
+        status: 'SUBMITTED',
+        responseClass: 'submitted',
+        txId: 'success_1',
+        latencyMs: 5,
+        attempts: 1,
+        retriesUsed: 0,
+      })
+      .mockResolvedValueOnce({
+        status: 'SUBMITTED',
+        responseClass: 'submitted',
+        txId: 'success_2',
+        latencyMs: 5,
+        attempts: 1,
+        retriesUsed: 0,
+      });
 
     await startGenerator(baseConfig);
     await waitForGeneratorStop();
@@ -90,8 +111,22 @@ describe('Scheduler submission outcome counting (H-31)', () => {
 
   it('does not count ERROR responses as submitted', async () => {
     mockSubmitTransaction
-      .mockResolvedValueOnce({ txId: 'success_1' })
-      .mockResolvedValueOnce({ status: 'ERROR', error: 'node rejected tx' });
+      .mockResolvedValueOnce({
+        status: 'SUBMITTED',
+        responseClass: 'submitted',
+        txId: 'success_1',
+        latencyMs: 5,
+        attempts: 1,
+        retriesUsed: 0,
+      })
+      .mockResolvedValueOnce({
+        status: 'ERROR',
+        responseClass: 'http_error',
+        error: 'node rejected tx',
+        latencyMs: 5,
+        attempts: 1,
+        retriesUsed: 0,
+      });
 
     await startGenerator(baseConfig);
     await waitForGeneratorStop();
@@ -104,8 +139,22 @@ describe('Scheduler submission outcome counting (H-31)', () => {
 
   it('does not count all-ERROR batch as any submitted', async () => {
     mockSubmitTransaction
-      .mockResolvedValueOnce({ status: 'ERROR', error: 'fail 1' })
-      .mockResolvedValueOnce({ status: 'ERROR', error: 'fail 2' });
+      .mockResolvedValueOnce({
+        status: 'ERROR',
+        responseClass: 'http_error',
+        error: 'fail 1',
+        latencyMs: 5,
+        attempts: 1,
+        retriesUsed: 0,
+      })
+      .mockResolvedValueOnce({
+        status: 'ERROR',
+        responseClass: 'http_error',
+        error: 'fail 2',
+        latencyMs: 5,
+        attempts: 1,
+        retriesUsed: 0,
+      });
 
     await startGenerator(baseConfig);
     await waitForGeneratorStop();
@@ -119,7 +168,11 @@ describe('Scheduler submission outcome counting (H-31)', () => {
   it('does not count NODE_UNAVAILABLE as submitted or failed', async () => {
     mockSubmitTransaction.mockResolvedValueOnce({
       status: 'NODE_UNAVAILABLE',
+      responseClass: 'node_unavailable',
       message: 'node is down',
+      latencyMs: 5,
+      attempts: 0,
+      retriesUsed: 0,
     });
 
     await startGenerator(baseConfig);

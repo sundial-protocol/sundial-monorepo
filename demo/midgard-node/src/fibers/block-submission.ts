@@ -1,4 +1,5 @@
 import * as SDK from "@al-ft/midgard-sdk";
+import { CML } from "@lucid-evolution/lucid";
 import { DatabaseError, NotFoundError } from "@/database/utils/common.js";
 import {
   AlwaysSucceedsContract,
@@ -30,14 +31,39 @@ const submitBlockCounter = Metric.counter("submit_block_count", {
   incremental: true,
 }).register();
 
+const l1CommitmentFeesLovelaceCounter = Metric.counter(
+  "l1_commitment_fees_lovelace",
+  {
+    description:
+      "A counter for total lovelace fees spent for submitted L1 commitment transactions",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const l1CommitmentFeeLovelaceLastGauge = Metric.gauge(
+  "l1_commitment_fee_lovelace_last",
+  {
+    description:
+      "A gauge for the lovelace fee of the most recently submitted L1 commitment transaction",
+    bigint: true,
+  },
+).register();
+
 export const blockSubmissionMetrics = {
   submitBlockCounter,
+  l1CommitmentFeesLovelaceCounter,
+  l1CommitmentFeeLovelaceLastGauge,
 } as const;
 
-export const initializeSubmissionMetrics = Metric.incrementBy(
-  blockSubmissionMetrics.submitBlockCounter,
-  0n,
-);
+export const initializeSubmissionMetrics = Effect.all([
+  Metric.incrementBy(blockSubmissionMetrics.submitBlockCounter, 0n),
+  Metric.incrementBy(
+    blockSubmissionMetrics.l1CommitmentFeesLovelaceCounter,
+    0n,
+  ),
+  Metric.set(blockSubmissionMetrics.l1CommitmentFeeLovelaceLastGauge, 0n),
+]);
 
 // For database operations.
 const BATCH_SIZE = 100;
@@ -75,6 +101,18 @@ const submitSignedTxCBOR = (
       }
     }),
   );
+
+const extractL1CommitmentFeeLovelace = (
+  l1CborBytes: Buffer,
+): Effect.Effect<bigint, SDK.CmlDeserializationError, never> =>
+  Effect.try({
+    try: () => CML.Transaction.from_cbor_bytes(l1CborBytes).body().fee(),
+    catch: (cause) =>
+      new SDK.CmlDeserializationError({
+        message: "Failed to deserialize submitted L1 commitment CBOR",
+        cause,
+      }),
+  });
 
 /**
  * Going through withdrawal events and resolving their spent outrefs from
@@ -258,6 +296,29 @@ export const submitEarliestBlock = Effect.gen(function* () {
           blockEntry[BlocksDB.Columns.L1_CBOR],
         );
         yield* Effect.logInfo(`🔗 🚀 Block commitment submitted: ${txHash}`);
+        yield* extractL1CommitmentFeeLovelace(
+          blockEntry[BlocksDB.Columns.L1_CBOR],
+        ).pipe(
+          Effect.flatMap((l1CommitmentFeeLovelace) =>
+            Effect.all([
+              Metric.incrementBy(
+                blockSubmissionMetrics.l1CommitmentFeesLovelaceCounter,
+                l1CommitmentFeeLovelace,
+              ),
+              Metric.set(
+                blockSubmissionMetrics.l1CommitmentFeeLovelaceLastGauge,
+                l1CommitmentFeeLovelace,
+              ),
+            ]),
+          ),
+          Effect.catchAll((error) =>
+            Effect.logWarning(
+              `Failed to update L1 commitment fee metrics for block ${SDK.bufferToHex(
+                blockEntry[BlocksDB.Columns.HEADER_HASH],
+              )}: ${error.message}`,
+            ),
+          ),
+        );
 
         const {
           txRequests,

@@ -1,0 +1,155 @@
+import type { StopConditions } from '../config/scenario.js';
+
+export type CollapseReason =
+  | 'node_unavailable'
+  | 'prometheus_down'
+  | 'commitment_failures'
+  | 'merge_failures'
+  | 'queue_not_recovered'
+  | 'mempool_not_recovered'
+  | 'tx_generator_failed'
+  | 'useful_throughput_below_threshold';
+
+export interface CollapseResult {
+  reason: CollapseReason;
+  values: Record<string, number | boolean | null>;
+}
+
+export interface CollapseInputs {
+  // Node availability from probe loop results.
+  nodeUnavailable: boolean;
+  consecutiveProbeFailures?: number;
+
+  // Prometheus up{job="midgard_nodes"} instant scalar. null = metric unreachable.
+  prometheusUp: number | null;
+
+  // TX generator exit code. undefined = not tracked; null = killed by signal (clean shutdown).
+  txGeneratorExitCode?: number | null;
+
+  // Counter deltas from TierWindowSummary.counterDeltas (deltaLoad field).
+  commitmentFailuresDelta: number | null;
+  mergeFailuresDelta: number | null;
+
+  // Recovery gauges from TierMetricWindow.afterRecovery.
+  recoveryQueueSize: number | null;
+  recoveryMempoolSize: number | null;
+
+  // Useful throughput inputs.
+  // mempoolAcceptedDelta is the tx_submissions_mempool_accepted_total counter delta
+  // over the load phase — NOT tx_submissions_enqueued_total (which only reflects
+  // acceptance into the in-memory queue, not into the mempool DB).
+  mempoolAcceptedDelta: number | null;
+  tierDurationSeconds: number;
+  targetTps: number;
+
+  stopConditions: StopConditions;
+}
+
+// Priority order (highest to lowest severity):
+// 1. node_unavailable     — node completely unreachable
+// 2. prometheus_down      — observability lost (when enabled)
+// 3. commitment_failures  — L2 protocol failure (when enabled)
+// 4. merge_failures       — L2 protocol failure (when enabled)
+// 5. queue_not_recovered  — tx queue did not drain (when threshold set)
+// 6. mempool_not_recovered— mempool did not drain (when threshold set)
+// 7. tx_generator_failed  — load generation process crashed
+// 8. useful_throughput_below_threshold — performance below ratio threshold (when set)
+export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
+  const { stopConditions } = inputs;
+
+  if (inputs.nodeUnavailable) {
+    return {
+      reason: 'node_unavailable',
+      values: {
+        consecutiveProbeFailures: inputs.consecutiveProbeFailures ?? null,
+      },
+    };
+  }
+
+  if (stopConditions.stopOnPrometheusDown) {
+    const up = inputs.prometheusUp;
+    if (up === null || up === 0) {
+      return {
+        reason: 'prometheus_down',
+        values: { prometheusUp: up },
+      };
+    }
+  }
+
+  if (stopConditions.stopOnCommitmentFailure) {
+    const delta = inputs.commitmentFailuresDelta;
+    if (delta !== null && delta > 0) {
+      return {
+        reason: 'commitment_failures',
+        values: { commitmentFailuresDelta: delta },
+      };
+    }
+  }
+
+  if (stopConditions.stopOnMergeFailure) {
+    const delta = inputs.mergeFailuresDelta;
+    if (delta !== null && delta > 0) {
+      return {
+        reason: 'merge_failures',
+        values: { mergeFailuresDelta: delta },
+      };
+    }
+  }
+
+  if (stopConditions.maxRecoveryQueueSize !== undefined) {
+    const size = inputs.recoveryQueueSize;
+    if (size !== null && size > stopConditions.maxRecoveryQueueSize) {
+      return {
+        reason: 'queue_not_recovered',
+        values: {
+          recoveryQueueSize: size,
+          maxRecoveryQueueSize: stopConditions.maxRecoveryQueueSize,
+        },
+      };
+    }
+  }
+
+  if (stopConditions.maxRecoveryMempoolSize !== undefined) {
+    const size = inputs.recoveryMempoolSize;
+    if (size !== null && size > stopConditions.maxRecoveryMempoolSize) {
+      return {
+        reason: 'mempool_not_recovered',
+        values: {
+          recoveryMempoolSize: size,
+          maxRecoveryMempoolSize: stopConditions.maxRecoveryMempoolSize,
+        },
+      };
+    }
+  }
+
+  const exitCode = inputs.txGeneratorExitCode;
+  if (exitCode !== undefined && exitCode !== null && exitCode !== 0) {
+    return {
+      reason: 'tx_generator_failed',
+      values: { exitCode },
+    };
+  }
+
+  if (stopConditions.minUsefulThroughputRatio !== undefined) {
+    const delta = inputs.mempoolAcceptedDelta;
+    if (delta !== null && inputs.tierDurationSeconds > 0 && inputs.targetTps > 0) {
+      const observedMempoolAcceptedTps = delta / inputs.tierDurationSeconds;
+      const usefulThroughputRatio = observedMempoolAcceptedTps / inputs.targetTps;
+      if (usefulThroughputRatio < stopConditions.minUsefulThroughputRatio) {
+        return {
+          reason: 'useful_throughput_below_threshold',
+          values: {
+            mempoolAcceptedDelta: delta,
+            tierDurationSeconds: inputs.tierDurationSeconds,
+            observedMempoolAcceptedTps,
+            targetTps: inputs.targetTps,
+            usefulThroughputRatio,
+            minUsefulThroughputRatio: stopConditions.minUsefulThroughputRatio,
+          },
+        };
+      }
+    }
+  }
+
+  return null;
+}

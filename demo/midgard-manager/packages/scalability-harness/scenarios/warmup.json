@@ -1,0 +1,26 @@
+{
+  "runId": "warmup",
+  "nodeEndpoint": "http://localhost:3000",
+  "prometheusEndpoint": "http://localhost:9090",
+  "outputDir": "benchmark-runs",
+  "seed": "warmup-2026-05-18",
+  "transactionType": "one-to-one",
+  "tierDurationSeconds": 600,
+  "recoverySeconds": 120,
+  "startTps": 100,
+  "maxTps": 100,
+  "stepMultiplier": 2,
+  "batchSize": 50,
+  "concurrency": 4,
+  "retryAttempts": 3,
+  "retryDelayMs": 500,
+  "stopConditions": {
+    "maxConsecutiveNodeProbeFailures": 5,
+    "stopOnPrometheusDown": true,
+    "stopOnCommitmentFailure": true,
+    "stopOnMergeFailure": true,
+    "maxRecoveryQueueSize": 5000,
+    "maxRecoveryMempoolSize": 5000,
+    "minUsefulThroughputRatio": 0.7
+  }
+}
