@@ -76,6 +76,27 @@ export const NODE_METRICS = [
 
 export type NodeMetric = (typeof NODE_METRICS)[number];
 
+// Metrics that are always present on a running node regardless of tx activity:
+// the scrape target health metric and fiber-emitted gauges.
+// Used by the preflight check to distinguish "node running but idle" from
+// "node not running / telemetry pipeline broken".
+export const ALWAYS_PRESENT_NODE_METRICS = [
+  'up{job="midgard_nodes"}',
+  'tx_queue_size',
+  'tx_queue_peak_size',
+  'mempool_tx_count',
+] as const;
+
+export type AlwaysPresentNodeMetric = (typeof ALWAYS_PRESENT_NODE_METRICS)[number];
+
+// Counter metrics that only appear in Prometheus after the first matching event.
+// Their absence on a freshly-started idle node is expected and should not block
+// the preflight check.
+export const COUNTER_NODE_METRICS = NODE_METRICS.filter(
+  (m): m is Exclude<NodeMetric, AlwaysPresentNodeMetric> =>
+    !(ALWAYS_PRESENT_NODE_METRICS as readonly string[]).includes(m)
+);
+
 // ---------------------------------------------------------------------------
 // cAdvisor metrics — optional. Missing ones do not fail the benchmark.
 // ---------------------------------------------------------------------------

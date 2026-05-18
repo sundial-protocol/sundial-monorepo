@@ -85,13 +85,14 @@ describe('runExecutionReadinessPreflight', () => {
     expect(result.checks.find((c) => c.name === 'prometheus_scrape_health')?.passed).toBe(false);
   });
 
-  it('blocks when required metrics are missing', async () => {
-    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-metric-missing-'));
+  it('blocks when always-present gauge metrics are missing', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-gauge-missing-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
-          tx_submissions_enqueued_total: [],
+          // tx_queue_size is always-present — its absence means the node is not running fibers
+          tx_queue_size: [],
         }),
         txGeneratorInvoker: PASSING_TX_INVOKER,
       },
@@ -99,6 +100,37 @@ describe('runExecutionReadinessPreflight', () => {
 
     expect(result.passed).toBe(false);
     expect(result.checks.find((c) => c.name === 'required_metrics_presence')?.passed).toBe(false);
+  });
+
+  it('passes when counter metrics are absent on a freshly-started idle node', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-cold-start-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory({
+          // Counter metrics are absent on a fresh node — should not block
+          tx_submissions_enqueued_total: [],
+          tx_submissions_rejected_total: [],
+          tx_submissions_mempool_accepted_total: [],
+          tx_submissions_processing_failed_total: [],
+          commit_block_count_total: [],
+          submit_block_count_total: [],
+          commit_block_tx_count_total: [],
+          l1_commitment_fees_lovelace_total: [],
+          l1_commitment_fee_lovelace_last: [],
+          commit_block_commitment_failures_total: [],
+          merge_block_count_total: [],
+          merge_block_failures_total: [],
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+      },
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.classification).toBe('Passed');
+    const metricsCheck = result.checks.find((c) => c.name === 'required_metrics_presence');
+    expect(metricsCheck?.passed).toBe(true);
+    expect(metricsCheck?.summary).toMatch(/not yet active/);
   });
 
   it('blocks when artifact output directory is not writable', async () => {
