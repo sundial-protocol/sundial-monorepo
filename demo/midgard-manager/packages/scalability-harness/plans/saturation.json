@@ -1,0 +1,10 @@
+{
+  "planId": "saturation",
+  "description": "Post-formal-tier saturation sequence (§8.3): step-ramp discovery from 50–1,600 TPS followed by the 25% increment ramp starting from the practical estimate ceiling. Run only after standard-progression has passed.",
+  "outputDir": "benchmark-plans",
+  "stopOnFailure": false,
+  "scenarios": [
+    "../scenarios/saturation-discovery.json",
+    "../scenarios/saturation-ramp-25pct.json"
+  ]
+}

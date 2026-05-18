@@ -531,3 +531,109 @@ describe('analyzeTiers — formal classification', () => {
     ).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// p95 inclusion latency check (gap 6)
+// ---------------------------------------------------------------------------
+
+describe('analyzeTiers — p95 inclusion latency check', () => {
+  it('is not_evaluable when policy threshold is not set', () => {
+    const c = analyzeTiers([makeTier({ acceptedToCommittedLatencyP95Ms: 10_000 })]);
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_p95_inclusion_latency');
+    expect(check?.outcome).toBe('not_evaluable');
+    expect(check?.expected).toBe('disabled');
+  });
+
+  it('passes when observed p95 is below threshold', () => {
+    const c = analyzeTiers([makeTier({ acceptedToCommittedLatencyP95Ms: 18_000 })], {
+      policy: { maxP95InclusionLatencyMs: 20_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_p95_inclusion_latency');
+    expect(check?.outcome).toBe('passed');
+  });
+
+  it('violates when observed p95 exceeds threshold', () => {
+    const c = analyzeTiers([makeTier({ acceptedToCommittedLatencyP95Ms: 25_000 })], {
+      policy: { maxP95InclusionLatencyMs: 20_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_p95_inclusion_latency');
+    expect(check?.outcome).toBe('violated');
+    expect(check?.severity).toBe('observation');
+  });
+
+  it('is not_evaluable when p95 latency data is null', () => {
+    const c = analyzeTiers([makeTier({ acceptedToCommittedLatencyP95Ms: null })], {
+      policy: { maxP95InclusionLatencyMs: 20_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_p95_inclusion_latency');
+    expect(check?.outcome).toBe('not_evaluable');
+  });
+
+  it('uses the maximum p95 across tiers', () => {
+    const tiers = [
+      makeTier({ tierIndex: 0, acceptedToCommittedLatencyP95Ms: 12_000 }),
+      makeTier({ tierIndex: 1, acceptedToCommittedLatencyP95Ms: 22_000 }),
+    ];
+    const c = analyzeTiers(tiers, { policy: { maxP95InclusionLatencyMs: 20_000 } });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_p95_inclusion_latency');
+    expect(check?.outcome).toBe('violated');
+    expect(check?.observed).toContain('22000');
+  });
+
+  it('violation produces observation-severity, not failure', () => {
+    const c = analyzeTiers([makeTier({ acceptedToCommittedLatencyP95Ms: 30_000 })], {
+      policy: { maxP95InclusionLatencyMs: 20_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_p95_inclusion_latency');
+    expect(check?.severity).toBe('observation');
+    // Should be "Passed with Observations", not "Failed"
+    expect(c.classification).toBe('Passed with Observations');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// L1 fee per committed tx check (gap 6)
+// ---------------------------------------------------------------------------
+
+describe('analyzeTiers — L1 fee per committed tx check', () => {
+  it('is not_evaluable when policy threshold is not set', () => {
+    const c = analyzeTiers([makeTier({ l1FeePerCommittedL2TxLovelace: 5_000 })]);
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_l1_fee_per_committed_tx');
+    expect(check?.outcome).toBe('not_evaluable');
+  });
+
+  it('passes when observed fee is below threshold', () => {
+    const c = analyzeTiers([makeTier({ l1FeePerCommittedL2TxLovelace: 3_000 })], {
+      policy: { maxL1FeePerCommittedTxLovelace: 10_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_l1_fee_per_committed_tx');
+    expect(check?.outcome).toBe('passed');
+  });
+
+  it('violates when observed fee exceeds threshold', () => {
+    const c = analyzeTiers([makeTier({ l1FeePerCommittedL2TxLovelace: 15_000 })], {
+      policy: { maxL1FeePerCommittedTxLovelace: 10_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_l1_fee_per_committed_tx');
+    expect(check?.outcome).toBe('violated');
+    expect(check?.severity).toBe('observation');
+  });
+
+  it('is not_evaluable when fee data is null (emulator environment)', () => {
+    const c = analyzeTiers([makeTier({ l1FeePerCommittedL2TxLovelace: null })], {
+      policy: { maxL1FeePerCommittedTxLovelace: 10_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_l1_fee_per_committed_tx');
+    expect(check?.outcome).toBe('not_evaluable');
+    expect(check?.observed).toBe('n/a');
+  });
+
+  it('violation produces observation-severity, not failure', () => {
+    const c = analyzeTiers([makeTier({ l1FeePerCommittedL2TxLovelace: 50_000 })], {
+      policy: { maxL1FeePerCommittedTxLovelace: 10_000 },
+    });
+    const check = c.criteriaChecks.find((ch) => ch.id === 'max_l1_fee_per_committed_tx');
+    expect(check?.severity).toBe('observation');
+    expect(c.classification).toBe('Passed with Observations');
+  });
+});

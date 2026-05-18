@@ -11,6 +11,8 @@ export interface RunClassificationPolicy {
   maxProcessingFailedRatio: number;
   maxFinalQueueSizeAfterRecovery?: number;
   maxFinalMempoolSizeAfterRecovery?: number;
+  maxP95InclusionLatencyMs?: number;
+  maxL1FeePerCommittedTxLovelace?: number;
 }
 
 export interface ClassificationCheckEvidence {
@@ -333,6 +335,64 @@ function buildCriteriaChecks(
         : maxFinalMempool === null
           ? 'No final mempool-size metrics were available.'
           : 'Observed as the maximum final mempool size across all tiers.',
+  });
+
+  // p95 inclusion latency — observation-severity: the cohort-alignment estimator
+  // has confidence caveats and may produce null or low-confidence results.
+  const maxP95Latency = maxNumber(summaries.map((s) => s.acceptedToCommittedLatencyP95Ms));
+  checks.push({
+    id: 'max_p95_inclusion_latency',
+    name: 'p95 mempool-accepted-to-committed inclusion latency',
+    severity: 'observation',
+    outcome:
+      policy.maxP95InclusionLatencyMs === undefined
+        ? 'not_evaluable'
+        : maxP95Latency === null
+          ? 'not_evaluable'
+          : maxP95Latency <= policy.maxP95InclusionLatencyMs
+            ? 'passed'
+            : 'violated',
+    expected:
+      policy.maxP95InclusionLatencyMs === undefined
+        ? 'disabled'
+        : `<= ${formatNumber(policy.maxP95InclusionLatencyMs)} ms`,
+    observed: maxP95Latency === null ? 'n/a' : `${formatNumber(maxP95Latency)} ms`,
+    details:
+      policy.maxP95InclusionLatencyMs === undefined
+        ? 'No p95 inclusion latency threshold configured.'
+        : maxP95Latency === null
+          ? 'No p95 latency estimate available (insufficient Prometheus range data or no committed transactions).'
+          : 'Observed as the maximum p95 accepted-to-committed latency across all tiers. ' +
+            'Estimated via cohort counter alignment; treat as heuristic where confidence is low.',
+  });
+
+  // L1 fee per committed L2 transaction — observation-severity: zero on emulator
+  // environments; meaningful only for runs with active L1 commitment.
+  const maxL1Fee = maxNumber(summaries.map((s) => s.l1FeePerCommittedL2TxLovelace));
+  checks.push({
+    id: 'max_l1_fee_per_committed_tx',
+    name: 'L1 fee per committed L2 transaction',
+    severity: 'observation',
+    outcome:
+      policy.maxL1FeePerCommittedTxLovelace === undefined
+        ? 'not_evaluable'
+        : maxL1Fee === null
+          ? 'not_evaluable'
+          : maxL1Fee <= policy.maxL1FeePerCommittedTxLovelace
+            ? 'passed'
+            : 'violated',
+    expected:
+      policy.maxL1FeePerCommittedTxLovelace === undefined
+        ? 'disabled'
+        : `<= ${formatNumber(policy.maxL1FeePerCommittedTxLovelace)} lovelace`,
+    observed: maxL1Fee === null ? 'n/a' : `${formatNumber(maxL1Fee)} lovelace`,
+    details:
+      policy.maxL1FeePerCommittedTxLovelace === undefined
+        ? 'No L1 fee-per-committed-tx threshold configured. ' +
+          'Set runClassificationPolicy.maxL1FeePerCommittedTxLovelace to enable this check.'
+        : maxL1Fee === null
+          ? 'No L1 fee data available (emulator environment or no committed blocks with fee metrics).'
+          : 'Observed as the maximum l1_commitment_fees_lovelace_total Δ / commit_block_tx_count_total Δ across all tiers.',
   });
 
   return checks;

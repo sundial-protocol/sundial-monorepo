@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { ScalabilityScenario, StopConditions } from '../config/scenario.js';
 import type { LoadTier } from '../config/tiers.js';
 import type { ArtifactWriter, TierSummary } from '../evidence/artifacts.js';
+import type { LokiClient, LokiTierCapture } from '../evidence/loki.js';
 import type {
   HarnessErrorEvent,
   PrometheusSnapshotEvent,
@@ -12,6 +13,7 @@ import type {
   TierStoppedEvent,
 } from '../evidence/load-events.js';
 import { makeEvent } from '../evidence/load-events.js';
+import type { TempoClient, TempoTierCapture } from '../evidence/tempo.js';
 import { CADVISOR_METRICS, NODE_METRICS, PrometheusClient } from '../metrics/prometheus.js';
 import type { TierMetricWindow, TierWindowSummary } from '../metrics/window.js';
 import { collectTierWindow, RANGE_STEP_SECONDS, summarizeTierWindow } from '../metrics/window.js';
@@ -49,6 +51,11 @@ export interface TierRunOptions {
     stepSeconds?: number
   ) => Promise<TierMetricWindow>;
   hostResourceCollectorFactory?: () => HostResourceCollector;
+  // Optional Loki/Tempo clients for evidence capture after the recovery window.
+  lokiClient?: LokiClient;
+  lokiNodeQuery?: string;
+  tempoClient?: TempoClient;
+  tempoServiceName?: string;
 }
 
 export interface MetricStopCondition {
@@ -76,6 +83,8 @@ export interface TierRunResult {
   txGeneratorExitCode: number | null;
   submissionAggregate: SubmissionAggregate | null;
   loadDriverResourceEvidence: LoadDriverResourceEvidence | null;
+  lokiCapture: LokiTierCapture | null;
+  tempoCapture: TempoTierCapture | null;
 }
 
 function createTimedController(ms: number): { controller: AbortController; cancel: () => void } {
@@ -238,6 +247,10 @@ export async function runTier(
     rangeStepSeconds = RANGE_STEP_SECONDS,
     collectWindowFn = collectTierWindow,
     hostResourceCollectorFactory = createHostResourceCollector,
+    lokiClient,
+    lokiNodeQuery,
+    tempoClient,
+    tempoServiceName,
   } = options;
 
   const tierArtifactDir = path.join(writer.runDir, `tier-${tier.tierIndex}`);
@@ -411,6 +424,68 @@ export async function runTier(
     );
   }
 
+  // Loki/Tempo evidence capture — covers the full tier window (load + recovery).
+  // Errors are recorded in the capture object and do not affect tier outcome.
+  let lokiCapture: LokiTierCapture | null = null;
+  if (lokiClient !== undefined) {
+    const capturedAt = new Date().toISOString();
+    const query = lokiNodeQuery ?? '{job="containerlogs"}';
+    try {
+      const result = await lokiClient.queryRange(query, startedAt, recoveryStoppedAt);
+      lokiCapture = {
+        tierIndex: tier.tierIndex,
+        targetTps: tier.targetTps,
+        capturedAt,
+        query,
+        startedAt: startedAt.toISOString(),
+        recoveryStoppedAt: recoveryStoppedAt.toISOString(),
+        result,
+        error: null,
+      };
+    } catch (err) {
+      lokiCapture = {
+        tierIndex: tier.tierIndex,
+        targetTps: tier.targetTps,
+        capturedAt,
+        query,
+        startedAt: startedAt.toISOString(),
+        recoveryStoppedAt: recoveryStoppedAt.toISOString(),
+        result: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  let tempoCapture: TempoTierCapture | null = null;
+  if (tempoClient !== undefined) {
+    const capturedAt = new Date().toISOString();
+    const svcName = tempoServiceName ?? 'midgard-node';
+    try {
+      const result = await tempoClient.searchTraces(svcName, startedAt, recoveryStoppedAt);
+      tempoCapture = {
+        tierIndex: tier.tierIndex,
+        targetTps: tier.targetTps,
+        capturedAt,
+        serviceName: svcName,
+        startedAt: startedAt.toISOString(),
+        recoveryStoppedAt: recoveryStoppedAt.toISOString(),
+        result,
+        error: null,
+      };
+    } catch (err) {
+      tempoCapture = {
+        tierIndex: tier.tierIndex,
+        targetTps: tier.targetTps,
+        capturedAt,
+        serviceName: svcName,
+        startedAt: startedAt.toISOString(),
+        recoveryStoppedAt: recoveryStoppedAt.toISOString(),
+        result: null,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   const stopConditionTriggered =
     probeResult.stopConditionTriggered ||
     recoveryProbeResult.stopConditionTriggered ||
@@ -460,5 +535,7 @@ export async function runTier(
     txGeneratorExitCode: generatorResult.exitCode,
     submissionAggregate: generatorResult.submissionAggregate,
     loadDriverResourceEvidence,
+    lokiCapture,
+    tempoCapture,
   };
 }

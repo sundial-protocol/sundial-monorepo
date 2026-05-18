@@ -2,6 +2,8 @@ import type { BenchmarkConclusion, ClassificationCheckEvidence } from '../analys
 import type { TierSummary } from '../analysis/tier-summary.js';
 import type { ScalabilityScenario } from '../config/scenario.js';
 import type { RunManifest } from '../evidence/artifacts.js';
+import type { LokiTierCapture } from '../evidence/loki.js';
+import type { TempoTierCapture } from '../evidence/tempo.js';
 
 export interface ReportInput {
   manifest: RunManifest;
@@ -10,6 +12,10 @@ export interface ReportInput {
   conclusion: BenchmarkConclusion;
   /** Filenames (not full paths) present in the artifact run directory. */
   artifactFiles: string[];
+  /** Per-tier Loki log captures, present when lokiEndpoint was configured. */
+  lokiCaptures?: LokiTierCapture[];
+  /** Per-tier Tempo trace captures, present when tempoEndpoint was configured. */
+  tempoCaptures?: TempoTierCapture[];
 }
 
 // --- Formatters ---
@@ -69,6 +75,11 @@ function renderRunMetadata(manifest: RunManifest): string {
     ['Working Tree', workingTree],
     ['Node Endpoint', manifest.nodeEndpoint],
     ['Prometheus Endpoint', manifest.prometheusEndpoint],
+    ['L1 Provider Mode', manifest.l1ProviderMode ?? 'not specified'],
+    ['Wallet Mode', manifest.walletMode ?? 'not specified'],
+    ...(manifest.walletProvisioningNote
+      ? [['Wallet Provisioning Note', manifest.walletProvisioningNote]]
+      : []),
     ['Harness Version', manifest.harnessVersion],
     ['Replay Corpus Path', manifest.replayCorpusPath ?? 'n/a'],
     ['Replay Corpus SHA256', manifest.replayCorpusSha256 ?? 'n/a'],
@@ -88,6 +99,11 @@ function renderScenario(scenario: ScalabilityScenario): string {
 
   const rows: string[][] = [
     ['Transaction Type', txLabel],
+    ['L1 Provider Mode', scenario.l1ProviderMode ?? 'not specified'],
+    ['Wallet Mode', scenario.walletMode ?? 'not specified'],
+    ...(scenario.walletProvisioningNote
+      ? [['Wallet Provisioning Note', scenario.walletProvisioningNote]]
+      : []),
     ['Start TPS', String(scenario.startTps)],
     ['Max TPS', String(scenario.maxTps)],
     ['Step Multiplier', String(scenario.stepMultiplier)],
@@ -477,6 +493,60 @@ function renderPrimaryBottleneckHypothesis(conclusion: BenchmarkConclusion): str
   return lines.join('\n');
 }
 
+function renderLokiEvidence(captures: LokiTierCapture[] | undefined): string | null {
+  if (captures === undefined || captures.length === 0) {
+    return null;
+  }
+
+  const headers = ['Tier', 'Target TPS', 'Window', 'Query', 'Streams', 'Entries', 'Truncated', 'Error'];
+  const rows = captures.map((c) => [
+    String(c.tierIndex),
+    String(c.targetTps),
+    `${c.startedAt.slice(0, 19)}Z → ${c.recoveryStoppedAt.slice(0, 19)}Z`,
+    `\`${c.query}\``,
+    c.result !== null ? String(c.result.streams.length) : 'n/a',
+    c.result !== null ? String(c.result.totalEntries) : 'n/a',
+    c.result !== null ? String(c.result.truncated) : 'n/a',
+    c.error !== null ? c.error.slice(0, 80) : '',
+  ]);
+
+  return [
+    '## Log Evidence (Loki)',
+    '',
+    'Per-tier log capture from Loki over the full tier window (load phase + recovery).',
+    'Full log streams are in `loki-captures.json`.',
+    '',
+    mdTable(headers, rows),
+  ].join('\n');
+}
+
+function renderTempoEvidence(captures: TempoTierCapture[] | undefined): string | null {
+  if (captures === undefined || captures.length === 0) {
+    return null;
+  }
+
+  const headers = ['Tier', 'Target TPS', 'Window', 'Service', 'Traces', 'Inspected', 'Truncated', 'Error'];
+  const rows = captures.map((c) => [
+    String(c.tierIndex),
+    String(c.targetTps),
+    `${c.startedAt.slice(0, 19)}Z → ${c.recoveryStoppedAt.slice(0, 19)}Z`,
+    c.serviceName,
+    c.result !== null ? String(c.result.traces.length) : 'n/a',
+    c.result !== null ? (c.result.inspectedTraces !== null ? String(c.result.inspectedTraces) : 'n/a') : 'n/a',
+    c.result !== null ? String(c.result.truncated) : 'n/a',
+    c.error !== null ? c.error.slice(0, 80) : '',
+  ]);
+
+  return [
+    '## Trace Evidence (Tempo)',
+    '',
+    'Per-tier trace capture from Tempo over the full tier window (load phase + recovery).',
+    'Full trace summaries are in `tempo-captures.json`.',
+    '',
+    mdTable(headers, rows),
+  ].join('\n');
+}
+
 function renderArtifactIndex(files: string[]): string {
   if (files.length === 0) {
     return '## Artifact Index\n\n_No artifact files recorded._';
@@ -508,6 +578,18 @@ function renderLimitations(): string {
 }
 
 export function renderReport(input: ReportInput): string {
+  const optionalSections: string[] = [];
+
+  const lokiSection = renderLokiEvidence(input.lokiCaptures);
+  if (lokiSection !== null) {
+    optionalSections.push(lokiSection);
+  }
+
+  const tempoSection = renderTempoEvidence(input.tempoCaptures);
+  if (tempoSection !== null) {
+    optionalSections.push(tempoSection);
+  }
+
   const sections = [
     renderHeader(),
     renderRunMetadata(input.manifest),
@@ -522,6 +604,7 @@ export function renderReport(input: ReportInput): string {
     renderCommitSubmitMergeProgress(input.tierSummaries),
     renderFailureSignals(input.tierSummaries),
     renderPrimaryBottleneckHypothesis(input.conclusion),
+    ...optionalSections,
     renderArtifactIndex(input.artifactFiles),
     renderLimitations(),
   ];

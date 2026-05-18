@@ -10,7 +10,9 @@ import type {
   LoadDriverSaturationFlags,
 } from '../runner/host-resources.js';
 import type { SubmissionAggregate } from '../runner/tx-generator.js';
+import type { LokiTierCapture } from './loki.js';
 import type { LoadEvent } from './load-events.js';
+import type { TempoTierCapture } from './tempo.js';
 
 export interface RunManifest {
   runId: string;
@@ -23,6 +25,16 @@ export interface RunManifest {
   harnessVersion: string;
   replayCorpusPath: string | null;
   replayCorpusSha256: string | null;
+  // L1 provider mode from the scenario. Null when the scenario did not specify one.
+  l1ProviderMode: string | null;
+  // Wallet mode from the scenario. Null when the scenario did not specify one.
+  walletMode: string | null;
+  // Optional wallet/UTxO provisioning note from the scenario.
+  walletProvisioningNote: string | null;
+  // Loki endpoint from the scenario. Null when Loki capture is not configured.
+  lokiEndpoint: string | null;
+  // Tempo endpoint from the scenario. Null when Tempo capture is not configured.
+  tempoEndpoint: string | null;
   host: {
     hostname: string;
     platform: string;
@@ -102,6 +114,8 @@ export class ArtifactWriter {
     this.runDir = runDir;
   }
 
+  // Creates a new run directory under scenario.outputDir named <timestamp>-<runId>.
+  // Use this for standalone scenario runs.
   static async create(
     scenario: ScalabilityScenario,
     scenarioPath: string,
@@ -130,6 +144,58 @@ export class ArtifactWriter {
       harnessVersion,
       replayCorpusPath: replayCorpus.replayCorpusPath,
       replayCorpusSha256: replayCorpus.replayCorpusSha256,
+      l1ProviderMode: scenario.l1ProviderMode ?? null,
+      walletMode: scenario.walletMode ?? null,
+      walletProvisioningNote: scenario.walletProvisioningNote ?? null,
+      lokiEndpoint: scenario.lokiEndpoint ?? null,
+      tempoEndpoint: scenario.tempoEndpoint ?? null,
+      host: {
+        hostname: os.hostname(),
+        platform: os.platform(),
+        arch: os.arch(),
+        cpus: os.cpus().length,
+        totalMemoryBytes: os.totalmem(),
+      },
+    };
+
+    await writeFile(path.join(runDir, 'run-manifest.json'), JSON.stringify(manifest, null, 2));
+
+    return writer;
+  }
+
+  // Creates a run directory at an explicit path rather than computing one from a timestamp.
+  // Use this for plan-managed runs where the caller controls directory naming.
+  static async createAt(
+    runDir: string,
+    scenario: ScalabilityScenario,
+    scenarioPath: string,
+    harnessVersion: string
+  ): Promise<ArtifactWriter> {
+    const startedAt = new Date();
+    await mkdir(runDir, { recursive: true });
+
+    const writer = new ArtifactWriter(runDir);
+
+    await writeFile(path.join(runDir, 'scenario.json'), JSON.stringify(scenario, null, 2));
+
+    const replayCorpus = await hashReplayCorpus(scenario.replayCorpusPath, scenarioPath);
+
+    const manifest: RunManifest = {
+      runId: scenario.runId,
+      startedAt: startedAt.toISOString(),
+      gitSha: gitSha(),
+      workingTreeStatus: gitStatus(),
+      nodeEndpoint: scenario.nodeEndpoint,
+      prometheusEndpoint: scenario.prometheusEndpoint,
+      scenarioPath,
+      harnessVersion,
+      replayCorpusPath: replayCorpus.replayCorpusPath,
+      replayCorpusSha256: replayCorpus.replayCorpusSha256,
+      l1ProviderMode: scenario.l1ProviderMode ?? null,
+      walletMode: scenario.walletMode ?? null,
+      walletProvisioningNote: scenario.walletProvisioningNote ?? null,
+      lokiEndpoint: scenario.lokiEndpoint ?? null,
+      tempoEndpoint: scenario.tempoEndpoint ?? null,
       host: {
         hostname: os.hostname(),
         platform: os.platform(),
@@ -166,6 +232,14 @@ export class ArtifactWriter {
 
   async writeReport(markdown: string): Promise<void> {
     await writeFile(this.filePath('report.md'), markdown);
+  }
+
+  async writeLokiCaptures(captures: LokiTierCapture[]): Promise<void> {
+    await writeFile(this.filePath('loki-captures.json'), JSON.stringify(captures, null, 2));
+  }
+
+  async writeTempoCaptures(captures: TempoTierCapture[]): Promise<void> {
+    await writeFile(this.filePath('tempo-captures.json'), JSON.stringify(captures, null, 2));
   }
 
   async logStdout(line: string): Promise<void> {

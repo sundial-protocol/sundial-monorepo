@@ -5,6 +5,12 @@ const RAMP_STRATEGIES = ['multiply', 'percent_increment'] as const;
 export const REQUEST_EVENT_MODES = ['off', 'sampled', 'all'] as const;
 export type RequestEventsMode = (typeof REQUEST_EVENT_MODES)[number];
 
+export const L1_PROVIDER_MODES = ['kupmios', 'blockfrost', 'emulator', 'unknown'] as const;
+export type L1ProviderMode = (typeof L1_PROVIDER_MODES)[number];
+
+export const WALLET_MODES = ['test-wallet', 'external-key'] as const;
+export type WalletMode = (typeof WALLET_MODES)[number];
+
 export interface StopConditions {
   maxConsecutiveNodeProbeFailures: number;
   stopOnPrometheusDown: boolean;
@@ -42,15 +48,43 @@ export interface RunClassificationPolicyConfig {
   maxProcessingFailedRatio?: number;
   maxFinalQueueSizeAfterRecovery?: number;
   maxFinalMempoolSizeAfterRecovery?: number;
+  maxP95InclusionLatencyMs?: number;
+  maxL1FeePerCommittedTxLovelace?: number;
 }
 
 export interface ScalabilityScenario {
   runId: string;
+  description?: string;
   nodeEndpoint: string;
   prometheusEndpoint: string;
   outputDir: string;
   seed: string;
   replayCorpusPath?: string;
+  // L1 provider mode used for this run. Recorded in the run manifest and report
+  // so before/after comparisons carry the provider context. Use "emulator" for
+  // local/test runs that do not connect to a live L1 provider.
+  l1ProviderMode?: L1ProviderMode;
+  // Wallet mode for the load generator. "test-wallet" generates a synthetic key
+  // pair and requires the node to be initialised with L2 genesis UTxOs for that
+  // wallet. "external-key" passes a pre-funded key via the WALLET_PRIVATE_KEY
+  // environment variable and is required for sustained high-TPS formal runs
+  // against a live L1.
+  walletMode?: WalletMode;
+  // Free-text note about wallet/UTxO provisioning for this run. Stored in the
+  // run manifest for traceability; does not affect harness behaviour.
+  walletProvisioningNote?: string;
+  // Loki endpoint for log evidence capture. When set, the harness queries Loki
+  // after each tier's recovery window and writes loki-captures.json. Default
+  // query is {job="containerlogs"} unless lokiNodeQuery overrides it.
+  lokiEndpoint?: string;
+  // Tempo endpoint for trace evidence capture. When set, the harness queries
+  // Tempo after each tier's recovery window and writes tempo-captures.json.
+  // Default service name is "midgard-node" unless tempoServiceName overrides it.
+  tempoEndpoint?: string;
+  // LogQL query passed to Loki query_range. Defaults to {job="containerlogs"}.
+  lokiNodeQuery?: string;
+  // OpenTelemetry service name used for Tempo trace search. Defaults to "midgard-node".
+  tempoServiceName?: string;
   transactionType: 'one-to-one' | 'multi-output' | 'mixed';
   oneToOneRatio?: number;
   tierDurationSeconds: number;
@@ -128,6 +162,12 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     );
   }
 
+  if (s.description !== undefined) {
+    if (typeof s.description !== 'string' || s.description.trim().length === 0) {
+      throw new ScenarioValidationError('description must be a non-empty string when provided');
+    }
+  }
+
   assertUrl(s.nodeEndpoint, 'nodeEndpoint');
   assertUrl(s.prometheusEndpoint, 'prometheusEndpoint');
 
@@ -145,6 +185,56 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     if (typeof s.replayCorpusPath !== 'string' || s.replayCorpusPath.trim().length === 0) {
       throw new ScenarioValidationError(
         'replayCorpusPath must be a non-empty string when provided'
+      );
+    }
+  }
+
+  if (s.l1ProviderMode !== undefined) {
+    if (
+      typeof s.l1ProviderMode !== 'string' ||
+      !(L1_PROVIDER_MODES as readonly string[]).includes(s.l1ProviderMode)
+    ) {
+      throw new ScenarioValidationError(
+        `l1ProviderMode must be one of: ${L1_PROVIDER_MODES.join(', ')}, got: ${s.l1ProviderMode}`
+      );
+    }
+  }
+
+  if (s.walletMode !== undefined) {
+    if (
+      typeof s.walletMode !== 'string' ||
+      !(WALLET_MODES as readonly string[]).includes(s.walletMode)
+    ) {
+      throw new ScenarioValidationError(
+        `walletMode must be one of: ${WALLET_MODES.join(', ')}, got: ${s.walletMode}`
+      );
+    }
+  }
+
+  if (s.walletProvisioningNote !== undefined) {
+    if (typeof s.walletProvisioningNote !== 'string') {
+      throw new ScenarioValidationError('walletProvisioningNote must be a string when provided');
+    }
+  }
+
+  if (s.lokiEndpoint !== undefined) {
+    assertUrl(s.lokiEndpoint, 'lokiEndpoint');
+  }
+
+  if (s.tempoEndpoint !== undefined) {
+    assertUrl(s.tempoEndpoint, 'tempoEndpoint');
+  }
+
+  if (s.lokiNodeQuery !== undefined) {
+    if (typeof s.lokiNodeQuery !== 'string' || s.lokiNodeQuery.trim().length === 0) {
+      throw new ScenarioValidationError('lokiNodeQuery must be a non-empty string when provided');
+    }
+  }
+
+  if (s.tempoServiceName !== undefined) {
+    if (typeof s.tempoServiceName !== 'string' || s.tempoServiceName.trim().length === 0) {
+      throw new ScenarioValidationError(
+        'tempoServiceName must be a non-empty string when provided'
       );
     }
   }
@@ -360,6 +450,18 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
       assertPositiveNumber(
         policy.maxFinalMempoolSizeAfterRecovery,
         'runClassificationPolicy.maxFinalMempoolSizeAfterRecovery'
+      );
+    }
+    if (policy.maxP95InclusionLatencyMs !== undefined) {
+      assertPositiveNumber(
+        policy.maxP95InclusionLatencyMs,
+        'runClassificationPolicy.maxP95InclusionLatencyMs'
+      );
+    }
+    if (policy.maxL1FeePerCommittedTxLovelace !== undefined) {
+      assertPositiveNumber(
+        policy.maxL1FeePerCommittedTxLovelace,
+        'runClassificationPolicy.maxL1FeePerCommittedTxLovelace'
       );
     }
   }

@@ -7,7 +7,11 @@ import type {
   Fetcher as PrometheusFetcher,
   PrometheusVectorResult,
 } from '../metrics/prometheus.js';
-import { NODE_METRICS, PrometheusClient } from '../metrics/prometheus.js';
+import {
+  ALWAYS_PRESENT_NODE_METRICS,
+  COUNTER_NODE_METRICS,
+  PrometheusClient,
+} from '../metrics/prometheus.js';
 import type { Fetcher as NodeProbeFetcher, ProbeResult } from './node-probe.js';
 import { PROBE_TIMEOUT_MS, probeNode } from './node-probe.js';
 
@@ -20,6 +24,8 @@ export const PREFLIGHT_CHECK_NAMES = [
   'required_metrics_presence',
   'artifact_directory_writable',
   'tx_generator_invocable',
+  'loki_reachable',
+  'tempo_reachable',
 ] as const;
 
 export type PreflightCheckName = (typeof PREFLIGHT_CHECK_NAMES)[number];
@@ -29,6 +35,9 @@ export interface PreflightCheckResult {
   passed: boolean;
   summary: string;
   actionableReason?: string;
+  // When false, a failing check contributes to observations but does not block the run.
+  // Defaults to true (blocking) when undefined.
+  blocking?: boolean;
 }
 
 export interface ExecutionReadinessPreflightResult {
@@ -80,6 +89,15 @@ function fail(
   actionableReason: string
 ): PreflightCheckResult {
   return { name, passed: false, summary, actionableReason };
+}
+
+// Non-blocking observation: recorded in check results but does not block the run.
+function observe(
+  name: PreflightCheckName,
+  summary: string,
+  actionableReason: string
+): PreflightCheckResult {
+  return { name, passed: false, summary, actionableReason, blocking: false };
 }
 
 async function checkNodeProbe(
@@ -161,42 +179,66 @@ async function checkRequiredMetricsPresence(
       dependencies.prometheusFetcher
     ) ?? new PrometheusClient(scenario.prometheusEndpoint, dependencies?.prometheusFetcher);
 
-  const checks = await Promise.all(
-    NODE_METRICS.map(async (metric) => {
-      try {
-        const series = await client.queryInstant(metric);
-        return {
-          metric,
-          ok: series.length > 0 && series.some((s) => !isNaN(parseFloat(s.value[1]))),
-          detail: series.length === 0 ? 'no_series' : '',
-        };
-      } catch (err) {
-        return {
-          metric,
-          ok: false,
-          detail: err instanceof Error ? err.message : String(err),
-        };
-      }
-    })
-  );
+  type MetricCheck = { metric: string; ok: boolean; detail: string };
 
-  const missing = checks.filter((c) => !c.ok);
-  if (missing.length > 0) {
-    const sample = missing
+  async function probe(metric: string): Promise<MetricCheck> {
+    try {
+      const series = await client.queryInstant(metric);
+      return {
+        metric,
+        ok: series.length > 0 && series.some((s) => !isNaN(parseFloat(s.value[1]))),
+        detail: series.length === 0 ? 'no_series' : '',
+      };
+    } catch (err) {
+      return {
+        metric,
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  const [alwaysPresentChecks, counterChecks] = await Promise.all([
+    Promise.all(ALWAYS_PRESENT_NODE_METRICS.map(probe)),
+    Promise.all(COUNTER_NODE_METRICS.map(probe)),
+  ]);
+
+  // Always-present metrics (gauges + scrape health) are hard requirements.
+  // If any are missing the node's telemetry pipeline is broken.
+  const missingAlwaysPresent = alwaysPresentChecks.filter((c) => !c.ok);
+  if (missingAlwaysPresent.length > 0) {
+    const sample = missingAlwaysPresent
       .slice(0, 4)
       .map((m) => `${m.metric} (${m.detail})`)
       .join(', ');
     return fail(
       'required_metrics_presence',
-      `Required metric queries missing/unusable: ${missing.length}/${NODE_METRICS.length}. Example: ${sample}`,
-      'Ensure node telemetry exports all required benchmark metrics and Prometheus can query them.'
+      `Always-present node metrics missing: ${missingAlwaysPresent.length}/${ALWAYS_PRESENT_NODE_METRICS.length}. Example: ${sample}`,
+      'Ensure midgard-node is running with monitoring enabled and Prometheus is scraping it.'
     );
   }
 
-  return pass(
-    'required_metrics_presence',
-    `All required metrics are queryable (${NODE_METRICS.length}/${NODE_METRICS.length}).`
-  );
+  // Counter metrics only appear after the first matching node event. Their
+  // absence on a freshly-started idle node is expected — report as a
+  // warning note but do not block the run.
+  const inactiveCounters = counterChecks.filter((c) => !c.ok);
+  if (inactiveCounters.length > 0) {
+    const total = ALWAYS_PRESENT_NODE_METRICS.length + COUNTER_NODE_METRICS.length;
+    const present = total - inactiveCounters.length;
+    return pass(
+      'required_metrics_presence',
+      `${present}/${total} metrics queryable; ${inactiveCounters.length} counter(s) not yet active ` +
+        `(expected on a freshly-started idle node — will appear after first node activity): ` +
+        inactiveCounters
+          .slice(0, 3)
+          .map((c) => c.metric)
+          .join(', ') +
+        (inactiveCounters.length > 3 ? ` +${inactiveCounters.length - 3} more` : '')
+    );
+  }
+
+  const total = ALWAYS_PRESENT_NODE_METRICS.length + COUNTER_NODE_METRICS.length;
+  return pass('required_metrics_presence', `All ${total} metrics are queryable.`);
 }
 
 async function checkArtifactDirectoryWritable(outputDir: string): Promise<PreflightCheckResult> {
@@ -281,6 +323,48 @@ function defaultTxGeneratorInvoker(): TxGeneratorInvoker {
   };
 }
 
+async function checkLokiReachable(endpoint: string): Promise<PreflightCheckResult> {
+  try {
+    const url = `${endpoint.replace(/\/$/, '')}/loki/api/v1/labels`;
+    const res = await (globalThis.fetch as (url: string) => Promise<Response>)(url);
+    if (res.ok) {
+      return pass('loki_reachable', `Loki is reachable at ${endpoint} (HTTP ${res.status}).`);
+    }
+    return observe(
+      'loki_reachable',
+      `Loki at ${endpoint} returned HTTP ${res.status}.`,
+      'Verify Loki is running and reachable. Log evidence capture will fail for this run.'
+    );
+  } catch (err) {
+    return observe(
+      'loki_reachable',
+      `Loki at ${endpoint} is not reachable: ${err instanceof Error ? err.message : String(err)}`,
+      'Verify Loki is running and reachable. Log evidence capture will fail for this run.'
+    );
+  }
+}
+
+async function checkTempoReachable(endpoint: string): Promise<PreflightCheckResult> {
+  try {
+    const url = `${endpoint.replace(/\/$/, '')}/api/search/tags`;
+    const res = await (globalThis.fetch as (url: string) => Promise<Response>)(url);
+    if (res.ok) {
+      return pass('tempo_reachable', `Tempo is reachable at ${endpoint} (HTTP ${res.status}).`);
+    }
+    return observe(
+      'tempo_reachable',
+      `Tempo at ${endpoint} returned HTTP ${res.status}.`,
+      'Verify Tempo is running and reachable. Trace evidence capture will fail for this run.'
+    );
+  } catch (err) {
+    return observe(
+      'tempo_reachable',
+      `Tempo at ${endpoint} is not reachable: ${err instanceof Error ? err.message : String(err)}`,
+      'Verify Tempo is running and reachable. Trace evidence capture will fail for this run.'
+    );
+  }
+}
+
 async function checkTxGeneratorInvocable(
   cwd: string,
   dependencies?: PreflightDependencies
@@ -315,8 +399,17 @@ export async function runExecutionReadinessPreflight(
   checks.push(await checkArtifactDirectoryWritable(outputDir));
   checks.push(await checkTxGeneratorInvocable(cwd, options.dependencies));
 
+  // Non-blocking reachability checks — only run when endpoint is configured.
+  if (scenario.lokiEndpoint !== undefined) {
+    checks.push(await checkLokiReachable(scenario.lokiEndpoint));
+  }
+  if (scenario.tempoEndpoint !== undefined) {
+    checks.push(await checkTempoReachable(scenario.tempoEndpoint));
+  }
+
+  // Only blocking checks (blocking !== false) prevent the run from starting.
   const blockedReasons = checks
-    .filter((c) => !c.passed)
+    .filter((c) => !c.passed && c.blocking !== false)
     .map((c) => c.actionableReason ?? c.summary);
 
   const passed = blockedReasons.length === 0;
