@@ -19,6 +19,9 @@ interface GeneratorOptions {
   outputDir?: string;
   seed?: string;
   replayCorpusPath?: string;
+  retryAttempts?: string;
+  retryDelayMs?: string;
+  requestEvents?: 'off' | 'sampled' | 'all';
 }
 
 const program = new Command();
@@ -48,6 +51,9 @@ program
     'generated-transactions'
   )
   .option('--seed <seed>', 'Deterministic seed for reproducible transaction generation')
+  .option('--retry-attempts <number>', 'Node submission retry attempts', '3')
+  .option('--retry-delay-ms <number>', 'Delay between submission retries in milliseconds', '1000')
+  .option('--request-events <mode>', 'Per-request submission event mode (off|sampled|all)', 'off')
   .option(
     '--replay-corpus-path <path>',
     'Replay transactions from a JSON corpus (array or { transactions: [] })'
@@ -91,6 +97,9 @@ program
       console.log(chalk.gray(`Batch Size: ${options.batchSize}`));
       console.log(chalk.gray(`Interval: ${options.interval} seconds`));
       console.log(chalk.gray(`Concurrency: ${options.concurrency}\n`));
+      console.log(chalk.gray(`Retry Attempts: ${options.retryAttempts}`));
+      console.log(chalk.gray(`Retry Delay: ${options.retryDelayMs}ms`));
+      console.log(chalk.gray(`Request Events: ${options.requestEvents}`));
       if (options.seed) {
         console.log(chalk.gray(`Generation Seed: ${options.seed}`));
       }
@@ -108,7 +117,10 @@ program
         batchSize: parseInt(options.batchSize),
         interval: parseInt(options.interval),
         concurrency: parseInt(options.concurrency),
+        nodeRetryAttempts: parseInt(options.retryAttempts ?? '3'),
+        nodeRetryDelay: parseInt(options.retryDelayMs ?? '1000'),
         outputDir: options.outputDir,
+        requestEvents: options.requestEvents ?? 'off',
         generationSeed: options.seed,
         replayCorpusPath: options.replayCorpusPath,
       });

@@ -1,0 +1,26 @@
+{
+  "runId": "initial-800",
+  "nodeEndpoint": "http://localhost:3000",
+  "prometheusEndpoint": "http://localhost:9090",
+  "outputDir": "benchmark-runs",
+  "seed": "initial-800-2026-05-18",
+  "transactionType": "one-to-one",
+  "tierDurationSeconds": 1800,
+  "recoverySeconds": 300,
+  "startTps": 800,
+  "maxTps": 800,
+  "stepMultiplier": 2,
+  "batchSize": 100,
+  "concurrency": 8,
+  "retryAttempts": 3,
+  "retryDelayMs": 500,
+  "stopConditions": {
+    "maxConsecutiveNodeProbeFailures": 5,
+    "stopOnPrometheusDown": true,
+    "stopOnCommitmentFailure": true,
+    "stopOnMergeFailure": true,
+    "maxRecoveryQueueSize": 25000,
+    "maxRecoveryMempoolSize": 15000,
+    "minUsefulThroughputRatio": 0.6
+  }
+}

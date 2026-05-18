@@ -2,6 +2,7 @@ import { Network, UTxO } from '@lucid-evolution/lucid';
 
 // Transaction Types
 export type TransactionType = 'one-to-one' | 'multi-output' | 'mixed';
+export type RequestEventsMode = 'off' | 'sampled' | 'all';
 
 // Node Client Configuration
 export interface MidgardNodeConfig {
@@ -40,6 +41,7 @@ export interface TransactionGeneratorConfig {
 
   // Output settings
   outputDir?: string;
+  requestEvents?: RequestEventsMode;
 }
 
 // Serialized Transaction Format
@@ -87,6 +89,7 @@ export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
 
   // Output defaults
   outputDir: 'generated-transactions',
+  requestEvents: 'off',
 };
 
 // Constants
@@ -153,5 +156,14 @@ export const validateGeneratorConfig = (config: TransactionGeneratorConfig): voi
   }
   if (config.concurrency > 20) {
     throw new Error('Concurrency must not exceed 20');
+  }
+
+  if (
+    config.requestEvents !== undefined &&
+    config.requestEvents !== 'off' &&
+    config.requestEvents !== 'sampled' &&
+    config.requestEvents !== 'all'
+  ) {
+    throw new Error('requestEvents must be one of: off, sampled, all');
   }
 };

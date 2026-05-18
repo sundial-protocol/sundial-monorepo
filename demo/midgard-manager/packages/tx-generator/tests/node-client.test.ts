@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MidgardNodeClient } from '../src/lib/client/node-client';
@@ -76,14 +75,11 @@ describe('MidgardNodeClient', () => {
       retryDelay: 10,
     });
 
-    // Submit the transaction - the client returns an Effect
-    const effectResult = client.submitTransaction('test_cbor_hex');
-
-    // Run the effect to get the result
-    const result = await Effect.runPromise(effectResult);
-
-    // Check the result
-    expect(result).toEqual({ txId: 'test_tx_id' });
+    const result = await client.submitTransaction('test_cbor_hex');
+    expect(result.status).toBe('SUBMITTED');
+    expect(result.txId).toBe('test_tx_id');
+    expect(result.attempts).toBe(1);
+    expect(result.retriesUsed).toBe(0);
 
     // Verify fetch was called with the correct arguments (second call)
     expect(mockFetch).toHaveBeenNthCalledWith(
@@ -98,7 +94,7 @@ describe('MidgardNodeClient', () => {
     );
   });
 
-  it('should handle network errors', async () => {
+  it('should classify unrecoverable network errors as ERROR', async () => {
     // First mock the availability check (node is available)
     mockFetch
       .mockResolvedValueOnce({
@@ -113,21 +109,9 @@ describe('MidgardNodeClient', () => {
       retryDelay: 10,
     });
 
-    // Submit the transaction - this returns an Effect
-    const effectResult = client.submitTransaction('test_cbor_hex');
-
-    // Set up a flag to check if the error was caught
-    let errorCaught = false;
-
-    try {
-      // Try to run the effect - this should fail
-      await Effect.runPromise(effectResult);
-    } catch (error) {
-      // Just verify an error was thrown without checking its structure
-      errorCaught = true;
-    }
-
-    // Assert that an error was caught
-    expect(errorCaught).toBe(true);
+    const result = await client.submitTransaction('test_cbor_hex');
+    expect(result.status).toBe('ERROR');
+    expect(result.error).toContain('Network error');
+    expect(result.attempts).toBe(1);
   });
 });

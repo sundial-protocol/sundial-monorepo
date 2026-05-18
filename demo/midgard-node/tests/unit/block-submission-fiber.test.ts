@@ -11,6 +11,7 @@ import { metricDelta } from "./harness/metric-snapshot.js";
 const retrieveFn = vi.hoisted(() => vi.fn());
 const setStatusFn = vi.hoisted(() => vi.fn());
 const SUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 91_337);
+const fromCborBytesFn = vi.hoisted(() => vi.fn());
 
 vi.mock("@/database/index.js", () => ({
   BlocksDB: {
@@ -73,6 +74,14 @@ vi.mock("@al-ft/midgard-sdk", () => ({
   },
 }));
 
+vi.mock("@lucid-evolution/lucid", () => ({
+  CML: {
+    Transaction: {
+      from_cbor_bytes: (...args: unknown[]) => fromCborBytesFn(...args),
+    },
+  },
+}));
+
 vi.mock("@/utils.js", () => ({
   batchProgram: (_size: number, total: number, _label: string, _fn: unknown) =>
     total === 0 ? Effect.succeed(undefined) : Effect.succeed(undefined),
@@ -95,6 +104,12 @@ const sqlHarness = createMockSqlHarness();
 
 const readSubmitCounter = Metric.value(
   blockSubmissionMetrics.submitBlockCounter,
+);
+const readL1CommitmentFeesCounter = Metric.value(
+  blockSubmissionMetrics.l1CommitmentFeesLovelaceCounter,
+);
+const readL1CommitmentFeeLastGauge = Metric.value(
+  blockSubmissionMetrics.l1CommitmentFeeLovelaceLastGauge,
 );
 
 const fakeSubmitProgram = vi.fn(() => Effect.succeed("faketxhash"));
@@ -152,6 +167,11 @@ beforeEach(() => {
   fakeCompleteProgram.mockReturnValue(
     Effect.succeed({ submitProgram: fakeSubmitProgram }),
   );
+  fromCborBytesFn.mockReturnValue({
+    body: () => ({
+      fee: () => 42n,
+    }),
+  });
 });
 
 describe("submitEarliestBlock — submit_block_count counter", () => {
@@ -191,6 +211,47 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
         SUBMITTED_STATUS_SENTINEL,
       );
     }),
+  );
+
+  it.effect(
+    "updates L1 commitment fee metrics after successful submission",
+    () =>
+      Effect.gen(function* () {
+        retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+
+        const feeDelta = (yield* metricDelta(
+          readL1CommitmentFeesCounter,
+          runAction(),
+          (state) => state.count,
+        )) as bigint;
+
+        expect(feeDelta).toBe(42n);
+
+        const lastFeeState = yield* readL1CommitmentFeeLastGauge.pipe(
+          Effect.provide(baseLayer),
+        );
+        expect(lastFeeState.value).toBe(42n);
+      }),
+  );
+
+  it.effect(
+    "does not fail block submission when fee extraction fails; fee metrics stay unchanged",
+    () =>
+      Effect.gen(function* () {
+        retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+        fromCborBytesFn.mockImplementation(() => {
+          throw new Error("bad cbor");
+        });
+
+        const feeDelta = (yield* metricDelta(
+          readL1CommitmentFeesCounter,
+          runAction(),
+          (state) => state.count,
+        )) as bigint;
+
+        expect(feeDelta).toBe(0n);
+        expect(setStatusFn).toHaveBeenCalledTimes(1);
+      }),
   );
 
   it.effect("does NOT increment when L1 submission fails", () =>

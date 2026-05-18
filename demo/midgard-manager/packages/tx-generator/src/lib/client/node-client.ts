@@ -9,6 +9,85 @@ export type SubmitTxError =
   | { _tag: 'ValidationError'; error: string }
   | { _tag: 'UnknownError'; error: string };
 
+export type SubmitTransactionStatus = 'SUBMITTED' | 'NODE_UNAVAILABLE' | 'ERROR';
+export type SubmitResponseClass =
+  | 'submitted'
+  | 'node_unavailable'
+  | 'http_error'
+  | 'timed_out'
+  | 'network_error'
+  | 'unknown_error';
+export type SubmitErrorClass = 'http_error' | 'timed_out' | 'network_error' | 'unknown_error';
+
+export interface SubmitTransactionResult {
+  status: SubmitTransactionStatus;
+  txId?: string;
+  error?: string;
+  errorClass?: SubmitErrorClass;
+  message?: string;
+  httpStatusCode?: number;
+  responseClass: SubmitResponseClass;
+  latencyMs: number;
+  attempts: number;
+  retriesUsed: number;
+}
+
+class SubmitHttpError extends Error {
+  readonly httpStatusCode: number;
+
+  constructor(httpStatusCode: number, message: string) {
+    super(message);
+    this.name = 'SubmitHttpError';
+    this.httpStatusCode = httpStatusCode;
+  }
+}
+
+function classifySubmitFailure(err: unknown): {
+  responseClass: SubmitResponseClass;
+  errorClass: SubmitErrorClass;
+  errorMessage: string;
+  httpStatusCode?: number;
+} {
+  if (err instanceof SubmitHttpError) {
+    return {
+      responseClass: 'http_error',
+      errorClass: 'http_error',
+      errorMessage: err.message,
+      httpStatusCode: err.httpStatusCode,
+    };
+  }
+
+  if (err instanceof DOMException && err.name === 'AbortError') {
+    return {
+      responseClass: 'timed_out',
+      errorClass: 'timed_out',
+      errorMessage: 'request timed out',
+    };
+  }
+
+  if (err instanceof TypeError) {
+    return {
+      responseClass: 'network_error',
+      errorClass: 'network_error',
+      errorMessage: err.message,
+    };
+  }
+
+  if (err instanceof Error) {
+    return {
+      responseClass: 'unknown_error',
+      errorClass: 'unknown_error',
+      errorMessage: err.message,
+    };
+  }
+
+  return {
+    responseClass: 'unknown_error',
+    errorClass: 'unknown_error',
+    errorMessage: String(err),
+  };
+}
+
 export class MidgardNodeClient {
   private readonly baseUrl: string;
   private readonly retryAttempts: number;
@@ -67,80 +146,103 @@ export class MidgardNodeClient {
   /**
    * Submit a transaction to the node with retries
    */
-  submitTransaction(cborHex: string, txType: string = 'Transaction') {
-    return Effect.tryPromise((signal: AbortSignal) =>
-      (async () => {
-        // First check if node is available
-        const isNodeAvailable = await this.isAvailable();
-        if (!isNodeAvailable) {
+  async submitTransaction(
+    cborHex: string,
+    txType: string = 'Transaction'
+  ): Promise<SubmitTransactionResult> {
+    const startedAtMs = Date.now();
+
+    const isNodeAvailable = await this.isAvailable();
+    if (!isNodeAvailable) {
+      return {
+        status: 'NODE_UNAVAILABLE',
+        message: 'Node is not available - transaction will be stored locally',
+        responseClass: 'node_unavailable',
+        latencyMs: Date.now() - startedAtMs,
+        attempts: 0,
+        retriesUsed: 0,
+      };
+    }
+
+    let attempts = 0;
+    while (attempts < this.retryAttempts) {
+      attempts += 1;
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          TRANSACTION_CONSTANTS.NODE_DEFAULTS.AVAILABILITY_TIMEOUT
+        );
+        let response: Response;
+        try {
+          response = await fetch(`${this.baseUrl}/submit?tx_cbor=${encodeURIComponent(cborHex)}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain',
+            },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        if (!response.ok) {
+          let errorMessage = `Unexpected status: ${response.status}`;
+          try {
+            const payload = await response.json();
+            if (payload && typeof payload.message === 'string') {
+              errorMessage = payload.message;
+            }
+          } catch {
+            // Best effort only.
+          }
+          throw new SubmitHttpError(response.status, errorMessage);
+        }
+
+        const result = await response.json();
+        const txId = typeof result?.txId === 'string' ? result.txId : undefined;
+        if (this.enableLogs && txId !== undefined) {
+          logSubmittedTransaction(txId, txType);
+        }
+        return {
+          status: 'SUBMITTED',
+          txId,
+          responseClass: 'submitted',
+          httpStatusCode: response.status,
+          latencyMs: Date.now() - startedAtMs,
+          attempts,
+          retriesUsed: Math.max(attempts - 1, 0),
+        };
+      } catch (error) {
+        if (attempts >= this.retryAttempts) {
+          const classified = classifySubmitFailure(error);
+          if (this.enableLogs) {
+            logFailedTransaction('unknown', txType, classified.errorMessage);
+          }
           return {
-            status: 'NODE_UNAVAILABLE',
-            message: 'Node is not available - transaction will be stored locally',
+            status: 'ERROR',
+            error: classified.errorMessage,
+            errorClass: classified.errorClass,
+            responseClass: classified.responseClass,
+            httpStatusCode: classified.httpStatusCode,
+            latencyMs: Date.now() - startedAtMs,
+            attempts,
+            retriesUsed: Math.max(attempts - 1, 0),
           };
         }
+        await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
+      }
+    }
 
-        let attempts = 0;
-        while (attempts < this.retryAttempts) {
-          try {
-            const response = await fetch(
-              `${this.baseUrl}/submit?tx_cbor=${encodeURIComponent(cborHex)}`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'text/plain',
-                },
-                signal,
-              }
-            );
-
-            if (!response.ok) {
-              const error = await response.json();
-              throw new Error(error.message || `Unexpected status: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            // Log the successful transaction submission
-            if (this.enableLogs && result && result.txId) {
-              logSubmittedTransaction(result.txId, txType);
-            }
-
-            // For successful submissions, return the raw result
-            return result;
-          } catch (error) {
-            attempts++;
-            if (attempts === this.retryAttempts) {
-              // Log the failed transaction if we've exhausted all attempts
-              if (this.enableLogs) {
-                const errorMsg = error instanceof Error ? error.message : String(error);
-                logFailedTransaction('unknown', txType, errorMsg);
-              }
-              throw error; // Let the Effect.catchAll handle it
-            }
-            await new Promise((resolve) => setTimeout(resolve, this.retryDelay));
-          }
-        }
-
-        throw new Error('All retry attempts failed');
-      })()
-    ).pipe(
-      // Handle errors by converting them to our status format
-      Effect.catchAll((error) =>
-        Effect.succeed(
-          error instanceof TypeError ||
-            (error instanceof Error && error.message === 'Node is not available')
-            ? {
-                status: 'NODE_UNAVAILABLE',
-                message: 'Node is not available - transaction will be stored locally',
-              }
-            : {
-                status: 'ERROR',
-                error: error instanceof Error ? error.message : String(error),
-              }
-        )
-      ),
-      Effect.runPromise
-    );
+    return {
+      status: 'ERROR',
+      error: 'All retry attempts failed',
+      errorClass: 'unknown_error',
+      responseClass: 'unknown_error',
+      latencyMs: Date.now() - startedAtMs,
+      attempts,
+      retriesUsed: Math.max(attempts - 1, 0),
+    };
   }
 
   /**

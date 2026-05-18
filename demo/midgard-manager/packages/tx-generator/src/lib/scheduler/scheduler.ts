@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { UTxO } from '@lucid-evolution/lucid';
 import pLimit from 'p-limit';
 
+import type { SubmitTransactionResult } from '../client/node-client.js';
 import { MidgardNodeClient } from '../client/node-client.js';
 import { SerializedMidgardTransaction } from '../client/types.js';
 import {
@@ -24,6 +25,16 @@ import {
   TransactionEvidenceEntry,
 } from './artifact-metadata.js';
 import { createSeededRandom, randomHex, randomInt } from './deterministic-random.js';
+import {
+  createEmptySubmissionAggregate,
+  recordAttemptedSubmission,
+  recordGeneratedTransactions,
+  recordSubmissionObservation,
+  REQUEST_EVENTS_SAMPLE_RATE,
+  type RequestEventsMode,
+  type SubmissionOutcome,
+  toSubmissionAggregateWithPercentiles,
+} from './submission-evidence.js';
 import { inspectGeneratedTransaction } from './transaction-inspector.js';
 
 const GENERATED_TX_PREFIX_ONE_TO_ONE = 'one-to-one';
@@ -31,6 +42,8 @@ const GENERATED_TX_PREFIX_MULTI_OUTPUT = 'multi-output';
 const GENERATED_TX_PREFIX_REPLAY = 'replay';
 const OUTPUT_INDEX_UPPER_EXCLUSIVE = 1001;
 const PROJECT_ROOT_RELATIVE_PATH = '../../../..';
+const SUBMISSION_AGGREGATE_FILE = 'submission-aggregates.json';
+const REQUEST_EVENTS_FILE = 'request-events.jsonl';
 
 // Get the directory path for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +65,7 @@ class TxGeneratorState {
     transactionsFailed: 0,
     lastError: null as string | null,
     startTime: null as Date | null,
+    submissionAggregate: createEmptySubmissionAggregate(),
   };
 
   private constructor() {}
@@ -90,6 +104,7 @@ class TxGeneratorState {
       transactionsFailed: 0,
       lastError: null,
       startTime: new Date(),
+      submissionAggregate: createEmptySubmissionAggregate(),
     };
   }
 
@@ -195,6 +210,41 @@ export const createDeterministicTaskPlan = (
   };
 };
 
+const resolveOutputDir = (outputDir: string): string =>
+  isAbsolute(outputDir) ? outputDir : join(projectRoot, outputDir);
+
+const shouldEmitRequestEvent = (mode: RequestEventsMode, sampleRandom: () => number): boolean => {
+  if (mode === 'all') {
+    return true;
+  }
+  if (mode === 'sampled') {
+    return sampleRandom() < REQUEST_EVENTS_SAMPLE_RATE;
+  }
+  return false;
+};
+
+const submissionOutcomeFromResult = (result: SubmitTransactionResult): SubmissionOutcome => {
+  if (result.status === 'SUBMITTED') {
+    return 'submitted';
+  }
+  if (result.status === 'NODE_UNAVAILABLE') {
+    return 'node_unavailable';
+  }
+  if (result.responseClass === 'timed_out') {
+    return 'timed_out';
+  }
+  return 'error';
+};
+
+const writeSubmissionAggregates = async (outputDir: string): Promise<void> => {
+  const outputPath = resolveOutputDir(outputDir);
+  const aggregatePath = join(outputPath, SUBMISSION_AGGREGATE_FILE);
+  await writeFile(
+    aggregatePath,
+    JSON.stringify(toSubmissionAggregateWithPercentiles(state.stats.submissionAggregate), null, 2)
+  );
+};
+
 const parseReplayCorpusContent = (
   replayCorpusPath: string,
   rawContent: string
@@ -259,7 +309,7 @@ const writeTransactionsWithManifest = async ({
 }): Promise<string> => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `${filenamePrefix}-${timestamp}.json`;
-  const transactionsPath = join(projectRoot, outputDir, filename);
+  const transactionsPath = join(resolveOutputDir(outputDir), filename);
   const manifestPath = `${transactionsPath}.manifest.json`;
 
   await writeFile(transactionsPath, JSON.stringify(transactions, null, 2));
@@ -293,6 +343,8 @@ const submitTransactions = async ({
   fullConfig,
   mode,
   replayCorpusPath,
+  requestEventsMode,
+  requestEventRandom,
 }: {
   txs: SerializedMidgardTransaction[];
   nodeClient: MidgardNodeClient;
@@ -302,19 +354,102 @@ const submitTransactions = async ({
   fullConfig: TransactionGeneratorConfig;
   mode: GenerationMode;
   replayCorpusPath: string | undefined;
+  requestEventsMode: RequestEventsMode;
+  requestEventRandom: () => number;
 }): Promise<void> => {
   const manifestTransactions = txs.map((tx) =>
     toEvidenceEntry(inspectGeneratedTransaction(tx, fullConfig.network), mode)
   );
+  recordGeneratedTransactions(state.stats.submissionAggregate, txs.length);
+
+  const txById = new Map(txs.map((tx) => [tx.txId, tx]));
+  const manifestById = new Map(manifestTransactions.map((tx) => [tx.txId, tx]));
   const validTransactions = manifestTransactions.filter(
     (entry) => entry.validation.status === 'accepted'
   );
   const rejectedCount = manifestTransactions.length - validTransactions.length;
+
+  const appendRequestEvent = async ({
+    txId,
+    outcome,
+    latencyMs,
+    retryCount,
+    httpStatusCode,
+    responseClass,
+    errorClass,
+    error,
+  }: {
+    txId: string;
+    outcome: SubmissionOutcome;
+    latencyMs: number | null;
+    retryCount: number;
+    httpStatusCode: number | null;
+    responseClass: string;
+    errorClass: string | null;
+    error?: string;
+  }): Promise<void> => {
+    if (outputDir === undefined) {
+      return;
+    }
+    if (!shouldEmitRequestEvent(requestEventsMode, requestEventRandom)) {
+      return;
+    }
+    const manifestTx = manifestById.get(txId);
+    const sourceTx = txById.get(txId);
+
+    const eventPath = join(resolveOutputDir(outputDir), REQUEST_EVENTS_FILE);
+    await appendFile(
+      eventPath,
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        txId,
+        finalOutcome: outcome,
+        outcome,
+        responseClass,
+        httpStatusCode,
+        errorClass,
+        latencyMs,
+        retryCount,
+        transactionType: sourceTx?.type ?? 'unknown',
+        transactionProfile: manifestTx?.profile ?? 'unknown',
+        cborByteSize: manifestTx?.cborByteSize ?? null,
+        midgardByteSize: manifestTx?.midgardByteSize ?? null,
+        ...(error !== undefined ? { error } : {}),
+      }) + '\n'
+    );
+  };
+
+  for (const tx of manifestTransactions) {
+    if (tx.validation.status === 'rejected') {
+      recordSubmissionObservation(state.stats.submissionAggregate, 'rejected', null, 0);
+      await appendRequestEvent({
+        txId: tx.txId,
+        outcome: 'rejected',
+        latencyMs: null,
+        retryCount: 0,
+        httpStatusCode: null,
+        responseClass: 'validation_rejected',
+        errorClass: 'validation_rejected',
+        error: tx.validation.detail ?? tx.validation.rejectCode,
+      });
+    }
+  }
+
   const nodeAvailable = await nodeClient.isAvailable();
 
   if (!nodeAvailable) {
     for (const tx of validTransactions) {
       tx.submission.status = 'NODE_UNAVAILABLE';
+      recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
+      await appendRequestEvent({
+        txId: tx.txId,
+        outcome: 'node_unavailable',
+        latencyMs: null,
+        retryCount: 0,
+        httpStatusCode: null,
+        responseClass: 'node_unavailable',
+        errorClass: 'node_unavailable',
+      });
     }
     if (outputDir) {
       const outputPath = await writeTransactionsWithManifest({
@@ -327,6 +462,7 @@ const submitTransactions = async ({
         mode,
         replayCorpusPath,
       });
+      await writeSubmissionAggregates(outputDir);
       console.log(`Node unavailable - transactions written to ${outputPath}`);
     }
     state.stats.transactionsGenerated += txs.length;
@@ -342,17 +478,46 @@ const submitTransactions = async ({
     let nodeUnavailableAnnounced = false;
 
     for (const tx of validTransactions) {
-      const sourceTx = txs.find((item) => item.txId === tx.txId);
+      const sourceTx = txById.get(tx.txId);
       if (sourceTx === undefined) {
         tx.submission.status = 'ERROR';
         tx.submission.error = 'transaction evidence entry not found in source list';
+        recordSubmissionObservation(state.stats.submissionAggregate, 'error', null, 0);
+        await appendRequestEvent({
+          txId: tx.txId,
+          outcome: 'error',
+          latencyMs: null,
+          retryCount: 0,
+          httpStatusCode: null,
+          responseClass: 'unknown_error',
+          errorClass: 'unknown_error',
+          error: tx.submission.error,
+        });
         failed++;
         continue;
       }
 
+      recordAttemptedSubmission(state.stats.submissionAggregate);
       const result = await nodeClient.submitTransaction(sourceTx.cborHex);
+      const submissionOutcome = submissionOutcomeFromResult(result);
+      recordSubmissionObservation(
+        state.stats.submissionAggregate,
+        submissionOutcome,
+        result.latencyMs,
+        result.retriesUsed
+      );
+      await appendRequestEvent({
+        txId: tx.txId,
+        outcome: submissionOutcome,
+        latencyMs: result.latencyMs,
+        retryCount: result.retriesUsed,
+        httpStatusCode: result.httpStatusCode ?? null,
+        responseClass: result.responseClass,
+        errorClass: result.errorClass ?? null,
+        error: result.error,
+      });
 
-      if (result && result.status === 'NODE_UNAVAILABLE') {
+      if (result.status === 'NODE_UNAVAILABLE') {
         tx.submission.status = 'NODE_UNAVAILABLE';
         nodeUnavailable = true;
         if (!nodeUnavailableAnnounced) {
@@ -360,7 +525,7 @@ const submitTransactions = async ({
           console.log('Node became unavailable during submission.');
         }
         break;
-      } else if (result && result.status === 'ERROR') {
+      } else if (result.status === 'ERROR') {
         tx.submission.status = 'ERROR';
         tx.submission.error = result.error;
         failed++;
@@ -374,6 +539,16 @@ const submitTransactions = async ({
       for (const tx of validTransactions) {
         if (tx.submission.status === 'NOT_ATTEMPTED') {
           tx.submission.status = 'NODE_UNAVAILABLE';
+          recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
+          await appendRequestEvent({
+            txId: tx.txId,
+            outcome: 'node_unavailable',
+            latencyMs: null,
+            retryCount: 0,
+            httpStatusCode: null,
+            responseClass: 'node_unavailable',
+            errorClass: 'node_unavailable',
+          });
         }
       }
     }
@@ -394,6 +569,7 @@ const submitTransactions = async ({
         mode,
         replayCorpusPath,
       });
+      await writeSubmissionAggregates(outputDir);
       console.log(`Transactions and manifest written to ${outputPath}`);
     }
 
@@ -416,6 +592,7 @@ const submitTransactions = async ({
         mode,
         replayCorpusPath,
       });
+      await writeSubmissionAggregates(outputDir);
       console.log(`Failed submission - transactions written to ${outputPath}`);
     }
 
@@ -450,6 +627,8 @@ export const startGenerator = async (
   const generationSeed = getNormalizedSeed(fullConfig.generationSeed);
   const deterministicStartMs = getDeterministicStartMs(generationSeed);
   const random = createSeededRandom(generationSeed);
+  const requestEventsMode: RequestEventsMode = fullConfig.requestEvents ?? 'off';
+  const requestEventRandom = createSeededRandom(`${generationSeed}:request-events`);
   const replayCorpus = await loadReplayCorpus(fullConfig.replayCorpusPath);
 
   // Set up node client with the new configuration structure
@@ -468,7 +647,7 @@ export const startGenerator = async (
 
   // Create output directory if needed
   if (fullConfig.outputDir) {
-    const outputPath = join(projectRoot, fullConfig.outputDir);
+    const outputPath = resolveOutputDir(fullConfig.outputDir);
     await mkdir(outputPath, { recursive: true });
   }
 
@@ -483,6 +662,10 @@ export const startGenerator = async (
   console.log(`• Concurrency: ${fullConfig.concurrency}`);
   console.log(`• Node Endpoint: ${fullConfig.nodeEndpoint}`);
   console.log(`• Generation Seed: ${generationSeed}`);
+  console.log(`• Request Events: ${requestEventsMode}`);
+  if (requestEventsMode === 'sampled') {
+    console.log(`• Request Event Sample Rate: ${REQUEST_EVENTS_SAMPLE_RATE}`);
+  }
   if (fullConfig.replayCorpusPath) {
     console.log(`• Replay Corpus Path: ${fullConfig.replayCorpusPath}`);
   }
@@ -504,6 +687,8 @@ export const startGenerator = async (
           fullConfig,
           mode: 'replay',
           replayCorpusPath: fullConfig.replayCorpusPath,
+          requestEventsMode,
+          requestEventRandom,
         });
         return;
       }
@@ -551,6 +736,8 @@ export const startGenerator = async (
             fullConfig,
             mode: 'generated',
             replayCorpusPath: undefined,
+            requestEventsMode,
+            requestEventRandom,
           });
         });
       });

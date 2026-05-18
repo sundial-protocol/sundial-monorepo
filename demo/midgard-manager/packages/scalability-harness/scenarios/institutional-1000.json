@@ -1,0 +1,27 @@
+{
+  "runId": "institutional-1000",
+  "nodeEndpoint": "http://localhost:3000",
+  "prometheusEndpoint": "http://localhost:9090",
+  "outputDir": "benchmark-runs",
+  "seed": "institutional-1000-2026-05-18",
+  "transactionType": "mixed",
+  "oneToOneRatio": 70,
+  "tierDurationSeconds": 1800,
+  "recoverySeconds": 300,
+  "startTps": 1000,
+  "maxTps": 1000,
+  "stepMultiplier": 2,
+  "batchSize": 200,
+  "concurrency": 8,
+  "retryAttempts": 3,
+  "retryDelayMs": 500,
+  "stopConditions": {
+    "maxConsecutiveNodeProbeFailures": 5,
+    "stopOnPrometheusDown": true,
+    "stopOnCommitmentFailure": true,
+    "stopOnMergeFailure": true,
+    "maxRecoveryQueueSize": 40000,
+    "maxRecoveryMempoolSize": 25000,
+    "minUsefulThroughputRatio": 0.6
+  }
+}
