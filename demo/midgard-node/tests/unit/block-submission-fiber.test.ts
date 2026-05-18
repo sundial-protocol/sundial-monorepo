@@ -5,10 +5,12 @@ import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { Lucid } from "@/services/lucid.js";
 import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
 import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
+import { metricDelta } from "./harness/metric-snapshot.js";
 
 // Hoisted so values can be swapped per test.
 const retrieveFn = vi.hoisted(() => vi.fn());
 const setStatusFn = vi.hoisted(() => vi.fn());
+const SUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 91_337);
 
 vi.mock("@/database/index.js", () => ({
   BlocksDB: {
@@ -29,7 +31,7 @@ vi.mock("@/database/index.js", () => ({
       EVENT_END_TIME: "event_end_time",
       HEADER_HASH: "header_hash",
     },
-    Status: { SUBMITTED: 1 },
+    Status: { SUBMITTED: SUBMITTED_STATUS_SENTINEL },
   },
   LatestLedgerDB: {
     tableName: "latest_ledger",
@@ -83,18 +85,17 @@ vi.mock("@/utils.js", () => ({
     }),
 }));
 
-// Mirror metric to read its global state.
-const submitCounter = Metric.counter("submit_block_count", {
-  description:
-    "A counter for blocks successfully submitted to L1 and marked SUBMITTED in BlocksDB",
-  bigint: true,
-  incremental: true,
-}).register();
-
 // Import after mocks are set up.
-import { submitEarliestBlock } from "@/fibers/block-submission.js";
+import {
+  blockSubmissionMetrics,
+  submitEarliestBlock,
+} from "@/fibers/block-submission.js";
 
 const sqlHarness = createMockSqlHarness();
+
+const readSubmitCounter = Metric.value(
+  blockSubmissionMetrics.submitBlockCounter,
+);
 
 const fakeSubmitProgram = vi.fn(() => Effect.succeed("faketxhash"));
 const fakeCompleteProgram = vi.fn<
@@ -158,11 +159,13 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
     Effect.gen(function* () {
       retrieveFn.mockReturnValue(Effect.succeed(Option.none()));
 
-      const before = yield* Metric.value(submitCounter);
-      yield* runAction();
-      const after = yield* Metric.value(submitCounter);
+      const delta = yield* metricDelta(
+        readSubmitCounter,
+        runAction(),
+        (state) => state.count,
+      );
 
-      expect(after.count - before.count).toBe(0n);
+      expect(delta).toBe(0n);
       expect(fakeFromTx).not.toHaveBeenCalled();
       expect(setStatusFn).not.toHaveBeenCalled();
     }),
@@ -172,16 +175,21 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
     Effect.gen(function* () {
       retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
 
-      const before = yield* Metric.value(submitCounter);
-      yield* runAction();
-      const after = yield* Metric.value(submitCounter);
+      const delta = yield* metricDelta(
+        readSubmitCounter,
+        runAction(),
+        (state) => state.count,
+      );
 
-      expect(after.count - before.count).toBe(1n);
+      expect(delta).toBe(1n);
       expect(fakeFromTx).toHaveBeenCalledWith("deadbeef");
       expect(fakeCompleteProgram).toHaveBeenCalledTimes(1);
       expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
       expect(setStatusFn).toHaveBeenCalledTimes(1);
-      expect(setStatusFn).toHaveBeenCalledWith(fakeBlockEntry, 1);
+      expect(setStatusFn).toHaveBeenCalledWith(
+        fakeBlockEntry,
+        SUBMITTED_STATUS_SENTINEL,
+      );
     }),
   );
 
@@ -192,11 +200,13 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
         Effect.fail({ _tag: "RunTimeError" }),
       );
 
-      const before = yield* Metric.value(submitCounter);
-      yield* runActionExpectLucidFailure();
-      const after = yield* Metric.value(submitCounter);
+      const delta = yield* metricDelta(
+        readSubmitCounter,
+        runActionExpectLucidFailure(),
+        (state) => state.count,
+      );
 
-      expect(after.count - before.count).toBe(0n);
+      expect(delta).toBe(0n);
       expect(fakeSubmitProgram).not.toHaveBeenCalled();
       expect(setStatusFn).not.toHaveBeenCalled();
     }),

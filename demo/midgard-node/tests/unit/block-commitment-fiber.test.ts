@@ -1,6 +1,6 @@
-import { describe, expect, vi, beforeEach } from "vitest";
+import { describe, expect, vi, afterEach, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Layer, Metric } from "effect";
+import { Effect, Fiber, Layer, Metric } from "effect";
 import { Globals } from "@/services/globals.js";
 import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
 import { NodeConfig } from "@/services/config.js";
@@ -24,6 +24,7 @@ vi.mock("worker_threads", () => ({
 }));
 
 const baseLayer = Layer.mergeAll(Globals.Default, makeTestNodeConfigLayer());
+const TEST_WORKER_TIMEOUT_MS = 10;
 
 const successfulCommitmentOutput = {
   type: "SuccessfulCommitmentOutput",
@@ -60,23 +61,44 @@ function makeShortTimeoutLayer() {
       Globals.Default,
       Layer.succeed(
         NodeConfig,
-        NodeConfig.of({ ...config, COMMITMENT_WORKER_TIMEOUT_MS: 10 }),
+        NodeConfig.of({
+          ...config,
+          COMMITMENT_WORKER_TIMEOUT_MS: TEST_WORKER_TIMEOUT_MS,
+        }),
       ),
     );
   });
 }
 
-// Helper: build a fake worker that calls one event callback synchronously.
+function runUntilCommitmentWorkerTimeout() {
+  return Effect.gen(function* () {
+    yield* Effect.sync(() => vi.useFakeTimers());
+    const shortTimeoutLayer = yield* makeShortTimeoutLayer();
+    const actionFiber = yield* Effect.fork(runAction(shortTimeoutLayer));
+    yield* Effect.promise(() =>
+      vi.advanceTimersByTimeAsync(TEST_WORKER_TIMEOUT_MS + 1),
+    );
+    yield* Fiber.join(actionFiber);
+  });
+}
+
+// Helper: build a fake worker that emits one event asynchronously after listener registration.
 function makeEventWorker(event: string, ...args: unknown[]) {
   const terminate = vi.fn();
   const on = vi.fn((ev: string, cb: (...a: unknown[]) => void) => {
-    if (ev === event) cb(...args);
+    if (ev === event) {
+      queueMicrotask(() => cb(...args));
+    }
   });
   return { on, terminate };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
@@ -141,12 +163,10 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
         terminate: vi.fn(),
       });
 
-      const shortTimeoutLayer = yield* makeShortTimeoutLayer();
-      const delta = yield* metricDelta(
-        readFailureCounter,
-        runAction(shortTimeoutLayer),
-        (state) => state.count,
-      );
+      const beforeCount = (yield* readFailureCounter).count;
+      yield* runUntilCommitmentWorkerTimeout();
+      const afterCount = (yield* readFailureCounter).count;
+      const delta = afterCount - beforeCount;
       expect(delta).toBe(1n);
     }),
   );
@@ -159,8 +179,7 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
       };
       makeWorkerInstance.mockReturnValue(neverRespondingWorker);
 
-      const shortTimeoutLayer = yield* makeShortTimeoutLayer();
-      yield* runAction(shortTimeoutLayer);
+      yield* runUntilCommitmentWorkerTimeout();
 
       expect(neverRespondingWorker.terminate).toHaveBeenCalled();
     }),
