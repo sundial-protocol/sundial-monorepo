@@ -100,10 +100,7 @@ export class PlanArtifactWriter {
   }
 
   async writePlanSummary(summary: unknown): Promise<void> {
-    await writeFile(
-      path.join(this.planDir, 'plan-summary.json'),
-      JSON.stringify(summary, null, 2)
-    );
+    await writeFile(path.join(this.planDir, 'plan-summary.json'), JSON.stringify(summary, null, 2));
   }
 
   async writePlanReport(markdown: string): Promise<void> {

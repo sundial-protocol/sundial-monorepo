@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
 import { Command } from 'commander';
 
+import type { PlanConfig } from '../config/plan.js';
+import { validatePlan } from '../config/plan.js';
 import type { ScalabilityScenario } from '../config/scenario.js';
 import {
   REQUEST_EVENT_MODES,
@@ -14,14 +16,12 @@ import {
   validateScenario,
 } from '../config/scenario.js';
 import { generateTiers } from '../config/tiers.js';
-import type { PlanConfig } from '../config/plan.js';
-import { validatePlan } from '../config/plan.js';
 import { ArtifactWriter } from '../evidence/artifacts.js';
 import { PlanArtifactWriter } from '../evidence/plan-artifacts.js';
 import type { ScenarioRunRecord } from '../report/plan-markdown.js';
 import { buildPlanConclusion, renderPlanReport } from '../report/plan-markdown.js';
-import { runScenario } from '../runner/scenario-runner.js';
 import { runExecutionReadinessPreflight } from '../runner/preflight.js';
+import { runScenario } from '../runner/scenario-runner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -352,10 +352,7 @@ async function executePlan(opts: {
     });
 
     const stopOnFailure = plan.stopOnFailure ?? true;
-    if (
-      stopOnFailure &&
-      (classLabel === 'Failed' || classLabel === 'Blocked')
-    ) {
+    if (stopOnFailure && (classLabel === 'Failed' || classLabel === 'Blocked')) {
       console.log(
         chalk.yellow(
           `\nPlan stop: ${scenario.runId} returned ${classLabel} — remaining scenarios will be skipped.`
@@ -369,14 +366,17 @@ async function executePlan(opts: {
   const planConclusion = buildPlanConclusion(records, planHarnessError);
 
   try {
-    await planWriter.writePlanSummary({ conclusion: planConclusion, records: records.map((r) => ({
-      scenarioIndex: r.scenarioIndex,
-      runId: r.runId,
-      runDir: r.runDir,
-      targetTps: r.targetTps,
-      skipped: r.skipped,
-      classification: r.skipped ? 'Blocked' : r.conclusion.classification,
-    })) });
+    await planWriter.writePlanSummary({
+      conclusion: planConclusion,
+      records: records.map((r) => ({
+        scenarioIndex: r.scenarioIndex,
+        runId: r.runId,
+        runDir: r.runDir,
+        targetTps: r.targetTps,
+        skipped: r.skipped,
+        classification: r.skipped ? 'Blocked' : r.conclusion.classification,
+      })),
+    });
   } catch (err) {
     console.error(chalk.red(`Failed to write plan summary: ${String(err)}`));
   }
@@ -439,8 +439,10 @@ program
   .option('--run-id <id>', 'override scenario runId (scenario mode only)')
   .option('--output-dir <dir>', 'override outputDir')
   .option('--dry-run', 'validate config and print planned tiers without creating load')
-  .option('--max-tier <number>', 'stop after this tier index, inclusive (scenario mode only)', (v: string) =>
-    parseInt(v, 10)
+  .option(
+    '--max-tier <number>',
+    'stop after this tier index, inclusive (scenario mode only)',
+    (v: string) => parseInt(v, 10)
   )
   .option(
     '--request-events <mode>',
@@ -541,8 +543,7 @@ program
       const preflight = await runExecutionReadinessPreflight(scenario);
       printPreflightHeading(preflight.classification);
       console.log(
-        chalk.green('  [PASS]') +
-          ' scenario_validity — Scenario JSON and CLI overrides are valid.'
+        chalk.green('  [PASS]') + ' scenario_validity — Scenario JSON and CLI overrides are valid.'
       );
       printPreflightResult(preflight);
       if (!preflight.passed) {
@@ -638,8 +639,7 @@ program
       const preflight = await runExecutionReadinessPreflight(scenario);
       printPreflightHeading(preflight.classification);
       console.log(
-        chalk.green('  [PASS]') +
-          ' scenario_validity — Scenario JSON and CLI overrides are valid.'
+        chalk.green('  [PASS]') + ' scenario_validity — Scenario JSON and CLI overrides are valid.'
       );
       printPreflightResult(preflight);
 

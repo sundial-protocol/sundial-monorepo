@@ -48,20 +48,20 @@ tests/
 Each file in `scenarios/` configures a single benchmark run. Scenario files are
 referenced by plan files and can also be run directly with `--scenario`.
 
-| File | runId | Target TPS | Test plan section |
-|------|-------|-----------|-------------------|
-| `warmup.json` | `warmup` | 100 | §8.1 warm-up |
-| `initial-800.json` | `initial-800` | 800 | §8.1 initial TPS validation |
-| `institutional-1000.json` | `institutional-1000` | 1,000 | §8.1 institutional baseline |
-| `institutional-5000.json` | `institutional-5000` | 5,000 | §8.1 institutional load |
-| `stress-10000.json` | `stress-10000` | 10,000 | §8.1 institutional stress |
-| `practical-24985.json` | `practical-24985` | 24,985 | §8.1 practical estimate target |
-| `spike.json` | `spike` | 49,970 | §8.1 peak spike |
-| `baseline-100-800.json` | `baseline-100-800` | 800 | §13 step-ramp baseline |
-| `baseline-100-800-replay.json` | `baseline-100-800-replay` | 800 | §13 replay variant |
-| `saturation-discovery.json` | `saturation-discovery` | 1,600 | §8.3 saturation discovery |
-| `saturation-discovery-replay.json` | `saturation-discovery-replay` | 1,600 | §8.3 replay variant |
-| `saturation-ramp-25pct.json` | `saturation-ramp-25pct` | varies | §8.3 25% increment ramp |
+| File                               | runId                         | Target TPS | Test plan section              |
+| ---------------------------------- | ----------------------------- | ---------- | ------------------------------ |
+| `warmup.json`                      | `warmup`                      | 100        | §8.1 warm-up                   |
+| `initial-800.json`                 | `initial-800`                 | 800        | §8.1 initial TPS validation    |
+| `institutional-1000.json`          | `institutional-1000`          | 1,000      | §8.1 institutional baseline    |
+| `institutional-5000.json`          | `institutional-5000`          | 5,000      | §8.1 institutional load        |
+| `stress-10000.json`                | `stress-10000`                | 10,000     | §8.1 institutional stress      |
+| `practical-24985.json`             | `practical-24985`             | 24,985     | §8.1 practical estimate target |
+| `spike.json`                       | `spike`                       | 49,970     | §8.1 peak spike                |
+| `baseline-100-800.json`            | `baseline-100-800`            | 800        | §13 step-ramp baseline         |
+| `baseline-100-800-replay.json`     | `baseline-100-800-replay`     | 800        | §13 replay variant             |
+| `saturation-discovery.json`        | `saturation-discovery`        | 1,600      | §8.3 saturation discovery      |
+| `saturation-discovery-replay.json` | `saturation-discovery-replay` | 1,600      | §8.3 replay variant            |
+| `saturation-ramp-25pct.json`       | `saturation-ramp-25pct`       | varies     | §8.3 25% increment ramp        |
 
 ### Key scenario fields
 
@@ -124,12 +124,12 @@ saturation-discovery → saturation-ramp-25pct
 {
   "planId": "standard-progression",
   "description": "...",
-  "outputDir": "benchmark-plans",      // directory for all plan output
-  "stopOnFailure": true,               // default true; set false for saturation exploration
+  "outputDir": "benchmark-plans", // directory for all plan output
+  "stopOnFailure": true, // default true; set false for saturation exploration
   "scenarios": [
-    "../scenarios/warmup.json",        // paths relative to the plan file
-    "../scenarios/initial-800.json"
-  ]
+    "../scenarios/warmup.json", // paths relative to the plan file
+    "../scenarios/initial-800.json",
+  ],
 }
 ```
 
@@ -206,14 +206,14 @@ node dist/bin/index.js tiers --scenario scenarios/saturation-ramp-25pct.json --m
 
 ### Common flags
 
-| Flag | Applies to | Description |
-|------|-----------|-------------|
-| `--dry-run` | `run` | Validate config and print tier breakdown; no load |
-| `--output-dir <dir>` | `run` | Override the scenario/plan `outputDir` |
-| `--request-events <mode>` | `run` | `off` \| `sampled` \| `all` (per-request JSONL events) |
-| `--run-id <id>` | `run --scenario` | Override the scenario's `runId` |
-| `--max-tier <n>` | `run --scenario`, `tiers` | Stop after tier index n (inclusive) |
-| `--no-increase` | `run --scenario`, `tiers` | Run only the first tier |
+| Flag                      | Applies to                | Description                                            |
+| ------------------------- | ------------------------- | ------------------------------------------------------ |
+| `--dry-run`               | `run`                     | Validate config and print tier breakdown; no load      |
+| `--output-dir <dir>`      | `run`                     | Override the scenario/plan `outputDir`                 |
+| `--request-events <mode>` | `run`                     | `off` \| `sampled` \| `all` (per-request JSONL events) |
+| `--run-id <id>`           | `run --scenario`          | Override the scenario's `runId`                        |
+| `--max-tier <n>`          | `run --scenario`, `tiers` | Stop after tier index n (inclusive)                    |
+| `--no-increase`           | `run --scenario`, `tiers` | Run only the first tier                                |
 
 ## Artifact structure
 
@@ -291,21 +291,21 @@ Sections:
 
 Per-scenario (`BenchmarkConclusion.classification`):
 
-| Classification | Meaning |
-|---------------|---------|
-| `Passed` | All tiers completed within acceptance criteria |
-| `Passed with Observations` | All tiers completed; non-blocking policy violations |
-| `Failed` | One or more tiers collapsed or acceptance criteria violated |
-| `Blocked` | Harness error or preflight failure prevented the run |
+| Classification             | Meaning                                                     |
+| -------------------------- | ----------------------------------------------------------- |
+| `Passed`                   | All tiers completed within acceptance criteria              |
+| `Passed with Observations` | All tiers completed; non-blocking policy violations         |
+| `Failed`                   | One or more tiers collapsed or acceptance criteria violated |
+| `Blocked`                  | Harness error or preflight failure prevented the run        |
 
 Plan (`PlanConclusion.classification`):
 
-| Classification | Meaning |
-|---------------|---------|
-| `Passed` | All scenarios passed |
-| `Passed with Observations` | All scenarios completed; some had observations |
-| `Failed` | One or more scenarios failed; remaining were skipped |
-| `Blocked` | Harness error before any scenario could complete |
+| Classification             | Meaning                                              |
+| -------------------------- | ---------------------------------------------------- |
+| `Passed`                   | All scenarios passed                                 |
+| `Passed with Observations` | All scenarios completed; some had observations       |
+| `Failed`                   | One or more scenarios failed; remaining were skipped |
+| `Blocked`                  | Harness error before any scenario could complete     |
 
 ## Running tests
 

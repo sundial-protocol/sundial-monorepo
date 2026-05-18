@@ -60,16 +60,16 @@ pnpm run start -- tiers --scenario scenarios/saturation-ramp-25pct.json --max-ti
 
 ### Flags reference
 
-| Flag | Commands | Description |
-|------|---------|-------------|
-| `--plan <path>` | `run` | Path to a plan JSON file |
-| `--scenario <path>` | `run`, `preflight`, `tiers` | Path to a scenario JSON file |
-| `--dry-run` | `run` | Validate config and print tier breakdown; no load |
-| `--output-dir <dir>` | `run` | Override the scenario/plan `outputDir` |
-| `--request-events <mode>` | `run` | `off` \| `sampled` \| `all` per-request JSONL events |
-| `--run-id <id>` | `run --scenario` | Override the scenario's `runId` |
-| `--max-tier <n>` | `run --scenario`, `tiers` | Stop after tier index n (inclusive) |
-| `--no-increase` | `run --scenario`, `tiers` | Run only the first tier |
+| Flag                      | Commands                    | Description                                          |
+| ------------------------- | --------------------------- | ---------------------------------------------------- |
+| `--plan <path>`           | `run`                       | Path to a plan JSON file                             |
+| `--scenario <path>`       | `run`, `preflight`, `tiers` | Path to a scenario JSON file                         |
+| `--dry-run`               | `run`                       | Validate config and print tier breakdown; no load    |
+| `--output-dir <dir>`      | `run`                       | Override the scenario/plan `outputDir`               |
+| `--request-events <mode>` | `run`                       | `off` \| `sampled` \| `all` per-request JSONL events |
+| `--run-id <id>`           | `run --scenario`            | Override the scenario's `runId`                      |
+| `--max-tier <n>`          | `run --scenario`, `tiers`   | Stop after tier index n (inclusive)                  |
+| `--no-increase`           | `run --scenario`, `tiers`   | Run only the first tier                              |
 
 `--plan` and `--scenario` are mutually exclusive. `--run-id`, `--max-tier`, and `--no-increase` only apply in `--scenario` mode.
 
@@ -97,11 +97,11 @@ A plan file encodes an ordered sequence of scenarios to run. Plan files live in 
   "planId": "standard-progression",
   "description": "...",
   "outputDir": "benchmark-plans",
-  "stopOnFailure": true,         // abort on Failed/Blocked; continue on Passed with Observations
+  "stopOnFailure": true, // abort on Failed/Blocked; continue on Passed with Observations
   "scenarios": [
-    "../scenarios/warmup.json",  // paths relative to the plan file
-    "../scenarios/initial-800.json"
-  ]
+    "../scenarios/warmup.json", // paths relative to the plan file
+    "../scenarios/initial-800.json",
+  ],
 }
 ```
 
@@ -127,20 +127,20 @@ saturation-discovery → saturation-ramp-25pct
 
 Scenario files live in `scenarios/`. Each file is a JSON object conforming to `ScalabilityScenario`.
 
-| File | runId | Target TPS | Test plan section |
-|------|-------|-----------|-------------------|
-| `warmup.json` | `warmup` | 100 | §8.1 warm-up |
-| `initial-800.json` | `initial-800` | 800 | §8.1 initial TPS validation |
-| `institutional-1000.json` | `institutional-1000` | 1,000 | §8.1 institutional baseline |
-| `institutional-5000.json` | `institutional-5000` | 5,000 | §8.1 institutional load |
-| `stress-10000.json` | `stress-10000` | 10,000 | §8.1 institutional stress |
-| `practical-24985.json` | `practical-24985` | 24,985 | §8.1 practical estimate target |
-| `spike.json` | `spike` | 49,970 | §8.1 peak spike |
-| `baseline-100-800.json` | `baseline-100-800` | 800 | §13 step-ramp baseline |
-| `baseline-100-800-replay.json` | `baseline-100-800-replay` | 800 | §13 replay variant |
-| `saturation-discovery.json` | `saturation-discovery` | 1,600 | §8.3 saturation discovery |
-| `saturation-discovery-replay.json` | `saturation-discovery-replay` | 1,600 | §8.3 replay variant |
-| `saturation-ramp-25pct.json` | `saturation-ramp-25pct` | varies | §8.3 25% increment ramp |
+| File                               | runId                         | Target TPS | Test plan section              |
+| ---------------------------------- | ----------------------------- | ---------- | ------------------------------ |
+| `warmup.json`                      | `warmup`                      | 100        | §8.1 warm-up                   |
+| `initial-800.json`                 | `initial-800`                 | 800        | §8.1 initial TPS validation    |
+| `institutional-1000.json`          | `institutional-1000`          | 1,000      | §8.1 institutional baseline    |
+| `institutional-5000.json`          | `institutional-5000`          | 5,000      | §8.1 institutional load        |
+| `stress-10000.json`                | `stress-10000`                | 10,000     | §8.1 institutional stress      |
+| `practical-24985.json`             | `practical-24985`             | 24,985     | §8.1 practical estimate target |
+| `spike.json`                       | `spike`                       | 49,970     | §8.1 peak spike                |
+| `baseline-100-800.json`            | `baseline-100-800`            | 800        | §13 step-ramp baseline         |
+| `baseline-100-800-replay.json`     | `baseline-100-800-replay`     | 800        | §13 replay variant             |
+| `saturation-discovery.json`        | `saturation-discovery`        | 1,600      | §8.3 saturation discovery      |
+| `saturation-discovery-replay.json` | `saturation-discovery-replay` | 1,600      | §8.3 replay variant            |
+| `saturation-ramp-25pct.json`       | `saturation-ramp-25pct`       | varies     | §8.3 25% increment ramp        |
 
 Tiers are generated from `startTps` to `maxTps` using `stepMultiplier` (multiply) or `ramp.percentIncrement` (percent increment). When `startTps === maxTps` the scenario has a single tier.
 
@@ -188,47 +188,47 @@ Scenario subdirectories are named `<NN>-<runId>` so they sort in execution order
 
 ## Scenario Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `runId` | string | Filesystem-safe identifier (alphanumeric, `-`, `_`) |
-| `description` | string? | Free-text description; recorded in manifest and report |
-| `nodeEndpoint` | string | Midgard node HTTP endpoint |
-| `prometheusEndpoint` | string | Prometheus HTTP endpoint |
-| `lokiEndpoint` | string? | Loki endpoint for log evidence capture |
-| `tempoEndpoint` | string? | Tempo endpoint for trace evidence capture |
-| `outputDir` | string | Parent directory for run artifacts |
-| `seed` | string | Deterministic generation seed |
-| `replayCorpusPath` | string? | Path to a pre-built transaction corpus (relative to scenario file) |
-| `l1ProviderMode` | string? | `kupmios` \| `blockfrost` \| `emulator` \| `unknown` |
-| `walletMode` | string? | `test-wallet` \| `external-key` |
-| `walletProvisioningNote` | string? | Free-text provisioning note; recorded in manifest |
-| `transactionType` | string | `one-to-one` \| `multi-output` \| `mixed` |
-| `oneToOneRatio` | number? | Percentage of one-to-one txs when `mixed` (0–100) |
-| `startTps` | number | First tier target TPS |
-| `maxTps` | number | Maximum tier target TPS |
-| `stepMultiplier` | number? | TPS multiplier between tiers (legacy; prefer `ramp`) |
-| `ramp` | object? | `{ strategy: "multiply", stepMultiplier }` or `{ strategy: "percent_increment", percentIncrement }` |
-| `tierOverrides` | array? | Per-tier duration/recovery overrides by `tierIndex` |
-| `tierDurationSeconds` | number | How long each tier runs |
-| `recoverySeconds` | number | Cool-down between tiers |
-| `batchSize` | number | Transactions per generator batch |
-| `concurrency` | number | Concurrent generator batches |
-| `retryAttempts` | number | Submission retry count |
-| `retryDelayMs` | number | Delay between retries (ms) |
-| `runClassificationPolicy` | object? | Optional overrides for formal run-classification thresholds |
-| `stopConditions` | object | Conditions that abort the run early |
+| Field                     | Type    | Description                                                                                         |
+| ------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `runId`                   | string  | Filesystem-safe identifier (alphanumeric, `-`, `_`)                                                 |
+| `description`             | string? | Free-text description; recorded in manifest and report                                              |
+| `nodeEndpoint`            | string  | Midgard node HTTP endpoint                                                                          |
+| `prometheusEndpoint`      | string  | Prometheus HTTP endpoint                                                                            |
+| `lokiEndpoint`            | string? | Loki endpoint for log evidence capture                                                              |
+| `tempoEndpoint`           | string? | Tempo endpoint for trace evidence capture                                                           |
+| `outputDir`               | string  | Parent directory for run artifacts                                                                  |
+| `seed`                    | string  | Deterministic generation seed                                                                       |
+| `replayCorpusPath`        | string? | Path to a pre-built transaction corpus (relative to scenario file)                                  |
+| `l1ProviderMode`          | string? | `kupmios` \| `blockfrost` \| `emulator` \| `unknown`                                                |
+| `walletMode`              | string? | `test-wallet` \| `external-key`                                                                     |
+| `walletProvisioningNote`  | string? | Free-text provisioning note; recorded in manifest                                                   |
+| `transactionType`         | string  | `one-to-one` \| `multi-output` \| `mixed`                                                           |
+| `oneToOneRatio`           | number? | Percentage of one-to-one txs when `mixed` (0–100)                                                   |
+| `startTps`                | number  | First tier target TPS                                                                               |
+| `maxTps`                  | number  | Maximum tier target TPS                                                                             |
+| `stepMultiplier`          | number? | TPS multiplier between tiers (legacy; prefer `ramp`)                                                |
+| `ramp`                    | object? | `{ strategy: "multiply", stepMultiplier }` or `{ strategy: "percent_increment", percentIncrement }` |
+| `tierOverrides`           | array?  | Per-tier duration/recovery overrides by `tierIndex`                                                 |
+| `tierDurationSeconds`     | number  | How long each tier runs                                                                             |
+| `recoverySeconds`         | number  | Cool-down between tiers                                                                             |
+| `batchSize`               | number  | Transactions per generator batch                                                                    |
+| `concurrency`             | number  | Concurrent generator batches                                                                        |
+| `retryAttempts`           | number  | Submission retry count                                                                              |
+| `retryDelayMs`            | number  | Delay between retries (ms)                                                                          |
+| `runClassificationPolicy` | object? | Optional overrides for formal run-classification thresholds                                         |
+| `stopConditions`          | object  | Conditions that abort the run early                                                                 |
 
 ## Stop Conditions
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `maxConsecutiveNodeProbeFailures` | number | Abort after N consecutive probe failures |
-| `stopOnPrometheusDown` | boolean | Abort if Prometheus becomes unreachable |
-| `stopOnCommitmentFailure` | boolean | Abort if block commitment stops advancing |
-| `stopOnMergeFailure` | boolean | Abort if merge stops advancing |
-| `maxRecoveryQueueSize` | number? | Abort if queue depth exceeds this during recovery |
-| `maxRecoveryMempoolSize` | number? | Abort if mempool depth exceeds this during recovery |
-| `minUsefulThroughputRatio` | number? (0–1) | Abort if observed durable mempool accepted TPS divided by target TPS falls below this |
+| Field                             | Type          | Description                                                                           |
+| --------------------------------- | ------------- | ------------------------------------------------------------------------------------- |
+| `maxConsecutiveNodeProbeFailures` | number        | Abort after N consecutive probe failures                                              |
+| `stopOnPrometheusDown`            | boolean       | Abort if Prometheus becomes unreachable                                               |
+| `stopOnCommitmentFailure`         | boolean       | Abort if block commitment stops advancing                                             |
+| `stopOnMergeFailure`              | boolean       | Abort if merge stops advancing                                                        |
+| `maxRecoveryQueueSize`            | number?       | Abort if queue depth exceeds this during recovery                                     |
+| `maxRecoveryMempoolSize`          | number?       | Abort if mempool depth exceeds this during recovery                                   |
+| `minUsefulThroughputRatio`        | number? (0–1) | Abort if observed durable mempool accepted TPS divided by target TPS falls below this |
 
 ## Metric Contract
 

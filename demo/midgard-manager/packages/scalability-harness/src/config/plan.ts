@@ -1,5 +1,4 @@
 const FILESYSTEM_SAFE_PLAN_ID = /^[A-Za-z0-9_-]+$/;
-const URL_PREFIX = /^https?:\/\//;
 
 export interface PlanConfig {
   planId: string;
