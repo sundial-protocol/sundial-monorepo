@@ -30,8 +30,12 @@ const submitBlockCounter = Metric.counter("submit_block_count", {
   incremental: true,
 }).register();
 
-export const initializeSubmissionMetrics = Metric.incrementBy(
+export const blockSubmissionMetrics = {
   submitBlockCounter,
+} as const;
+
+export const initializeSubmissionMetrics = Metric.incrementBy(
+  blockSubmissionMetrics.submitBlockCounter,
   0n,
 );
 
@@ -334,7 +338,7 @@ export const submitEarliestBlock = Effect.gen(function* () {
           ],
           { concurrency: "unbounded" },
         );
-        yield* Metric.increment(submitBlockCounter);
+        yield* Metric.increment(blockSubmissionMetrics.submitBlockCounter);
       }),
   });
 });

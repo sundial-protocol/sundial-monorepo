@@ -33,6 +33,34 @@ import {
   waitForGeneratorStop,
 } from '../../src/lib/scheduler/scheduler';
 
+const BASE_UTXO = {
+  txHash: '0'.repeat(64),
+  outputIndex: 0,
+  assets: { lovelace: 10_000_000_000n },
+  address: '',
+  datum: null,
+  datumHash: null,
+  scriptRef: null,
+};
+
+const PLAN_CONFIG = {
+  transactionType: 'mixed' as const,
+  oneToOneRatio: 40,
+  batchSize: 6,
+  generationSeed: 'm42-seed-replayable',
+};
+
+const EXPECTED_PLAN_IDS = [
+  '316B90D6B600E91B5D572523BD638AD4112AA6CA4AEC53207EB829B8F935A89E:575',
+  '9A2A5244B06778AF5DB946778ADF0F493CA2817F473029CA2F31D4F2EC01EF2E:146',
+  'CAA4DE8FDF0991C0EF0EBB2083C1EDFFCDBD06348A686AA4E54A9E956158B2A9:923',
+  '838AC823157EBC9344BC73CC132C650FB375DDAD4CAA3C4A95BBED1E15EC49B6:783',
+  '1BA465CF47DB4CB1C3FACDE687DB2906169859B689086624668CFEE14527A54D:292',
+  '2CD3F635AB69BD7362EE472220C9EDCF6789FC34AB5266CF5E2ABE01391BF932:986',
+];
+
+const MAX_GENERATED_OUTPUT_INDEX = 1_000;
+
 describe('Deterministic generation and replay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -62,69 +90,38 @@ describe('Deterministic generation and replay', () => {
     await stopGenerator();
   });
 
-  it('builds the same deterministic task plan for repeated runs with the same seed', async () => {
-    const config = {
-      walletSeedOrPrivateKey: 'seeded_test_key',
-      nodeEndpoint: 'http://localhost:3000',
-      transactionType: 'mixed' as const,
-      oneToOneRatio: 40,
-      batchSize: 6,
-      interval: 0,
-      concurrency: 2,
-      autoStopAfterBatch: true,
-      generationSeed: 'm42-seed-replayable',
-    };
+  const buildDeterministicPlan = () =>
+    createDeterministicTaskPlan({
+      initialUTxO: BASE_UTXO,
+      ...PLAN_CONFIG,
+    });
 
-    const firstPlan = createDeterministicTaskPlan({
-      initialUTxO: {
-        txHash: '0'.repeat(64),
-        outputIndex: 0,
-        assets: { lovelace: 10_000_000_000n },
-        address: '',
-        datum: null,
-        datumHash: null,
-        scriptRef: null,
-      },
-      batchSize: config.batchSize,
-      transactionType: config.transactionType,
-      oneToOneRatio: config.oneToOneRatio,
-      generationSeed: config.generationSeed,
-    });
-    const secondPlan = createDeterministicTaskPlan({
-      initialUTxO: {
-        txHash: '0'.repeat(64),
-        outputIndex: 0,
-        assets: { lovelace: 10_000_000_000n },
-        address: '',
-        datum: null,
-        datumHash: null,
-        scriptRef: null,
-      },
-      batchSize: config.batchSize,
-      transactionType: config.transactionType,
-      oneToOneRatio: config.oneToOneRatio,
-      generationSeed: config.generationSeed,
-    });
+  const getPlanIds = (plan: ReturnType<typeof createDeterministicTaskPlan>) =>
+    plan.taskPlans.map(
+      (taskPlan) => `${taskPlan.initialUTxO.txHash}:${taskPlan.initialUTxO.outputIndex}`
+    );
+
+  it('builds the same deterministic task plan for repeated runs with the same seed', async () => {
+    const firstPlan = buildDeterministicPlan();
+    const secondPlan = buildDeterministicPlan();
 
     expect(secondPlan).toEqual(firstPlan);
-    expect(secondPlan.taskPlans).toHaveLength(config.batchSize);
-    expect(
-      secondPlan.taskPlans.map(
-        (taskPlan) => `${taskPlan.initialUTxO.txHash}:${taskPlan.initialUTxO.outputIndex}`
-      )
-    ).toMatchInlineSnapshot(`
-      [
-        "316B90D6B600E91B5D572523BD638AD4112AA6CA4AEC53207EB829B8F935A89E:575",
-        "9A2A5244B06778AF5DB946778ADF0F493CA2817F473029CA2F31D4F2EC01EF2E:146",
-        "CAA4DE8FDF0991C0EF0EBB2083C1EDFFCDBD06348A686AA4E54A9E956158B2A9:923",
-        "838AC823157EBC9344BC73CC132C650FB375DDAD4CAA3C4A95BBED1E15EC49B6:783",
-        "1BA465CF47DB4CB1C3FACDE687DB2906169859B689086624668CFEE14527A54D:292",
-        "2CD3F635AB69BD7362EE472220C9EDCF6789FC34AB5266CF5E2ABE01391BF932:986",
-      ]
-    `);
+    expect(secondPlan.taskPlans).toHaveLength(PLAN_CONFIG.batchSize);
+    expect(getPlanIds(secondPlan)).toEqual(EXPECTED_PLAN_IDS);
   });
 
-  it('replays a corpus without invoking live generators', async () => {
+  it('generates unique UTxO ids with output indexes in the supported range', async () => {
+    const plan = buildDeterministicPlan();
+    const planIds = getPlanIds(plan);
+    const outputIndexes = plan.taskPlans.map((taskPlan) => taskPlan.initialUTxO.outputIndex);
+
+    expect(plan.taskPlans).toHaveLength(PLAN_CONFIG.batchSize);
+    expect(new Set(planIds).size).toBe(PLAN_CONFIG.batchSize);
+    expect(Math.min(...outputIndexes)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...outputIndexes)).toBeLessThanOrEqual(MAX_GENERATED_OUTPUT_INDEX);
+  });
+
+  it('loads replay corpus without generators and records replayed txs as unsubmitted failures', async () => {
     const tempDir = await mkdtemp(join(tmpdir(), 'm42-corpus-'));
     const corpusPath = join(tempDir, 'corpus.json');
     await writeFile(

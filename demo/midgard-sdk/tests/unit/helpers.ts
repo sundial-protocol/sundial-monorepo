@@ -1,20 +1,38 @@
 import { Effect } from "effect";
-import { Data, credentialToAddress, toUnit } from "@lucid-evolution/lucid";
+import {
+  Data,
+  credentialToAddress,
+  toUnit,
+  type Assets,
+  type Delegation,
+  type LucidEvolution,
+  type Script,
+  type TxBuilder,
+  type TxSignBuilder,
+  type UTxO,
+  type Wallet,
+} from "@lucid-evolution/lucid";
 import { vi } from "vitest";
 
 import {
   AddressData,
+  AuthenticatedValidator,
   ConfirmedState,
   DepositDatum,
   Header,
   NodeDatum,
+  NODE_ASSET_NAME,
   OutputReference,
+  StateQueueDatum,
+  StateQueueUTxO,
   TxOrderDatum,
   Value,
   WithdrawalOrderDatum,
 } from "../../src/index.ts";
 
-export type BuilderSpy = {
+type CompletedTxFixture = Readonly<{ signed: true }>;
+
+export type BuilderSpy = TxBuilder & {
   collectFrom: ReturnType<typeof vi.fn>;
   readFrom: ReturnType<typeof vi.fn>;
   mintAssets: ReturnType<typeof vi.fn>;
@@ -34,7 +52,38 @@ export type BuilderSpy = {
     Script: ReturnType<typeof vi.fn>;
     MintingPolicy: ReturnType<typeof vi.fn>;
   };
+  completedTx: CompletedTxFixture;
 };
+
+export type LucidMock = LucidEvolution & {
+  newTx: ReturnType<typeof vi.fn>;
+  utxosAt: ReturnType<typeof vi.fn>;
+  utxosAtWithUnit: ReturnType<typeof vi.fn>;
+  wallet: ReturnType<typeof vi.fn>;
+  config: ReturnType<typeof vi.fn>;
+};
+
+type WalletFixture = Pick<
+  Wallet,
+  | "address"
+  | "rewardAddress"
+  | "getUtxos"
+  | "getUtxosCore"
+  | "getDelegation"
+  | "signTx"
+  | "signMessage"
+  | "submitTx"
+> & {
+  overrideUTxOs: ReturnType<typeof vi.fn>;
+};
+
+const unexpectedCallError = (method: string): Error =>
+  new Error(`unexpected call: ${method}`);
+
+const makeUnexpectedMethodSpy = (method: string): ReturnType<typeof vi.fn> =>
+  vi.fn(() => {
+    throw unexpectedCallError(method);
+  });
 
 export const txHashA = "11".repeat(32);
 export const txHashB = "22".repeat(32);
@@ -77,12 +126,17 @@ export const addressDataKeyA: AddressData = {
   stakeCredential: null,
 };
 
-export const validatorA = {
+const plutusV3Script: Script = {
+  type: "PlutusV3",
+  script: "4d01000033222220051200120011",
+};
+
+export const validatorA: AuthenticatedValidator = {
   mintingScriptCBOR: "4d01000033222220051200120011",
-  mintingScript: { type: "PlutusV3", script: "4d01000033222220051200120011" },
+  mintingScript: plutusV3Script,
   policyId: policyIdA,
   spendingScriptCBOR: "4d01000033222220051200120011",
-  spendingScript: { type: "PlutusV3", script: "4d01000033222220051200120011" },
+  spendingScript: plutusV3Script,
   spendingScriptHash: scriptHashA,
   spendingScriptAddress: addressScriptA,
 };
@@ -224,63 +278,123 @@ export const makeMidgardValidatorsFixture = () => ({
   },
 });
 
-export const makeBuilderSpy = (): BuilderSpy & Record<string, unknown> => {
-  const builder: Record<string, unknown> = {};
-  const collectFrom = vi.fn(() => builder);
-  const readFrom = vi.fn(() => builder);
-  const mintAssets = vi.fn(() => builder);
-  const validTo = vi.fn(() => builder);
-  const validFrom = vi.fn(() => builder);
-  const addSignerKey = vi.fn(() => builder);
-  const setMinFee = vi.fn(() => builder);
-  const compose = vi.fn(() => builder);
-  const complete = vi.fn(async () => ({ signed: true }));
-  const completeProgram = vi.fn(() => Effect.succeed({ signed: true }));
-  const payToAddressWithData = vi.fn(() => builder);
-  const payToAddress = vi.fn(() => builder);
-  const payToContract = vi.fn(() => builder);
-  const attachScript = vi.fn(() => builder);
-  const attachMintingPolicy = vi.fn(() => builder);
-
-  Object.assign(builder, {
-    collectFrom,
-    readFrom,
-    mintAssets,
-    validTo,
-    validFrom,
-    addSignerKey,
-    setMinFee,
-    compose,
-    complete,
-    completeProgram,
-    pay: {
-      ToAddressWithData: payToAddressWithData,
-      ToAddress: payToAddress,
-      ToContract: payToContract,
-    },
-    attach: {
-      Script: attachScript,
-      MintingPolicy: attachMintingPolicy,
-    },
-  });
-
-  return builder as BuilderSpy & Record<string, unknown>;
+const makeTxSignBuilderSpy = (): CompletedTxFixture => {
+  return { signed: true };
 };
 
-export const makeLucidMock = (
-  builder?: BuilderSpy & Record<string, unknown>,
-) => {
+export const makeBuilderSpy = (): BuilderSpy => {
+  const completedTx = makeTxSignBuilderSpy();
+  const builder = {
+    collectFrom: vi.fn(() => builder),
+    readFrom: vi.fn(() => builder),
+    mintAssets: vi.fn(() => builder),
+    validTo: vi.fn(() => builder),
+    validFrom: vi.fn(() => builder),
+    addSignerKey: vi.fn(() => builder),
+    setMinFee: vi.fn(() => builder),
+    compose: vi.fn(() => builder),
+    complete: vi.fn(async () => completedTx),
+    completeProgram: vi.fn(() => Effect.succeed(completedTx)),
+    pay: {
+      ToAddressWithData: vi.fn(() => builder),
+      ToAddress: vi.fn(() => builder),
+      ToContract: vi.fn(() => builder),
+    },
+    attach: {
+      Script: vi.fn(() => builder),
+      MintingPolicy: vi.fn(() => builder),
+    },
+    addSigner: makeUnexpectedMethodSpy("TxBuilder.addSigner"),
+    registerStake: makeUnexpectedMethodSpy("TxBuilder.registerStake"),
+    deRegisterStake: makeUnexpectedMethodSpy("TxBuilder.deRegisterStake"),
+    withdraw: makeUnexpectedMethodSpy("TxBuilder.withdraw"),
+    register: {
+      Stake: makeUnexpectedMethodSpy("TxBuilder.register.Stake"),
+      DRep: makeUnexpectedMethodSpy("TxBuilder.register.DRep"),
+    },
+    deregister: {
+      Stake: makeUnexpectedMethodSpy("TxBuilder.deregister.Stake"),
+      DRep: makeUnexpectedMethodSpy("TxBuilder.deregister.DRep"),
+    },
+    delegateTo: makeUnexpectedMethodSpy("TxBuilder.delegateTo"),
+    delegate: {
+      ToPool: makeUnexpectedMethodSpy("TxBuilder.delegate.ToPool"),
+      VoteToDRep: makeUnexpectedMethodSpy("TxBuilder.delegate.VoteToDRep"),
+      VoteToPoolAndDRep: makeUnexpectedMethodSpy(
+        "TxBuilder.delegate.VoteToPoolAndDRep",
+      ),
+    },
+    registerAndDelegate: {
+      ToPool: makeUnexpectedMethodSpy("TxBuilder.registerAndDelegate.ToPool"),
+      ToDRep: makeUnexpectedMethodSpy("TxBuilder.registerAndDelegate.ToDRep"),
+      ToPoolAndDRep: makeUnexpectedMethodSpy(
+        "TxBuilder.registerAndDelegate.ToPoolAndDRep",
+      ),
+    },
+    updateDRep: makeUnexpectedMethodSpy("TxBuilder.updateDRep"),
+    authCommitteeHot: makeUnexpectedMethodSpy("TxBuilder.authCommitteeHot"),
+    resignCommitteeHot: makeUnexpectedMethodSpy("TxBuilder.resignCommitteeHot"),
+    attachMetadata: makeUnexpectedMethodSpy("TxBuilder.attachMetadata"),
+    completeSafe: makeUnexpectedMethodSpy("TxBuilder.completeSafe"),
+    chainProgram: makeUnexpectedMethodSpy("TxBuilder.chainProgram"),
+    chain: makeUnexpectedMethodSpy("TxBuilder.chain"),
+    chainSafe: makeUnexpectedMethodSpy("TxBuilder.chainSafe"),
+    config: makeUnexpectedMethodSpy("TxBuilder.config"),
+    rawConfig: makeUnexpectedMethodSpy("TxBuilder.rawConfig"),
+    lucidConfig: makeUnexpectedMethodSpy("TxBuilder.lucidConfig"),
+    getPrograms: makeUnexpectedMethodSpy("TxBuilder.getPrograms"),
+    completedTx,
+  } satisfies BuilderSpy;
+
+  return builder;
+};
+
+export const makeLucidMock = (builder?: BuilderSpy): LucidMock => {
   const selectedBuilder = builder ?? makeBuilderSpy();
-  return {
+  const wallet = {
+    overrideUTxOs: vi.fn(),
+    address: vi.fn(async () => addressKeyA),
+    rewardAddress: vi.fn(async () => null),
+    getUtxos: vi.fn(async () => []),
+    getUtxosCore: vi.fn(async () => []),
+    getDelegation: vi.fn(
+      async (): Delegation => ({ poolId: null, rewards: 0n }),
+    ),
+    signTx: vi.fn(async () => ({})),
+    signMessage: vi.fn(async () => ({ signature: hexA, key: pubKeyHashA })),
+    submitTx: vi.fn(async () => txHashA),
+  } satisfies WalletFixture;
+
+  const lucid = {
     newTx: vi.fn(() => selectedBuilder),
     utxosAt: vi.fn(async () => []),
     utxosAtWithUnit: vi.fn(async () => []),
-    wallet: vi.fn(() => ({
-      getUtxos: vi.fn(async () => []),
-      address: vi.fn(async () => addressKeyA),
-    })),
+    wallet: vi.fn(() => wallet),
     config: vi.fn(() => ({ network: "Preview" })),
-  };
+    overrideUTxOs: vi.fn(),
+    switchProvider: vi.fn(async () => undefined),
+    fromTx: vi.fn(() => selectedBuilder.completedTx),
+    selectWallet: {
+      fromSeed: vi.fn(),
+      fromPrivateKey: vi.fn(),
+      fromAPI: vi.fn(),
+      fromAddress: vi.fn(),
+    },
+    currentSlot: vi.fn(() => 0),
+    unixTimeToSlot: vi.fn(() => 0),
+    utxoByUnit: vi.fn(async () =>
+      makeUtxo({ txHash: txHashA, outputIndex: 0 }),
+    ),
+    utxosByOutRef: vi.fn(async () => []),
+    delegationAt: vi.fn(
+      async (): Delegation => ({ poolId: null, rewards: 0n }),
+    ),
+    awaitTx: vi.fn(async () => true),
+    datumOf: vi.fn(async () => undefined),
+    metadataOf: vi.fn(async () => undefined),
+  } satisfies LucidMock;
+
+  return lucid;
 };
 
 export const makeUtxo = (params: {
@@ -288,7 +402,7 @@ export const makeUtxo = (params: {
   outputIndex: number;
   datum?: string;
   unit?: string;
-}) => {
+}): UTxO => {
   const unit = params.unit ?? toUnit(policyIdA, assetNameA);
   return {
     txHash: params.txHash,
@@ -299,6 +413,57 @@ export const makeUtxo = (params: {
     },
     address: addressScriptA,
     datum: params.datum,
+  };
+};
+
+export const makeConfirmedStateQueueNode = (
+  params: {
+    next?: StateQueueDatum["next"];
+    confirmedState?: ConfirmedState;
+  } = {},
+): StateQueueDatum => ({
+  key: "Empty",
+  next: params.next ?? "Empty",
+  data: Data.castTo(
+    params.confirmedState ?? confirmedStateFixture,
+    ConfirmedState,
+  ),
+});
+
+export const makeBlockStateQueueNode = (params: {
+  key: string;
+  next?: StateQueueDatum["next"];
+  header?: Header;
+}): StateQueueDatum => ({
+  key: { Key: { key: params.key } },
+  next: params.next ?? "Empty",
+  data: Data.castTo(params.header ?? headerFixture, Header),
+});
+
+export const makeStateQueueUtxo = (params: {
+  txHash: string;
+  outputIndex: number;
+  datum: StateQueueDatum;
+  assetName?: string;
+  policyId?: string;
+}): StateQueueUTxO => {
+  const assetName =
+    params.assetName ??
+    (params.datum.key === "Empty"
+      ? NODE_ASSET_NAME
+      : `${NODE_ASSET_NAME}${params.datum.key.Key.key}`);
+  const policyId = params.policyId ?? policyIdA;
+  const utxo = makeUtxo({
+    txHash: params.txHash,
+    outputIndex: params.outputIndex,
+    datum: Data.to(params.datum, NodeDatum),
+    unit: toUnit(policyId, assetName),
+  });
+
+  return {
+    utxo,
+    datum: params.datum,
+    assetName,
   };
 };
 
