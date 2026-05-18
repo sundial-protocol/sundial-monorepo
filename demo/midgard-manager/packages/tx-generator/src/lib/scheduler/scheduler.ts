@@ -100,9 +100,23 @@ class TxGeneratorState {
 
 type GenerationMode = 'generated' | 'replay';
 
-interface TaskPlan {
+export interface TaskPlan {
   initialUTxO: UTxO;
   useOneToOne: boolean;
+}
+
+export interface DeterministicTaskPlanConfig {
+  initialUTxO: UTxO;
+  batchSize: number;
+  transactionType: TransactionGeneratorConfig['transactionType'];
+  oneToOneRatio?: number;
+  generationSeed: string;
+}
+
+export interface DeterministicTaskPlanResult {
+  generationSeed: string;
+  deterministicStartMs: number;
+  taskPlans: TaskPlan[];
 }
 
 interface ReplayCorpusFile {
@@ -137,6 +151,49 @@ const generateUniqueUTxOs = (baseUTxO: UTxO, count: number, random: () => number
     txHash: randomHex(random, 64).toUpperCase(),
     outputIndex: randomInt(random, OUTPUT_INDEX_UPPER_EXCLUSIVE),
   }));
+
+const buildTaskPlans = ({
+  initialUTxO,
+  batchSize,
+  transactionType,
+  oneToOneRatio,
+  random,
+}: {
+  initialUTxO: UTxO;
+  batchSize: number;
+  transactionType: TransactionGeneratorConfig['transactionType'];
+  oneToOneRatio: number;
+  random: () => number;
+}): TaskPlan[] => {
+  const uniqueUTxOs = generateUniqueUTxOs(initialUTxO, batchSize, random);
+  return uniqueUTxOs.map((taskUTxO) => ({
+    initialUTxO: taskUTxO,
+    useOneToOne:
+      transactionType === 'one-to-one' ||
+      (transactionType === 'mixed' && random() * 100 < oneToOneRatio),
+  }));
+};
+
+export const createDeterministicTaskPlan = (
+  config: DeterministicTaskPlanConfig
+): DeterministicTaskPlanResult => {
+  const generationSeed = getNormalizedSeed(config.generationSeed);
+  const random = createSeededRandom(generationSeed);
+  const deterministicStartMs = getDeterministicStartMs(generationSeed);
+  const taskPlans = buildTaskPlans({
+    initialUTxO: config.initialUTxO,
+    batchSize: config.batchSize,
+    transactionType: config.transactionType,
+    oneToOneRatio: config.oneToOneRatio ?? DEFAULT_CONFIG.oneToOneRatio ?? 70,
+    random,
+  });
+
+  return {
+    generationSeed,
+    deterministicStartMs,
+    taskPlans,
+  };
+};
 
 const parseReplayCorpusContent = (
   replayCorpusPath: string,
@@ -451,14 +508,13 @@ export const startGenerator = async (
         return;
       }
 
-      const uniqueUTxOs = generateUniqueUTxOs(fullConfig.initialUTxO, fullConfig.batchSize, random);
-      const taskPlans: TaskPlan[] = uniqueUTxOs.map((taskUTxO) => ({
-        initialUTxO: taskUTxO,
-        useOneToOne:
-          fullConfig.transactionType === 'one-to-one' ||
-          (fullConfig.transactionType === 'mixed' &&
-            random() * 100 < (fullConfig.oneToOneRatio ?? 70)),
-      }));
+      const taskPlans = buildTaskPlans({
+        initialUTxO: fullConfig.initialUTxO,
+        batchSize: fullConfig.batchSize,
+        transactionType: fullConfig.transactionType,
+        oneToOneRatio: fullConfig.oneToOneRatio ?? DEFAULT_CONFIG.oneToOneRatio ?? 70,
+        random,
+      });
 
       const tasks = taskPlans.map(async (taskPlan) => {
         return concurrencyLimiter(async () => {
@@ -534,12 +590,15 @@ export const startGenerator = async (
   };
 
   // Start the generator
-  state.currentPromise = runGenerator().catch((error) => {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    state.stats.lastError = errorMessage;
-    console.error('Generator failed:', errorMessage);
-    state.currentPromise = null;
-  });
+  state.currentPromise = runGenerator()
+    .catch((error) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      state.stats.lastError = errorMessage;
+      console.error('Generator failed:', errorMessage);
+    })
+    .finally(() => {
+      state.currentPromise = null;
+    });
 };
 
 /**
@@ -548,6 +607,33 @@ export const startGenerator = async (
 export const stopGenerator = (): Promise<void> => {
   state.shouldStop = true;
   return Promise.resolve();
+};
+
+export const waitForGeneratorStop = async (maxMs = 2000): Promise<void> => {
+  const runningPromise = state.currentPromise;
+  if (runningPromise === null) {
+    return;
+  }
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  try {
+    await Promise.race([
+      runningPromise,
+      new Promise<void>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`Timed out waiting for generator to stop after ${maxMs}ms`));
+        }, maxMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle !== null) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+
+  if (state.stats.lastError !== null) {
+    throw new Error(`Generator stopped with error: ${state.stats.lastError}`);
+  }
 };
 
 /**

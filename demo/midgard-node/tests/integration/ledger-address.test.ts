@@ -272,3 +272,50 @@ it.effect("Address history status upsert advances an event", () => {
     expect(txCbors.length).toBe(1);
   }).pipe(Effect.provide(layers));
 });
+
+it.effect(
+  "Address history upsert deduplicates duplicate keys within a single batch",
+  () => {
+    const layers = makeBaseLayers();
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const txIdB = Buffer.alloc(32, 0xab);
+      const txCborB = Buffer.alloc(64, 0xcd);
+
+      // Insert tx rows so AddressHistoryDB.retrieve can join by event_id.
+      yield* ImmutableDB.insertTx({ tx_id: txIdA, tx: txCborA });
+      yield* ImmutableDB.insertTx({ tx_id: txIdB, tx: txCborB });
+
+      const entries: AddressHistoryDB.Entry[] = [
+        {
+          [AddressHistoryDB.Columns.EVENT_ID]: txIdA,
+          [AddressHistoryDB.Columns.ADDRESS]: testAddress,
+          [AddressHistoryDB.Columns.EVENT_TYPE]: AddressHistoryDB.EventType.TX,
+          [AddressHistoryDB.Columns.STATUS]: AddressHistoryDB.Status.SLATED,
+        },
+        {
+          // Same conflict key as previous row.
+          [AddressHistoryDB.Columns.EVENT_ID]: txIdA,
+          [AddressHistoryDB.Columns.ADDRESS]: testAddress,
+          [AddressHistoryDB.Columns.EVENT_TYPE]: AddressHistoryDB.EventType.TX,
+          [AddressHistoryDB.Columns.STATUS]: AddressHistoryDB.Status.SUBMITTED,
+        },
+        {
+          // Different event_id must persist as a separate address-history row.
+          [AddressHistoryDB.Columns.EVENT_ID]: txIdB,
+          [AddressHistoryDB.Columns.ADDRESS]: testAddress,
+          [AddressHistoryDB.Columns.EVENT_TYPE]: AddressHistoryDB.EventType.TX,
+          [AddressHistoryDB.Columns.STATUS]: AddressHistoryDB.Status.SLATED,
+        },
+      ];
+
+      yield* AddressHistoryDB.upsertEntries(entries);
+
+      const txCbors = yield* AddressHistoryDB.retrieve(testAddress);
+      expect(txCbors.length).toBe(2);
+      expect(txCbors.some((c) => Buffer.from(c).equals(txCborA))).toBe(true);
+      expect(txCbors.some((c) => Buffer.from(c).equals(txCborB))).toBe(true);
+    }).pipe(Effect.provide(layers));
+  },
+);

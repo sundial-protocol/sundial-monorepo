@@ -37,6 +37,13 @@ const txProcessingFailedCounter = Metric.counter(
   },
 ).register();
 
+export const txQueueProcessorMetrics = {
+  txQueueSizeGauge,
+  txQueuePeakSizeGauge,
+  txMempoolAcceptedCounter,
+  txProcessingFailedCounter,
+} as const;
+
 export const txQueueProcessorAction = (
   txQueue: Queue.Dequeue<string>,
   withMonitoring?: boolean,

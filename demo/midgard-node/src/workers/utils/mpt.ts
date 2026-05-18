@@ -143,6 +143,10 @@ export class LevelDB {
     await this._leveldb.open();
   }
 
+  async close() {
+    await this._leveldb.close();
+  }
+
   async get(key: string) {
     return this._leveldb.get(key, LEVELDB_ENCODING_OPTS);
   }
@@ -161,10 +165,6 @@ export class LevelDB {
 
   shallowCopy() {
     return new LevelDB(this._leveldb);
-  }
-
-  getDatabase() {
-    return this._leveldb;
   }
 }
 
@@ -210,6 +210,12 @@ export class MptError extends EffectData.TaggedError(
   static trieRevert(trie: string, cause: unknown) {
     return new MptError({
       message: `An error occurred reverting ${trie} trie`,
+      cause,
+    });
+  }
+  static trieClose(trie: string, cause: unknown) {
+    return new MptError({
+      message: `An error occurred closing ${trie} trie`,
       cause,
     });
   }
@@ -301,6 +307,23 @@ export class MidgardMpt {
     });
   }
 
+  public get(key: Uint8Array): Effect.Effect<Uint8Array | null, MptError> {
+    const trieName = this.trieName;
+    return Effect.tryPromise({
+      try: () => this.trie.get(key),
+      catch: (e) => MptError.get(trieName, e),
+    }).pipe(
+      Effect.map((value) => {
+        if (value === null || value === undefined) {
+          return null;
+        }
+        return value instanceof Uint8Array && !Buffer.isBuffer(value)
+          ? value
+          : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+      }),
+    );
+  }
+
   public getRoot(): Effect.Effect<Uint8Array, MptError> {
     const trieName = this.trieName;
     const root = this.trie.root();
@@ -346,6 +369,17 @@ export class MidgardMpt {
     return Effect.tryPromise({
       try: () => this.trie.revert(),
       catch: (e) => MptError.trieRevert(this.trieName, e),
+    });
+  }
+
+  public close(): Effect.Effect<void, MptError> {
+    const databaseAndPath = this.databaseAndPath;
+    if (!databaseAndPath) {
+      return Effect.void;
+    }
+    return Effect.tryPromise({
+      try: () => databaseAndPath.database.close(),
+      catch: (e) => MptError.trieClose(this.trieName, e),
     });
   }
 
