@@ -170,15 +170,9 @@ export function renderPlanReport(input: PlanReportInput): string {
         ['Working tree', manifest.workingTreeStatus || 'clean'],
         ['Harness version', manifest.harnessVersion],
         ['Scenarios', String(manifest.scenarioPaths.length)],
-        [
-          'Host',
-          `${manifest.host.hostname} (${manifest.host.platform}/${manifest.host.arch})`,
-        ],
+        ['Host', `${manifest.host.hostname} (${manifest.host.platform}/${manifest.host.arch})`],
         ['CPUs', String(manifest.host.cpus)],
-        [
-          'Total memory',
-          `${(manifest.host.totalMemoryBytes / 1024 / 1024 / 1024).toFixed(1)} GiB`,
-        ],
+        ['Total memory', `${(manifest.host.totalMemoryBytes / 1024 / 1024 / 1024).toFixed(1)} GiB`],
       ]
     )
   );
@@ -189,7 +183,16 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
   sections.push(
     mdTable(
-      ['#', 'Run ID', 'Target TPS', 'Result', 'Tiers Passed', 'Highest Passed TPS', 'Collapse TPS', 'Bottleneck'],
+      [
+        '#',
+        'Run ID',
+        'Target TPS',
+        'Result',
+        'Tiers Passed',
+        'Highest Passed TPS',
+        'Collapse TPS',
+        'Bottleneck',
+      ],
       records.map((r) => {
         const c: FormalRunClassification | 'skipped' = r.skipped
           ? 'skipped'
@@ -231,7 +234,9 @@ export function renderPlanReport(input: PlanReportInput): string {
           const completed = r.tierSummaries.filter((t) => t.result === 'completed');
           const avg = (field: keyof TierSummary): number | null => {
             if (completed.length === 0) return null;
-            const vals = completed.map((t) => t[field] as number | null).filter((v): v is number => v !== null);
+            const vals = completed
+              .map((t) => t[field] as number | null)
+              .filter((v): v is number => v !== null);
             return vals.length === 0 ? null : vals.reduce((a, b) => a + b, 0) / vals.length;
           };
           return [
@@ -282,19 +287,19 @@ export function renderPlanReport(input: PlanReportInput): string {
   } else {
     sections.push(
       mdTable(
-        ['Scenario', 'Peak Queue Size', 'Peak Mempool Size', 'Commitment Failures', 'Merge Failures'],
+        [
+          'Scenario',
+          'Peak Queue Size',
+          'Peak Mempool Size',
+          'Commitment Failures',
+          'Merge Failures',
+        ],
         executed.map((r) => {
           const peakQueue = maxNullable(r.tierSummaries.map((t) => t.peakQueueSize));
           const peakMempool = maxNullable(r.tierSummaries.map((t) => t.peakMempoolSize));
           const commitFailures = sumNullable(r.tierSummaries.map((t) => t.commitmentFailureDelta));
           const mergeFailures = sumNullable(r.tierSummaries.map((t) => t.mergeFailureDelta));
-          return [
-            r.runId,
-            n(peakQueue),
-            n(peakMempool),
-            n(commitFailures),
-            n(mergeFailures),
-          ];
+          return [r.runId, n(peakQueue), n(peakMempool), n(commitFailures), n(mergeFailures)];
         })
       )
     );
@@ -359,10 +364,7 @@ export function renderPlanReport(input: PlanReportInput): string {
       ['Field', 'Value'],
       [
         ['Plan classification', planLabel(conclusion.classification)],
-        [
-          'Scenarios executed',
-          `${conclusion.completedScenarios} / ${conclusion.totalScenarios}`,
-        ],
+        ['Scenarios executed', `${conclusion.completedScenarios} / ${conclusion.totalScenarios}`],
         ['Highest passed target TPS', n(conclusion.highestPassedTargetTps)],
         ['Highest passed scenario', s(conclusion.highestPassedRunId)],
         ['Stopped early at', s(conclusion.stoppedEarlyAt)],

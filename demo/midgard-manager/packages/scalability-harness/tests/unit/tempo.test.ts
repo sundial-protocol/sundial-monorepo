@@ -118,10 +118,7 @@ describe('TempoClient.searchTraces', () => {
       return new Response(JSON.stringify({ traces: [], metrics: {} }), { status: 200 });
     };
 
-    const client = new TempoClient(
-      ENDPOINT,
-      capturingFetcher as Parameters<typeof TempoClient>[1]
-    );
+    const client = new TempoClient(ENDPOINT, capturingFetcher as Parameters<typeof TempoClient>[1]);
     await client.searchTraces('midgard-node', START, END);
 
     const expectedStartSec = Math.floor(START.getTime() / 1000).toString();

@@ -10,8 +10,8 @@ import type {
   LoadDriverSaturationFlags,
 } from '../runner/host-resources.js';
 import type { SubmissionAggregate } from '../runner/tx-generator.js';
-import type { LokiTierCapture } from './loki.js';
 import type { LoadEvent } from './load-events.js';
+import type { LokiTierCapture } from './loki.js';
 import type { TempoTierCapture } from './tempo.js';
 
 export interface RunManifest {

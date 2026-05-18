@@ -4,7 +4,6 @@ import path from 'node:path';
 import type { ScalabilityScenario, StopConditions } from '../config/scenario.js';
 import type { LoadTier } from '../config/tiers.js';
 import type { ArtifactWriter, TierSummary } from '../evidence/artifacts.js';
-import type { LokiClient, LokiTierCapture } from '../evidence/loki.js';
 import type {
   HarnessErrorEvent,
   PrometheusSnapshotEvent,
@@ -13,6 +12,7 @@ import type {
   TierStoppedEvent,
 } from '../evidence/load-events.js';
 import { makeEvent } from '../evidence/load-events.js';
+import type { LokiClient, LokiTierCapture } from '../evidence/loki.js';
 import type { TempoClient, TempoTierCapture } from '../evidence/tempo.js';
 import { CADVISOR_METRICS, NODE_METRICS, PrometheusClient } from '../metrics/prometheus.js';
 import type { TierMetricWindow, TierWindowSummary } from '../metrics/window.js';

@@ -498,7 +498,16 @@ function renderLokiEvidence(captures: LokiTierCapture[] | undefined): string | n
     return null;
   }
 
-  const headers = ['Tier', 'Target TPS', 'Window', 'Query', 'Streams', 'Entries', 'Truncated', 'Error'];
+  const headers = [
+    'Tier',
+    'Target TPS',
+    'Window',
+    'Query',
+    'Streams',
+    'Entries',
+    'Truncated',
+    'Error',
+  ];
   const rows = captures.map((c) => [
     String(c.tierIndex),
     String(c.targetTps),
@@ -525,14 +534,27 @@ function renderTempoEvidence(captures: TempoTierCapture[] | undefined): string |
     return null;
   }
 
-  const headers = ['Tier', 'Target TPS', 'Window', 'Service', 'Traces', 'Inspected', 'Truncated', 'Error'];
+  const headers = [
+    'Tier',
+    'Target TPS',
+    'Window',
+    'Service',
+    'Traces',
+    'Inspected',
+    'Truncated',
+    'Error',
+  ];
   const rows = captures.map((c) => [
     String(c.tierIndex),
     String(c.targetTps),
     `${c.startedAt.slice(0, 19)}Z → ${c.recoveryStoppedAt.slice(0, 19)}Z`,
     c.serviceName,
     c.result !== null ? String(c.result.traces.length) : 'n/a',
-    c.result !== null ? (c.result.inspectedTraces !== null ? String(c.result.inspectedTraces) : 'n/a') : 'n/a',
+    c.result !== null
+      ? c.result.inspectedTraces !== null
+        ? String(c.result.inspectedTraces)
+        : 'n/a'
+      : 'n/a',
     c.result !== null ? String(c.result.truncated) : 'n/a',
     c.error !== null ? c.error.slice(0, 80) : '',
   ]);
