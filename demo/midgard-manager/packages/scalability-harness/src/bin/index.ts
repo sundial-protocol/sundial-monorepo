@@ -17,6 +17,7 @@ import {
 } from '../config/scenario.js';
 import { generateTiers } from '../config/tiers.js';
 import { ArtifactWriter } from '../evidence/artifacts.js';
+import { GrafanaScreenshotService } from '../evidence/grafana-screenshots.js';
 import { PlanArtifactWriter } from '../evidence/plan-artifacts.js';
 import type { ScenarioRunRecord } from '../report/plan-markdown.js';
 import { buildPlanConclusion, renderPlanReport } from '../report/plan-markdown.js';
@@ -112,14 +113,22 @@ function resolveRequestEventsMode(
 
 function applyScenarioOverrides(
   scenario: ScalabilityScenario,
-  opts: { runId?: string; outputDir?: string; requestEvents?: string }
+  opts: { runId?: string; outputDir?: string; requestEvents?: string; grafanaScreenshots?: boolean }
 ): ScalabilityScenario {
   const requestEvents = resolveRequestEventsMode(opts.requestEvents);
+  if (opts.grafanaScreenshots === true && scenario.grafanaScreenshots === undefined) {
+    throw new CliInputError(
+      '--grafana-screenshots was provided but scenario.grafanaScreenshots is not configured'
+    );
+  }
   return validateScenario({
     ...scenario,
     ...(opts.runId !== undefined ? { runId: opts.runId } : {}),
     ...(opts.outputDir !== undefined ? { outputDir: path.resolve(opts.outputDir) } : {}),
     ...(requestEvents !== undefined ? { requestEvents } : {}),
+    ...(opts.grafanaScreenshots === true && scenario.grafanaScreenshots !== undefined
+      ? { grafanaScreenshots: { ...scenario.grafanaScreenshots, enabled: true } }
+      : {}),
   });
 }
 
@@ -149,6 +158,7 @@ async function executePlan(opts: {
   dryRun?: boolean;
   outputDir?: string;
   requestEvents?: string;
+  grafanaScreenshots?: boolean;
 }): Promise<void> {
   const planPath = path.resolve(opts.planPath);
   let plan: PlanConfig;
@@ -183,9 +193,12 @@ async function executePlan(opts: {
       console.error(chalk.red(`  - scenarios[${i}] (${scenPath}): ${message}`));
       process.exit(1);
     }
-    if (opts.requestEvents !== undefined) {
+    if (opts.requestEvents !== undefined || opts.grafanaScreenshots === true) {
       try {
-        scenario = applyScenarioOverrides(scenario, { requestEvents: opts.requestEvents });
+        scenario = applyScenarioOverrides(scenario, {
+          requestEvents: opts.requestEvents,
+          grafanaScreenshots: opts.grafanaScreenshots,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error(chalk.red(`\nExecution Readiness: Blocked`));
@@ -395,6 +408,35 @@ async function executePlan(opts: {
     console.error(chalk.red(`Failed to write plan report: ${String(err)}`));
   }
 
+  const scenarioWithScreenshotsIndex = loadedScenarios.findIndex(
+    (scenario) => scenario.grafanaScreenshots?.enabled === true
+  );
+  if (scenarioWithScreenshotsIndex >= 0) {
+    const referenceScenario = loadedScenarios[scenarioWithScreenshotsIndex];
+    const referenceScenarioPath = resolvedScenarioPaths[scenarioWithScreenshotsIndex];
+    const planWindowStart = new Date(
+      records
+        .map((record) => record.tierSummaries[0]?.startedAt)
+        .filter((startedAt): startedAt is string => startedAt !== undefined)
+        .sort()[0] ?? new Date().toISOString()
+    ).toISOString();
+    const planWindowEnd = new Date().toISOString();
+    try {
+      await GrafanaScreenshotService.capturePlanSummary(
+        referenceScenario,
+        referenceScenarioPath,
+        planWriter.planDir,
+        plan.planId,
+        planWindowStart,
+        planWindowEnd
+      );
+    } catch (err) {
+      console.error(
+        chalk.red(`Failed to capture plan-summary Grafana screenshots: ${String(err)}`)
+      );
+    }
+  }
+
   const planReportPath = path.join(planWriter.planDir, 'plan-report.md');
   console.log(chalk.green(`\nPlan Report: ${planReportPath}`));
 
@@ -448,6 +490,10 @@ program
     '--request-events <mode>',
     `per-request submission events mode (${REQUEST_EVENT_MODES.join('|')})`
   )
+  .option(
+    '--grafana-screenshots',
+    'enable Grafana screenshot capture (requires scenario.grafanaScreenshots config)'
+  )
   .option('--no-increase', 'run only the first tier (scenario mode only)')
   .action(
     async (opts: {
@@ -458,6 +504,7 @@ program
       dryRun?: boolean;
       maxTier?: number;
       requestEvents?: string;
+      grafanaScreenshots?: boolean;
       increase: boolean;
     }) => {
       if (opts.plan !== undefined && opts.scenario !== undefined) {
@@ -472,6 +519,7 @@ program
           dryRun: opts.dryRun,
           outputDir: opts.outputDir,
           requestEvents: opts.requestEvents,
+          grafanaScreenshots: opts.grafanaScreenshots,
         });
         return;
       }
@@ -490,6 +538,7 @@ program
           runId: opts.runId,
           outputDir: opts.outputDir,
           requestEvents: opts.requestEvents,
+          grafanaScreenshots: opts.grafanaScreenshots,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -612,12 +661,17 @@ program
     '--request-events <mode>',
     `per-request submission events mode (${REQUEST_EVENT_MODES.join('|')})`
   )
+  .option(
+    '--grafana-screenshots',
+    'enable Grafana screenshot capture (requires scenario.grafanaScreenshots config)'
+  )
   .action(
     async (opts: {
       scenario: string;
       runId?: string;
       outputDir?: string;
       requestEvents?: string;
+      grafanaScreenshots?: boolean;
     }) => {
       const scenarioPath = path.resolve(opts.scenario);
       let scenario: ScalabilityScenario;
@@ -628,6 +682,7 @@ program
           runId: opts.runId,
           outputDir: opts.outputDir,
           requestEvents: opts.requestEvents,
+          grafanaScreenshots: opts.grafanaScreenshots,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

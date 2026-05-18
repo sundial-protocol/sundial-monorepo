@@ -90,10 +90,15 @@ export const deleteMpt = (
   path: string,
   name: string,
 ): Effect.Effect<void, FileSystemError> =>
-  Effect.try({
-    try: () => {
-      FS.rmSync(path, { recursive: true, force: true });
-      FS.mkdirSync(path, { recursive: true });
+  Effect.tryPromise({
+    try: async () => {
+      await FS.promises.rm(path, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 50,
+      });
+      await FS.promises.mkdir(path, { recursive: true });
     },
     catch: (e) =>
       new FileSystemError({
@@ -140,10 +145,16 @@ export class LevelDB {
   }
 
   async open() {
+    if (this._leveldb.status === "open") {
+      return;
+    }
     await this._leveldb.open();
   }
 
   async close() {
+    if (this._leveldb.status === "closed") {
+      return;
+    }
     await this._leveldb.close();
   }
 

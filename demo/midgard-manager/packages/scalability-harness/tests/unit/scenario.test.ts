@@ -139,6 +139,21 @@ describe('validateScenario', () => {
       };
       expect(() => validateScenario(s)).not.toThrow();
     });
+
+    it('accepts grafanaScreenshots config when enabled', () => {
+      const s = {
+        ...VALID_SCENARIO,
+        grafanaScreenshots: {
+          enabled: true,
+          grafanaBaseUrl: 'http://localhost:3001',
+          dashboardJsonPath: '../../../midgard-node/grafana/dashboard.json',
+          theme: 'light',
+          timezone: 'utc',
+          peakCaptureCooldownSeconds: 60,
+        },
+      };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
   });
 
   describe('missing required fields', () => {
@@ -203,6 +218,19 @@ describe('validateScenario', () => {
     it('rejects invalid prometheusEndpoint', () => {
       expect(() =>
         validateScenario({ ...VALID_SCENARIO, prometheusEndpoint: 'localhost' })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects invalid grafanaScreenshots.grafanaBaseUrl when enabled', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          grafanaScreenshots: {
+            enabled: true,
+            grafanaBaseUrl: 'localhost:3001',
+            dashboardJsonPath: '../../../midgard-node/grafana/dashboard.json',
+          },
+        })
       ).toThrow(ScenarioValidationError);
     });
   });

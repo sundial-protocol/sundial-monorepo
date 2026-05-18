@@ -1,11 +1,18 @@
 export type { CollapseInputs, CollapseReason, CollapseResult } from './analysis/collapse.js';
 export { detectCollapse } from './analysis/collapse.js';
-export type { ScalabilityScenario, StopConditions } from './config/scenario.js';
+export type {
+  GrafanaScreenshotsConfig,
+  GrafanaScreenshotTheme,
+  ScalabilityScenario,
+  StopConditions,
+} from './config/scenario.js';
 export { ScenarioValidationError, validateScenario } from './config/scenario.js';
 export type { LoadTier } from './config/tiers.js';
 export { generateTiers } from './config/tiers.js';
 export type { RunManifest, TierSummary } from './evidence/artifacts.js';
 export { ArtifactWriter } from './evidence/artifacts.js';
+export type { GrafanaScreenshotRecord } from './evidence/grafana-screenshots.js';
+export { GrafanaScreenshotService } from './evidence/grafana-screenshots.js';
 export type {
   HarnessErrorEvent,
   LoadEvent,

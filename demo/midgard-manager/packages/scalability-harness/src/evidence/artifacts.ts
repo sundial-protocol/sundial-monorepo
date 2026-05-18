@@ -35,6 +35,9 @@ export interface RunManifest {
   lokiEndpoint: string | null;
   // Tempo endpoint from the scenario. Null when Tempo capture is not configured.
   tempoEndpoint: string | null;
+  // Grafana screenshot capture enabled flag and dashboard source path, when configured.
+  grafanaScreenshotsEnabled: boolean;
+  grafanaDashboardJsonPath: string | null;
   host: {
     hostname: string;
     platform: string;
@@ -149,6 +152,8 @@ export class ArtifactWriter {
       walletProvisioningNote: scenario.walletProvisioningNote ?? null,
       lokiEndpoint: scenario.lokiEndpoint ?? null,
       tempoEndpoint: scenario.tempoEndpoint ?? null,
+      grafanaScreenshotsEnabled: scenario.grafanaScreenshots?.enabled ?? false,
+      grafanaDashboardJsonPath: scenario.grafanaScreenshots?.dashboardJsonPath ?? null,
       host: {
         hostname: os.hostname(),
         platform: os.platform(),
@@ -196,6 +201,8 @@ export class ArtifactWriter {
       walletProvisioningNote: scenario.walletProvisioningNote ?? null,
       lokiEndpoint: scenario.lokiEndpoint ?? null,
       tempoEndpoint: scenario.tempoEndpoint ?? null,
+      grafanaScreenshotsEnabled: scenario.grafanaScreenshots?.enabled ?? false,
+      grafanaDashboardJsonPath: scenario.grafanaScreenshots?.dashboardJsonPath ?? null,
       host: {
         hostname: os.hostname(),
         platform: os.platform(),

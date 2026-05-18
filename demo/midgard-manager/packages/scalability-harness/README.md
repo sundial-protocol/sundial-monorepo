@@ -67,6 +67,7 @@ pnpm run start -- tiers --scenario scenarios/saturation-ramp-25pct.json --max-ti
 | `--dry-run`               | `run`                       | Validate config and print tier breakdown; no load    |
 | `--output-dir <dir>`      | `run`                       | Override the scenario/plan `outputDir`               |
 | `--request-events <mode>` | `run`                       | `off` \| `sampled` \| `all` per-request JSONL events |
+| `--grafana-screenshots`   | `run`, `preflight`          | Force-enable `scenario.grafanaScreenshots.enabled`   |
 | `--run-id <id>`           | `run --scenario`            | Override the scenario's `runId`                      |
 | `--max-tier <n>`          | `run --scenario`, `tiers`   | Stop after tier index n (inclusive)                  |
 | `--no-increase`           | `run --scenario`, `tiers`   | Run only the first tier                              |
@@ -159,6 +160,8 @@ Each run creates a timestamped directory under `outputDir`:
   prometheus-samples.json — metric snapshots
   loki-captures.json      — Loki log captures (if lokiEndpoint configured)
   tempo-captures.json     — Tempo trace captures (if tempoEndpoint configured)
+  grafana-screenshots/    — dashboard screenshots (if grafanaScreenshots.enabled)
+  grafana-screenshots.json — screenshot capture manifest (if enabled)
   summary.json            — machine-readable BenchmarkConclusion
   report.md               — human-readable scenario report
   stdout.log / stderr.log
@@ -176,6 +179,8 @@ Each run creates a timestamped directory under `outputDir`:
     run-manifest.json
     tier-summaries.jsonl
     prometheus-samples.json
+    grafana-screenshots/
+    grafana-screenshots.json
     summary.json
     report.md
     ...
@@ -215,8 +220,40 @@ Scenario subdirectories are named `<NN>-<runId>` so they sort in execution order
 | `concurrency`             | number  | Concurrent generator batches                                                                        |
 | `retryAttempts`           | number  | Submission retry count                                                                              |
 | `retryDelayMs`            | number  | Delay between retries (ms)                                                                          |
+| `grafanaScreenshots`      | object? | Opt-in Grafana screenshot capture configuration                                                     |
 | `runClassificationPolicy` | object? | Optional overrides for formal run-classification thresholds                                         |
 | `stopConditions`          | object  | Conditions that abort the run early                                                                 |
+
+### Grafana Screenshots
+
+When `grafanaScreenshots.enabled` is true, the harness captures event-based screenshots:
+
+- tier baseline (`tier_started` timestamp)
+- first metric stop-condition threshold crossing (one-time per scenario)
+- tier end (`after_load`)
+- recovery end (`after_recovery`)
+- optional new peaks (queue, mempool, commitment duration) with cooldown
+- plan-summary layout plus optional per-panel set (`d-solo`) for final evidence
+
+Runtime prerequisite: install `playwright` in this package and ensure Chromium is available.
+
+`grafanaScreenshots` fields:
+
+| Field                        | Type     | Description                                                                  |
+| ---------------------------- | -------- | ---------------------------------------------------------------------------- |
+| `enabled`                    | boolean  | Enable screenshot capture for this scenario                                  |
+| `grafanaBaseUrl`             | string   | Grafana base URL (for example `http://localhost:3001`)                       |
+| `dashboardJsonPath`          | string   | Dashboard JSON path used for deterministic panel/layout mapping              |
+| `dashboardUid`               | string?  | Optional UID override (otherwise read from dashboard JSON)                   |
+| `timezone`                   | string?  | Grafana URL timezone parameter (default `utc`)                               |
+| `theme`                      | string?  | `light` or `dark` (default `light`)                                          |
+| `lookbackMinutes`            | number?  | Lookback window for point-in-time captures (default `10`)                    |
+| `viewportWidth`              | number?  | Browser viewport width in px (default `1920`)                                |
+| `viewportHeight`             | number?  | Browser viewport height in px (default `1080`)                               |
+| `waitForPanelsMs`            | number?  | Extra wait after navigation before capture (default `4000`)                  |
+| `peakCaptureCooldownSeconds` | number?  | Cooldown between peak-triggered captures (default `60`)                      |
+| `capturePeakEvents`          | boolean? | Enable optional peak captures (default `true`)                               |
+| `captureFinalPanelSet`       | boolean? | Capture final plan-summary per-panel image set via `d-solo` (default `true`) |
 
 ## Stop Conditions
 
