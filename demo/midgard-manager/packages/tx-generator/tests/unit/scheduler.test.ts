@@ -1,12 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockSubmitTransaction, mockIsAvailable, mockInspectGeneratedTransaction } = vi.hoisted(
-  () => ({
-    mockSubmitTransaction: vi.fn(),
-    mockIsAvailable: vi.fn(),
-    mockInspectGeneratedTransaction: vi.fn(),
-  })
-);
+const {
+  mockSubmitTransaction,
+  mockIsAvailable,
+  mockInspectGeneratedTransaction,
+  generatedOneToOneTransactionsFromGenerator,
+} = vi.hoisted(() => ({
+  mockSubmitTransaction: vi.fn(),
+  mockIsAvailable: vi.fn(),
+  mockInspectGeneratedTransaction: vi.fn(),
+  // Intentional: generator output fixture has two transactions so tests
+  // assert scheduler counting against generator output, not batch-size limits.
+  generatedOneToOneTransactionsFromGenerator: [
+    { txId: 'tx_1', cborHex: 'cbor_1', type: 'one-to-one', description: '' },
+    { txId: 'tx_2', cborHex: 'cbor_2', type: 'one-to-one', description: '' },
+  ],
+}));
 
 vi.mock('../../src/lib/client/node-client', () => ({
   MidgardNodeClient: vi.fn().mockImplementation(() => ({
@@ -16,10 +25,9 @@ vi.mock('../../src/lib/client/node-client', () => ({
 }));
 
 vi.mock('../../src/lib/generators/index.js', () => ({
-  generateOneToOneTransactions: vi.fn().mockResolvedValue([
-    { txId: 'tx_1', cborHex: 'cbor_1', type: 'one-to-one', description: '' },
-    { txId: 'tx_2', cborHex: 'cbor_2', type: 'one-to-one', description: '' },
-  ]),
+  generateOneToOneTransactions: vi
+    .fn()
+    .mockResolvedValue(generatedOneToOneTransactionsFromGenerator),
   generateMultiOutputTransactions: vi.fn().mockResolvedValue([]),
 }));
 
@@ -31,6 +39,7 @@ import {
   getGeneratorStatus,
   startGenerator,
   stopGenerator,
+  waitForGeneratorStop,
 } from '../../src/lib/scheduler/scheduler';
 
 const baseConfig = {
@@ -42,13 +51,6 @@ const baseConfig = {
   concurrency: 1,
   autoStopAfterBatch: true,
   outputDir: undefined,
-};
-
-const waitForStop = async (maxMs = 2000) => {
-  const deadline = Date.now() + maxMs;
-  while (getGeneratorStatus().running && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 10));
-  }
 };
 
 describe('Scheduler submission outcome counting (H-31)', () => {
@@ -78,7 +80,7 @@ describe('Scheduler submission outcome counting (H-31)', () => {
       .mockResolvedValueOnce({ txId: 'success_2' });
 
     await startGenerator(baseConfig);
-    await waitForStop();
+    await waitForGeneratorStop();
 
     const status = getGeneratorStatus();
     expect(status.transactionsGenerated).toBe(2);
@@ -92,7 +94,7 @@ describe('Scheduler submission outcome counting (H-31)', () => {
       .mockResolvedValueOnce({ status: 'ERROR', error: 'node rejected tx' });
 
     await startGenerator(baseConfig);
-    await waitForStop();
+    await waitForGeneratorStop();
 
     const status = getGeneratorStatus();
     expect(status.transactionsGenerated).toBe(2);
@@ -106,7 +108,7 @@ describe('Scheduler submission outcome counting (H-31)', () => {
       .mockResolvedValueOnce({ status: 'ERROR', error: 'fail 2' });
 
     await startGenerator(baseConfig);
-    await waitForStop();
+    await waitForGeneratorStop();
 
     const status = getGeneratorStatus();
     expect(status.transactionsGenerated).toBe(2);
@@ -121,7 +123,7 @@ describe('Scheduler submission outcome counting (H-31)', () => {
     });
 
     await startGenerator(baseConfig);
-    await waitForStop();
+    await waitForGeneratorStop();
 
     const status = getGeneratorStatus();
     expect(status.transactionsGenerated).toBe(2);
@@ -157,7 +159,7 @@ describe('Scheduler submission outcome counting (H-31)', () => {
       }));
 
     await startGenerator(baseConfig);
-    await waitForStop();
+    await waitForGeneratorStop();
 
     const status = getGeneratorStatus();
     expect(mockSubmitTransaction).toHaveBeenCalledTimes(1);

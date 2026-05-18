@@ -87,10 +87,7 @@ describe("deleteMpt on existing directory", () => {
       Effect.gen(function* () {
         tmpPath = path.join(os.tmpdir(), `midgard-del-exists-${randomUUID()}`);
         const mpt = yield* MidgardMpt.create("del-exists", tmpPath);
-        yield* Effect.tryPromise({
-          try: () => mpt.databaseAndPath!.database._leveldb.close(),
-          catch: (e) => new Error(`${e}`),
-        });
+        yield* mpt.close();
         yield* deleteMpt(tmpPath, "del-exists");
         const stat = FS.statSync(tmpPath);
         expect(stat.isDirectory()).toBe(true);
@@ -99,10 +96,7 @@ describe("deleteMpt on existing directory", () => {
         const reopened = yield* MidgardMpt.create("del-exists-reopen", tmpPath);
         const rootIsEmpty = yield* reopened.rootIsEmpty();
         expect(rootIsEmpty).toBe(true);
-        yield* Effect.tryPromise({
-          try: () => reopened.databaseAndPath!.database._leveldb.close(),
-          catch: (e) => new Error(`${e}`),
-        });
+        yield* reopened.close();
       }),
   );
 });

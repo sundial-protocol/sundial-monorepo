@@ -60,6 +60,16 @@ const commitBlockDurationHistogram = Metric.histogram(
   "Histogram of block commitment worker duration in seconds (success or failure)",
 ).register();
 
+export const blockCommitmentMetrics = {
+  commitBlockNumTxGauge,
+  commitBlockEventsSizeGauge,
+  commitBlockCounter,
+  commitBlockTxCounter,
+  commitBlockL1UserEventsGauge,
+  commitBlockCommitmentFailuresCounter,
+  commitBlockDurationHistogram,
+} as const;
+
 export const buildAndSubmitCommitmentBlockAction = () =>
   Effect.gen(function* () {
     const globals = yield* Globals;

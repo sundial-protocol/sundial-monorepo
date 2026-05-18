@@ -110,179 +110,231 @@ const makeUtxo = (seed: string): UTxO => ({
   },
 });
 
-describe("buildNewBlockEntry - H-26 wallet topup retry", () => {
+const makeEntry = (): Parameters<typeof buildNewBlockEntry>[0] =>
+  ({
+    [BlocksDB.Columns.NEW_WALLET_UTXOS]: Buffer.from([0x01]),
+    [BlocksDB.Columns.EVENT_END_TIME]: new Date("2026-01-01T00:00:00.000Z"),
+  }) as Parameters<typeof buildNewBlockEntry>[0];
+
+const makeStats = (): BlocksDB.Stats => ({
+  deposits_count: 1,
+  tx_orders_count: 1,
+  tx_requests_count: 1,
+  withdrawals_count: 0,
+  total_events_size: 10,
+});
+
+const makeSignedBuilder = () => ({
+  sign: {
+    withWallet: () => ({
+      completeProgram: () =>
+        Effect.succeed({
+          toTransaction: () => ({
+            to_cbor_bytes: () => new Uint8Array([0xca, 0xfe]),
+          }),
+        }),
+    }),
+  },
+  toHash: () => "tx-hash",
+});
+
+const makeLucidFixture = (freshWalletUTxOs: readonly UTxO[]) => {
+  const overrideUTxOs = vi.fn((_utxos: readonly UTxO[]) => undefined);
+  const getUtxos = vi.fn(() => Promise.resolve([...freshWalletUTxOs]));
+  const lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet"> = {
+    overrideUTxOs,
+    wallet: () => ({
+      overrideUTxOs: vi.fn(),
+      address: vi.fn(),
+      rewardAddress: vi.fn(),
+      getUtxos,
+      getUtxosCore: vi.fn(),
+      getDelegation: vi.fn(),
+      signTx: vi.fn(),
+      signMessage: vi.fn(),
+      submitTx: vi.fn(),
+    }),
+  };
+  return {
+    lucidApi,
+    overrideUTxOs,
+    getUtxos,
+  };
+};
+
+const makeRuntimeLayer = (
+  lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet">,
+) =>
+  Layer.mergeAll(
+    Layer.succeed(AlwaysSucceedsContract, {
+      stateQueue: {
+        spendingScript: {
+          type: "PlutusV3",
+          script: "spend-script",
+        },
+        spendingScriptAddress: "addr_test_state_queue",
+        policyId: "policy-id",
+        mintingScript: {
+          type: "PlutusV3",
+          script: "mint-script",
+        },
+      },
+    } as never),
+    Layer.succeed(Lucid, {
+      _tag: "Lucid",
+      api: lucidApi as LucidEvolution,
+      switchToOperatorsMainWallet: Effect.void,
+      switchToOperatorsBlockCommitmentWallet: Effect.void,
+      switchToOperatorsMergingWallet: Effect.void,
+    }),
+  );
+
+const setupPrerequisites = (staleWalletUtxos: readonly UTxO[]) => {
+  dbCommonMocks.deserializeUTxOsFromStorage.mockReturnValue(
+    Effect.succeed(staleWalletUtxos),
+  );
+  blocksDbMocks.getAppendedStateQueueUTxOFromEntry.mockReturnValue(
+    Effect.succeed({
+      utxo: makeUtxo("e"),
+      datum: {
+        next: {
+          Key: {
+            key: "f".repeat(56),
+          },
+        },
+      },
+    }),
+  );
+  sdkMocks.updateLatestBlocksDatumAndGetTheNewHeaderProgram.mockReturnValue(
+    Effect.succeed({
+      nodeDatum: { next: { Key: { key: "1".repeat(56) } } },
+      header: {
+        version: 1n,
+      },
+    }),
+  );
+  sdkMocks.hashBlockHeader.mockReturnValue(Effect.succeed("aa"));
+};
+
+describe("buildNewBlockEntry wallet topup retry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it.effect(
-    "refreshes wallet UTxOs from provider and retries with a fresh TxBuilder after chainProgram failure",
-    () =>
-      Effect.gen(function* () {
-        const staleWalletUtxos: readonly UTxO[] = [makeUtxo("a")];
-        const freshWalletUtxosFromProvider: UTxO[] = [makeUtxo("b")];
-        const returnedWalletUtxos: readonly UTxO[] = [makeUtxo("c")];
-        const producedUtxos: readonly UTxO[] = [makeUtxo("d")];
+  it.effect("retries with refreshed wallet UTxOs after chain failure", () =>
+    Effect.gen(function* () {
+      const staleWalletUtxos: readonly UTxO[] = [makeUtxo("a")];
+      const freshWalletUtxosFromProvider: UTxO[] = [makeUtxo("b")];
+      const returnedWalletUtxos: readonly UTxO[] = [makeUtxo("c")];
+      const producedUtxos: readonly UTxO[] = [makeUtxo("d")];
 
-        const serializedWallet = Buffer.from([0xa1]);
-        const serializedProduced = Buffer.from([0xb2]);
+      const { lucidApi, overrideUTxOs, getUtxos } = makeLucidFixture(
+        freshWalletUtxosFromProvider,
+      );
+      setupPrerequisites(staleWalletUtxos);
+      dbCommonMocks.serializeUTxOsForStorage.mockReturnValue(
+        Effect.succeed(Buffer.from([0x42])),
+      );
+      const signBuilder = makeSignedBuilder();
 
-        const overrideUTxOs = vi.fn((_utxos: readonly UTxO[]) => undefined);
-        const getUtxos = vi.fn(() =>
-          Promise.resolve(freshWalletUtxosFromProvider),
-        );
+      const firstBuilder = {
+        chainProgram: vi.fn(() => Effect.fail(new Error("collateral missing"))),
+      };
+      const secondBuilder = {
+        chainProgram: vi.fn(() =>
+          Effect.succeed([returnedWalletUtxos, producedUtxos, signBuilder]),
+        ),
+      };
 
-        const lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet"> = {
-          overrideUTxOs,
-          wallet: () => ({
-            overrideUTxOs: vi.fn(),
-            address: vi.fn(),
-            rewardAddress: vi.fn(),
-            getUtxos,
-            getUtxosCore: vi.fn(),
-            getDelegation: vi.fn(),
-            signTx: vi.fn(),
-            signMessage: vi.fn(),
-            submitTx: vi.fn(),
-          }),
-        };
+      sdkMocks.incompleteCommitBlockHeaderTxProgram
+        .mockReturnValueOnce(Effect.succeed(firstBuilder))
+        .mockReturnValueOnce(Effect.succeed(secondBuilder));
 
-        dbCommonMocks.deserializeUTxOsFromStorage.mockReturnValue(
-          Effect.succeed(staleWalletUtxos),
-        );
-        dbCommonMocks.serializeUTxOsForStorage.mockImplementation(
-          (utxos: readonly UTxO[]) => {
-            if (utxos === returnedWalletUtxos) {
-              return Effect.succeed(serializedWallet);
-            }
-            if (utxos === producedUtxos) {
-              return Effect.succeed(serializedProduced);
-            }
-            return Effect.fail(
-              new Error("Unexpected UTxO set for serialization"),
-            );
-          },
-        );
+      yield* buildNewBlockEntry(
+        makeEntry(),
+        "utxo-root",
+        "tx-root",
+        "deposit-root",
+        "withdrawal-root",
+        new Date("2026-01-02T00:00:00.000Z"),
+        makeStats(),
+      ).pipe(Effect.provide(makeRuntimeLayer(lucidApi)));
 
-        blocksDbMocks.getAppendedStateQueueUTxOFromEntry.mockReturnValue(
-          Effect.succeed({
-            utxo: makeUtxo("e"),
-            datum: {
-              next: {
-                Key: {
-                  key: "f".repeat(56),
-                },
-              },
-            },
-          }),
-        );
+      expect(
+        sdkMocks.incompleteCommitBlockHeaderTxProgram,
+      ).toHaveBeenCalledTimes(2);
+      expect(firstBuilder.chainProgram).toHaveBeenCalledTimes(1);
+      expect(secondBuilder.chainProgram).toHaveBeenCalledTimes(1);
+      expect(getUtxos).toHaveBeenCalledTimes(1);
+      expect(overrideUTxOs).toHaveBeenCalledWith(staleWalletUtxos);
+      expect(overrideUTxOs).toHaveBeenLastCalledWith(
+        freshWalletUtxosFromProvider,
+      );
+    }),
+  );
 
-        sdkMocks.updateLatestBlocksDatumAndGetTheNewHeaderProgram.mockReturnValue(
-          Effect.succeed({
-            nodeDatum: { next: { Key: { key: "1".repeat(56) } } },
-            header: {
-              version: 1n,
-            },
-          }),
-        );
-        sdkMocks.hashBlockHeader.mockReturnValue(Effect.succeed("aa"));
+  it.effect("persists returned wallet and produced UTxOs", () =>
+    Effect.gen(function* () {
+      const staleWalletUtxos: readonly UTxO[] = [makeUtxo("a")];
+      const freshWalletUtxosFromProvider: UTxO[] = [makeUtxo("b")];
+      const returnedWalletUtxos: readonly UTxO[] = [makeUtxo("c")];
+      const producedUTxOs: readonly UTxO[] = [makeUtxo("d")];
+      const serializedWallet = Buffer.from([0xa1]);
+      const serializedProduced = Buffer.from([0xb2]);
 
-        const signBuilder = {
-          sign: {
-            withWallet: () => ({
-              completeProgram: () =>
-                Effect.succeed({
-                  toTransaction: () => ({
-                    to_cbor_bytes: () => new Uint8Array([0xca, 0xfe]),
-                  }),
-                }),
-            }),
-          },
-          toHash: () => "tx-hash",
-        };
+      const { lucidApi, getUtxos } = makeLucidFixture(
+        freshWalletUtxosFromProvider,
+      );
+      setupPrerequisites(staleWalletUtxos);
+      dbCommonMocks.serializeUTxOsForStorage.mockImplementation(
+        (utxos: readonly UTxO[]) => {
+          if (utxos === returnedWalletUtxos) {
+            return Effect.succeed(serializedWallet);
+          }
+          if (utxos === producedUTxOs) {
+            return Effect.succeed(serializedProduced);
+          }
+          return Effect.fail(
+            new Error("Unexpected UTxO set for serialization"),
+          );
+        },
+      );
 
-        const firstBuilder = {
-          chainProgram: vi.fn(() =>
-            Effect.fail(new Error("collateral missing")),
-          ),
-        };
-        const secondBuilder = {
-          chainProgram: vi.fn(() =>
-            Effect.succeed([returnedWalletUtxos, producedUtxos, signBuilder]),
-          ),
-        };
+      const txBuilder = {
+        chainProgram: vi.fn(() =>
+          Effect.succeed([
+            returnedWalletUtxos,
+            producedUTxOs,
+            makeSignedBuilder(),
+          ]),
+        ),
+      };
+      sdkMocks.incompleteCommitBlockHeaderTxProgram.mockReturnValue(
+        Effect.succeed(txBuilder),
+      );
 
-        sdkMocks.incompleteCommitBlockHeaderTxProgram
-          .mockReturnValueOnce(Effect.succeed(firstBuilder))
-          .mockReturnValueOnce(Effect.succeed(secondBuilder));
+      const result = yield* buildNewBlockEntry(
+        makeEntry(),
+        "utxo-root",
+        "tx-root",
+        "deposit-root",
+        "withdrawal-root",
+        new Date("2026-01-02T00:00:00.000Z"),
+        makeStats(),
+      ).pipe(Effect.provide(makeRuntimeLayer(lucidApi)));
 
-        const entry = {
-          [BlocksDB.Columns.NEW_WALLET_UTXOS]: Buffer.from([0x01]),
-          [BlocksDB.Columns.EVENT_END_TIME]: new Date(
-            "2026-01-01T00:00:00.000Z",
-          ),
-        } as Parameters<typeof buildNewBlockEntry>[0];
-
-        const stats = {
-          deposits_count: 1,
-          tx_orders_count: 1,
-          tx_requests_count: 1,
-          withdrawals_count: 0,
-          total_events_size: 10,
-        };
-
-        const layer = Layer.mergeAll(
-          Layer.succeed(AlwaysSucceedsContract, {
-            stateQueue: {
-              spendingScript: {
-                type: "PlutusV3",
-                script: "spend-script",
-              },
-              policyId: "policy-id",
-              mintingScript: {
-                type: "PlutusV3",
-                script: "mint-script",
-              },
-            },
-          } as never),
-          Layer.succeed(Lucid, {
-            _tag: "Lucid",
-            api: lucidApi as LucidEvolution,
-            switchToOperatorsMainWallet: Effect.void,
-            switchToOperatorsBlockCommitmentWallet: Effect.void,
-            switchToOperatorsMergingWallet: Effect.void,
-          }),
-        );
-
-        const result = yield* buildNewBlockEntry(
-          entry,
-          "utxo-root",
-          "tx-root",
-          "deposit-root",
-          "withdrawal-root",
-          new Date("2026-01-02T00:00:00.000Z"),
-          stats,
-        ).pipe(Effect.provide(layer));
-
-        expect(
-          sdkMocks.incompleteCommitBlockHeaderTxProgram,
-        ).toHaveBeenCalledTimes(2);
-        expect(firstBuilder.chainProgram).toHaveBeenCalledTimes(1);
-        expect(secondBuilder.chainProgram).toHaveBeenCalledTimes(1);
-        expect(getUtxos).toHaveBeenCalledTimes(1);
-        expect(overrideUTxOs).toHaveBeenCalledWith(staleWalletUtxos);
-        expect(overrideUTxOs).toHaveBeenCalledWith(
-          freshWalletUtxosFromProvider,
-        );
-        expect(result[BlocksDB.Columns.NEW_WALLET_UTXOS]).toEqual(
-          serializedWallet,
-        );
-        expect(result[BlocksDB.Columns.PRODUCED_UTXOS]).toEqual(
-          serializedProduced,
-        );
-        expect(result[BlocksDB.Columns.STATUS]).toBe(
-          BlocksDB.Status.UNSUBMITTED,
-        );
-      }),
+      expect(getUtxos).not.toHaveBeenCalled();
+      expect(result[BlocksDB.Columns.NEW_WALLET_UTXOS]).toEqual(
+        serializedWallet,
+      );
+      expect(result[BlocksDB.Columns.PRODUCED_UTXOS]).toEqual(
+        serializedProduced,
+      );
+      expect(result[BlocksDB.Columns.STATUS]).toBe(BlocksDB.Status.UNSUBMITTED);
+      expect(txBuilder.chainProgram).toHaveBeenCalledTimes(1);
+      expect(
+        sdkMocks.incompleteCommitBlockHeaderTxProgram,
+      ).toHaveBeenCalledTimes(1);
+    }),
   );
 });

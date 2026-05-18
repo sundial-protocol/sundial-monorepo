@@ -10,6 +10,7 @@ import { EMPTY_ROOT } from "../constants.js";
 
 const txIdA = Buffer.alloc(32, 0xaa);
 const txCborA = Buffer.alloc(64, 0xbb);
+const txCborBytesA = new Uint8Array(txCborA);
 
 it.effect("Empty in-memory MPT has expected root", () =>
   Effect.gen(function* () {
@@ -88,34 +89,39 @@ describe("LevelDB-backed MPT", () => {
       const emptyRoot = yield* mpt1.getRootHex();
       yield* mpt1.batch([{ type: "put", key: txIdA, value: txCborA }]);
       const rootAfterPut = yield* mpt1.getRootHex();
-      yield* Effect.tryPromise({
-        try: () => mpt1.databaseAndPath!.database._leveldb.close(),
-        catch: (e) => new Error(`${e}`),
-      });
+      const valueBeforeClose = yield* mpt1.get(txIdA);
+      yield* mpt1.close();
 
       const mpt2 = yield* MidgardMpt.create("unit-test-leveldb", tmpPath);
       const reopenedRoot = yield* mpt2.getRootHex();
-      yield* Effect.tryPromise({
-        try: () => mpt2.databaseAndPath!.database._leveldb.close(),
-        catch: (e) => new Error(`${e}`),
-      });
+      const reopenedValue = yield* mpt2.get(txIdA);
+      yield* mpt2.close();
 
       expect(rootAfterPut).not.toBe(emptyRoot);
       expect(reopenedRoot).toBe(rootAfterPut);
+      expect(valueBeforeClose).toStrictEqual(txCborBytesA);
+      expect(reopenedValue).toStrictEqual(txCborBytesA);
     }),
   );
 
-  it.effect("opens LevelDB during trie creation", () =>
+  it.effect("supports closing and reopening LevelDB-backed trie", () =>
     Effect.gen(function* () {
       tmpPath = path.join(os.tmpdir(), `midgard-unit-open-${randomUUID()}`);
       const mpt = yield* MidgardMpt.create("unit-test-leveldb-open", tmpPath);
-      const leveldb = mpt.databaseAndPath?.database.getDatabase();
-      expect(leveldb).toBeDefined();
-      expect(leveldb!.status).toBe("open");
-      yield* Effect.tryPromise({
-        try: () => leveldb!.close(),
-        catch: (e) => new Error(`${e}`),
-      });
+      yield* mpt.batch([{ type: "put", key: txIdA, value: txCborA }]);
+      const rootAfterPut = yield* mpt.getRootHex();
+      yield* mpt.close();
+
+      const reopened = yield* MidgardMpt.create(
+        "unit-test-leveldb-open",
+        tmpPath,
+      );
+      const reopenedRoot = yield* reopened.getRootHex();
+      const reopenedValue = yield* reopened.get(txIdA);
+      yield* reopened.close();
+
+      expect(reopenedRoot).toBe(rootAfterPut);
+      expect(reopenedValue).toStrictEqual(txCborBytesA);
     }),
   );
 });

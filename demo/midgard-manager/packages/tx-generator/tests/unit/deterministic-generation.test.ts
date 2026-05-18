@@ -26,33 +26,12 @@ vi.mock('../../src/lib/generators/index.js', () => ({
 }));
 
 import {
+  createDeterministicTaskPlan,
   getGeneratorStatus,
   startGenerator,
   stopGenerator,
+  waitForGeneratorStop,
 } from '../../src/lib/scheduler/scheduler';
-
-const waitForStop = async (maxMs = 2000) => {
-  const deadline = Date.now() + maxMs;
-  while (getGeneratorStatus().running && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-};
-
-const getGenerationPlan = () => {
-  const oneToOneInputs = mockOneToOne.mock.calls.map((call) => {
-    const config = call[0];
-    return `${config.initialUTxO.txHash}:${config.initialUTxO.outputIndex}`;
-  });
-  const multiOutputInputs = mockMultiOutput.mock.calls.map((call) => {
-    const config = call[0];
-    return `${config.initialUTxO.txHash}:${config.initialUTxO.outputIndex}`;
-  });
-
-  return {
-    oneToOneInputs,
-    multiOutputInputs,
-  };
-};
 
 describe('Deterministic generation and replay', () => {
   beforeEach(() => {
@@ -83,7 +62,7 @@ describe('Deterministic generation and replay', () => {
     await stopGenerator();
   });
 
-  it('uses the same generation plan for repeated runs with the same seed', async () => {
+  it('builds the same deterministic task plan for repeated runs with the same seed', async () => {
     const config = {
       walletSeedOrPrivateKey: 'seeded_test_key',
       nodeEndpoint: 'http://localhost:3000',
@@ -96,22 +75,53 @@ describe('Deterministic generation and replay', () => {
       generationSeed: 'm42-seed-replayable',
     };
 
-    await startGenerator(config);
-    await waitForStop();
-    const firstPlan = getGenerationPlan();
-
-    mockOneToOne.mockClear();
-    mockMultiOutput.mockClear();
-    mockSubmitTransaction.mockClear();
-
-    await startGenerator(config);
-    await waitForStop();
-    const secondPlan = getGenerationPlan();
+    const firstPlan = createDeterministicTaskPlan({
+      initialUTxO: {
+        txHash: '0'.repeat(64),
+        outputIndex: 0,
+        assets: { lovelace: 10_000_000_000n },
+        address: '',
+        datum: null,
+        datumHash: null,
+        scriptRef: null,
+      },
+      batchSize: config.batchSize,
+      transactionType: config.transactionType,
+      oneToOneRatio: config.oneToOneRatio,
+      generationSeed: config.generationSeed,
+    });
+    const secondPlan = createDeterministicTaskPlan({
+      initialUTxO: {
+        txHash: '0'.repeat(64),
+        outputIndex: 0,
+        assets: { lovelace: 10_000_000_000n },
+        address: '',
+        datum: null,
+        datumHash: null,
+        scriptRef: null,
+      },
+      batchSize: config.batchSize,
+      transactionType: config.transactionType,
+      oneToOneRatio: config.oneToOneRatio,
+      generationSeed: config.generationSeed,
+    });
 
     expect(secondPlan).toEqual(firstPlan);
-    expect(secondPlan.oneToOneInputs.length + secondPlan.multiOutputInputs.length).toBe(
-      config.batchSize
-    );
+    expect(secondPlan.taskPlans).toHaveLength(config.batchSize);
+    expect(
+      secondPlan.taskPlans.map(
+        (taskPlan) => `${taskPlan.initialUTxO.txHash}:${taskPlan.initialUTxO.outputIndex}`
+      )
+    ).toMatchInlineSnapshot(`
+      [
+        "316B90D6B600E91B5D572523BD638AD4112AA6CA4AEC53207EB829B8F935A89E:575",
+        "9A2A5244B06778AF5DB946778ADF0F493CA2817F473029CA2F31D4F2EC01EF2E:146",
+        "CAA4DE8FDF0991C0EF0EBB2083C1EDFFCDBD06348A686AA4E54A9E956158B2A9:923",
+        "838AC823157EBC9344BC73CC132C650FB375DDAD4CAA3C4A95BBED1E15EC49B6:783",
+        "1BA465CF47DB4CB1C3FACDE687DB2906169859B689086624668CFEE14527A54D:292",
+        "2CD3F635AB69BD7362EE472220C9EDCF6789FC34AB5266CF5E2ABE01391BF932:986",
+      ]
+    `);
   });
 
   it('replays a corpus without invoking live generators', async () => {
@@ -150,7 +160,7 @@ describe('Deterministic generation and replay', () => {
         autoStopAfterBatch: true,
         replayCorpusPath: corpusPath,
       });
-      await waitForStop();
+      await waitForGeneratorStop();
       const status = getGeneratorStatus();
 
       expect(mockOneToOne).not.toHaveBeenCalled();

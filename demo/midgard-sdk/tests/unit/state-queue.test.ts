@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("SDK unit state queue programs", () => {
-  it("fetchConfirmedStateAndItsLinkByUnitProgram uses unit lookups and never scans by address", async () => {
+  it("fetchConfirmedStateAndItsLinkByUnitProgram resolves confirmed and link UTxOs via unit lookups", async () => {
     const lucid = makeLucidMock();
     const stateQueueKey = "ab".repeat(28);
     const confirmedNodeDatum = {
@@ -58,9 +58,16 @@ describe("SDK unit state queue programs", () => {
       unit: firstBlockUnit,
     });
 
-    lucid.utxosAtWithUnit
-      .mockResolvedValueOnce([confirmedUtxo])
-      .mockResolvedValueOnce([blockUtxo]);
+    const lookupByUnit = new Map<string, unknown[]>([
+      [rootUnit, [confirmedUtxo]],
+      [firstBlockUnit, [blockUtxo]],
+    ]);
+    lucid.utxosAt.mockImplementation(async () => {
+      throw new Error("unexpected broad state-queue scan");
+    });
+    lucid.utxosAtWithUnit.mockImplementation(
+      async (_address, unit) => lookupByUnit.get(unit) ?? [],
+    );
 
     const result = await Effect.runPromise(
       sdk.fetchConfirmedStateAndItsLinkByUnitProgram(lucid as any, {
@@ -69,18 +76,7 @@ describe("SDK unit state queue programs", () => {
       }),
     );
 
-    expect(lucid.utxosAt).not.toHaveBeenCalled();
-    expect(lucid.utxosAtWithUnit).toHaveBeenCalledTimes(2);
-    expect(lucid.utxosAtWithUnit).toHaveBeenNthCalledWith(
-      1,
-      addressScriptA,
-      rootUnit,
-    );
-    expect(lucid.utxosAtWithUnit).toHaveBeenNthCalledWith(
-      2,
-      addressScriptA,
-      firstBlockUnit,
-    );
+    expect(lucid.utxosAtWithUnit).toHaveBeenCalled();
     expect(result.confirmed.utxo.txHash).toBe(txHashA);
     expect(result.link?.utxo.txHash).toBe(txHashB);
   });

@@ -97,9 +97,13 @@ import { submitEarliestBlock } from "@/fibers/block-submission.js";
 const sqlHarness = createMockSqlHarness();
 
 const fakeSubmitProgram = vi.fn(() => Effect.succeed("faketxhash"));
-const fakeCompleteProgram = vi.fn(() =>
-  Effect.succeed({ submitProgram: fakeSubmitProgram }),
-);
+const fakeCompleteProgram = vi.fn<
+  () => Effect.Effect<
+    { submitProgram: typeof fakeSubmitProgram },
+    { _tag: "RunTimeError" },
+    never
+  >
+>(() => Effect.succeed({ submitProgram: fakeSubmitProgram }));
 const fakeFromTx = vi.fn(() => ({ completeProgram: fakeCompleteProgram }));
 
 const fakeLucidLayer = Layer.succeed(
@@ -121,17 +125,14 @@ const baseLayer = Layer.mergeAll(
 );
 
 function runAction(layer = baseLayer) {
-  return submitEarliestBlock.pipe(
-    Effect.catchAllCause(() => Effect.void),
-    Effect.provide(layer),
-  );
+  return submitEarliestBlock.pipe(Effect.provide(layer));
 }
 
-async function readSubmitCount(layer = baseLayer): Promise<bigint> {
-  const state = await Effect.runPromise(
-    Metric.value(submitCounter).pipe(Effect.provide(layer)),
+function runActionExpectLucidFailure(layer = baseLayer) {
+  return submitEarliestBlock.pipe(
+    Effect.catchTag("LucidError", () => Effect.void),
+    Effect.provide(layer),
   );
-  return state.count;
 }
 
 const fakeBlockEntry = {
@@ -162,6 +163,8 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
       const after = yield* Metric.value(submitCounter);
 
       expect(after.count - before.count).toBe(0n);
+      expect(fakeFromTx).not.toHaveBeenCalled();
+      expect(setStatusFn).not.toHaveBeenCalled();
     }),
   );
 
@@ -174,19 +177,28 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
       const after = yield* Metric.value(submitCounter);
 
       expect(after.count - before.count).toBe(1n);
+      expect(fakeFromTx).toHaveBeenCalledWith("deadbeef");
+      expect(fakeCompleteProgram).toHaveBeenCalledTimes(1);
+      expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
+      expect(setStatusFn).toHaveBeenCalledTimes(1);
+      expect(setStatusFn).toHaveBeenCalledWith(fakeBlockEntry, 1);
     }),
   );
 
   it.effect("does NOT increment when L1 submission fails", () =>
     Effect.gen(function* () {
       retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
-      fakeCompleteProgram.mockReturnValue(Effect.die(new Error("tx rejected")));
+      fakeCompleteProgram.mockReturnValue(
+        Effect.fail({ _tag: "RunTimeError" }),
+      );
 
       const before = yield* Metric.value(submitCounter);
-      yield* runAction();
+      yield* runActionExpectLucidFailure();
       const after = yield* Metric.value(submitCounter);
 
       expect(after.count - before.count).toBe(0n);
+      expect(fakeSubmitProgram).not.toHaveBeenCalled();
+      expect(setStatusFn).not.toHaveBeenCalled();
     }),
   );
 });
