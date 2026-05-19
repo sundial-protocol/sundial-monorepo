@@ -4,6 +4,7 @@ import type { BenchmarkConclusion } from '../../src/analysis/analyzer.js';
 import type { TierSummary } from '../../src/analysis/tier-summary.js';
 import type { ScalabilityScenario } from '../../src/config/scenario.js';
 import type { RunManifest } from '../../src/evidence/artifacts.js';
+import type { ChartRecord, ChartSection } from '../../src/report/charts.js';
 import type { ReportInput } from '../../src/report/markdown.js';
 import { renderReport } from '../../src/report/markdown.js';
 
@@ -739,5 +740,206 @@ describe('renderReport — return type', () => {
   it('contains markdown table separators', () => {
     const out = renderReport(makeInput());
     expect(out).toContain('| --- |');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Chart embedding helpers
+// ---------------------------------------------------------------------------
+
+function makeChartRecord(
+  slug: string,
+  title: string,
+  section: ChartSection,
+  hasData = true
+): ChartRecord {
+  return { slug, title, section, relPath: `charts/${slug}.svg`, hasData };
+}
+
+function makeSampleChartRecords(): ChartRecord[] {
+  return [
+    makeChartRecord('received-tps', 'Received TPS', 'Throughput'),
+    makeChartRecord('received-cumulative', 'Received Cumulative', 'Throughput'),
+    makeChartRecord('tx-queue', 'TX Queue Size', 'Queue and Mempool'),
+    makeChartRecord('mempool-count', 'Mempool Count', 'Queue and Mempool'),
+    makeChartRecord('built-blocks', 'Blocks Built', 'Block Pipeline'),
+    makeChartRecord('submitted-blocks', 'Blocks Submitted', 'Block Pipeline'),
+    makeChartRecord('commit-failures', 'Commitment Failures', 'Failure Signals'),
+    makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure'),
+    makeChartRecord('memory-usage', 'Memory Usage', 'Infrastructure'),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// renderReport — chart embedding
+// ---------------------------------------------------------------------------
+
+describe('renderReport — chart embedding: Infrastructure section', () => {
+  it('omits ## Infrastructure when chartRecords is undefined', () => {
+    const out = renderReport(makeInput());
+    expect(out).not.toContain('## Infrastructure');
+  });
+
+  it('omits ## Infrastructure when chartRecords is an empty array', () => {
+    const out = renderReport(makeInput({ chartRecords: [] }));
+    expect(out).not.toContain('## Infrastructure');
+  });
+
+  it('omits ## Infrastructure when all infrastructure records have hasData: false', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', false),
+      makeChartRecord('memory-usage', 'Memory Usage', 'Infrastructure', false),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    expect(out).not.toContain('## Infrastructure');
+  });
+
+  it('includes ## Infrastructure when at least one infrastructure record has hasData: true', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    expect(out).toContain('## Infrastructure');
+  });
+
+  it('embeds image markdown for infrastructure charts with hasData: true', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
+      makeChartRecord('memory-usage', 'Memory Usage', 'Infrastructure', true),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    expect(out).toContain('![CPU Usage](charts/cpu-usage.svg)');
+    expect(out).toContain('![Memory Usage](charts/memory-usage.svg)');
+  });
+
+  it('skips infrastructure charts with hasData: false', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
+      makeChartRecord('memory-usage', 'Memory Usage', 'Infrastructure', false),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    expect(out).toContain('![CPU Usage](charts/cpu-usage.svg)');
+    expect(out).not.toContain('![Memory Usage](charts/memory-usage.svg)');
+  });
+
+  it('places ## Infrastructure after ## Primary Bottleneck Hypothesis', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxBottleneck = out.indexOf('## Primary Bottleneck Hypothesis');
+    const idxInfra = out.indexOf('## Infrastructure');
+    expect(idxBottleneck).toBeGreaterThan(-1);
+    expect(idxInfra).toBeGreaterThan(-1);
+    expect(idxInfra).toBeGreaterThan(idxBottleneck);
+  });
+
+  it('places ## Infrastructure before ## Artifact Index', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxInfra = out.indexOf('## Infrastructure');
+    const idxArtifact = out.indexOf('## Artifact Index');
+    expect(idxInfra).toBeGreaterThan(-1);
+    expect(idxArtifact).toBeGreaterThan(-1);
+    expect(idxArtifact).toBeGreaterThan(idxInfra);
+  });
+});
+
+describe('renderReport — chart embedding: per-section charts', () => {
+  it('embeds Throughput charts after ## Throughput Stage Deltas', () => {
+    const records = makeSampleChartRecords();
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxSection = out.indexOf('## Throughput Stage Deltas');
+    const idxChart = out.indexOf('![Received TPS](charts/received-tps.svg)');
+    expect(idxSection).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(idxSection);
+  });
+
+  it('embeds Queue and Mempool charts after ## Queue and Mempool Behavior', () => {
+    const records = makeSampleChartRecords();
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxSection = out.indexOf('## Queue and Mempool Behavior');
+    const idxChart = out.indexOf('![TX Queue Size](charts/tx-queue.svg)');
+    expect(idxSection).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(idxSection);
+  });
+
+  it('embeds Block Pipeline charts after ## Commit/Submit/Merge Progress', () => {
+    const records = makeSampleChartRecords();
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxSection = out.indexOf('## Commit/Submit/Merge Progress');
+    const idxChart = out.indexOf('![Blocks Built](charts/built-blocks.svg)');
+    expect(idxSection).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(idxSection);
+  });
+
+  it('embeds Failure Signals charts after ## Failure Signals', () => {
+    const records = makeSampleChartRecords();
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxSection = out.indexOf('## Failure Signals');
+    const idxChart = out.indexOf('![Commitment Failures](charts/commit-failures.svg)');
+    expect(idxSection).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(-1);
+    expect(idxChart).toBeGreaterThan(idxSection);
+  });
+
+  it('does not embed charts from wrong sections in Throughput', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    // No throughput charts → section has no embedded images
+    const idxSection = out.indexOf('## Throughput Stage Deltas');
+    const nextSection = out.indexOf('\n## ', idxSection + 1);
+    const throughputBlock = out.slice(idxSection, nextSection > -1 ? nextSection : undefined);
+    expect(throughputBlock).not.toContain('![CPU Usage]');
+  });
+
+  it('omits chart images for hasData: false records in all sections', () => {
+    const records: ChartRecord[] = [
+      makeChartRecord('received-tps', 'Received TPS', 'Throughput', false),
+      makeChartRecord('tx-queue', 'TX Queue Size', 'Queue and Mempool', false),
+      makeChartRecord('built-blocks', 'Blocks Built', 'Block Pipeline', false),
+      makeChartRecord('commit-failures', 'Commitment Failures', 'Failure Signals', false),
+    ];
+    const out = renderReport(makeInput({ chartRecords: records }));
+    expect(out).not.toContain('![Received TPS]');
+    expect(out).not.toContain('![TX Queue Size]');
+    expect(out).not.toContain('![Blocks Built]');
+    expect(out).not.toContain('![Commitment Failures]');
+  });
+
+  it('Throughput charts appear before Queue and Mempool charts in document order', () => {
+    const records = makeSampleChartRecords();
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxThroughput = out.indexOf('![Received TPS](charts/received-tps.svg)');
+    const idxQueue = out.indexOf('![TX Queue Size](charts/tx-queue.svg)');
+    expect(idxThroughput).toBeGreaterThan(-1);
+    expect(idxQueue).toBeGreaterThan(-1);
+    expect(idxThroughput).toBeLessThan(idxQueue);
+  });
+
+  it('Block Pipeline charts appear before Failure Signals charts in document order', () => {
+    const records = makeSampleChartRecords();
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const idxBlock = out.indexOf('![Blocks Built](charts/built-blocks.svg)');
+    const idxFailure = out.indexOf('![Commitment Failures](charts/commit-failures.svg)');
+    expect(idxBlock).toBeGreaterThan(-1);
+    expect(idxFailure).toBeGreaterThan(-1);
+    expect(idxBlock).toBeLessThan(idxFailure);
+  });
+
+  it('uses relative paths starting with charts/ for embedded images', () => {
+    const records = makeSampleChartRecords();
+    const out = renderReport(makeInput({ chartRecords: records }));
+    const imageMatches = [...out.matchAll(/!\[([^\]]+)\]\(([^)]+)\)/g)];
+    for (const match of imageMatches) {
+      expect(match[2]).toMatch(/^charts\//);
+    }
   });
 });

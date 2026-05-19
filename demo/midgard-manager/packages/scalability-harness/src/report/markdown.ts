@@ -4,6 +4,7 @@ import type { ScalabilityScenario } from '../config/scenario.js';
 import type { RunManifest } from '../evidence/artifacts.js';
 import type { LokiTierCapture } from '../evidence/loki.js';
 import type { TempoTierCapture } from '../evidence/tempo.js';
+import type { ChartRecord, ChartSection } from './charts.js';
 
 export interface ReportInput {
   manifest: RunManifest;
@@ -16,6 +17,8 @@ export interface ReportInput {
   lokiCaptures?: LokiTierCapture[];
   /** Per-tier Tempo trace captures, present when tempoEndpoint was configured. */
   tempoCaptures?: TempoTierCapture[];
+  /** Generated chart SVGs, keyed by section. Present when chart generation ran. */
+  chartRecords?: ChartRecord[];
 }
 
 // --- Formatters ---
@@ -48,6 +51,23 @@ function mdTable(headers: string[], rows: string[][]): string {
     `| ${sep.join(' | ')} |`,
     ...rows.map((row) => `| ${row.join(' | ')} |`),
   ].join('\n');
+}
+
+// --- Chart image helpers ---
+
+function chartsForSection(
+  section: ChartSection,
+  chartRecords: ChartRecord[] | undefined
+): string | null {
+  if (chartRecords === undefined) return null;
+  const matching = chartRecords.filter((r) => r.section === section && r.hasData);
+  if (matching.length === 0) return null;
+  return matching.map((r) => `![${r.title}](${r.relPath})`).join('\n\n');
+}
+
+function appendCharts(base: string, charts: string | null): string {
+  if (charts === null) return base;
+  return base + '\n\n' + charts;
 }
 
 // --- Section renderers ---
@@ -243,7 +263,7 @@ function renderFormalRunClassification(conclusion: BenchmarkConclusion): string 
   return lines.join('\n');
 }
 
-function renderThroughputStageDeltas(tiers: TierSummary[]): string {
+function renderThroughputStageDeltas(tiers: TierSummary[], chartRecords?: ChartRecord[]): string {
   const prose = [
     'The columns below reflect three distinct pipeline stages:',
     '',
@@ -274,7 +294,8 @@ function renderThroughputStageDeltas(tiers: TierSummary[]): string {
     f2(t.observedCommittedTps),
   ]);
 
-  return ['## Throughput Stage Deltas', '', prose, '', mdTable(headers, rows)].join('\n');
+  const base = ['## Throughput Stage Deltas', '', prose, '', mdTable(headers, rows)].join('\n');
+  return appendCharts(base, chartsForSection('Throughput', chartRecords));
 }
 
 function renderClientSubmissionEvidence(tiers: TierSummary[]): string {
@@ -380,7 +401,7 @@ function renderAcceptedToCommittedLatencyEvidence(tiers: TierSummary[]): string 
   ].join('\n');
 }
 
-function renderQueueAndMempoolBehavior(tiers: TierSummary[]): string {
+function renderQueueAndMempoolBehavior(tiers: TierSummary[], chartRecords?: ChartRecord[]): string {
   if (tiers.length === 0) {
     return '## Queue and Mempool Behavior\n\n_No tier data._';
   }
@@ -403,10 +424,14 @@ function renderQueueAndMempoolBehavior(tiers: TierSummary[]): string {
     n(t.finalMempoolSizeAfterRecovery),
   ]);
 
-  return ['## Queue and Mempool Behavior', '', mdTable(headers, rows)].join('\n');
+  const base = ['## Queue and Mempool Behavior', '', mdTable(headers, rows)].join('\n');
+  return appendCharts(base, chartsForSection('Queue and Mempool', chartRecords));
 }
 
-function renderCommitSubmitMergeProgress(tiers: TierSummary[]): string {
+function renderCommitSubmitMergeProgress(
+  tiers: TierSummary[],
+  chartRecords?: ChartRecord[]
+): string {
   if (tiers.length === 0) {
     return '## Commit/Submit/Merge Progress\n\n_No tier data._';
   }
@@ -442,10 +467,13 @@ function renderCommitSubmitMergeProgress(tiers: TierSummary[]): string {
     f2(t.l1FeePerCommittedL2TxLovelace),
   ]);
 
-  return ['## Commit/Submit/Merge Progress', '', prose, '', mdTable(headers, rows)].join('\n');
+  const base = ['## Commit/Submit/Merge Progress', '', prose, '', mdTable(headers, rows)].join(
+    '\n'
+  );
+  return appendCharts(base, chartsForSection('Block Pipeline', chartRecords));
 }
 
-function renderFailureSignals(tiers: TierSummary[]): string {
+function renderFailureSignals(tiers: TierSummary[], chartRecords?: ChartRecord[]): string {
   if (tiers.length === 0) {
     return '## Failure Signals\n\n_No tier data._';
   }
@@ -468,7 +496,14 @@ function renderFailureSignals(tiers: TierSummary[]): string {
     n(t.processingFailedDelta),
   ]);
 
-  return ['## Failure Signals', '', mdTable(headers, rows)].join('\n');
+  const base = ['## Failure Signals', '', mdTable(headers, rows)].join('\n');
+  return appendCharts(base, chartsForSection('Failure Signals', chartRecords));
+}
+
+function renderInfrastructureCharts(chartRecords?: ChartRecord[]): string | null {
+  const charts = chartsForSection('Infrastructure', chartRecords);
+  if (charts === null) return null;
+  return ['## Infrastructure', '', charts].join('\n');
 }
 
 function renderPrimaryBottleneckHypothesis(conclusion: BenchmarkConclusion): string {
@@ -595,7 +630,13 @@ function renderLimitations(): string {
 }
 
 export function renderReport(input: ReportInput): string {
+  const charts = input.chartRecords;
   const optionalSections: string[] = [];
+
+  const infraSection = renderInfrastructureCharts(charts);
+  if (infraSection !== null) {
+    optionalSections.push(infraSection);
+  }
 
   const lokiSection = renderLokiEvidence(input.lokiCaptures);
   if (lokiSection !== null) {
@@ -614,12 +655,12 @@ export function renderReport(input: ReportInput): string {
     renderTierResultsTable(input.tierSummaries),
     renderFormalRunClassification(input.conclusion),
     renderCollapsePoint(input.conclusion),
-    renderThroughputStageDeltas(input.tierSummaries),
+    renderThroughputStageDeltas(input.tierSummaries, charts),
     renderClientSubmissionEvidence(input.tierSummaries),
     renderAcceptedToCommittedLatencyEvidence(input.tierSummaries),
-    renderQueueAndMempoolBehavior(input.tierSummaries),
-    renderCommitSubmitMergeProgress(input.tierSummaries),
-    renderFailureSignals(input.tierSummaries),
+    renderQueueAndMempoolBehavior(input.tierSummaries, charts),
+    renderCommitSubmitMergeProgress(input.tierSummaries, charts),
+    renderFailureSignals(input.tierSummaries, charts),
     renderPrimaryBottleneckHypothesis(input.conclusion),
     ...optionalSections,
     renderArtifactIndex(input.artifactFiles),
