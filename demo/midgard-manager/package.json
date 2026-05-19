@@ -8,7 +8,9 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "pnpm --filter @midgard-manager/* build",
+    "build": "npm run build:root && npm run build:packages",
+    "build:root": "node -e \"process.exit(0)\"",
+    "build:packages": "pnpm --recursive --filter '@midgard-manager/*' run build",
     "dev": "pnpm --filter @midgard-manager/* dev",
     "type-check:cli": "pnpm --filter @midgard-manager/cli run type-check",
     "type-check:tx-generator": "pnpm --filter @midgard-manager/tx-generator run type-check",
@@ -19,6 +21,9 @@
     "start": "pnpm --filter @midgard-manager/cli start",
     "tx-generator": "pnpm --filter @midgard-manager/tx-generator start",
     "scalability-harness": "pnpm --filter @midgard-manager/scalability-harness start",
+    "wallet:block-commitment:topup": "node scripts/fund-bc-wallet.mjs",
+    "wallet:block-commitment:check": "node scripts/fund-bc-wallet.mjs --check",
+    "wallet:topup:block-commitment": "npm run wallet:block-commitment:topup",
     "test": "pnpm --filter @midgard-manager/* test",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md}\"",

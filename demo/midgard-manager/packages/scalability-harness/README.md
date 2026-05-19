@@ -65,10 +65,13 @@ top up the block-commitment operator wallet before running formal scalability sc
 
 ```bash
 # From demo/ (workspace shortcut)
-npm run wallet:topup:block-commitment
+npm run wallet:block-commitment:topup
 
-# Directly in demo/midgard-node
-npm --prefix midgard-node run wallet:topup-block-commitment
+# Directly in demo/midgard-manager
+npm --prefix midgard-manager run wallet:block-commitment:topup
+
+# Check current balance only (no top-up tx)
+npm --prefix midgard-manager run wallet:block-commitment:check
 ```
 
 ### Flags reference

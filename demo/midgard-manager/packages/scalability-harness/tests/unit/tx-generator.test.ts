@@ -91,31 +91,29 @@ function makeWriter() {
 // ---------------------------------------------------------------------------
 
 describe('computeSettings', () => {
-  // CLIENT_OVERSEND_RATIO = 1.1: the client targets 110% of the scenario TPS to
+  // CLIENT_OVERSEND_RATIO = 2: the client targets 200% of the scenario TPS to
   // absorb scheduling jitter without falling below the configured target.
-  // effectiveTps = targetTps * 1.1
-  // concurrency  = ceil(effectiveTps * txCostSeconds * 2)
-  // interval     = concurrency / effectiveTps  (≈ 2 * txCostSeconds)
+  // effectiveTps = targetTps * 2
+  // concurrency  = ceil(effectiveTps * txCostSeconds * 12)
+  // interval     = concurrency / effectiveTps  (≈ 6 * txCostSeconds)
   //
-  // Note: IEEE-754 floating-point means ceil(targetTps * 1.1 * cost * 2) may
-  // round up by 1 from the mathematical value. The resulting interval is
-  // concurrency/effectiveTps which stays within ≈5% of 2*txCostSeconds.
+  // Note: IEEE-754 floating-point means ceil(targetTps * 2 * cost * 12) may
+  // round up by 1 from the mathematical value.
 
   it('sets batchSize equal to concurrency', () => {
     const s = computeSettings(100, 0.2);
     expect(s.batchSize).toBe(s.concurrency);
   });
 
-  it('sets concurrency proportional to effectiveTps (targetTps * 1.1)', () => {
-    // effectiveTps = 110; concurrency ≈ ceil(110 * 0.2 * 2) = ceil(44) = 44 or 45 (FP)
+  it('sets concurrency proportional to effectiveTps (targetTps * 2)', () => {
+    // effectiveTps = 200; concurrency = ceil(200 * 0.2 * 12) = 480
     const s = computeSettings(100, 0.2);
-    expect(s.concurrency).toBeGreaterThanOrEqual(44);
-    expect(s.concurrency).toBeLessThanOrEqual(45);
+    expect(s.concurrency).toBe(480);
   });
 
-  it('sets actualTpsEstimate to effectiveTps (targetTps * 1.1)', () => {
-    expect(computeSettings(100, 0.2).actualTpsEstimate).toBeCloseTo(110);
-    expect(computeSettings(800, 0.2).actualTpsEstimate).toBeCloseTo(880);
+  it('sets actualTpsEstimate to effectiveTps (targetTps * 2)', () => {
+    expect(computeSettings(100, 0.2).actualTpsEstimate).toBeCloseTo(200);
+    expect(computeSettings(800, 0.2).actualTpsEstimate).toBeCloseTo(1600);
   });
 
   it('preserves targetTps as the scenario-configured value, not the effective rate', () => {
@@ -130,15 +128,22 @@ describe('computeSettings', () => {
     expect(s800.concurrency / s200.concurrency).toBeCloseTo(4, 1);
   });
 
-  it('interval stays close to 2 * txCostSeconds regardless of targetTps', () => {
-    // interval = concurrency / effectiveTps ≈ 2 * txCostSeconds; FP ceiling may
+  it('interval stays close to 6 * txCostSeconds regardless of targetTps', () => {
+    // interval = concurrency / effectiveTps ≈ 6 * txCostSeconds; FP ceiling may
     // add at most 1 to concurrency, so allow ±5% tolerance.
     const s100 = computeSettings(100, 0.2);
     const s800 = computeSettings(800, 0.2);
-    expect(s100.intervalSeconds).toBeGreaterThan(0.38);
-    expect(s100.intervalSeconds).toBeLessThan(0.42);
-    expect(s800.intervalSeconds).toBeGreaterThan(0.38);
-    expect(s800.intervalSeconds).toBeLessThan(0.42);
+    expect(s100.intervalSeconds).toBeGreaterThan(2.39);
+    expect(s100.intervalSeconds).toBeLessThan(2.41);
+    expect(s800.intervalSeconds).toBeGreaterThan(2.39);
+    expect(s800.intervalSeconds).toBeLessThan(2.41);
+  });
+
+  it('derives maxInFlight, generationConcurrency, and preparedQueueCapacity', () => {
+    const s = computeSettings(800, 0.2);
+    expect(s.maxInFlight).toBe(3840);
+    expect(s.generationConcurrency).toBe(2048);
+    expect(s.preparedQueueCapacity).toBe(15360);
   });
 
   it('clamps concurrency to at least 1', () => {
@@ -204,6 +209,10 @@ describe('startTxGenerator', () => {
     expect(args).toContain('--batch-size');
     expect(args).toContain('--interval');
     expect(args).toContain('--concurrency');
+    expect(args).toContain('--max-in-flight');
+    expect(args).toContain('--generation-concurrency');
+    expect(args).toContain('--prepared-queue-capacity');
+    expect(args).toContain('--target-tps');
     expect(args).toContain('--retry-attempts');
     expect(args).toContain(String(BASE_SCENARIO.retryAttempts));
     expect(args).toContain('--retry-delay-ms');
