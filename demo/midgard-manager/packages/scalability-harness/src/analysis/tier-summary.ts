@@ -13,7 +13,11 @@ export interface TierSummary {
   targetTps: number;
   startedAt: string;
   stoppedAt: string;
+  // Full tier window: load + recovery.
   durationSeconds: number;
+  // Load phase only. This is the correct denominator for TPS metrics because
+  // counter deltas (deltaLoad) cover only the load phase.
+  loadDurationSeconds: number;
   result: 'completed' | 'collapsed' | 'evidence_incomplete';
   collapseReason?: string;
   // HTTP boundary acceptance into the in-memory tx queue.
@@ -65,6 +69,10 @@ export interface TierSummaryInput {
   tierIndex: number;
   targetTps: number;
   startedAt: string;
+  // End of the load phase (when the tx generator stopped). Used as the
+  // denominator for TPS metrics since counter deltas cover the load phase only.
+  loadStoppedAt: string;
+  // End of the full tier window (after recovery). Used for durationSeconds.
   stoppedAt: string;
   metricWindow: TierMetricWindow | null;
   windowSummary: TierWindowSummary | null;
@@ -105,6 +113,7 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     tierIndex,
     targetTps,
     startedAt,
+    loadStoppedAt,
     stoppedAt,
     metricWindow,
     windowSummary,
@@ -114,7 +123,9 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     evidenceIncomplete,
   } = input;
 
-  const durationSeconds = (new Date(stoppedAt).getTime() - new Date(startedAt).getTime()) / 1000;
+  const startMs = new Date(startedAt).getTime();
+  const durationSeconds = (new Date(stoppedAt).getTime() - startMs) / 1000;
+  const loadDurationSeconds = (new Date(loadStoppedAt).getTime() - startMs) / 1000;
 
   const result: TierSummary['result'] =
     collapse !== null ? 'collapsed' : evidenceIncomplete ? 'evidence_incomplete' : 'completed';
@@ -142,6 +153,7 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     startedAt,
     stoppedAt,
     durationSeconds,
+    loadDurationSeconds,
     result,
     ...(collapse !== null ? { collapseReason: collapse.reason } : {}),
     enqueuedDelta,
@@ -159,9 +171,9 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
       l1CommitmentFeesDeltaLovelace,
       committedTxDelta
     ),
-    observedEnqueuedTps: deriveTps(enqueuedDelta, durationSeconds),
-    observedMempoolAcceptedTps: deriveTps(mempoolAcceptedDelta, durationSeconds),
-    observedCommittedTps: deriveTps(committedTxDelta, durationSeconds),
+    observedEnqueuedTps: deriveTps(enqueuedDelta, loadDurationSeconds),
+    observedMempoolAcceptedTps: deriveTps(mempoolAcceptedDelta, loadDurationSeconds),
+    observedCommittedTps: deriveTps(committedTxDelta, loadDurationSeconds),
     peakQueueSize: queueGauge?.peak ?? null,
     finalQueueSizeAfterRecovery: queueGauge?.final ?? null,
     peakMempoolSize: mempoolGauge?.peak ?? null,

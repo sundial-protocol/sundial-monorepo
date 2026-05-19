@@ -12,7 +12,7 @@ import type { SubmissionAggregate } from '../../src/runner/tx-generator.js';
 // ---------------------------------------------------------------------------
 
 const STARTED_AT = '2025-01-01T00:00:00.000Z';
-const STOPPED_AT = '2025-01-01T00:01:00.000Z'; // 60 s later
+const STOPPED_AT = '2025-01-01T00:01:00.000Z'; // 60 s later — used as both load end and full window end in default fixture
 
 function makeCounterDelta(query: string, deltaLoad: number | null): CounterDelta {
   return { query, deltaLoad, deltaRecovery: null };
@@ -83,6 +83,7 @@ function makeInput(overrides: Partial<TierSummaryInput> = {}): TierSummaryInput 
     tierIndex: 0,
     targetTps: 10,
     startedAt: STARTED_AT,
+    loadStoppedAt: STOPPED_AT,
     stoppedAt: STOPPED_AT,
     metricWindow: null,
     windowSummary: makeWindowSummary(),
@@ -319,9 +320,33 @@ describe('buildTierSummary — normal tier', () => {
     expect(s.stoppedAt).toBe(STOPPED_AT);
   });
 
-  it('computes durationSeconds from ISO timestamps', () => {
+  it('computes durationSeconds (full window) and loadDurationSeconds (load phase) from ISO timestamps', () => {
     const s = buildTierSummary(makeInput());
+    // Default fixture has loadStoppedAt == stoppedAt == 60s after start
     expect(s.durationSeconds).toBe(60);
+    expect(s.loadDurationSeconds).toBe(60);
+  });
+
+  it('uses load phase duration, not full tier window, for TPS computation', () => {
+    // load = 60s, recovery = 30s → total = 90s
+    const RECOVERY_STOPPED_AT = '2025-01-01T00:01:30.000Z';
+    const s = buildTierSummary(
+      makeInput({
+        loadStoppedAt: STOPPED_AT,
+        stoppedAt: RECOVERY_STOPPED_AT,
+        windowSummary: makeWindowSummary({
+          enqueuedDelta: 600,
+          mempoolAcceptedDelta: 540,
+          committedTxDelta: 480,
+        }),
+      })
+    );
+    expect(s.durationSeconds).toBe(90);
+    expect(s.loadDurationSeconds).toBe(60);
+    // TPS must use 60s (load), not 90s (full window)
+    expect(s.observedEnqueuedTps).toBeCloseTo(600 / 60);
+    expect(s.observedMempoolAcceptedTps).toBeCloseTo(540 / 60);
+    expect(s.observedCommittedTps).toBeCloseTo(480 / 60);
   });
 
   it('extracts enqueuedDelta from tx_submissions_enqueued_total', () => {
@@ -663,9 +688,11 @@ describe('buildTierSummary — missing metrics', () => {
     expect(s.acceptedToCommittedLatencyP99Ms).toBeNull();
   });
 
-  it('does not trigger division by zero when durationSeconds is zero', () => {
-    const s = buildTierSummary(makeInput({ startedAt: STARTED_AT, stoppedAt: STARTED_AT }));
-    expect(s.durationSeconds).toBe(0);
+  it('does not trigger division by zero when load duration is zero', () => {
+    const s = buildTierSummary(
+      makeInput({ startedAt: STARTED_AT, loadStoppedAt: STARTED_AT, stoppedAt: STARTED_AT })
+    );
+    expect(s.loadDurationSeconds).toBe(0);
     expect(s.observedEnqueuedTps).toBeNull();
     expect(s.observedMempoolAcceptedTps).toBeNull();
     expect(s.observedCommittedTps).toBeNull();

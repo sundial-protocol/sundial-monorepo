@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ScalabilityScenario } from '../../src/config/scenario.js';
 import {
+  type NodeBalanceFetcher,
   runExecutionReadinessPreflight,
   type TxGeneratorInvoker,
 } from '../../src/runner/preflight.js';
@@ -51,6 +52,9 @@ const PASSING_TX_INVOKER: TxGeneratorInvoker = {
   invoke: async () => ({ passed: true, summary: 'ok' }),
 };
 
+// Returns null so the balance check observes (non-blocking) without making real network calls.
+const NULL_BALANCE_FETCHER: NodeBalanceFetcher = async () => null;
+
 describe('runExecutionReadinessPreflight', () => {
   it('passes when all readiness checks pass', async () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-pass-'));
@@ -59,6 +63,7 @@ describe('runExecutionReadinessPreflight', () => {
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory(),
         txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
       },
     });
 
@@ -76,6 +81,7 @@ describe('runExecutionReadinessPreflight', () => {
           'up{job="midgard_nodes"}': [{ value: [1, '0'] }],
         }),
         txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
       },
     });
 
@@ -94,6 +100,7 @@ describe('runExecutionReadinessPreflight', () => {
           tx_queue_size: [],
         }),
         txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
       },
     });
 
@@ -122,6 +129,7 @@ describe('runExecutionReadinessPreflight', () => {
           merge_block_failures_total: [],
         }),
         txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
       },
     });
 
@@ -142,6 +150,7 @@ describe('runExecutionReadinessPreflight', () => {
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory(),
         txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
       },
     });
 
@@ -162,11 +171,78 @@ describe('runExecutionReadinessPreflight', () => {
             actionableReason: 'fix it',
           }),
         },
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
       },
     });
 
     expect(result.passed).toBe(false);
     expect(result.checks.find((c) => c.name === 'tx_generator_invocable')?.passed).toBe(false);
     expect(result.blockedReasons).toContain('fix it');
+  });
+
+  it('observes (non-blocking) when commitment wallet balance is unavailable', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-wallet-unavailable-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory(),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: async () => null,
+      },
+    });
+
+    const balanceCheck = result.checks.find((c) => c.name === 'commitment_wallet_balance');
+    expect(balanceCheck).toBeDefined();
+    expect(balanceCheck?.passed).toBe(false);
+    expect(balanceCheck?.blocking).toBe(false);
+    expect(balanceCheck?.summary).toMatch(/could not be retrieved/i);
+    expect(result.passed).toBe(true);
+  });
+
+  it('passes when commitment wallet balance is sufficient for estimated scenario cost', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-wallet-sufficient-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory({
+          l1_commitment_fee_lovelace_last: [{ value: [1, '300000'] }],
+          'rate(commit_block_count_total[5m])': [{ value: [1, '0.01'] }],
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: async () => 2_000_000n,
+      },
+    });
+
+    const balanceCheck = result.checks.find((c) => c.name === 'commitment_wallet_balance');
+    expect(balanceCheck).toBeDefined();
+    expect(balanceCheck?.passed).toBe(true);
+    expect(balanceCheck?.summary).toMatch(/balance is sufficient/i);
+    expect(result.passed).toBe(true);
+  });
+
+  it('blocks when commitment wallet balance is insufficient', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-wallet-insufficient-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory({
+          l1_commitment_fee_lovelace_last: [{ value: [1, '300000'] }],
+          'rate(commit_block_count_total[5m])': [{ value: [1, '0.01'] }],
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: async () => 1_000_000n,
+      },
+    });
+
+    const balanceCheck = result.checks.find((c) => c.name === 'commitment_wallet_balance');
+    expect(balanceCheck).toBeDefined();
+    expect(balanceCheck?.passed).toBe(false);
+    expect(balanceCheck?.blocking).not.toBe(false);
+    expect(balanceCheck?.summary).toMatch(/shortfall/i);
+    expect(balanceCheck?.actionableReason).toMatch(/wallet:topup:block-commitment/);
+    expect(result.classification).toBe('Blocked');
+    expect(
+      result.blockedReasons.some((reason) => reason.includes('wallet:topup:block-commitment'))
+    ).toBe(true);
   });
 });

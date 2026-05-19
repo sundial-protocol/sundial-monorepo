@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { ScalabilityScenario } from '../config/scenario.js';
+import { generateTiers } from '../config/tiers.js';
 import type {
   Fetcher as PrometheusFetcher,
   PrometheusVectorResult,
@@ -16,6 +17,12 @@ import type { Fetcher as NodeProbeFetcher, ProbeResult } from './node-probe.js';
 import { PROBE_TIMEOUT_MS, probeNode } from './node-probe.js';
 
 const TX_GENERATOR_PREFLIGHT_TIMEOUT_MS = 30_000;
+const COMMITMENT_WALLET_BALANCE_PROBE_TIMEOUT_MS = 5_000;
+const FALLBACK_FEE_PER_BLOCK_LOVELACE = 300_000n;
+const FALLBACK_BLOCK_RATE_PER_SECOND = 1 / 30;
+const BALANCE_SAFETY_MULTIPLIER_NUMERATOR = 3n;
+const BALANCE_SAFETY_MULTIPLIER_DENOMINATOR = 2n;
+const LOVELACE_PER_ADA = 1_000_000n;
 const TX_GENERATOR_CLI_PATH = 'dist/bin/index.js';
 
 export const PREFLIGHT_CHECK_NAMES = [
@@ -25,6 +32,7 @@ export const PREFLIGHT_CHECK_NAMES = [
   'required_metrics_presence',
   'artifact_directory_writable',
   'tx_generator_invocable',
+  'commitment_wallet_balance',
   'loki_reachable',
   'tempo_reachable',
 ] as const;
@@ -62,6 +70,8 @@ export interface TxGeneratorInvoker {
   invoke(cwd: string): Promise<TxGeneratorInvocabilityResult>;
 }
 
+export type NodeBalanceFetcher = (nodeEndpoint: string) => Promise<bigint | null>;
+
 export interface PreflightDependencies {
   nodeProbeFetcher?: NodeProbeFetcher;
   prometheusFetcher?: PrometheusFetcher;
@@ -72,6 +82,7 @@ export interface PreflightDependencies {
   ) => Promise<ProbeResult>;
   prometheusClientFactory?: (endpoint: string, fetcher?: PrometheusFetcher) => PrometheusClientLike;
   txGeneratorInvoker?: TxGeneratorInvoker;
+  nodeBalanceFetcher?: NodeBalanceFetcher;
 }
 
 export interface RunExecutionReadinessPreflightOptions {
@@ -409,6 +420,119 @@ async function checkTxGeneratorInvocable(
       );
 }
 
+async function defaultNodeBalanceFetcher(nodeEndpoint: string): Promise<bigint | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), COMMITMENT_WALLET_BALANCE_PROBE_TIMEOUT_MS);
+  try {
+    const url = `${nodeEndpoint.replace(/\/$/, '')}/commitment-wallet/balance`;
+    const res = await (globalThis.fetch as typeof fetch)(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { lovelaceBalance?: unknown };
+    if (typeof json.lovelaceBalance !== 'string') return null;
+    return BigInt(json.lovelaceBalance);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function estimateNeededLovelace(
+  scenario: ScalabilityScenario,
+  client: PrometheusClientLike
+): Promise<bigint> {
+  const tiers = generateTiers(scenario);
+  const totalDurationSeconds = tiers.reduce(
+    (sum, t) => sum + t.durationSeconds + t.recoverySeconds,
+    0
+  );
+
+  let feePerBlock = FALLBACK_FEE_PER_BLOCK_LOVELACE;
+  try {
+    const feeResult = await client.queryInstant('l1_commitment_fee_lovelace_last');
+    if (feeResult.length > 0) {
+      const feeValue = parseFloat(feeResult[0].value[1]);
+      if (!isNaN(feeValue) && feeValue > 0) {
+        feePerBlock = BigInt(Math.ceil(feeValue));
+      }
+    }
+  } catch {
+    // use fallback
+  }
+
+  let blockRatePerSecond = FALLBACK_BLOCK_RATE_PER_SECOND;
+  try {
+    const rateResult = await client.queryInstant('rate(commit_block_count_total[5m])');
+    if (rateResult.length > 0) {
+      const rateValue = parseFloat(rateResult[0].value[1]);
+      if (!isNaN(rateValue) && rateValue > 0) {
+        blockRatePerSecond = rateValue;
+      }
+    }
+  } catch {
+    // use fallback
+  }
+
+  const estimatedBlocks = Math.ceil(totalDurationSeconds * blockRatePerSecond);
+  const estimatedBlocksBigInt = BigInt(estimatedBlocks);
+  const estimatedBaseLovelace = feePerBlock * estimatedBlocksBigInt;
+  const estimatedWithSafety =
+    (estimatedBaseLovelace * BALANCE_SAFETY_MULTIPLIER_NUMERATOR +
+      BALANCE_SAFETY_MULTIPLIER_DENOMINATOR -
+      1n) /
+    BALANCE_SAFETY_MULTIPLIER_DENOMINATOR;
+  return estimatedWithSafety;
+}
+
+function lovelaceToAdaString(value: bigint): string {
+  const whole = value / LOVELACE_PER_ADA;
+  const fractional = value % LOVELACE_PER_ADA;
+  return `${whole}.${fractional.toString().padStart(6, '0')}`;
+}
+
+async function checkCommitmentWalletBalance(
+  scenario: ScalabilityScenario,
+  dependencies?: PreflightDependencies
+): Promise<PreflightCheckResult> {
+  const balanceFetcher = dependencies?.nodeBalanceFetcher ?? defaultNodeBalanceFetcher;
+  const client =
+    dependencies?.prometheusClientFactory?.(
+      scenario.prometheusEndpoint,
+      dependencies.prometheusFetcher
+    ) ?? new PrometheusClient(scenario.prometheusEndpoint, dependencies?.prometheusFetcher);
+
+  const balance = await balanceFetcher(scenario.nodeEndpoint);
+
+  if (balance === null) {
+    return observe(
+      'commitment_wallet_balance',
+      'Commitment wallet balance could not be retrieved; balance check skipped.',
+      'Ensure the node exposes GET /commitment-wallet/balance and is reachable. ' +
+        'Top up the block commitment wallet if needed before running formal scenarios.'
+    );
+  }
+
+  const neededLovelace = await estimateNeededLovelace(scenario, client);
+  const balanceAda = lovelaceToAdaString(balance);
+  const neededAda = lovelaceToAdaString(neededLovelace);
+
+  if (balance < neededLovelace) {
+    const shortfallLovelace = neededLovelace - balance;
+    const shortfallAda = lovelaceToAdaString(shortfallLovelace);
+    return fail(
+      'commitment_wallet_balance',
+      `Commitment wallet has ${balanceAda} ADA but an estimated ${neededAda} ADA is needed ` +
+        `(shortfall: ${shortfallLovelace.toString()} lovelace / ${shortfallAda} ADA).`,
+      `Top up the block commitment wallet before running: from demo/, run \`npm run wallet:topup:block-commitment\`.`
+    );
+  }
+
+  return pass(
+    'commitment_wallet_balance',
+    `Commitment wallet balance is sufficient: ${balanceAda} ADA available, estimated ${neededAda} ADA needed.`
+  );
+}
+
 export async function runExecutionReadinessPreflight(
   scenario: ScalabilityScenario,
   options: RunExecutionReadinessPreflightOptions = {}
@@ -426,6 +550,7 @@ export async function runExecutionReadinessPreflight(
   checks.push(await checkRequiredMetricsPresence(scenario, options.dependencies));
   checks.push(await checkArtifactDirectoryWritable(outputDir));
   checks.push(await checkTxGeneratorInvocable(cwd, options.dependencies));
+  checks.push(await checkCommitmentWalletBalance(scenario, options.dependencies));
 
   // Non-blocking reachability checks — only run when endpoint is configured.
   if (scenario.lokiEndpoint !== undefined) {

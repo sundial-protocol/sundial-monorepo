@@ -91,39 +91,54 @@ function makeWriter() {
 // ---------------------------------------------------------------------------
 
 describe('computeSettings', () => {
-  it('sets concurrency = ceil(targetTps * txCostSeconds * 2)', () => {
-    // ceil(100 * 0.2 * 2) = ceil(40) = 40
-    expect(computeSettings(100, 0.2).concurrency).toBe(40);
-  });
+  // CLIENT_OVERSEND_RATIO = 1.1: the client targets 110% of the scenario TPS to
+  // absorb scheduling jitter without falling below the configured target.
+  // effectiveTps = targetTps * 1.1
+  // concurrency  = ceil(effectiveTps * txCostSeconds * 2)
+  // interval     = concurrency / effectiveTps  (≈ 2 * txCostSeconds)
+  //
+  // Note: IEEE-754 floating-point means ceil(targetTps * 1.1 * cost * 2) may
+  // round up by 1 from the mathematical value. The resulting interval is
+  // concurrency/effectiveTps which stays within ≈5% of 2*txCostSeconds.
 
   it('sets batchSize equal to concurrency', () => {
     const s = computeSettings(100, 0.2);
     expect(s.batchSize).toBe(s.concurrency);
   });
 
-  it('sets intervalSeconds = batchSize / targetTps', () => {
-    // concurrency=40, interval=40/100=0.4
-    expect(computeSettings(100, 0.2).intervalSeconds).toBe(0.4);
+  it('sets concurrency proportional to effectiveTps (targetTps * 1.1)', () => {
+    // effectiveTps = 110; concurrency ≈ ceil(110 * 0.2 * 2) = ceil(44) = 44 or 45 (FP)
+    const s = computeSettings(100, 0.2);
+    expect(s.concurrency).toBeGreaterThanOrEqual(44);
+    expect(s.concurrency).toBeLessThanOrEqual(45);
   });
 
-  it('sets actualTpsEstimate equal to targetTps', () => {
-    expect(computeSettings(100, 0.2).actualTpsEstimate).toBe(100);
-    expect(computeSettings(800, 0.2).actualTpsEstimate).toBe(800);
+  it('sets actualTpsEstimate to effectiveTps (targetTps * 1.1)', () => {
+    expect(computeSettings(100, 0.2).actualTpsEstimate).toBeCloseTo(110);
+    expect(computeSettings(800, 0.2).actualTpsEstimate).toBeCloseTo(880);
   });
 
-  it('scales concurrency linearly with targetTps', () => {
-    // 800 TPS needs 4x the concurrency of 200 TPS
+  it('preserves targetTps as the scenario-configured value, not the effective rate', () => {
+    expect(computeSettings(100, 0.2).targetTps).toBe(100);
+    expect(computeSettings(800, 0.2).targetTps).toBe(800);
+  });
+
+  it('scales concurrency approximately 4x when targetTps goes from 200 to 800', () => {
     const s200 = computeSettings(200, 0.2);
     const s800 = computeSettings(800, 0.2);
-    expect(s800.concurrency).toBe(s200.concurrency * 4);
+    // Ratio must be close to 4 (exact match not guaranteed due to FP ceiling rounding)
+    expect(s800.concurrency / s200.concurrency).toBeCloseTo(4, 1);
   });
 
-  it('interval is always 2 * txCostSeconds regardless of targetTps', () => {
-    // interval = batchSize/targetTps = ceil(tps*cost*2)/tps ≈ 2*cost
+  it('interval stays close to 2 * txCostSeconds regardless of targetTps', () => {
+    // interval = concurrency / effectiveTps ≈ 2 * txCostSeconds; FP ceiling may
+    // add at most 1 to concurrency, so allow ±5% tolerance.
     const s100 = computeSettings(100, 0.2);
     const s800 = computeSettings(800, 0.2);
-    expect(s100.intervalSeconds).toBeCloseTo(0.4);
-    expect(s800.intervalSeconds).toBeCloseTo(0.4);
+    expect(s100.intervalSeconds).toBeGreaterThan(0.38);
+    expect(s100.intervalSeconds).toBeLessThan(0.42);
+    expect(s800.intervalSeconds).toBeGreaterThan(0.38);
+    expect(s800.intervalSeconds).toBeLessThan(0.42);
   });
 
   it('clamps concurrency to at least 1', () => {

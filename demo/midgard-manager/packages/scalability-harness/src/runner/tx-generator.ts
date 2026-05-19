@@ -65,15 +65,22 @@ export interface SubmissionAggregate {
 
 // Generator settings are fully derived from targetTps and txCostSeconds.
 //
-// concurrency = ceil(targetTps * txCostSeconds * PARALLELISM_HEADROOM)
-// batchSize   = concurrency   (one parallel wave per batch)
-// interval    = batchSize / targetTps
+// effectiveTps = targetTps * CLIENT_OVERSEND_RATIO
+// concurrency  = ceil(effectiveTps * txCostSeconds * PARALLELISM_HEADROOM)
+// batchSize    = concurrency   (one parallel wave per batch)
+// interval     = batchSize / effectiveTps
 //
 // With PARALLELISM_HEADROOM=2 the interval is always 2*txCostSeconds regardless
-// of targetTps, so batch execution time (~txCostSeconds, all tasks in parallel)
-// is well inside the interval and the wall-clock scheduler fires exactly on
-// time. Scaling TPS only changes how many concurrent workers run per batch.
+// of effectiveTps, so batch execution time (~txCostSeconds, all tasks in
+// parallel) is well inside the interval and the wall-clock scheduler fires
+// exactly on time. Scaling TPS only changes how many concurrent workers run
+// per batch.
+//
+// CLIENT_OVERSEND_RATIO drives the client slightly above the scenario target so
+// that measurement overhead, startup latency, and scheduling jitter do not
+// cause the effective send rate to fall below the target.
 const PARALLELISM_HEADROOM = 2;
+const CLIENT_OVERSEND_RATIO = 1.1;
 
 export interface GeneratorSettings {
   intervalSeconds: number;
@@ -121,10 +128,11 @@ export interface RunnerOptions {
 }
 
 export function computeSettings(targetTps: number, txCostSeconds: number): GeneratorSettings {
-  const concurrency = Math.max(1, Math.ceil(targetTps * txCostSeconds * PARALLELISM_HEADROOM));
+  const effectiveTps = targetTps * CLIENT_OVERSEND_RATIO;
+  const concurrency = Math.max(1, Math.ceil(effectiveTps * txCostSeconds * PARALLELISM_HEADROOM));
   const batchSize = concurrency;
-  const intervalSeconds = batchSize / targetTps;
-  const actualTpsEstimate = targetTps;
+  const intervalSeconds = batchSize / effectiveTps;
+  const actualTpsEstimate = effectiveTps;
   return { intervalSeconds, batchSize, concurrency, targetTps, actualTpsEstimate };
 }
 

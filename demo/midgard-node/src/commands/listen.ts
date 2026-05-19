@@ -12,6 +12,7 @@ import {
   fromHex,
   getAddressDetails,
   toHex,
+  walletFromSeed,
 } from "@lucid-evolution/lucid";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -72,6 +73,7 @@ const COMMIT_ENDPOINT: string = "commit";
 const RESET_ENDPOINT: string = "reset";
 const SUBMIT_ENDPOINT: string = "submit";
 const STATE_QUEUE_ENDPOINT: string = "stateQueue";
+const COMMITMENT_WALLET_BALANCE_ENDPOINT: string = "commitment-wallet/balance";
 
 const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
@@ -548,6 +550,55 @@ const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
     ),
   );
 
+const getCommitmentWalletBalanceHandler = Effect.gen(function* () {
+  const nodeConfig = yield* NodeConfig;
+  const { api: lucidApi } = yield* Lucid;
+  let address: string;
+  try {
+    address = walletFromSeed(
+      nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT,
+      { network: nodeConfig.NETWORK },
+    ).address;
+  } catch (e) {
+    yield* Effect.logError(
+      `GET /${COMMITMENT_WALLET_BALANCE_ENDPOINT} - failed to derive commitment wallet address: ${e}`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: "Failed to derive commitment wallet address" },
+      { status: 500 },
+    );
+  }
+  yield* Effect.logInfo(
+    `GET /${COMMITMENT_WALLET_BALANCE_ENDPOINT} - querying commitment wallet UTxOs`,
+  );
+  const utxos = yield* Effect.tryPromise({
+    try: () => lucidApi.utxosAt(address),
+    catch: (e) =>
+      new Error(
+        `Failed to query commitment wallet UTxOs: ${e instanceof Error ? e.message : String(e)}`,
+      ),
+  });
+  const lovelaceBalance = utxos.reduce(
+    (sum, u) => sum + (u.assets.lovelace ?? 0n),
+    0n,
+  );
+  yield* Effect.logInfo(
+    `GET /${COMMITMENT_WALLET_BALANCE_ENDPOINT} - balance: ${lovelaceBalance} lovelace`,
+  );
+  return yield* HttpServerResponse.json({
+    lovelaceBalance: String(lovelaceBalance),
+  });
+}).pipe(
+  Effect.catchAll((e) =>
+    failWith500(
+      "GET",
+      COMMITMENT_WALLET_BALANCE_ENDPOINT,
+      e,
+      "Failed to query commitment wallet balance",
+    ),
+  ),
+);
+
 const router = (
   txQueue: Queue.Queue<string>,
 ): Effect.Effect<
@@ -571,6 +622,10 @@ const router = (
       HttpRouter.get(`/${MERGE_ENDPOINT}`, getMergeHandler),
       HttpRouter.get(`/${RESET_ENDPOINT}`, getResetHandler),
       HttpRouter.get(`/${STATE_QUEUE_ENDPOINT}`, getStateQueueHandler),
+      HttpRouter.get(
+        `/${COMMITMENT_WALLET_BALANCE_ENDPOINT}`,
+        getCommitmentWalletBalanceHandler,
+      ),
       HttpRouter.get(`/logBlocksTxsDB`, getLogBlocksTxsDBHandler),
       HttpRouter.get(`/logGlobals`, getLogGlobalsHandler),
       HttpRouter.post(`/${SUBMIT_ENDPOINT}`, postSubmitHandler(txQueue)),

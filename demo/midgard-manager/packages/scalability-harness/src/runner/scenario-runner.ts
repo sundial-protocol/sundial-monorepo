@@ -200,6 +200,7 @@ export async function runScenario(
       tierIndex: result.tierIndex,
       targetTps: result.targetTps,
       startedAt: result.startedAt,
+      loadStoppedAt: result.stoppedAt,
       stoppedAt: result.recoveryStoppedAt,
       metricWindow: result.metricWindow,
       windowSummary: result.windowSummary,
