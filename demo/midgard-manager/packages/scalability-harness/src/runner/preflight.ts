@@ -523,7 +523,7 @@ async function checkCommitmentWalletBalance(
       'commitment_wallet_balance',
       `Commitment wallet has ${balanceAda} ADA but an estimated ${neededAda} ADA is needed ` +
         `(shortfall: ${shortfallLovelace.toString()} lovelace / ${shortfallAda} ADA).`,
-      `Top up the block commitment wallet before running: from demo/, run \`npm run wallet:topup:block-commitment\`.`
+      `Top up the block commitment wallet before running: from demo/, run \`npm run wallet:block-commitment:topup\`.`
     );
   }
 

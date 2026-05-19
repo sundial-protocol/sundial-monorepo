@@ -239,10 +239,10 @@ describe('runExecutionReadinessPreflight', () => {
     expect(balanceCheck?.passed).toBe(false);
     expect(balanceCheck?.blocking).not.toBe(false);
     expect(balanceCheck?.summary).toMatch(/shortfall/i);
-    expect(balanceCheck?.actionableReason).toMatch(/wallet:topup:block-commitment/);
+    expect(balanceCheck?.actionableReason).toMatch(/wallet:block-commitment:topup/);
     expect(result.classification).toBe('Blocked');
     expect(
-      result.blockedReasons.some((reason) => reason.includes('wallet:topup:block-commitment'))
+      result.blockedReasons.some((reason) => reason.includes('wallet:block-commitment:topup'))
     ).toBe(true);
   });
 });

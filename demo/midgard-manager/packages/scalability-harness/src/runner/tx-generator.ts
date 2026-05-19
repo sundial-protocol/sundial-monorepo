@@ -83,12 +83,16 @@ export interface SubmissionAggregate {
 // Generator settings are fully derived from targetTps and txCostSeconds.
 //
 // effectiveTps = targetTps * CLIENT_OVERSEND_RATIO
-// concurrency  = ceil(effectiveTps * txCostSeconds * PARALLELISM_HEADROOM)
+// concurrency  = ceil(effectiveTps * txCostSeconds * SUBMISSION_PARALLELISM_HEADROOM)
 // batchSize    = concurrency   (one parallel wave per batch)
+// maxInFlight  = concurrency
+// generationConcurrency = min(MAX_GENERATION_CONCURRENCY, maxInFlight * GENERATION_TO_SUBMISSION_CONCURRENCY_RATIO)
+// preparedQueueCapacity = maxInFlight * PREPARED_QUEUE_HEADROOM
 // interval     = batchSize / effectiveTps
 //
-// With PARALLELISM_HEADROOM=2 the interval is always 2*txCostSeconds regardless
-// of effectiveTps, so batch execution time (~txCostSeconds, all tasks in
+// With SUBMISSION_PARALLELISM_HEADROOM=12 the interval is always
+// 12*txCostSeconds / CLIENT_OVERSEND_RATIO regardless of effectiveTps, so batch execution time
+// (~txCostSeconds, all tasks in
 // parallel) is well inside the interval and the wall-clock scheduler fires
 // exactly on time. Scaling TPS only changes how many concurrent workers run
 // per batch.
@@ -96,13 +100,19 @@ export interface SubmissionAggregate {
 // CLIENT_OVERSEND_RATIO drives the client slightly above the scenario target so
 // that measurement overhead, startup latency, and scheduling jitter do not
 // cause the effective send rate to fall below the target.
-const PARALLELISM_HEADROOM = 2;
-const CLIENT_OVERSEND_RATIO = 1.1;
+const SUBMISSION_PARALLELISM_HEADROOM = 12;
+const CLIENT_OVERSEND_RATIO = 2;
+const GENERATION_TO_SUBMISSION_CONCURRENCY_RATIO = 2;
+const MAX_GENERATION_CONCURRENCY = 2048;
+const PREPARED_QUEUE_HEADROOM = 4;
 
 export interface GeneratorSettings {
   intervalSeconds: number;
   batchSize: number;
   concurrency: number;
+  maxInFlight: number;
+  generationConcurrency: number;
+  preparedQueueCapacity: number;
   targetTps: number;
   actualTpsEstimate: number;
 }
@@ -146,11 +156,32 @@ export interface RunnerOptions {
 
 export function computeSettings(targetTps: number, txCostSeconds: number): GeneratorSettings {
   const effectiveTps = targetTps * CLIENT_OVERSEND_RATIO;
-  const concurrency = Math.max(1, Math.ceil(effectiveTps * txCostSeconds * PARALLELISM_HEADROOM));
+  const concurrency = Math.max(
+    1,
+    Math.ceil(effectiveTps * txCostSeconds * SUBMISSION_PARALLELISM_HEADROOM)
+  );
   const batchSize = concurrency;
+  const maxInFlight = concurrency;
+  const generationConcurrency = Math.max(
+    1,
+    Math.min(
+      MAX_GENERATION_CONCURRENCY,
+      Math.ceil(maxInFlight * GENERATION_TO_SUBMISSION_CONCURRENCY_RATIO)
+    )
+  );
+  const preparedQueueCapacity = Math.max(1, maxInFlight * PREPARED_QUEUE_HEADROOM);
   const intervalSeconds = batchSize / effectiveTps;
   const actualTpsEstimate = effectiveTps;
-  return { intervalSeconds, batchSize, concurrency, targetTps, actualTpsEstimate };
+  return {
+    intervalSeconds,
+    batchSize,
+    concurrency,
+    maxInFlight,
+    generationConcurrency,
+    preparedQueueCapacity,
+    targetTps,
+    actualTpsEstimate,
+  };
 }
 
 function toGeneratorSeed(seed: string): string {
@@ -187,6 +218,14 @@ function buildArgs(
     String(settings.intervalSeconds),
     '--concurrency',
     String(settings.concurrency),
+    '--max-in-flight',
+    String(settings.maxInFlight),
+    '--generation-concurrency',
+    String(settings.generationConcurrency),
+    '--prepared-queue-capacity',
+    String(settings.preparedQueueCapacity),
+    '--target-tps',
+    String(settings.actualTpsEstimate),
     '--retry-attempts',
     String(scenario.retryAttempts),
     '--retry-delay-ms',

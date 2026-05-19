@@ -34,9 +34,12 @@ import {
   recordGeneratedTransactions,
   recordGenerationLatency,
   recordInFlightSubmits,
+  recordLucidPoolWaitLatency,
   recordPreparedQueueDepth,
+  recordQueueBackpressureWaitLatency,
   recordSubmissionObservation,
   recordSubmitLatency,
+  recordTokenWaitLatency,
   recordTokenLate,
   REQUEST_EVENTS_SAMPLE_RATE,
   type RequestEventsMode,
@@ -53,10 +56,9 @@ const PROJECT_ROOT_RELATIVE_PATH = '../../../..';
 const SUBMISSION_AGGREGATE_FILE = 'submission-aggregates.json';
 const REQUEST_EVENTS_FILE = 'request-events.jsonl';
 const SUBMISSION_AGGREGATE_FLUSH_INTERVAL_MS = 1_000;
-const AVAILABILITY_RECHECK_MS = 1_000;
-const AVAILABILITY_TIMEOUT_MS = 750;
 const QUEUE_BACKPRESSURE_SLEEP_MS = 1;
 const TOKEN_LATE_THRESHOLD_MS = 10;
+const RUNTIME_TELEMETRY_INTERVAL_MS = 10_000;
 
 // Get the directory path for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -179,16 +181,17 @@ class TokenBucket {
     this.onLateToken = onLateToken;
   }
 
-  async waitForToken(shouldStop: () => boolean): Promise<boolean> {
+  async waitForToken(shouldStop: () => boolean): Promise<{ acquired: boolean; waitMs: number }> {
+    const startedAtMs = Date.now();
     while (true) {
       if (shouldStop()) {
-        return false;
+        return { acquired: false, waitMs: Date.now() - startedAtMs };
       }
 
       this.refill();
       if (this.tokens >= 1) {
         this.tokens -= 1;
-        return true;
+        return { acquired: true, waitMs: Date.now() - startedAtMs };
       }
 
       const waitMs = Math.max(1, Math.ceil(((1 - this.tokens) / this.ratePerSecond) * 1000));
@@ -211,80 +214,6 @@ class TokenBucket {
   }
 }
 
-interface NodeAvailabilityTracker {
-  probeNow(): Promise<boolean>;
-  isAvailable(): boolean;
-  start(): void;
-  stop(): Promise<void>;
-}
-
-function createNodeAvailabilityTracker(nodeClient: MidgardNodeClient): NodeAvailabilityTracker {
-  let running = false;
-  let available = true;
-  let loopPromise: Promise<void> | null = null;
-  let inFlightProbe: Promise<boolean> | null = null;
-  let waitResolver: (() => void) | null = null;
-  let waitTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const probeNow = async (): Promise<boolean> => {
-    if (inFlightProbe !== null) {
-      return inFlightProbe;
-    }
-    inFlightProbe = nodeClient
-      .isAvailable(AVAILABILITY_TIMEOUT_MS)
-      .then((result) => {
-        available = result;
-        return result;
-      })
-      .catch(() => {
-        available = false;
-        return false;
-      })
-      .finally(() => {
-        inFlightProbe = null;
-      });
-    return inFlightProbe;
-  };
-
-  return {
-    probeNow,
-    isAvailable() {
-      return available;
-    },
-    start() {
-      if (running) {
-        return;
-      }
-      running = true;
-      loopPromise = (async () => {
-        while (running && !state.shouldStop) {
-          await probeNow();
-          await new Promise<void>((resolve) => {
-            waitResolver = resolve;
-            waitTimer = setTimeout(resolve, AVAILABILITY_RECHECK_MS);
-          });
-          waitResolver = null;
-          waitTimer = null;
-        }
-      })();
-    },
-    async stop() {
-      running = false;
-      if (waitTimer !== null) {
-        clearTimeout(waitTimer);
-        waitTimer = null;
-      }
-      if (waitResolver !== null) {
-        waitResolver();
-        waitResolver = null;
-      }
-      if (loopPromise !== null) {
-        await loopPromise;
-      }
-    },
-  };
-}
-
 // Get the shared instance
 const state = TxGeneratorState.getInstance();
 
@@ -292,6 +221,20 @@ const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+
+const formatRate = (countDelta: number, elapsedMs: number): string => {
+  if (elapsedMs <= 0) {
+    return '0.0';
+  }
+  return ((countDelta * 1000) / elapsedMs).toFixed(1);
+};
+
+const formatMeanMs = (sumMs: number, count: number): string => {
+  if (count <= 0) {
+    return 'n/a';
+  }
+  return (sumMs / count).toFixed(1);
+};
 
 const buildFilenamePrefix = (useOneToOne: boolean, mode: GenerationMode): string => {
   if (mode === 'replay') {
@@ -524,22 +467,23 @@ async function withBackpressureCapacity(
   queue: queueAsPromised<PreparedSubmission>,
   queueCapacity: number,
   getActiveWorkers: () => number
-): Promise<void> {
+): Promise<number> {
+  const startedAtMs = Date.now();
   while (!state.shouldStop) {
     const queued = queue.length();
     const inFlight = getActiveWorkers();
     recordPreparedQueueDepth(state.stats.submissionAggregate, queued + inFlight);
     if (queued + inFlight < queueCapacity) {
-      return;
+      return Date.now() - startedAtMs;
     }
     await sleep(QUEUE_BACKPRESSURE_SLEEP_MS);
   }
+  return Date.now() - startedAtMs;
 }
 
 async function processPreparedSubmission(params: {
   prepared: PreparedSubmission;
   nodeClient: MidgardNodeClient;
-  nodeAvailabilityTracker: NodeAvailabilityTracker;
   fullConfig: TransactionGeneratorConfig;
   outputDir: string | undefined;
   requestEventsMode: RequestEventsMode;
@@ -551,7 +495,6 @@ async function processPreparedSubmission(params: {
   const {
     prepared,
     nodeClient,
-    nodeAvailabilityTracker,
     fullConfig,
     outputDir,
     requestEventsMode,
@@ -582,41 +525,10 @@ async function processPreparedSubmission(params: {
     return;
   }
 
-  if (!nodeAvailabilityTracker.isAvailable()) {
-    prepared.evidenceEntry.submission.status = 'NODE_UNAVAILABLE';
-    recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
-    await appendRequestEvent(outputDir, requestEventsMode, requestEventRandom, {
-      sourceTx: prepared.sourceTx,
-      evidenceEntry: prepared.evidenceEntry,
-      outcome: 'node_unavailable',
-      latencyMs: null,
-      retryCount: 0,
-      httpStatusCode: null,
-      responseClass: 'node_unavailable',
-      errorClass: 'node_unavailable',
-    });
-
-    if (outputDir !== undefined) {
-      await writeTransactionsWithManifest({
-        outputDir,
-        filenamePrefix: buildFilenamePrefix(
-          prepared.evidenceEntry.profile === 'one-to-one',
-          prepared.mode
-        ),
-        transactions: [prepared.sourceTx],
-        manifestTransactions: [prepared.evidenceEntry],
-        generationSeed,
-        fullConfig,
-        mode: prepared.mode,
-        replayCorpusPath,
-      });
-    }
-    return;
-  }
-
   if (rateLimiter !== null) {
-    const gotToken = await rateLimiter.waitForToken(() => state.shouldStop);
-    if (!gotToken) {
+    const tokenResult = await rateLimiter.waitForToken(() => state.shouldStop);
+    recordTokenWaitLatency(state.stats.submissionAggregate, tokenResult.waitMs);
+    if (!tokenResult.acquired) {
       return;
     }
   }
@@ -689,7 +601,9 @@ async function prepareAndEnqueueTaskPlan(params: {
   const generationStartedAtMs = Date.now();
 
   if (taskPlan.useOneToOne) {
+    const poolWaitStartedAtMs = Date.now();
     const pooledLucid = lucidPool !== null ? await lucidPool.acquire() : undefined;
+    recordLucidPoolWaitLatency(state.stats.submissionAggregate, Date.now() - poolWaitStartedAtMs);
     try {
       txs = await generateOneToOneTransactions({
         network: fullConfig.network,
@@ -733,7 +647,12 @@ async function prepareAndEnqueueTaskPlan(params: {
       return;
     }
 
-    await withBackpressureCapacity(submissionQueue, queueCapacity, getActiveWorkers);
+    const queueWaitMs = await withBackpressureCapacity(
+      submissionQueue,
+      queueCapacity,
+      getActiveWorkers
+    );
+    recordQueueBackpressureWaitLatency(state.stats.submissionAggregate, queueWaitMs);
     if (state.shouldStop) {
       return;
     }
@@ -774,7 +693,12 @@ async function prepareAndEnqueueReplay(params: {
       'replay'
     );
 
-    await withBackpressureCapacity(submissionQueue, queueCapacity, getActiveWorkers);
+    const queueWaitMs = await withBackpressureCapacity(
+      submissionQueue,
+      queueCapacity,
+      getActiveWorkers
+    );
+    recordQueueBackpressureWaitLatency(state.stats.submissionAggregate, queueWaitMs);
     if (state.shouldStop) {
       return;
     }
@@ -860,8 +784,6 @@ export const startGenerator = async (
     enableLogs: fullConfig.nodeEnableLogs,
     skipAvailabilityCheck: true,
   });
-  const nodeAvailabilityTracker = createNodeAvailabilityTracker(nodeClient);
-
   // Pre-initialize a pool of Lucid instances for one-to-one generation.
   const needsPool =
     fullConfig.transactionType === 'one-to-one' || fullConfig.transactionType === 'mixed';
@@ -878,13 +800,10 @@ export const startGenerator = async (
   let activeSubmissionWorkers = 0;
   const rateLimiter =
     resolvedTargetTps !== null
-      ? new TokenBucket(resolvedTargetTps, 1, () => {
+      ? new TokenBucket(resolvedTargetTps, Math.max(1, maxInFlight), () => {
           recordTokenLate(state.stats.submissionAggregate);
         })
       : null;
-
-  await nodeAvailabilityTracker.probeNow();
-  nodeAvailabilityTracker.start();
 
   const submissionQueue: queueAsPromised<PreparedSubmission> = fastq.promise(
     async (prepared) => {
@@ -898,7 +817,6 @@ export const startGenerator = async (
         await processPreparedSubmission({
           prepared,
           nodeClient,
-          nodeAvailabilityTracker,
           fullConfig,
           outputDir: fullConfig.outputDir,
           requestEventsMode,
@@ -924,6 +842,7 @@ export const startGenerator = async (
 
   // Create output directory if needed
   let aggregateFlushTimer: ReturnType<typeof setInterval> | null = null;
+  let runtimeTelemetryTimer: ReturnType<typeof setInterval> | null = null;
   if (fullConfig.outputDir) {
     const outputPath = resolveOutputDir(fullConfig.outputDir);
     await mkdir(outputPath, { recursive: true });
@@ -935,6 +854,85 @@ export const startGenerator = async (
     }, SUBMISSION_AGGREGATE_FLUSH_INTERVAL_MS);
     aggregateFlushTimer.unref?.();
   }
+
+  let previousTelemetrySnapshot = {
+    capturedAtMs: Date.now(),
+    generated: 0,
+    attempted: 0,
+    submitted: 0,
+    timedOut: 0,
+    errors: 0,
+  };
+
+  runtimeTelemetryTimer = setInterval(() => {
+    const capturedAtMs = Date.now();
+    const elapsedMs = Math.max(1, capturedAtMs - previousTelemetrySnapshot.capturedAtMs);
+    const aggregate = state.stats.submissionAggregate;
+    const submissionPercentiles = toSubmissionAggregateWithPercentiles(aggregate).percentilesMs;
+
+    const generatedDelta = aggregate.counters.generated - previousTelemetrySnapshot.generated;
+    const attemptedDelta = aggregate.counters.attempted - previousTelemetrySnapshot.attempted;
+    const submittedDelta = aggregate.counters.submitted - previousTelemetrySnapshot.submitted;
+    const timedOutDelta = aggregate.counters.timed_out - previousTelemetrySnapshot.timedOut;
+    const errorDelta = aggregate.counters.error - previousTelemetrySnapshot.errors;
+
+    const queueDepth = aggregate.schedulerMetrics.prepared_queue_depth.current;
+    const inFlight = aggregate.schedulerMetrics.in_flight_submits.current;
+    const queueCapacityUtilization = ((queueDepth / Math.max(1, preparedQueueCapacity)) * 100).toFixed(
+      1
+    );
+
+    const submitP95Ms = submissionPercentiles.schedulerMetrics.submit_latency.p95 ?? 0;
+    const generationP95Ms = submissionPercentiles.schedulerMetrics.generation_latency.p95 ?? 0;
+    const queueWaitP95Ms =
+      submissionPercentiles.schedulerMetrics.queue_backpressure_wait_latency.p95 ?? 0;
+    const tokenWaitP95Ms = submissionPercentiles.schedulerMetrics.token_wait_latency.p95 ?? 0;
+    const poolWaitP95Ms = submissionPercentiles.schedulerMetrics.lucid_pool_wait_latency.p95 ?? 0;
+
+    const submitMeanMs = formatMeanMs(
+      aggregate.schedulerMetrics.submit_latency.sumMs,
+      aggregate.schedulerMetrics.submit_latency.count
+    );
+
+    const queueWaitMeanMs = formatMeanMs(
+      aggregate.schedulerMetrics.queue_backpressure_wait_latency.sumMs,
+      aggregate.schedulerMetrics.queue_backpressure_wait_latency.count
+    );
+
+    const tokenWaitMeanMs = formatMeanMs(
+      aggregate.schedulerMetrics.token_wait_latency.sumMs,
+      aggregate.schedulerMetrics.token_wait_latency.count
+    );
+
+    const poolWaitMeanMs = formatMeanMs(
+      aggregate.schedulerMetrics.lucid_pool_wait_latency.sumMs,
+      aggregate.schedulerMetrics.lucid_pool_wait_latency.count
+    );
+
+    console.log(
+      `[telemetry] gen=${formatRate(generatedDelta, elapsedMs)}/s attempt=${formatRate(attemptedDelta, elapsedMs)}/s submit=${formatRate(submittedDelta, elapsedMs)}/s timeout=${formatRate(timedOutDelta, elapsedMs)}/s error=${formatRate(errorDelta, elapsedMs)}/s inflight=${inFlight}/${maxInFlight} queue=${queueDepth}/${preparedQueueCapacity} (${queueCapacityUtilization}%) p95ms{submit=${submitP95Ms},gen=${generationP95Ms},qwait=${queueWaitP95Ms},token=${tokenWaitP95Ms},pool=${poolWaitP95Ms}} meanms{submit=${submitMeanMs},qwait=${queueWaitMeanMs},token=${tokenWaitMeanMs},pool=${poolWaitMeanMs}}`
+    );
+
+    if (submitP95Ms >= 5_000 && queueDepth >= Math.floor(preparedQueueCapacity * 0.8)) {
+      console.warn(
+        `[telemetry][bottleneck] submit path saturated: submit p95=${submitP95Ms}ms with prepared queue utilization ${queueCapacityUtilization}%`
+      );
+    } else if (generationP95Ms >= 1_000 && queueDepth < Math.floor(preparedQueueCapacity * 0.2)) {
+      console.warn(
+        `[telemetry][bottleneck] generation path saturated: generation p95=${generationP95Ms}ms with low prepared queue depth`
+      );
+    }
+
+    previousTelemetrySnapshot = {
+      capturedAtMs,
+      generated: aggregate.counters.generated,
+      attempted: aggregate.counters.attempted,
+      submitted: aggregate.counters.submitted,
+      timedOut: aggregate.counters.timed_out,
+      errors: aggregate.counters.error,
+    };
+  }, RUNTIME_TELEMETRY_INTERVAL_MS);
+  runtimeTelemetryTimer.unref?.();
 
   state.stopHook = () => {
     submissionQueue.kill();
@@ -1073,11 +1071,13 @@ export const startGenerator = async (
       console.error('Generator failed:', errorMessage);
     })
     .finally(async () => {
-      await nodeAvailabilityTracker.stop();
       state.currentPromise = null;
       state.stopHook = null;
       if (aggregateFlushTimer !== null) {
         clearInterval(aggregateFlushTimer);
+      }
+      if (runtimeTelemetryTimer !== null) {
+        clearInterval(runtimeTelemetryTimer);
       }
       if (fullConfig.outputDir) {
         await writeSubmissionAggregates(fullConfig.outputDir).catch(() => {

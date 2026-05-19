@@ -13,6 +13,10 @@ interface GeneratorOptions {
   batchSize: string;
   interval: string;
   concurrency: string;
+  targetTps?: string;
+  maxInFlight?: string;
+  generationConcurrency?: string;
+  preparedQueueCapacity?: string;
   testWallet: boolean;
   privateKey?: string;
   network?: string;
@@ -42,6 +46,10 @@ program
   .option('-b, --batch-size <number>', 'Number of transactions per batch', '10')
   .option('-i, --interval <seconds>', 'Interval between batches in seconds', '5')
   .option('-c, --concurrency <number>', 'Number of concurrent batches', '5')
+  .option('--target-tps <number>', 'Submission token bucket target TPS')
+  .option('--max-in-flight <number>', 'Maximum concurrent in-flight submissions')
+  .option('--generation-concurrency <number>', 'Concurrent transaction generation workers')
+  .option('--prepared-queue-capacity <number>', 'Prepared submission queue capacity')
   .option('--test-wallet', 'Generate a test wallet for transactions', false)
   .option('-k, --private-key <key>', 'Wallet private key (required if --test-wallet is not used)')
   .option('-n, --network <network>', 'Network to use (Preview/Mainnet)', 'Preview')
@@ -97,6 +105,18 @@ program
       console.log(chalk.gray(`Batch Size: ${options.batchSize}`));
       console.log(chalk.gray(`Interval: ${options.interval} seconds`));
       console.log(chalk.gray(`Concurrency: ${options.concurrency}\n`));
+      if (options.targetTps !== undefined) {
+        console.log(chalk.gray(`Target TPS: ${options.targetTps}`));
+      }
+      if (options.maxInFlight !== undefined) {
+        console.log(chalk.gray(`Max In Flight: ${options.maxInFlight}`));
+      }
+      if (options.generationConcurrency !== undefined) {
+        console.log(chalk.gray(`Generation Concurrency: ${options.generationConcurrency}`));
+      }
+      if (options.preparedQueueCapacity !== undefined) {
+        console.log(chalk.gray(`Prepared Queue Capacity: ${options.preparedQueueCapacity}`));
+      }
       console.log(chalk.gray(`Retry Attempts: ${options.retryAttempts}`));
       console.log(chalk.gray(`Retry Delay: ${options.retryDelayMs}ms`));
       console.log(chalk.gray(`Request Events: ${options.requestEvents}`));
@@ -117,6 +137,18 @@ program
         batchSize: parseInt(options.batchSize),
         interval: parseFloat(options.interval),
         concurrency: parseInt(options.concurrency),
+        targetTps:
+          options.targetTps !== undefined ? Number.parseFloat(options.targetTps) : undefined,
+        maxInFlight:
+          options.maxInFlight !== undefined ? Number.parseInt(options.maxInFlight, 10) : undefined,
+        generationConcurrency:
+          options.generationConcurrency !== undefined
+            ? Number.parseInt(options.generationConcurrency, 10)
+            : undefined,
+        preparedQueueCapacity:
+          options.preparedQueueCapacity !== undefined
+            ? Number.parseInt(options.preparedQueueCapacity, 10)
+            : undefined,
         nodeRetryAttempts: parseInt(options.retryAttempts ?? '3'),
         nodeRetryDelay: parseInt(options.retryDelayMs ?? '1000'),
         outputDir: options.outputDir,

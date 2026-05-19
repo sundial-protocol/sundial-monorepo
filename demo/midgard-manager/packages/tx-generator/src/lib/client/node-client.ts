@@ -186,7 +186,7 @@ export class MidgardNodeClient {
         );
         let response: Response;
         try {
-          response = await fetch(`${this.baseUrl}/submit?tx_cbor=${encodeURIComponent(cborHex)}`, {
+          response = await fetch(`${this.baseUrl}/submit?tx_cbor=${cborHex}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain',

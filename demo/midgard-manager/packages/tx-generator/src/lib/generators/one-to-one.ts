@@ -41,6 +41,7 @@ export interface OneToOneTransactionConfig {
 
 // Constants for transaction generation
 const GC_PAUSE_INTERVAL = 1000; // Number of transactions before GC pause
+const GC_PAUSE_DURATION_MS = 10;
 const MIN_LOVELACE_OUTPUT = 1_000_000n; // Minimum lovelace per output
 
 /**
@@ -152,25 +153,30 @@ const generateOneToOneTransactions = async (
   const transactions: SerializedMidgardTransaction[] = [];
 
   try {
-    // First transaction to move away from genesis UTxO
-    const initialTxBuilder = lucid.newTx();
-    const [, , initialTxSignBuilder] = await initialTxBuilder.pay
-      .ToAddress(initialUTxO.address, initialUTxO.assets)
-      .chain();
+    if (txsCount > 1) {
+      // For multi-tx chains, move away from the synthetic initial UTxO once.
+      const initialTxBuilder = lucid.newTx();
+      const [, , initialTxSignBuilder] = await initialTxBuilder.pay
+        .ToAddress(initialUTxO.address, initialUTxO.assets)
+        .chain();
 
-    const initialTxSigned = await initialTxSignBuilder.sign
-      .withPrivateKey(walletSeedOrPrivateKey)
-      .complete();
+      const initialTxSigned = await initialTxSignBuilder.sign
+        .withPrivateKey(walletSeedOrPrivateKey)
+        .complete();
 
-    // Use the output of initial transaction for subsequent transactions
-    const firstUtxo = {
-      txHash: initialTxSigned.toHash(),
-      outputIndex: initialUTxO.outputIndex,
-      address: initialUTxO.address,
-      assets: initialUTxO.assets,
-    };
+      const firstUtxo = {
+        txHash: initialTxSigned.toHash(),
+        outputIndex: initialUTxO.outputIndex,
+        address: initialUTxO.address,
+        assets: initialUTxO.assets,
+      };
 
-    lucid.selectWallet.fromAddress(firstUtxo.address, [firstUtxo]);
+      lucid.selectWallet.fromAddress(firstUtxo.address, [firstUtxo]);
+
+      initialTxBuilder.rawConfig().txBuilder.free();
+      initialTxSignBuilder.toTransaction().free();
+      initialTxSigned.toTransaction().free();
+    }
 
     // Generate the actual transactions with unique data
     for (let i = 0; i < txsCount; i++) {
@@ -216,15 +222,12 @@ const generateOneToOneTransactions = async (
       txSigned.toTransaction().free();
 
       // Periodic GC pause to prevent memory pressure
-      if (i % GC_PAUSE_INTERVAL === 0) {
-        await new Promise<void>((resolve) => setTimeout(() => resolve(), 100));
+      if (i > 0 && i % GC_PAUSE_INTERVAL === 0) {
+        await new Promise<void>((resolve) =>
+          setTimeout(() => resolve(), GC_PAUSE_DURATION_MS)
+        );
       }
     }
-
-    // Cleanup initial transaction resources
-    initialTxBuilder.rawConfig().txBuilder.free();
-    initialTxSignBuilder.toTransaction().free();
-    initialTxSigned.toTransaction().free();
   } catch (error) {
     console.error('Error generating transactions:', error);
     throw error;
