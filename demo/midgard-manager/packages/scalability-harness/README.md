@@ -26,36 +26,36 @@ A plan runs an ordered sequence of scenarios and produces an aggregated report.
 
 ```bash
 # Full §8.1 benchmark sequence
-pnpm run start -- run --plan plans/standard-progression.json
+node dist/bin/index.js run --plan plans/standard-progression.json
 
 # §8.3 saturation discovery sequence
-pnpm run start -- run --plan plans/saturation.json
+node dist/bin/index.js run --plan plans/saturation.json
 
 # Dry run — validate all scenarios and print tier breakdowns without load
-pnpm run start -- run --plan plans/standard-progression.json --dry-run
+node dist/bin/index.js run --plan plans/standard-progression.json --dry-run
 
 # Override output directory
-pnpm run start -- run --plan plans/standard-progression.json --output-dir /tmp/bench
+node dist/bin/index.js run --plan plans/standard-progression.json --output-dir /tmp/bench
 ```
 
 ### Run a single scenario
 
 ```bash
-pnpm run start -- run --scenario scenarios/warmup.json
-pnpm run start -- run --scenario scenarios/warmup.json --dry-run
-pnpm run start -- run --scenario scenarios/stress-10000.json --max-tier 2
-pnpm run start -- run --scenario scenarios/initial-800.json --run-id initial-800-v2
+node dist/bin/index.js run --scenario scenarios/warmup.json
+node dist/bin/index.js run --scenario scenarios/warmup.json --dry-run
+node dist/bin/index.js run --scenario scenarios/stress-10000.json --max-tier 2
+node dist/bin/index.js run --scenario scenarios/initial-800.json --run-id initial-800-v2
 ```
 
 ### Other commands
 
 ```bash
 # Run preflight checks against a scenario's endpoints
-pnpm run start -- preflight --scenario scenarios/warmup.json
+node dist/bin/index.js preflight --scenario scenarios/warmup.json
 
 # Print load tiers for a scenario without running
-pnpm run start -- tiers --scenario scenarios/practical-24985.json
-pnpm run start -- tiers --scenario scenarios/saturation-ramp-25pct.json --max-tier 4
+node dist/bin/index.js tiers --scenario scenarios/practical-24985.json
+node dist/bin/index.js tiers --scenario scenarios/saturation-ramp-25pct.json --max-tier 4
 ```
 
 ### Collateral top-up (block commitment wallet)
