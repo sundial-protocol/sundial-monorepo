@@ -170,4 +170,50 @@ describe('Deterministic generation and replay', () => {
       await rm(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('loads JSONL replay corpus without loading the full corpus into memory', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'm42-corpus-jsonl-'));
+    const corpusPath = join(tempDir, 'corpus.jsonl');
+    await writeFile(
+      corpusPath,
+      [
+        JSON.stringify({
+          txId: 'replay-jsonl-1',
+          cborHex: 'cbor-replay-jsonl-1',
+          type: 'Midgard L2 User Transaction',
+          description: 'replay tx jsonl 1',
+        }),
+        JSON.stringify({
+          txId: 'replay-jsonl-2',
+          cborHex: 'cbor-replay-jsonl-2',
+          type: 'Midgard L2 User Transaction',
+          description: 'replay tx jsonl 2',
+        }),
+      ].join('\n') + '\n'
+    );
+
+    try {
+      await startGenerator({
+        walletSeedOrPrivateKey: 'seeded_test_key',
+        nodeEndpoint: 'http://localhost:3000',
+        transactionType: 'mixed',
+        batchSize: 6,
+        interval: 0,
+        concurrency: 1,
+        autoStopAfterBatch: true,
+        replayCorpusPath: corpusPath,
+      });
+      await waitForGeneratorStop();
+      const status = getGeneratorStatus();
+
+      expect(mockOneToOne).not.toHaveBeenCalled();
+      expect(mockMultiOutput).not.toHaveBeenCalled();
+      expect(mockSubmitTransaction).not.toHaveBeenCalled();
+      expect(status.transactionsGenerated).toBe(2);
+      expect(status.transactionsSubmitted).toBe(0);
+      expect(status.transactionsFailed).toBe(2);
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
 });
