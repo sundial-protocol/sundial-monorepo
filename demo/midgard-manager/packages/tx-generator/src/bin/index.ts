@@ -206,7 +206,7 @@ program
   .option('-t, --type <type>', 'Transaction type (one-to-one, multi-output, mixed)', 'one-to-one')
   .option('-r, --ratio <number>', 'Percentage of one-to-one transactions in mixed mode', '70')
   .option('-s, --seed <seed>', 'Deterministic seed (default: random)')
-  .option('-n, --network <network>', 'Network (Preview/Mainnet)', 'Preview')
+  .option('--network <network>', 'Network (Preview/Mainnet)', 'Preview')
   .option('--test-wallet', 'Generate a fresh test wallet private key', false)
   .option('-k, --private-key <key>', 'Wallet private key')
   .action(

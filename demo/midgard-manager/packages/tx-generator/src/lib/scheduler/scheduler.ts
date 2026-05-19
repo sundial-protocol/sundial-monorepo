@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
+import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 import { UTxO } from '@lucid-evolution/lucid';
@@ -141,6 +143,10 @@ interface PreparedSubmission {
 interface ReplayCorpusFile {
   transactions: SerializedMidgardTransaction[];
 }
+
+type ReplayCorpus =
+  | { type: 'array'; transactions: SerializedMidgardTransaction[] }
+  | { type: 'jsonl'; resolvedPath: string; sourcePath: string };
 
 export interface TaskPlan {
   initialUTxO: UTxO;
@@ -334,9 +340,49 @@ const parseReplayCorpusContent = (
   return transactions;
 };
 
+const parseReplayCorpusLine = (
+  replayCorpusPath: string,
+  lineNumber: number,
+  line: string
+): SerializedMidgardTransaction => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch {
+    throw new Error(`Replay corpus "${replayCorpusPath}" has invalid JSON at line ${lineNumber}`);
+  }
+
+  if (
+    parsed === null ||
+    typeof parsed !== 'object' ||
+    !('txId' in parsed) ||
+    !('cborHex' in parsed) ||
+    !('description' in parsed) ||
+    !('type' in parsed)
+  ) {
+    throw new Error(
+      `Replay corpus "${replayCorpusPath}" has invalid transaction at line ${lineNumber}`
+    );
+  }
+
+  const tx = parsed as SerializedMidgardTransaction;
+  if (
+    typeof tx.txId !== 'string' ||
+    typeof tx.cborHex !== 'string' ||
+    typeof tx.description !== 'string' ||
+    typeof tx.type !== 'string'
+  ) {
+    throw new Error(
+      `Replay corpus "${replayCorpusPath}" has invalid transaction at line ${lineNumber}`
+    );
+  }
+
+  return tx;
+};
+
 const loadReplayCorpus = async (
   replayCorpusPath: string | undefined
-): Promise<SerializedMidgardTransaction[] | null> => {
+): Promise<ReplayCorpus | null> => {
   if (replayCorpusPath === undefined) {
     return null;
   }
@@ -344,8 +390,20 @@ const loadReplayCorpus = async (
   const resolvedPath = isAbsolute(replayCorpusPath)
     ? replayCorpusPath
     : join(projectRoot, replayCorpusPath);
+
+  if (resolvedPath.endsWith('.jsonl')) {
+    return {
+      type: 'jsonl',
+      resolvedPath,
+      sourcePath: replayCorpusPath,
+    };
+  }
+
   const raw = await readFile(resolvedPath, 'utf8');
-  return parseReplayCorpusContent(replayCorpusPath, raw);
+  return {
+    type: 'array',
+    transactions: parseReplayCorpusContent(replayCorpusPath, raw),
+  };
 };
 
 async function appendRequestEvent(
@@ -599,7 +657,7 @@ async function prepareAndEnqueueTaskPlan(params: {
 }
 
 async function prepareAndEnqueueReplay(params: {
-  replayCorpus: SerializedMidgardTransaction[];
+  replayCorpus: ReplayCorpus;
   fullConfig: TransactionGeneratorConfig;
   submissionQueue: queueAsPromised<PreparedSubmission>;
   queueCapacity: number;
@@ -607,7 +665,7 @@ async function prepareAndEnqueueReplay(params: {
 }): Promise<void> {
   const { replayCorpus, fullConfig, submissionQueue, queueCapacity, getActiveWorkers } = params;
 
-  for (const sourceTx of replayCorpus) {
+  const processSourceTx = async (sourceTx: SerializedMidgardTransaction): Promise<void> => {
     if (state.shouldStop) {
       return;
     }
@@ -643,6 +701,39 @@ async function prepareAndEnqueueReplay(params: {
       state.stats.submissionAggregate,
       submissionQueue.length() + getActiveWorkers()
     );
+  };
+
+  if (replayCorpus.type === 'array') {
+    for (const sourceTx of replayCorpus.transactions) {
+      await processSourceTx(sourceTx);
+    }
+    return;
+  }
+
+  const rl = createInterface({
+    input: createReadStream(replayCorpus.resolvedPath, { encoding: 'utf8' }),
+    crlfDelay: Infinity,
+  });
+  let lineNumber = 0;
+  let sawAtLeastOneLine = false;
+
+  for await (const rawLine of rl) {
+    if (state.shouldStop) {
+      rl.close();
+      return;
+    }
+    const line = rawLine.trim();
+    if (line.length === 0) {
+      continue;
+    }
+    sawAtLeastOneLine = true;
+    lineNumber += 1;
+    const sourceTx = parseReplayCorpusLine(replayCorpus.sourcePath, lineNumber, line);
+    await processSourceTx(sourceTx);
+  }
+
+  if (!sawAtLeastOneLine) {
+    throw new Error(`Replay corpus "${replayCorpus.sourcePath}" is empty`);
   }
 }
 

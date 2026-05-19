@@ -1,4 +1,5 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { access, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
@@ -30,6 +31,71 @@ import { renderReport } from '../report/markdown.js';
 import type { TierRunResult } from './load-runner.js';
 import { runTier } from './load-runner.js';
 import { computeSettings } from './tx-generator.js';
+
+const PREGEN_CORPUS_SCHEMA_VERSION = 'v1';
+const DEFAULT_MIXED_ONE_TO_ONE_RATIO = 70;
+
+interface PregenCorpusIdentity {
+  schemaVersion: string;
+  transactionType: ScalabilityScenario['transactionType'];
+  oneToOneRatio: number | null;
+  transactionCount: number;
+  seed: string;
+  network: 'Preview';
+}
+
+function sanitizeFileToken(value: string): string {
+  const token = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (token.length === 0) {
+    return 'x';
+  }
+  return token.slice(0, 24);
+}
+
+function buildPregenCorpusIdentity(scenario: ScalabilityScenario): PregenCorpusIdentity {
+  return {
+    schemaVersion: PREGEN_CORPUS_SCHEMA_VERSION,
+    transactionType: scenario.transactionType,
+    oneToOneRatio:
+      scenario.transactionType === 'mixed'
+        ? (scenario.oneToOneRatio ?? DEFAULT_MIXED_ONE_TO_ONE_RATIO)
+        : null,
+    transactionCount: scenario.pregenTransactionCount ?? 0,
+    seed: scenario.seed,
+    network: 'Preview',
+  };
+}
+
+function buildPregenCorpusBaseName(identity: PregenCorpusIdentity): string {
+  const identityHash = createHash('sha256')
+    .update(JSON.stringify(identity))
+    .digest('hex')
+    .slice(0, 16);
+  const typeToken = sanitizeFileToken(identity.transactionType);
+  const seedToken = sanitizeFileToken(identity.seed);
+  const ratioToken =
+    identity.oneToOneRatio === null
+      ? 'na'
+      : identity.oneToOneRatio.toString().replace(/[^0-9]/g, '');
+  return `corpus-${identity.schemaVersion}-t-${typeToken}-r-${ratioToken}-n-${identity.transactionCount}-s-${seedToken}-${identityHash}`;
+}
+
+function cacheDataDirFromRunDir(runDir: string): string {
+  return path.join(path.dirname(runDir), 'data');
+}
+
+async function hasNonEmptyFile(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    const details = await stat(filePath);
+    return details.isFile() && details.size > 0;
+  } catch {
+    return false;
+  }
+}
 
 function lookupCounterDelta(summary: TierWindowSummary | null, query: string): number | null {
   return summary?.counterDeltas.find((d) => d.query === query)?.deltaLoad ?? null;
@@ -146,65 +212,117 @@ export async function runScenario(
   // tx-generator replay loop, so any count > 0 is valid.
   let pregenCorpusPath: string | undefined;
   if (scenario.pregenTransactionCount !== undefined) {
-    const corpusPath = path.join(writer.runDir, 'pregen-corpus.json');
+    const identity = buildPregenCorpusIdentity(scenario);
+    const cacheDataDir = cacheDataDirFromRunDir(writer.runDir);
+    await mkdir(cacheDataDir, { recursive: true });
+    const corpusBaseName = buildPregenCorpusBaseName(identity);
+    const corpusPath = path.join(cacheDataDir, `${corpusBaseName}.jsonl`);
+    const metadataPath = path.join(cacheDataDir, `${corpusBaseName}.meta.json`);
     const count = scenario.pregenTransactionCount;
-    console.log(chalk.blue(`\n  Pre-generating ${count.toLocaleString()} transactions...`));
-    const { privateKey, address } = await generateTestWallet();
-    const initialUTxO = {
-      txHash: '0'.repeat(64),
-      outputIndex: 0,
-      address,
-      assets: { lovelace: 10_000_000_000n },
-      datum: null,
-      datumHash: null,
-      scriptRef: null,
-    };
-    const pregenStart = performance.now();
-    let lastPct = -1;
-    try {
-      await generateCorpus({
-        count,
-        walletSeedOrPrivateKey: privateKey,
-        transactionType: scenario.transactionType,
-        oneToOneRatio: scenario.oneToOneRatio,
-        network: 'Preview',
-        initialUTxO,
-        seed: scenario.seed,
-        outputPath: corpusPath,
-        onProgress(generated, total) {
-          const pct = Math.floor((generated / total) * 100);
-          if (pct !== lastPct && pct % 5 === 0) {
-            lastPct = pct;
-            const filled = Math.floor(pct / 5);
-            const bar = '='.repeat(filled) + '-'.repeat(20 - filled);
-            process.stdout.write(`\r  [${bar}] ${pct}% (${generated}/${total})`);
-          }
-        },
-      });
-      process.stdout.write('\n');
-    } catch (err) {
-      process.stdout.write('\n');
-      console.error(chalk.red(`  Pre-generation failed: ${String(err)}`));
-      return {
-        tierSummaries: [],
-        conclusion: {
-          highestCompletedTier: null,
-          highestCompletedTargetTps: null,
-          firstCollapsedTier: null,
-          firstCollapsedTargetTps: null,
-          primaryBottleneck: 'harness_error',
-          classification: 'Blocked',
-          classificationReasons: [`Pre-generation failed: ${String(err)}`],
-          violatedChecks: [],
-          criteriaChecks: [],
-          policy: buildRunClassificationPolicy(scenario),
-          notes: [],
-        },
-        harnessErrorOccurred: true,
+    const cachedCorpusExists = await hasNonEmptyFile(corpusPath);
+    if (cachedCorpusExists) {
+      console.log(chalk.gray(`\n  Reusing cached pre-generated corpus: ${corpusPath}`));
+    } else {
+      console.log(chalk.blue(`\n  Pre-generating ${count.toLocaleString()} transactions...`));
+      const { privateKey, address } = await generateTestWallet();
+      const initialUTxO = {
+        txHash: '0'.repeat(64),
+        outputIndex: 0,
+        address,
+        assets: { lovelace: 10_000_000_000n },
+        datum: null,
+        datumHash: null,
+        scriptRef: null,
       };
+      const pregenStart = performance.now();
+      let lastRenderedGenerated = 0;
+      let lastRenderedAtMs = 0;
+      const tempCorpusPath = `${corpusPath}.tmp-${process.pid}-${Date.now()}`;
+      try {
+        await generateCorpus({
+          count,
+          walletSeedOrPrivateKey: privateKey,
+          transactionType: scenario.transactionType,
+          oneToOneRatio: scenario.oneToOneRatio,
+          network: 'Preview',
+          initialUTxO,
+          seed: scenario.seed,
+          outputPath: tempCorpusPath,
+          onProgress(generated, total) {
+            const nowMs = performance.now();
+            const pct = Math.floor((generated / total) * 100);
+            const elapsedSec = Math.max(1, (nowMs - pregenStart) / 1000);
+            const rate = generated / elapsedSec;
+            const remaining = Math.max(0, total - generated);
+            const etaSec = rate > 0 ? remaining / rate : Infinity;
+
+            const shouldRender =
+              generated === 1 ||
+              generated === total ||
+              generated - lastRenderedGenerated >= 1000 ||
+              nowMs - lastRenderedAtMs >= 2000;
+
+            if (shouldRender) {
+              const filled = Math.floor((pct / 100) * 20);
+              const bar = '='.repeat(filled) + '-'.repeat(20 - filled);
+              const etaDisplay = Number.isFinite(etaSec)
+                ? `${Math.floor(etaSec / 60)}m${Math.floor(etaSec % 60)
+                    .toString()
+                    .padStart(2, '0')}s`
+                : 'n/a';
+              process.stdout.write(
+                `\r  [${bar}] ${pct}% (${generated}/${total}) ${rate.toFixed(1)} tx/s ETA ${etaDisplay}`
+              );
+              lastRenderedGenerated = generated;
+              lastRenderedAtMs = nowMs;
+            }
+          },
+        });
+        process.stdout.write('\n');
+
+        const corpusAlreadyCreated = await hasNonEmptyFile(corpusPath);
+        if (corpusAlreadyCreated) {
+          await rm(tempCorpusPath, { force: true });
+        } else {
+          await rename(tempCorpusPath, corpusPath);
+        }
+      } catch (err) {
+        process.stdout.write('\n');
+        await rm(tempCorpusPath, { force: true }).catch(() => undefined);
+        console.error(chalk.red(`  Pre-generation failed: ${String(err)}`));
+        return {
+          tierSummaries: [],
+          conclusion: {
+            highestCompletedTier: null,
+            highestCompletedTargetTps: null,
+            firstCollapsedTier: null,
+            firstCollapsedTargetTps: null,
+            primaryBottleneck: 'harness_error',
+            classification: 'Blocked',
+            classificationReasons: [`Pre-generation failed: ${String(err)}`],
+            violatedChecks: [],
+            criteriaChecks: [],
+            policy: buildRunClassificationPolicy(scenario),
+            notes: [],
+          },
+          harnessErrorOccurred: true,
+        };
+      }
+      const pregenSec = ((performance.now() - pregenStart) / 1000).toFixed(1);
+      await writeFile(
+        metadataPath,
+        JSON.stringify(
+          {
+            ...identity,
+            generatedAt: new Date().toISOString(),
+            corpusPath,
+          },
+          null,
+          2
+        )
+      );
+      console.log(chalk.gray(`  Pre-generation complete in ${pregenSec}s — corpus: ${corpusPath}`));
     }
-    const pregenSec = ((performance.now() - pregenStart) / 1000).toFixed(1);
-    console.log(chalk.gray(`  Pre-generation complete in ${pregenSec}s — corpus: ${corpusPath}`));
     pregenCorpusPath = corpusPath;
   }
 

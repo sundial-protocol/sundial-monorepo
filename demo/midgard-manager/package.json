@@ -25,7 +25,11 @@
     "wallet:block-commitment:topup": "node scripts/fund-bc-wallet.mjs",
     "wallet:block-commitment:check": "node scripts/fund-bc-wallet.mjs --check",
     "wallet:topup:block-commitment": "npm run wallet:block-commitment:topup",
-    "test": "pnpm --filter @midgard-manager/* test",
+    "test:unit:tx-builder": "pnpm --filter @midgard-manager/tx-builder run test",
+    "test:unit:tx-generator": "pnpm --filter @midgard-manager/tx-generator run test",
+    "test:unit:scalability-harness": "pnpm --filter @midgard-manager/scalability-harness run test",
+    "test:unit": "pnpm run test:unit:tx-builder && pnpm run test:unit:tx-generator && pnpm run test:unit:scalability-harness",
+    "test": "pnpm run test:unit",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md}\"",
     "lint:fix": "ESLINT_USE_FLAT_CONFIG=false eslint . --fix"
