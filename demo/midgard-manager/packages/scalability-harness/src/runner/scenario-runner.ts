@@ -23,6 +23,7 @@ import type { TempoTierCapture } from '../evidence/tempo.js';
 import { TempoClient } from '../evidence/tempo.js';
 import { PrometheusClient } from '../metrics/prometheus.js';
 import type { TierMetricWindow, TierWindowSummary } from '../metrics/window.js';
+import { generateCharts } from '../report/charts.js';
 import { renderReport } from '../report/markdown.js';
 import type { TierRunResult } from './load-runner.js';
 import { runTier } from './load-runner.js';
@@ -323,6 +324,15 @@ export async function runScenario(
     // Non-fatal: report renders with empty artifact index.
   }
 
+  let chartRecords: Awaited<ReturnType<typeof generateCharts>> | undefined;
+  if (prometheusWindows.length > 0) {
+    try {
+      chartRecords = await generateCharts(prometheusWindows, writer.runDir);
+    } catch (err) {
+      console.error(chalk.red(`  Failed to generate charts: ${String(err)}`));
+    }
+  }
+
   const markdown = renderReport({
     manifest,
     scenario,
@@ -331,6 +341,7 @@ export async function runScenario(
     artifactFiles,
     lokiCaptures: lokiCaptures.length > 0 ? lokiCaptures : undefined,
     tempoCaptures: tempoCaptures.length > 0 ? tempoCaptures : undefined,
+    chartRecords,
   });
 
   try {
