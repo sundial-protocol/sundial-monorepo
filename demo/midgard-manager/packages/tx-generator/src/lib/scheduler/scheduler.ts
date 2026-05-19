@@ -785,25 +785,28 @@ export const startGenerator = async (
 
   // Create a function to run the generator loop
   const runGenerator = async () => {
-    // Generate at least one batch
-    await generateTransactions();
-
-    // If auto-stop is enabled, stop here (for scheduled jobs)
+    // If auto-stop is enabled, run one batch then exit (for scheduled jobs)
     if (fullConfig.autoStopAfterBatch) {
+      await generateTransactions();
       console.log('Auto-stop enabled - stopping after one batch');
       state.shouldStop = true;
       return;
     }
 
-    // Otherwise, continue in a loop until stopped manually
+    // Wall-clock-aligned loop: measure batch execution time and sleep only the
+    // remaining portion of the target period. If the batch takes longer than
+    // the period the next batch starts immediately without any extra wait,
+    // keeping actual TPS as close to targetTps as possible.
+    const targetPeriodMs = fullConfig.interval * 1000;
     while (!state.shouldStop) {
-      // Wait for the specified interval
-      await new Promise((resolve) => setTimeout(resolve, fullConfig.interval * 1000));
-
-      // Check if we should stop before generating more transactions
+      const batchStart = Date.now();
+      await generateTransactions();
       if (state.shouldStop) break;
 
-      await generateTransactions();
+      const remaining = Math.max(0, targetPeriodMs - (Date.now() - batchStart));
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
     }
     console.log('Transaction generator stopped');
   };

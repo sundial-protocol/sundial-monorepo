@@ -503,6 +503,137 @@ describe('checkMetricStopConditions', () => {
     ).toBeNull();
   });
 
+  // ---- minCommitToAcceptedRatio --------------------------------------------
+
+  it('returns null when minCommitToAcceptedRatio is not set', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 1000, deltaRecovery: 1000 },
+        { query: 'commit_block_tx_count_total', deltaLoad: 500, deltaRecovery: 500 },
+      ],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, minCommitToAcceptedRatio: undefined },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  it('returns commit_drain_below_threshold when committed/accepted ratio is below threshold', () => {
+    // accepted=1000, committed=500, ratio=0.5 < 1.0
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 1000, deltaRecovery: 1000 },
+        { query: 'commit_block_tx_count_total', deltaLoad: 500, deltaRecovery: 500 },
+      ],
+    });
+    const result = checkMetricStopConditions(
+      { ...BASE_SC, minCommitToAcceptedRatio: 1.0 },
+      emptyWindow,
+      summary,
+      60,
+      100
+    );
+    expect(result?.reason).toBe('commit_drain_below_threshold');
+    expect(result?.metricValues?.committedTxDelta).toBe(500);
+    expect(result?.metricValues?.mempoolAcceptedDelta).toBe(1000);
+    expect(result?.metricValues?.commitToAcceptedRatio as number).toBeCloseTo(0.5);
+    expect(result?.metricValues?.minCommitToAcceptedRatio).toBe(1.0);
+  });
+
+  it('returns null when committed equals accepted', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 1000, deltaRecovery: 1000 },
+        { query: 'commit_block_tx_count_total', deltaLoad: 1000, deltaRecovery: 1000 },
+      ],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, minCommitToAcceptedRatio: 1.0 },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  it('returns null when committed exceeds accepted (draining backlog)', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 1000, deltaRecovery: 1000 },
+        { query: 'commit_block_tx_count_total', deltaLoad: 1200, deltaRecovery: 1200 },
+      ],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, minCommitToAcceptedRatio: 1.0 },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  it('returns null when mempoolAcceptedDelta is 0 (no load delivered)', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 0, deltaRecovery: 0 },
+        { query: 'commit_block_tx_count_total', deltaLoad: 0, deltaRecovery: 0 },
+      ],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, minCommitToAcceptedRatio: 1.0 },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  it('returns null when committedTxDelta is null (evidence incomplete)', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 1000, deltaRecovery: 1000 },
+        { query: 'commit_block_tx_count_total', deltaLoad: null, deltaRecovery: null },
+      ],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, minCommitToAcceptedRatio: 1.0 },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  it('returns null when commit_block_tx_count_total is absent from deltas', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 1000, deltaRecovery: 1000 },
+      ],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, minCommitToAcceptedRatio: 1.0 },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
   // ---- minUsefulThroughputRatio --------------------------------------------
 
   it('returns null when minUsefulThroughputRatio is not set', () => {
@@ -1074,6 +1205,34 @@ describe('runTier', () => {
     const result = await runTier(BASE_SCENARIO, BASE_TIER, writer, prometheusClient, opts);
 
     expect(result.txGeneratorExitCode).toBe(1);
+  });
+
+  it('aborts load phase immediately when generator crashes during startup', async () => {
+    const proc = new MockProcess();
+    const spawner = { spawn: vi.fn(() => proc as unknown as ChildProcess) };
+    // Use a long load duration to prove early abort — without the fix this would take ~2000 ms.
+    const opts = makeOptions({
+      tierDurationMs: 2000,
+      recoveryDurationMs: 50,
+      runnerOptions: { spawner, sigintGraceMs: 50, sigTermGraceMs: 50 },
+    });
+
+    // Crash the generator immediately after spawn (non-zero exit = startup failure).
+    setImmediate(() => {
+      proc.exitCode = 1;
+      proc.killed = true;
+      proc.emit('exit', 1, null);
+      proc.emit('close', 1, null);
+    });
+
+    const start = Date.now();
+    const result = await runTier(BASE_SCENARIO, BASE_TIER, writer, prometheusClient, opts);
+    const elapsed = Date.now() - start;
+
+    expect(result.txGeneratorExitCode).toBe(1);
+    expect(result.shouldContinue).toBe(false);
+    // Load phase must abort far short of the 2000 ms tier duration.
+    expect(elapsed).toBeLessThan(500);
   });
 
   // ---- multi-tier acceptance tests ----------------------------------------

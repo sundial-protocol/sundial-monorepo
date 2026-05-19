@@ -46,8 +46,7 @@ function makeScenario(overrides: Partial<ScalabilityScenario> = {}): Scalability
     startTps: 100,
     maxTps: 800,
     stepMultiplier: 2,
-    batchSize: 10,
-    concurrency: 4,
+    txGeneratorTaskCostSeconds: 0.2,
     retryAttempts: 3,
     retryDelayMs: 500,
     stopConditions: {

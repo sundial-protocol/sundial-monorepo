@@ -67,6 +67,7 @@ function buildCollapseInputs(
       result.windowSummary,
       'tx_submissions_mempool_accepted_total'
     ),
+    committedTxDelta: lookupCounterDelta(result.windowSummary, 'commit_block_tx_count_total'),
     tierDurationSeconds: result.elapsedMs / 1000,
     targetTps: result.targetTps,
     stopConditions,
@@ -137,11 +138,7 @@ export async function runScenario(
   let harnessErrorOccurred = false;
 
   for (const tier of tiers) {
-    const generatorSettings = computeSettings(
-      tier.targetTps,
-      scenario.batchSize,
-      scenario.concurrency
-    );
+    const generatorSettings = computeSettings(tier.targetTps, scenario.txGeneratorTaskCostSeconds);
     console.log(chalk.gray(`\n  [${tier.tierIndex}] ${tier.targetTps} TPS running...`));
     console.log(
       chalk.gray(

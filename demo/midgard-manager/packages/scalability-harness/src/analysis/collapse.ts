@@ -8,6 +8,7 @@ export type CollapseReason =
   | 'queue_not_recovered'
   | 'mempool_not_recovered'
   | 'tx_generator_failed'
+  | 'commit_drain_below_threshold'
   | 'useful_throughput_below_threshold';
 
 export interface CollapseResult {
@@ -37,11 +38,13 @@ export interface CollapseInputs {
   recoveryQueueSize: number | null;
   recoveryMempoolSize: number | null;
 
-  // Useful throughput inputs.
+  // Node drain health inputs.
   // mempoolAcceptedDelta is the tx_submissions_mempool_accepted_total counter delta
   // over the load phase — NOT tx_submissions_enqueued_total (which only reflects
   // acceptance into the in-memory queue, not into the mempool DB).
+  // committedTxDelta is the commit_block_tx_count_total counter delta over the load phase.
   mempoolAcceptedDelta: number | null;
+  committedTxDelta?: number | null;
   tierDurationSeconds: number;
   targetTps: number;
 
@@ -49,14 +52,15 @@ export interface CollapseInputs {
 }
 
 // Priority order (highest to lowest severity):
-// 1. node_unavailable     — node completely unreachable
-// 2. prometheus_down      — observability lost (when enabled)
-// 3. commitment_failures  — L2 protocol failure (when enabled)
-// 4. merge_failures       — L2 protocol failure (when enabled)
-// 5. queue_not_recovered  — tx queue did not drain (when threshold set)
-// 6. mempool_not_recovered— mempool did not drain (when threshold set)
-// 7. tx_generator_failed  — load generation process crashed
-// 8. useful_throughput_below_threshold — performance below ratio threshold (when set)
+// 1. node_unavailable              — node completely unreachable
+// 2. prometheus_down               — observability lost (when enabled)
+// 3. commitment_failures           — L2 protocol failure (when enabled)
+// 4. merge_failures                — L2 protocol failure (when enabled)
+// 5. queue_not_recovered           — tx queue did not drain (when threshold set)
+// 6. mempool_not_recovered         — mempool did not drain (when threshold set)
+// 7. tx_generator_failed           — load generation process crashed (unreliable data)
+// 8. commit_drain_below_threshold  — node committed fewer txs than it accepted (node-health)
+// 9. useful_throughput_below_threshold — load-driver delivered below ratio threshold (when set)
 export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
   const { stopConditions } = inputs;
 
@@ -151,6 +155,25 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
       reason: 'tx_generator_failed',
       values: { exitCode },
     };
+  }
+
+  if (stopConditions.minCommitToAcceptedRatio !== undefined) {
+    const accepted = inputs.mempoolAcceptedDelta;
+    const committed = inputs.committedTxDelta ?? null;
+    if (accepted !== null && committed !== null && accepted > 0) {
+      const commitToAcceptedRatio = committed / accepted;
+      if (commitToAcceptedRatio < stopConditions.minCommitToAcceptedRatio) {
+        return {
+          reason: 'commit_drain_below_threshold',
+          values: {
+            committedTxDelta: committed,
+            mempoolAcceptedDelta: accepted,
+            commitToAcceptedRatio,
+            minCommitToAcceptedRatio: stopConditions.minCommitToAcceptedRatio,
+          },
+        };
+      }
+    }
   }
 
   if (stopConditions.minUsefulThroughputRatio !== undefined) {

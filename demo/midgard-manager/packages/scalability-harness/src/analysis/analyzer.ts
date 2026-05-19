@@ -72,6 +72,8 @@ function bottleneckFromCollapseReason(reason: string): string | null {
       return 'block commitment (mempool did not recover after load)';
     case 'tx_generator_failed':
       return 'load generation (tx generator process crashed)';
+    case 'commit_drain_below_threshold':
+      return 'block commitment throughput (commit rate fell below accepted transaction rate during load)';
     default:
       return null;
   }

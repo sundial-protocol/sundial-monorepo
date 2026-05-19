@@ -359,6 +359,29 @@ export function checkMetricStopConditions(
     }
   }
 
+  if (stopConditions.minCommitToAcceptedRatio !== undefined) {
+    const mempoolAcceptedDelta =
+      windowSummary.counterDeltas.find((d) => d.query === 'tx_submissions_mempool_accepted_total')
+        ?.deltaLoad ?? null;
+    const committedTxDelta =
+      windowSummary.counterDeltas.find((d) => d.query === 'commit_block_tx_count_total')
+        ?.deltaLoad ?? null;
+    if (mempoolAcceptedDelta !== null && committedTxDelta !== null && mempoolAcceptedDelta > 0) {
+      const commitToAcceptedRatio = committedTxDelta / mempoolAcceptedDelta;
+      if (commitToAcceptedRatio < stopConditions.minCommitToAcceptedRatio) {
+        return {
+          reason: 'commit_drain_below_threshold',
+          metricValues: {
+            committedTxDelta,
+            mempoolAcceptedDelta,
+            commitToAcceptedRatio,
+            minCommitToAcceptedRatio: stopConditions.minCommitToAcceptedRatio,
+          },
+        };
+      }
+    }
+  }
+
   if (stopConditions.minUsefulThroughputRatio !== undefined) {
     const mempoolAcceptedDelta =
       windowSummary.counterDeltas.find((d) => d.query === 'tx_submissions_mempool_accepted_total')
@@ -587,6 +610,13 @@ export async function runTier(
           liveMetricCheckInFlight = false;
         });
     };
+
+    // Abort the load phase immediately if the generator process crashes.
+    void generatorHandle.processExited.then((exitCode) => {
+      if (!loadController.signal.aborted && exitCode !== null && exitCode !== 0) {
+        loadController.abort();
+      }
+    });
 
     scheduleLiveMetricCheck();
     probeResult = await runProbeLoop(

@@ -154,9 +154,6 @@ export const validateGeneratorConfig = (config: TransactionGeneratorConfig): voi
   if (config.concurrency < 1) {
     throw new Error('Concurrency must be at least 1');
   }
-  if (config.concurrency > 20) {
-    throw new Error('Concurrency must not exceed 20');
-  }
 
   if (
     config.requestEvents !== undefined &&

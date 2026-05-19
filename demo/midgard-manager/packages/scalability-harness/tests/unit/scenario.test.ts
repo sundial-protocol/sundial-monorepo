@@ -19,8 +19,7 @@ const VALID_SCENARIO = {
   startTps: 100,
   maxTps: 800,
   stepMultiplier: 2,
-  batchSize: 50,
-  concurrency: 4,
+  txGeneratorTaskCostSeconds: 0.2,
   retryAttempts: 3,
   retryDelayMs: 500,
   stopConditions: {
@@ -80,6 +79,22 @@ describe('validateScenario', () => {
           maxRecoveryMempoolSize: 5000,
           minUsefulThroughputRatio: 0.5,
         },
+      };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
+    it('accepts minCommitToAcceptedRatio as a node-health stop condition', () => {
+      const s = {
+        ...VALID_SCENARIO,
+        stopConditions: { ...VALID_SCENARIO.stopConditions, minCommitToAcceptedRatio: 1.0 },
+      };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
+    it('accepts minCommitToAcceptedRatio of 0', () => {
+      const s = {
+        ...VALID_SCENARIO,
+        stopConditions: { ...VALID_SCENARIO.stopConditions, minCommitToAcceptedRatio: 0 },
       };
       expect(() => validateScenario(s)).not.toThrow();
     });
@@ -292,14 +307,8 @@ describe('validateScenario', () => {
       );
     });
 
-    it('rejects non-positive batchSize', () => {
-      expect(() => validateScenario({ ...VALID_SCENARIO, batchSize: -10 })).toThrow(
-        ScenarioValidationError
-      );
-    });
-
-    it('rejects non-positive concurrency', () => {
-      expect(() => validateScenario({ ...VALID_SCENARIO, concurrency: 0 })).toThrow(
+    it('rejects non-positive txGeneratorTaskCostSeconds', () => {
+      expect(() => validateScenario({ ...VALID_SCENARIO, txGeneratorTaskCostSeconds: 0 })).toThrow(
         ScenarioValidationError
       );
     });
@@ -317,6 +326,36 @@ describe('validateScenario', () => {
           stopConditions: {
             ...VALID_SCENARIO.stopConditions,
             maxConsecutiveNodeProbeFailures: 0,
+          },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects minCommitToAcceptedRatio above 1', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: { ...VALID_SCENARIO.stopConditions, minCommitToAcceptedRatio: 1.1 },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects minCommitToAcceptedRatio below 0', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: { ...VALID_SCENARIO.stopConditions, minCommitToAcceptedRatio: -0.1 },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects non-finite minCommitToAcceptedRatio', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: {
+            ...VALID_SCENARIO.stopConditions,
+            minCommitToAcceptedRatio: Number.NaN,
           },
         })
       ).toThrow(ScenarioValidationError);

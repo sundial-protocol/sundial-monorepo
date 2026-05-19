@@ -63,18 +63,23 @@ export interface SubmissionAggregate {
   };
 }
 
-// The generator fires one batch of batchSize tasks every intervalSeconds.
-// intervalSeconds = max(0.1, batchSize / targetTps), floored at 100 ms so
-// that the schedule accurately reflects actual batch throughput without
-// spinning arbitrarily fast. actualTpsEstimate may fall below targetTps when
-// batchSize < targetTps * 0.1 (the 100 ms floor binds); raise batchSize to
-// increase the ceiling.
+// Generator settings are fully derived from targetTps and txCostSeconds.
+//
+// concurrency = ceil(targetTps * txCostSeconds * PARALLELISM_HEADROOM)
+// batchSize   = concurrency   (one parallel wave per batch)
+// interval    = batchSize / targetTps
+//
+// With PARALLELISM_HEADROOM=2 the interval is always 2*txCostSeconds regardless
+// of targetTps, so batch execution time (~txCostSeconds, all tasks in parallel)
+// is well inside the interval and the wall-clock scheduler fires exactly on
+// time. Scaling TPS only changes how many concurrent workers run per batch.
+const PARALLELISM_HEADROOM = 2;
+
 export interface GeneratorSettings {
   intervalSeconds: number;
   batchSize: number;
   concurrency: number;
   targetTps: number;
-  // What the generator will actually deliver at this interval — may differ from targetTps.
   actualTpsEstimate: number;
 }
 
@@ -93,6 +98,9 @@ export interface TxGeneratorHandle {
   readonly pid: number | undefined;
   readonly settings: GeneratorSettings;
   readonly startedAt: string;
+  // Resolves with the exit code when the process exits for any reason.
+  // null = exited via signal (e.g. SIGINT from stop()); non-zero = crash.
+  readonly processExited: Promise<number | null>;
   stop(): Promise<TxGeneratorResult>;
 }
 
@@ -112,13 +120,11 @@ export interface RunnerOptions {
   requestEvents?: RequestEventsMode;
 }
 
-export function computeSettings(
-  targetTps: number,
-  batchSize: number,
-  concurrency: number
-): GeneratorSettings {
-  const intervalSeconds = Math.max(0.1, batchSize / targetTps);
-  const actualTpsEstimate = batchSize / intervalSeconds;
+export function computeSettings(targetTps: number, txCostSeconds: number): GeneratorSettings {
+  const concurrency = Math.max(1, Math.ceil(targetTps * txCostSeconds * PARALLELISM_HEADROOM));
+  const batchSize = concurrency;
+  const intervalSeconds = batchSize / targetTps;
+  const actualTpsEstimate = targetTps;
   return { intervalSeconds, batchSize, concurrency, targetTps, actualTpsEstimate };
 }
 
@@ -267,7 +273,7 @@ export async function startTxGenerator(
     requestEvents = 'off',
   } = options;
 
-  const settings = computeSettings(tier.targetTps, scenario.batchSize, scenario.concurrency);
+  const settings = computeSettings(tier.targetTps, scenario.txGeneratorTaskCostSeconds);
   const args = buildArgs(scenario, tier, settings, tierArtifactDir, requestEvents, cwd);
   const startedAt = new Date().toISOString();
 
@@ -308,10 +314,15 @@ export async function startTxGenerator(
     })
   );
 
+  const processExited = new Promise<number | null>((resolve) => {
+    proc.once('exit', (code) => resolve(code));
+  });
+
   return {
     pid: proc.pid,
     settings,
     startedAt,
+    processExited,
 
     async stop(): Promise<TxGeneratorResult> {
       const { exitCode, signal } = await stopProcess(proc, sigintGraceMs, sigTermGraceMs);

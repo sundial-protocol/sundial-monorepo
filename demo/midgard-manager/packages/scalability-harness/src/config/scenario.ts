@@ -36,6 +36,12 @@ export interface StopConditions {
   stopOnMergeFailure: boolean;
   maxRecoveryQueueSize?: number;
   maxRecoveryMempoolSize?: number;
+  // Node-health drain check: requires committedTxDelta >= mempoolAcceptedDelta * ratio.
+  // Fires when the node commits fewer transactions than it accepted during the load window,
+  // indicating the node cannot sustain the incoming rate. Use 1.0 for strict drain parity.
+  minCommitToAcceptedRatio?: number;
+  // Load-driver adequacy check: requires mempoolAcceptedTps / targetTps >= ratio.
+  // Fires when the load driver itself failed to deliver the target rate regardless of node health.
   minUsefulThroughputRatio?: number;
 }
 
@@ -112,8 +118,10 @@ export interface ScalabilityScenario {
   stepMultiplier?: number;
   ramp?: Ramp;
   tierOverrides?: TierOverride[];
-  batchSize: number;
-  concurrency: number;
+  // Estimated wall-clock cost of generating and submitting one transaction (seconds).
+  // The harness derives batchSize, concurrency, and interval from this value and
+  // targetTps so scenarios only need to set this once per environment.
+  txGeneratorTaskCostSeconds: number;
   retryAttempts: number;
   retryDelayMs: number;
   requestEvents?: RequestEventsMode;
@@ -371,8 +379,7 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
   assertPositiveNumber(s.recoverySeconds, 'recoverySeconds');
   assertPositiveNumber(s.startTps, 'startTps');
   assertPositiveNumber(s.maxTps, 'maxTps');
-  assertPositiveNumber(s.batchSize, 'batchSize');
-  assertPositiveNumber(s.concurrency, 'concurrency');
+  assertPositiveNumber(s.txGeneratorTaskCostSeconds, 'txGeneratorTaskCostSeconds');
 
   if (s.ramp !== undefined) {
     if (typeof s.ramp !== 'object' || s.ramp === null) {
@@ -598,11 +605,40 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
   }
 
   if (sc.maxRecoveryQueueSize !== undefined) {
-    assertPositiveNumber(sc.maxRecoveryQueueSize, 'stopConditions.maxRecoveryQueueSize');
+    if (
+      typeof sc.maxRecoveryQueueSize !== 'number' ||
+      !isFinite(sc.maxRecoveryQueueSize) ||
+      sc.maxRecoveryQueueSize < 0
+    ) {
+      throw new ScenarioValidationError(
+        `stopConditions.maxRecoveryQueueSize must be a non-negative number when provided, got: ${sc.maxRecoveryQueueSize}`
+      );
+    }
   }
 
   if (sc.maxRecoveryMempoolSize !== undefined) {
-    assertPositiveNumber(sc.maxRecoveryMempoolSize, 'stopConditions.maxRecoveryMempoolSize');
+    if (
+      typeof sc.maxRecoveryMempoolSize !== 'number' ||
+      !isFinite(sc.maxRecoveryMempoolSize) ||
+      sc.maxRecoveryMempoolSize < 0
+    ) {
+      throw new ScenarioValidationError(
+        `stopConditions.maxRecoveryMempoolSize must be a non-negative number when provided, got: ${sc.maxRecoveryMempoolSize}`
+      );
+    }
+  }
+
+  if (sc.minCommitToAcceptedRatio !== undefined) {
+    if (
+      typeof sc.minCommitToAcceptedRatio !== 'number' ||
+      !isFinite(sc.minCommitToAcceptedRatio) ||
+      sc.minCommitToAcceptedRatio < 0 ||
+      sc.minCommitToAcceptedRatio > 1
+    ) {
+      throw new ScenarioValidationError(
+        `stopConditions.minCommitToAcceptedRatio must be between 0 and 1 when provided, got: ${sc.minCommitToAcceptedRatio}`
+      );
+    }
   }
 
   if (sc.minUsefulThroughputRatio !== undefined) {
