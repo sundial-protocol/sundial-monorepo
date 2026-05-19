@@ -10,6 +10,7 @@ export interface MidgardNodeConfig {
   retryAttempts?: number;
   retryDelay?: number;
   enableLogs?: boolean;
+  skipAvailabilityCheck?: boolean;
 }
 
 // Transaction Generator Configuration
@@ -37,6 +38,10 @@ export interface TransactionGeneratorConfig {
   batchSize: number;
   interval: number;
   concurrency: number;
+  targetTps?: number;
+  maxInFlight?: number;
+  generationConcurrency?: number;
+  preparedQueueCapacity?: number;
   autoStopAfterBatch?: boolean;
 
   // Output settings
@@ -85,6 +90,10 @@ export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
   batchSize: 10,
   interval: 5,
   concurrency: 5,
+  targetTps: undefined,
+  maxInFlight: undefined,
+  generationConcurrency: undefined,
+  preparedQueueCapacity: undefined,
   autoStopAfterBatch: false,
 
   // Output defaults
@@ -153,6 +162,18 @@ export const validateGeneratorConfig = (config: TransactionGeneratorConfig): voi
   }
   if (config.concurrency < 1) {
     throw new Error('Concurrency must be at least 1');
+  }
+  if (config.targetTps !== undefined && config.targetTps <= 0) {
+    throw new Error('targetTps must be positive when provided');
+  }
+  if (config.maxInFlight !== undefined && config.maxInFlight < 1) {
+    throw new Error('maxInFlight must be at least 1 when provided');
+  }
+  if (config.generationConcurrency !== undefined && config.generationConcurrency < 1) {
+    throw new Error('generationConcurrency must be at least 1 when provided');
+  }
+  if (config.preparedQueueCapacity !== undefined && config.preparedQueueCapacity < 1) {
+    throw new Error('preparedQueueCapacity must be at least 1 when provided');
   }
 
   if (

@@ -32,6 +32,10 @@ export interface SubmitTransactionResult {
   retriesUsed: number;
 }
 
+interface SubmitTransactionOptions {
+  skipAvailabilityCheck?: boolean;
+}
+
 class SubmitHttpError extends Error {
   readonly httpStatusCode: number;
 
@@ -93,12 +97,14 @@ export class MidgardNodeClient {
   private readonly retryAttempts: number;
   private readonly retryDelay: number;
   private readonly enableLogs: boolean;
+  private readonly skipAvailabilityCheck: boolean;
 
   constructor(config: MidgardNodeConfig) {
     this.baseUrl = config.baseUrl;
     this.retryAttempts = config.retryAttempts ?? TRANSACTION_CONSTANTS.NODE_DEFAULTS.RETRY_ATTEMPTS;
     this.retryDelay = config.retryDelay ?? TRANSACTION_CONSTANTS.NODE_DEFAULTS.RETRY_DELAY;
     this.enableLogs = config.enableLogs ?? true;
+    this.skipAvailabilityCheck = config.skipAvailabilityCheck ?? false;
   }
 
   /**
@@ -148,20 +154,25 @@ export class MidgardNodeClient {
    */
   async submitTransaction(
     cborHex: string,
-    txType: string = 'Transaction'
+    txType: string = 'Transaction',
+    options: SubmitTransactionOptions = {}
   ): Promise<SubmitTransactionResult> {
     const startedAtMs = Date.now();
+    const skipAvailabilityCheck =
+      this.skipAvailabilityCheck || options.skipAvailabilityCheck === true;
 
-    const isNodeAvailable = await this.isAvailable();
-    if (!isNodeAvailable) {
-      return {
-        status: 'NODE_UNAVAILABLE',
-        message: 'Node is not available - transaction will be stored locally',
-        responseClass: 'node_unavailable',
-        latencyMs: Date.now() - startedAtMs,
-        attempts: 0,
-        retriesUsed: 0,
-      };
+    if (!skipAvailabilityCheck) {
+      const isNodeAvailable = await this.isAvailable();
+      if (!isNodeAvailable) {
+        return {
+          status: 'NODE_UNAVAILABLE',
+          message: 'Node is not available - transaction will be stored locally',
+          responseClass: 'node_unavailable',
+          latencyMs: Date.now() - startedAtMs,
+          attempts: 0,
+          retriesUsed: 0,
+        };
+      }
     }
 
     let attempts = 0;
