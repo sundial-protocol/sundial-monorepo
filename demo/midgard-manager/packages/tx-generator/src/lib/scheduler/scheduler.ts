@@ -4,6 +4,8 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { UTxO } from '@lucid-evolution/lucid';
+import * as fastq from 'fastq';
+import type { queueAsPromised } from 'fastq';
 import pLimit from 'p-limit';
 
 import type { SubmitTransactionResult } from '../client/node-client.js';
@@ -45,6 +47,10 @@ const OUTPUT_INDEX_UPPER_EXCLUSIVE = 1001;
 const PROJECT_ROOT_RELATIVE_PATH = '../../../..';
 const SUBMISSION_AGGREGATE_FILE = 'submission-aggregates.json';
 const REQUEST_EVENTS_FILE = 'request-events.jsonl';
+const SUBMISSION_AGGREGATE_FLUSH_INTERVAL_MS = 1_000;
+const AVAILABILITY_RECHECK_MS = 1_000;
+const AVAILABILITY_TIMEOUT_MS = 750;
+const QUEUE_BACKPRESSURE_SLEEP_MS = 1;
 
 // Get the directory path for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +66,7 @@ class TxGeneratorState {
 
   private _shouldStop = false;
   private _currentPromise: Promise<void> | null = null;
+  private _stopHook: (() => void) | null = null;
   private _stats = {
     transactionsGenerated: 0,
     transactionsSubmitted: 0,
@@ -94,6 +101,14 @@ class TxGeneratorState {
     this._currentPromise = value;
   }
 
+  get stopHook(): (() => void) | null {
+    return this._stopHook;
+  }
+
+  set stopHook(value: (() => void) | null) {
+    this._stopHook = value;
+  }
+
   get stats() {
     return this._stats;
   }
@@ -116,6 +131,16 @@ class TxGeneratorState {
 
 type GenerationMode = 'generated' | 'replay';
 
+interface PreparedSubmission {
+  sourceTx: SerializedMidgardTransaction;
+  evidenceEntry: TransactionEvidenceEntry;
+  mode: GenerationMode;
+}
+
+interface ReplayCorpusFile {
+  transactions: SerializedMidgardTransaction[];
+}
+
 export interface TaskPlan {
   initialUTxO: UTxO;
   useOneToOne: boolean;
@@ -135,12 +160,75 @@ export interface DeterministicTaskPlanResult {
   taskPlans: TaskPlan[];
 }
 
-interface ReplayCorpusFile {
-  transactions: SerializedMidgardTransaction[];
+class TokenBucket {
+  private tokens = 1;
+  private lastRefillMs = Date.now();
+  private readonly ratePerSecond: number;
+  private readonly maxTokens: number;
+
+  constructor(ratePerSecond: number, maxTokens = 1) {
+    this.ratePerSecond = ratePerSecond;
+    this.maxTokens = Math.max(1, maxTokens);
+  }
+
+  async waitForToken(shouldStop: () => boolean): Promise<boolean> {
+    while (true) {
+      if (shouldStop()) {
+        return false;
+      }
+
+      this.refill();
+      if (this.tokens >= 1) {
+        this.tokens -= 1;
+        return true;
+      }
+
+      const waitMs = Math.max(1, Math.ceil(((1 - this.tokens) / this.ratePerSecond) * 1000));
+      await sleep(waitMs);
+    }
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const elapsedSeconds = Math.max(0, (now - this.lastRefillMs) / 1000);
+    if (elapsedSeconds <= 0) {
+      return;
+    }
+
+    this.tokens = Math.min(this.maxTokens, this.tokens + elapsedSeconds * this.ratePerSecond);
+    this.lastRefillMs = now;
+  }
+}
+
+interface NodeAvailabilityTracker {
+  checkNow(): Promise<boolean>;
+}
+
+function createNodeAvailabilityTracker(nodeClient: MidgardNodeClient): NodeAvailabilityTracker {
+  let lastCheckedMs = 0;
+  let lastValue = true;
+
+  return {
+    async checkNow() {
+      const now = Date.now();
+      if (now - lastCheckedMs < AVAILABILITY_RECHECK_MS) {
+        return lastValue;
+      }
+
+      lastCheckedMs = now;
+      lastValue = await nodeClient.isAvailable(AVAILABILITY_TIMEOUT_MS);
+      return lastValue;
+    },
+  };
 }
 
 // Get the shared instance
 const state = TxGeneratorState.getInstance();
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const buildFilenamePrefix = (useOneToOne: boolean, mode: GenerationMode): string => {
   if (mode === 'replay') {
@@ -188,27 +276,6 @@ const buildTaskPlans = ({
       transactionType === 'one-to-one' ||
       (transactionType === 'mixed' && random() * 100 < oneToOneRatio),
   }));
-};
-
-export const createDeterministicTaskPlan = (
-  config: DeterministicTaskPlanConfig
-): DeterministicTaskPlanResult => {
-  const generationSeed = getNormalizedSeed(config.generationSeed);
-  const random = createSeededRandom(generationSeed);
-  const deterministicStartMs = getDeterministicStartMs(generationSeed);
-  const taskPlans = buildTaskPlans({
-    initialUTxO: config.initialUTxO,
-    batchSize: config.batchSize,
-    transactionType: config.transactionType,
-    oneToOneRatio: config.oneToOneRatio ?? DEFAULT_CONFIG.oneToOneRatio ?? 70,
-    random,
-  });
-
-  return {
-    generationSeed,
-    deterministicStartMs,
-    taskPlans,
-  };
 };
 
 const resolveOutputDir = (outputDir: string): string =>
@@ -335,52 +402,13 @@ const writeTransactionsWithManifest = async ({
   return transactionsPath;
 };
 
-const submitTransactions = async ({
-  txs,
-  nodeClient,
-  outputDir,
-  filenamePrefix,
-  generationSeed,
-  fullConfig,
-  mode,
-  replayCorpusPath,
-  requestEventsMode,
-  requestEventRandom,
-}: {
-  txs: SerializedMidgardTransaction[];
-  nodeClient: MidgardNodeClient;
-  outputDir?: string;
-  filenamePrefix: string;
-  generationSeed: string;
-  fullConfig: TransactionGeneratorConfig;
-  mode: GenerationMode;
-  replayCorpusPath: string | undefined;
-  requestEventsMode: RequestEventsMode;
-  requestEventRandom: () => number;
-}): Promise<void> => {
-  const manifestTransactions = txs.map((tx) =>
-    toEvidenceEntry(inspectGeneratedTransaction(tx, fullConfig.network), mode)
-  );
-  recordGeneratedTransactions(state.stats.submissionAggregate, txs.length);
-
-  const txById = new Map(txs.map((tx) => [tx.txId, tx]));
-  const manifestById = new Map(manifestTransactions.map((tx) => [tx.txId, tx]));
-  const validTransactions = manifestTransactions.filter(
-    (entry) => entry.validation.status === 'accepted'
-  );
-  const rejectedCount = manifestTransactions.length - validTransactions.length;
-
-  const appendRequestEvent = async ({
-    txId,
-    outcome,
-    latencyMs,
-    retryCount,
-    httpStatusCode,
-    responseClass,
-    errorClass,
-    error,
-  }: {
-    txId: string;
+async function appendRequestEvent(
+  outputDir: string | undefined,
+  requestEventsMode: RequestEventsMode,
+  requestEventRandom: () => number,
+  input: {
+    sourceTx: SerializedMidgardTransaction;
+    evidenceEntry: TransactionEvidenceEntry;
     outcome: SubmissionOutcome;
     latencyMs: number | null;
     retryCount: number;
@@ -388,218 +416,338 @@ const submitTransactions = async ({
     responseClass: string;
     errorClass: string | null;
     error?: string;
-  }): Promise<void> => {
-    if (outputDir === undefined) {
-      return;
-    }
-    if (!shouldEmitRequestEvent(requestEventsMode, requestEventRandom)) {
-      return;
-    }
-    const manifestTx = manifestById.get(txId);
-    const sourceTx = txById.get(txId);
-
-    const eventPath = join(resolveOutputDir(outputDir), REQUEST_EVENTS_FILE);
-    await appendFile(
-      eventPath,
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        txId,
-        finalOutcome: outcome,
-        outcome,
-        responseClass,
-        httpStatusCode,
-        errorClass,
-        latencyMs,
-        retryCount,
-        transactionType: sourceTx?.type ?? 'unknown',
-        transactionProfile: manifestTx?.profile ?? 'unknown',
-        cborByteSize: manifestTx?.cborByteSize ?? null,
-        midgardByteSize: manifestTx?.midgardByteSize ?? null,
-        ...(error !== undefined ? { error } : {}),
-      }) + '\n'
-    );
-  };
-
-  for (const tx of manifestTransactions) {
-    if (tx.validation.status === 'rejected') {
-      recordSubmissionObservation(state.stats.submissionAggregate, 'rejected', null, 0);
-      await appendRequestEvent({
-        txId: tx.txId,
-        outcome: 'rejected',
-        latencyMs: null,
-        retryCount: 0,
-        httpStatusCode: null,
-        responseClass: 'validation_rejected',
-        errorClass: 'validation_rejected',
-        error: tx.validation.detail ?? tx.validation.rejectCode,
-      });
-    }
   }
-
-  const nodeAvailable = await nodeClient.isAvailable();
-
-  if (!nodeAvailable) {
-    for (const tx of validTransactions) {
-      tx.submission.status = 'NODE_UNAVAILABLE';
-      recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
-      await appendRequestEvent({
-        txId: tx.txId,
-        outcome: 'node_unavailable',
-        latencyMs: null,
-        retryCount: 0,
-        httpStatusCode: null,
-        responseClass: 'node_unavailable',
-        errorClass: 'node_unavailable',
-      });
-    }
-    if (outputDir) {
-      const outputPath = await writeTransactionsWithManifest({
-        outputDir,
-        filenamePrefix,
-        transactions: txs,
-        manifestTransactions,
-        generationSeed,
-        fullConfig,
-        mode,
-        replayCorpusPath,
-      });
-      await writeSubmissionAggregates(outputDir);
-      console.log(`Node unavailable - transactions written to ${outputPath}`);
-    }
-    state.stats.transactionsGenerated += txs.length;
-    state.stats.transactionsFailed += rejectedCount;
+): Promise<void> {
+  if (outputDir === undefined) {
+    return;
+  }
+  if (!shouldEmitRequestEvent(requestEventsMode, requestEventRandom)) {
     return;
   }
 
-  try {
-    const submissionStart = Date.now();
-    let submitted = 0;
-    let failed = rejectedCount;
-    let nodeUnavailable = false;
-    let nodeUnavailableAnnounced = false;
+  const eventPath = join(resolveOutputDir(outputDir), REQUEST_EVENTS_FILE);
+  await appendFile(
+    eventPath,
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      txId: input.sourceTx.txId,
+      finalOutcome: input.outcome,
+      outcome: input.outcome,
+      responseClass: input.responseClass,
+      httpStatusCode: input.httpStatusCode,
+      errorClass: input.errorClass,
+      latencyMs: input.latencyMs,
+      retryCount: input.retryCount,
+      transactionType: input.sourceTx.type,
+      transactionProfile: input.evidenceEntry.profile,
+      cborByteSize: input.evidenceEntry.cborByteSize,
+      midgardByteSize: input.evidenceEntry.midgardByteSize,
+      ...(input.error !== undefined ? { error: input.error } : {}),
+    }) + '\n'
+  );
+}
 
-    for (const tx of validTransactions) {
-      const sourceTx = txById.get(tx.txId);
-      if (sourceTx === undefined) {
-        tx.submission.status = 'ERROR';
-        tx.submission.error = 'transaction evidence entry not found in source list';
-        recordSubmissionObservation(state.stats.submissionAggregate, 'error', null, 0);
-        await appendRequestEvent({
-          txId: tx.txId,
-          outcome: 'error',
-          latencyMs: null,
-          retryCount: 0,
-          httpStatusCode: null,
-          responseClass: 'unknown_error',
-          errorClass: 'unknown_error',
-          error: tx.submission.error,
-        });
-        failed++;
-        continue;
-      }
-
-      recordAttemptedSubmission(state.stats.submissionAggregate);
-      const result = await nodeClient.submitTransaction(sourceTx.cborHex);
-      const submissionOutcome = submissionOutcomeFromResult(result);
-      recordSubmissionObservation(
-        state.stats.submissionAggregate,
-        submissionOutcome,
-        result.latencyMs,
-        result.retriesUsed
-      );
-      await appendRequestEvent({
-        txId: tx.txId,
-        outcome: submissionOutcome,
-        latencyMs: result.latencyMs,
-        retryCount: result.retriesUsed,
-        httpStatusCode: result.httpStatusCode ?? null,
-        responseClass: result.responseClass,
-        errorClass: result.errorClass ?? null,
-        error: result.error,
-      });
-
-      if (result.status === 'NODE_UNAVAILABLE') {
-        tx.submission.status = 'NODE_UNAVAILABLE';
-        nodeUnavailable = true;
-        if (!nodeUnavailableAnnounced) {
-          nodeUnavailableAnnounced = true;
-          console.log('Node became unavailable during submission.');
-        }
-        break;
-      } else if (result.status === 'ERROR') {
-        tx.submission.status = 'ERROR';
-        tx.submission.error = result.error;
-        failed++;
-      } else {
-        tx.submission.status = 'SUBMITTED';
-        submitted++;
-      }
-    }
-
-    if (nodeUnavailable) {
-      for (const tx of validTransactions) {
-        if (tx.submission.status === 'NOT_ATTEMPTED') {
-          tx.submission.status = 'NODE_UNAVAILABLE';
-          recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
-          await appendRequestEvent({
-            txId: tx.txId,
-            outcome: 'node_unavailable',
-            latencyMs: null,
-            retryCount: 0,
-            httpStatusCode: null,
-            responseClass: 'node_unavailable',
-            errorClass: 'node_unavailable',
-          });
-        }
-      }
-    }
-
-    const submissionEnd = Date.now();
-    state.stats.transactionsGenerated += txs.length;
-    state.stats.transactionsSubmitted += submitted;
-    state.stats.transactionsFailed += failed;
-
-    if (outputDir) {
-      const outputPath = await writeTransactionsWithManifest({
-        outputDir,
-        filenamePrefix,
-        transactions: txs,
-        manifestTransactions,
-        generationSeed,
-        fullConfig,
-        mode,
-        replayCorpusPath,
-      });
-      await writeSubmissionAggregates(outputDir);
-      console.log(`Transactions and manifest written to ${outputPath}`);
-    }
-
-    if (!nodeUnavailable) {
-      console.log(
-        `Submitted ${submitted} transactions (${failed} failed) in ${submissionEnd - submissionStart}ms`
-      );
-    }
-  } catch (submitError) {
-    console.error('Failed to submit transactions:', submitError);
-
-    if (outputDir) {
-      const outputPath = await writeTransactionsWithManifest({
-        outputDir,
-        filenamePrefix,
-        transactions: txs,
-        manifestTransactions,
-        generationSeed,
-        fullConfig,
-        mode,
-        replayCorpusPath,
-      });
-      await writeSubmissionAggregates(outputDir);
-      console.log(`Failed submission - transactions written to ${outputPath}`);
-    }
-
-    state.stats.transactionsGenerated += txs.length;
-    state.stats.transactionsFailed += rejectedCount;
+function resolveTargetTps(config: TransactionGeneratorConfig): number | null {
+  if (config.targetTps !== undefined) {
+    return config.targetTps > 0 ? config.targetTps : null;
   }
+  if (config.interval <= 0) {
+    return null;
+  }
+  return config.batchSize / config.interval;
+}
+
+async function withBackpressureCapacity(
+  queue: queueAsPromised<PreparedSubmission>,
+  queueCapacity: number,
+  getActiveWorkers: () => number
+): Promise<void> {
+  while (!state.shouldStop) {
+    const queued = queue.length();
+    const inFlight = getActiveWorkers();
+    if (queued + inFlight < queueCapacity) {
+      return;
+    }
+    await sleep(QUEUE_BACKPRESSURE_SLEEP_MS);
+  }
+}
+
+async function processPreparedSubmission(params: {
+  prepared: PreparedSubmission;
+  nodeClient: MidgardNodeClient;
+  nodeAvailabilityTracker: NodeAvailabilityTracker;
+  fullConfig: TransactionGeneratorConfig;
+  outputDir: string | undefined;
+  requestEventsMode: RequestEventsMode;
+  requestEventRandom: () => number;
+  generationSeed: string;
+  replayCorpusPath: string | undefined;
+  rateLimiter: TokenBucket | null;
+  isNodeUnavailableLatched: () => boolean;
+  latchNodeUnavailable: () => void;
+}): Promise<void> {
+  const {
+    prepared,
+    nodeClient,
+    nodeAvailabilityTracker,
+    fullConfig,
+    outputDir,
+    requestEventsMode,
+    requestEventRandom,
+    generationSeed,
+    replayCorpusPath,
+    rateLimiter,
+    isNodeUnavailableLatched,
+    latchNodeUnavailable,
+  } = params;
+
+  if (prepared.evidenceEntry.validation.status === 'rejected') {
+    prepared.evidenceEntry.submission.status = 'VALIDATION_REJECTED';
+    state.stats.transactionsFailed += 1;
+    recordSubmissionObservation(state.stats.submissionAggregate, 'rejected', null, 0);
+    await appendRequestEvent(outputDir, requestEventsMode, requestEventRandom, {
+      sourceTx: prepared.sourceTx,
+      evidenceEntry: prepared.evidenceEntry,
+      outcome: 'rejected',
+      latencyMs: null,
+      retryCount: 0,
+      httpStatusCode: null,
+      responseClass: 'validation_rejected',
+      errorClass: 'validation_rejected',
+      error:
+        prepared.evidenceEntry.validation.detail ??
+        prepared.evidenceEntry.validation.rejectCode ??
+        'validation_rejected',
+    });
+    return;
+  }
+
+  if (isNodeUnavailableLatched()) {
+    prepared.evidenceEntry.submission.status = 'NODE_UNAVAILABLE';
+    recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
+    await appendRequestEvent(outputDir, requestEventsMode, requestEventRandom, {
+      sourceTx: prepared.sourceTx,
+      evidenceEntry: prepared.evidenceEntry,
+      outcome: 'node_unavailable',
+      latencyMs: null,
+      retryCount: 0,
+      httpStatusCode: null,
+      responseClass: 'node_unavailable',
+      errorClass: 'node_unavailable',
+    });
+    return;
+  }
+
+  if (rateLimiter !== null) {
+    const gotToken = await rateLimiter.waitForToken(() => state.shouldStop);
+    if (!gotToken) {
+      return;
+    }
+  }
+
+  const isNodeAvailable = await nodeAvailabilityTracker.checkNow();
+  if (!isNodeAvailable) {
+    latchNodeUnavailable();
+    prepared.evidenceEntry.submission.status = 'NODE_UNAVAILABLE';
+    recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
+    await appendRequestEvent(outputDir, requestEventsMode, requestEventRandom, {
+      sourceTx: prepared.sourceTx,
+      evidenceEntry: prepared.evidenceEntry,
+      outcome: 'node_unavailable',
+      latencyMs: null,
+      retryCount: 0,
+      httpStatusCode: null,
+      responseClass: 'node_unavailable',
+      errorClass: 'node_unavailable',
+    });
+
+    if (outputDir !== undefined) {
+      await writeTransactionsWithManifest({
+        outputDir,
+        filenamePrefix: buildFilenamePrefix(
+          prepared.evidenceEntry.profile === 'one-to-one',
+          prepared.mode
+        ),
+        transactions: [prepared.sourceTx],
+        manifestTransactions: [prepared.evidenceEntry],
+        generationSeed,
+        fullConfig,
+        mode: prepared.mode,
+        replayCorpusPath,
+      });
+    }
+    return;
+  }
+
+  recordAttemptedSubmission(state.stats.submissionAggregate);
+
+  const result = await nodeClient.submitTransaction(prepared.sourceTx.cborHex);
+
+  const submissionOutcome = submissionOutcomeFromResult(result);
+  recordSubmissionObservation(
+    state.stats.submissionAggregate,
+    submissionOutcome,
+    result.latencyMs,
+    result.retriesUsed
+  );
+
+  await appendRequestEvent(outputDir, requestEventsMode, requestEventRandom, {
+    sourceTx: prepared.sourceTx,
+    evidenceEntry: prepared.evidenceEntry,
+    outcome: submissionOutcome,
+    latencyMs: result.latencyMs,
+    retryCount: result.retriesUsed,
+    httpStatusCode: result.httpStatusCode ?? null,
+    responseClass: result.responseClass,
+    errorClass: result.errorClass ?? null,
+    error: result.error,
+  });
+
+  if (result.status === 'NODE_UNAVAILABLE') {
+    latchNodeUnavailable();
+    prepared.evidenceEntry.submission.status = 'NODE_UNAVAILABLE';
+    return;
+  }
+
+  if (result.status === 'ERROR') {
+    prepared.evidenceEntry.submission.status = 'ERROR';
+    prepared.evidenceEntry.submission.error = result.error;
+    state.stats.transactionsFailed += 1;
+    return;
+  }
+
+  prepared.evidenceEntry.submission.status = 'SUBMITTED';
+  state.stats.transactionsSubmitted += 1;
+}
+
+async function prepareAndEnqueueTaskPlan(params: {
+  taskPlan: TaskPlan;
+  mode: GenerationMode;
+  fullConfig: TransactionGeneratorConfig;
+  random: () => number;
+  deterministicStartMs: number;
+  lucidPool: LucidPool | null;
+  submissionQueue: queueAsPromised<PreparedSubmission>;
+  queueCapacity: number;
+  getActiveWorkers: () => number;
+}): Promise<void> {
+  const {
+    taskPlan,
+    mode,
+    fullConfig,
+    random,
+    deterministicStartMs,
+    lucidPool,
+    submissionQueue,
+    queueCapacity,
+    getActiveWorkers,
+  } = params;
+
+  let txs: SerializedMidgardTransaction[];
+
+  if (taskPlan.useOneToOne) {
+    const pooledLucid = lucidPool !== null ? await lucidPool.acquire() : undefined;
+    try {
+      txs = await generateOneToOneTransactions({
+        network: fullConfig.network,
+        initialUTxO: taskPlan.initialUTxO,
+        txsCount: 1,
+        walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
+        random,
+        deterministicStartMs,
+        lucid: pooledLucid,
+      });
+    } finally {
+      if (pooledLucid !== undefined && lucidPool !== null) {
+        lucidPool.release(pooledLucid);
+      }
+    }
+  } else {
+    txs = await generateMultiOutputTransactions({
+      network: fullConfig.network,
+      initialUTxO: taskPlan.initialUTxO,
+      utxosCount: TRANSACTION_CONSTANTS.OUTPUTS_PER_DISTRIBUTION,
+      finalUtxosCount: 1,
+      walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
+      random,
+    });
+  }
+
+  recordGeneratedTransactions(state.stats.submissionAggregate, txs.length);
+  state.stats.transactionsGenerated += txs.length;
+
+  for (const sourceTx of txs) {
+    const evidenceEntry = toEvidenceEntry(inspectGeneratedTransaction(sourceTx, fullConfig.network), mode);
+    if (state.shouldStop) {
+      return;
+    }
+
+    await withBackpressureCapacity(submissionQueue, queueCapacity, getActiveWorkers);
+    if (state.shouldStop) {
+      return;
+    }
+
+    void submissionQueue.push({ sourceTx, evidenceEntry, mode }).catch((error: unknown) => {
+      if (state.stats.lastError === null && error instanceof Error) {
+        state.stats.lastError = error.message;
+      }
+      state.shouldStop = true;
+    });
+  }
+}
+
+async function prepareAndEnqueueReplay(params: {
+  replayCorpus: SerializedMidgardTransaction[];
+  fullConfig: TransactionGeneratorConfig;
+  submissionQueue: queueAsPromised<PreparedSubmission>;
+  queueCapacity: number;
+  getActiveWorkers: () => number;
+}): Promise<void> {
+  const { replayCorpus, fullConfig, submissionQueue, queueCapacity, getActiveWorkers } = params;
+
+  for (const sourceTx of replayCorpus) {
+    if (state.shouldStop) {
+      return;
+    }
+
+    recordGeneratedTransactions(state.stats.submissionAggregate, 1);
+    state.stats.transactionsGenerated += 1;
+
+    const evidenceEntry = toEvidenceEntry(inspectGeneratedTransaction(sourceTx, fullConfig.network), 'replay');
+
+    await withBackpressureCapacity(submissionQueue, queueCapacity, getActiveWorkers);
+    if (state.shouldStop) {
+      return;
+    }
+
+    void submissionQueue.push({ sourceTx, evidenceEntry, mode: 'replay' }).catch((error: unknown) => {
+      if (state.stats.lastError === null && error instanceof Error) {
+        state.stats.lastError = error.message;
+      }
+      state.shouldStop = true;
+    });
+  }
+}
+
+export const createDeterministicTaskPlan = (
+  config: DeterministicTaskPlanConfig
+): DeterministicTaskPlanResult => {
+  const generationSeed = getNormalizedSeed(config.generationSeed);
+  const random = createSeededRandom(generationSeed);
+  const deterministicStartMs = getDeterministicStartMs(generationSeed);
+  const taskPlans = buildTaskPlans({
+    initialUTxO: config.initialUTxO,
+    batchSize: config.batchSize,
+    transactionType: config.transactionType,
+    oneToOneRatio: config.oneToOneRatio ?? DEFAULT_CONFIG.oneToOneRatio ?? 70,
+    random,
+  });
+
+  return {
+    generationSeed,
+    deterministicStartMs,
+    taskPlans,
+  };
 };
 
 /**
@@ -610,10 +758,10 @@ export const startGenerator = async (
 ): Promise<void> => {
   // Stop any existing generator
   if (state.currentPromise) {
-    stopGenerator();
+    await stopGenerator();
+    await waitForGeneratorStop();
   }
 
-  // Reset the stop flag
   state.shouldStop = false;
 
   // Merge with default config
@@ -632,26 +780,29 @@ export const startGenerator = async (
   const requestEventRandom = createSeededRandom(`${generationSeed}:request-events`);
   const replayCorpus = await loadReplayCorpus(fullConfig.replayCorpusPath);
 
+  const resolvedTargetTps = resolveTargetTps(fullConfig);
+  const maxInFlight = fullConfig.maxInFlight ?? fullConfig.concurrency;
+  const generationConcurrency =
+    fullConfig.generationConcurrency ?? Math.max(1, Math.min(maxInFlight, fullConfig.batchSize));
+  const preparedQueueCapacity =
+    fullConfig.preparedQueueCapacity ?? Math.max(fullConfig.batchSize * 2, maxInFlight * 2, 1);
+
   // Set up node client with the new configuration structure
   const nodeClient = new MidgardNodeClient({
     baseUrl: fullConfig.nodeEndpoint,
     retryAttempts: fullConfig.nodeRetryAttempts,
     retryDelay: fullConfig.nodeRetryDelay,
     enableLogs: fullConfig.nodeEnableLogs,
+    skipAvailabilityCheck: true,
   });
-
-  // Create a limiter for concurrent transaction generation
-  const concurrencyLimiter = pLimit(fullConfig.concurrency);
+  const nodeAvailabilityTracker = createNodeAvailabilityTracker(nodeClient);
 
   // Pre-initialize a pool of Lucid instances for one-to-one generation.
-  // Pool size matches concurrency so every running task gets an instance
-  // immediately without contention. Skipped for pure multi-output workloads
-  // where Lucid is constructed once per large batch anyway.
   const needsPool =
     fullConfig.transactionType === 'one-to-one' || fullConfig.transactionType === 'mixed';
   const lucidPool = needsPool
     ? await LucidPool.create(
-        fullConfig.concurrency,
+        generationConcurrency,
         fullConfig.walletSeedOrPrivateKey,
         fullConfig.initialUTxO.address,
         fullConfig.initialUTxO.assets,
@@ -659,14 +810,57 @@ export const startGenerator = async (
       )
     : null;
 
+  let activeSubmissionWorkers = 0;
+  let nodeUnavailableLatched = false;
+  const rateLimiter = resolvedTargetTps !== null ? new TokenBucket(resolvedTargetTps, 1) : null;
+
+  const submissionQueue: queueAsPromised<PreparedSubmission> = fastq.promise(
+    async (prepared) => {
+      activeSubmissionWorkers += 1;
+      try {
+        await processPreparedSubmission({
+          prepared,
+          nodeClient,
+          nodeAvailabilityTracker,
+          fullConfig,
+          outputDir: fullConfig.outputDir,
+          requestEventsMode,
+          requestEventRandom,
+          generationSeed,
+          replayCorpusPath: fullConfig.replayCorpusPath,
+          rateLimiter,
+          isNodeUnavailableLatched: () => nodeUnavailableLatched,
+          latchNodeUnavailable: () => {
+            nodeUnavailableLatched = true;
+          },
+        });
+      } finally {
+        activeSubmissionWorkers = Math.max(0, activeSubmissionWorkers - 1);
+      }
+    },
+    Math.max(1, maxInFlight)
+  );
+
   // Reset stats
   state.resetStats();
 
   // Create output directory if needed
+  let aggregateFlushTimer: ReturnType<typeof setInterval> | null = null;
   if (fullConfig.outputDir) {
     const outputPath = resolveOutputDir(fullConfig.outputDir);
     await mkdir(outputPath, { recursive: true });
+
+    aggregateFlushTimer = setInterval(() => {
+      void writeSubmissionAggregates(fullConfig.outputDir as string).catch(() => {
+        // best effort periodic flush
+      });
+    }, SUBMISSION_AGGREGATE_FLUSH_INTERVAL_MS);
+    aggregateFlushTimer.unref?.();
   }
+
+  state.stopHook = () => {
+    submissionQueue.kill();
+  };
 
   // Log start with more configuration details
   console.log('\nStarting transaction generator with configuration:');
@@ -674,9 +868,12 @@ export const startGenerator = async (
   if (fullConfig.transactionType === 'mixed') {
     console.log(`• One-to-One Ratio: ${fullConfig.oneToOneRatio}%`);
   }
-  console.log(`• Batch Size: ${fullConfig.batchSize}`);
-  console.log(`• Interval: ${fullConfig.interval}s`);
-  console.log(`• Concurrency: ${fullConfig.concurrency}`);
+  console.log(`• Legacy Batch Size: ${fullConfig.batchSize}`);
+  console.log(`• Legacy Interval: ${fullConfig.interval}s`);
+  console.log(`• Max In Flight: ${maxInFlight}`);
+  console.log(`• Generation Concurrency: ${generationConcurrency}`);
+  console.log(`• Prepared Queue Capacity: ${preparedQueueCapacity}`);
+  console.log(`• Target TPS: ${resolvedTargetTps === null ? 'unbounded' : resolvedTargetTps}`);
   console.log(`• Node Endpoint: ${fullConfig.nodeEndpoint}`);
   console.log(`• Generation Seed: ${generationSeed}`);
   console.log(`• Request Events: ${requestEventsMode}`);
@@ -687,139 +884,125 @@ export const startGenerator = async (
     console.log(`• Replay Corpus Path: ${fullConfig.replayCorpusPath}`);
   }
   if (fullConfig.autoStopAfterBatch) {
-    console.log('• Auto-stop: Enabled (will stop after one batch)');
+    console.log('• Auto-stop: Enabled (bounded prefill then drain)');
   }
   console.log();
 
-  // Define the transaction generation function
-  const generateTransactions = async () => {
-    try {
-      if (replayCorpus !== null) {
-        await submitTransactions({
-          txs: replayCorpus,
-          nodeClient,
-          outputDir: fullConfig.outputDir,
-          filenamePrefix: GENERATED_TX_PREFIX_REPLAY,
-          generationSeed,
+  const producer = async (): Promise<void> => {
+    if (replayCorpus !== null) {
+      if (fullConfig.autoStopAfterBatch) {
+        await prepareAndEnqueueReplay({
+          replayCorpus,
           fullConfig,
-          mode: 'replay',
-          replayCorpusPath: fullConfig.replayCorpusPath,
-          requestEventsMode,
-          requestEventRandom,
+          submissionQueue,
+          queueCapacity: preparedQueueCapacity,
+          getActiveWorkers: () => activeSubmissionWorkers,
         });
         return;
       }
 
-      const taskPlans = buildTaskPlans({
-        initialUTxO: fullConfig.initialUTxO,
-        batchSize: fullConfig.batchSize,
-        transactionType: fullConfig.transactionType,
-        oneToOneRatio: fullConfig.oneToOneRatio ?? DEFAULT_CONFIG.oneToOneRatio ?? 70,
-        random,
-      });
-
-      const tasks = taskPlans.map(async (taskPlan) => {
-        return concurrencyLimiter(async () => {
-          let txs: SerializedMidgardTransaction[];
-
-          if (taskPlan.useOneToOne) {
-            // Acquire a pre-initialized Lucid instance from the pool.
-            // Release it immediately after generation so the next task can
-            // start building its tx while this task is still submitting.
-            const pooledLucid = lucidPool !== null ? await lucidPool.acquire() : undefined;
-            try {
-              txs = await generateOneToOneTransactions({
-                network: fullConfig.network,
-                initialUTxO: taskPlan.initialUTxO,
-                txsCount: 1,
-                walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
-                nodeClient,
-                random,
-                deterministicStartMs,
-                lucid: pooledLucid,
-              });
-            } finally {
-              if (pooledLucid !== undefined && lucidPool !== null) {
-                lucidPool.release(pooledLucid);
-              }
-            }
-          } else {
-            txs = await generateMultiOutputTransactions({
-              network: fullConfig.network,
-              initialUTxO: taskPlan.initialUTxO,
-              utxosCount: TRANSACTION_CONSTANTS.OUTPUTS_PER_DISTRIBUTION,
-              finalUtxosCount: 1,
-              walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
-              nodeClient,
-              random,
-            });
-          }
-
-          if (!txs || !Array.isArray(txs)) {
-            throw new Error('Failed to generate transactions');
-          }
-
-          await submitTransactions({
-            txs,
-            nodeClient,
-            outputDir: fullConfig.outputDir,
-            filenamePrefix: buildFilenamePrefix(taskPlan.useOneToOne, 'generated'),
-            generationSeed,
-            fullConfig,
-            mode: 'generated',
-            replayCorpusPath: undefined,
-            requestEventsMode,
-            requestEventRandom,
-          });
+      while (!state.shouldStop) {
+        await prepareAndEnqueueReplay({
+          replayCorpus,
+          fullConfig,
+          submissionQueue,
+          queueCapacity: preparedQueueCapacity,
+          getActiveWorkers: () => activeSubmissionWorkers,
         });
-      });
-
-      await Promise.all(tasks);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      state.stats.lastError = errorMessage;
-      console.error('Error in transaction generation loop:', errorMessage);
-      throw error;
-    }
-  };
-
-  // Create a function to run the generator loop
-  const runGenerator = async () => {
-    // If auto-stop is enabled, run one batch then exit (for scheduled jobs)
-    if (fullConfig.autoStopAfterBatch) {
-      await generateTransactions();
-      console.log('Auto-stop enabled - stopping after one batch');
-      state.shouldStop = true;
+      }
       return;
     }
 
-    // Wall-clock-aligned loop: measure batch execution time and sleep only the
-    // remaining portion of the target period. If the batch takes longer than
-    // the period the next batch starts immediately without any extra wait,
-    // keeping actual TPS as close to targetTps as possible.
-    const targetPeriodMs = fullConfig.interval * 1000;
-    while (!state.shouldStop) {
-      const batchStart = Date.now();
-      await generateTransactions();
-      if (state.shouldStop) break;
+    const generationLimiter = pLimit(generationConcurrency);
+    const generationWorkers: Promise<void>[] = [];
+    const oneToOneRatio = fullConfig.oneToOneRatio ?? DEFAULT_CONFIG.oneToOneRatio ?? 70;
 
-      const remaining = Math.max(0, targetPeriodMs - (Date.now() - batchStart));
-      if (remaining > 0) {
-        await new Promise((resolve) => setTimeout(resolve, remaining));
+    const taskBudget = fullConfig.autoStopAfterBatch ? fullConfig.batchSize : Number.POSITIVE_INFINITY;
+    let reservedTasks = 0;
+
+    const reserveTask = (): boolean => {
+      if (reservedTasks >= taskBudget) {
+        return false;
+      }
+      reservedTasks += 1;
+      return true;
+    };
+
+    const runWorker = async (): Promise<void> => {
+      while (!state.shouldStop) {
+        if (!reserveTask()) {
+          return;
+        }
+
+        await generationLimiter(async () => {
+          const taskPlan = buildTaskPlans({
+            initialUTxO: fullConfig.initialUTxO,
+            batchSize: 1,
+            transactionType: fullConfig.transactionType,
+            oneToOneRatio,
+            random,
+          })[0];
+
+          await prepareAndEnqueueTaskPlan({
+            taskPlan,
+            mode: 'generated',
+            fullConfig,
+            random,
+            deterministicStartMs,
+            lucidPool,
+            submissionQueue,
+            queueCapacity: preparedQueueCapacity,
+            getActiveWorkers: () => activeSubmissionWorkers,
+          });
+        });
+
+        // Prevent microtask starvation when mocked generators resolve instantly.
+        await sleep(0);
+      }
+    };
+
+    for (let workerIndex = 0; workerIndex < generationConcurrency; workerIndex += 1) {
+      generationWorkers.push(runWorker());
+    }
+
+    await Promise.all(generationWorkers);
+  };
+
+  const runGenerator = async () => {
+    await producer();
+
+    if (fullConfig.autoStopAfterBatch) {
+      await submissionQueue.drained();
+    } else {
+      while (!state.shouldStop) {
+        await sleep(25);
       }
     }
+
+    if (fullConfig.outputDir) {
+      await writeSubmissionAggregates(fullConfig.outputDir);
+    }
+
     console.log('Transaction generator stopped');
   };
 
-  // Start the generator
   state.currentPromise = runGenerator()
     .catch((error) => {
       const errorMessage = error instanceof Error ? error.message : String(error);
       state.stats.lastError = errorMessage;
       console.error('Generator failed:', errorMessage);
     })
-    .finally(() => {
+    .finally(async () => {
       state.currentPromise = null;
+      state.stopHook = null;
+      if (aggregateFlushTimer !== null) {
+        clearInterval(aggregateFlushTimer);
+      }
+      if (fullConfig.outputDir) {
+        await writeSubmissionAggregates(fullConfig.outputDir).catch(() => {
+          // best effort
+        });
+      }
     });
 };
 
@@ -828,7 +1011,11 @@ export const startGenerator = async (
  */
 export const stopGenerator = (): Promise<void> => {
   state.shouldStop = true;
-  return Promise.resolve();
+  state.stopHook?.();
+  if (state.currentPromise === null) {
+    return Promise.resolve();
+  }
+  return Promise.race([state.currentPromise, sleep(5_000)]).then(() => undefined);
 };
 
 export const waitForGeneratorStop = async (maxMs = 2000): Promise<void> => {
