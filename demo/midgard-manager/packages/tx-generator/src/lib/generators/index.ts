@@ -1,6 +1,10 @@
 /* eslint-disable simple-import-sort/exports */
-export { generateMultiOutputTransactions } from './multi-output.js';
-export { generateOneToOneTransactions } from './one-to-one.js';
+export {
+  generateMultiOutputTransactions,
+  generateOneToOneTransactions,
+} from '@midgard-manager/tx-builder';
 
-export type { MultiOutputTransactionConfig } from './multi-output.js';
-export type { OneToOneTransactionConfig } from './one-to-one.js';
+export type {
+  MultiOutputTransactionConfig,
+  OneToOneTransactionConfig,
+} from '@midgard-manager/tx-builder';

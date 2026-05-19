@@ -9,6 +9,10 @@ export interface MidgardNodeConfig {
   baseUrl: string;
   retryAttempts?: number;
   retryDelay?: number;
+  // Per-request timeout for /submit calls. Defaults to AVAILABILITY_TIMEOUT (5000 ms).
+  // Set to a small value (e.g. 500–2000 ms) for load-test scenarios so workers
+  // fail fast and recycle quickly instead of blocking for the full retry chain.
+  submitTimeoutMs?: number;
   enableLogs?: boolean;
   skipAvailabilityCheck?: boolean;
 }
@@ -19,6 +23,7 @@ export interface TransactionGeneratorConfig {
   nodeEndpoint: string;
   nodeRetryAttempts?: number;
   nodeRetryDelay?: number;
+  nodeSubmitTimeoutMs?: number;
   nodeEnableLogs?: boolean;
 
   // Network settings
@@ -113,6 +118,9 @@ export const TRANSACTION_CONSTANTS = {
     RETRY_ATTEMPTS: 3,
     RETRY_DELAY: 1000,
     AVAILABILITY_TIMEOUT: 5000,
+    // Per-request submit timeout (ms). Distinct from the availability check timeout.
+    // Set short (e.g. 500-2000 ms) for load-test scenarios to free workers quickly.
+    SUBMIT_TIMEOUT_MS: 5000,
   },
 } as const;
 

@@ -56,6 +56,31 @@ describe('validateScenario', () => {
       expect(() => validateScenario(s)).not.toThrow();
     });
 
+    it('accepts pregenTransactionCount when provided', () => {
+      const { replayCorpusPath: _, ...withoutCorpus } = VALID_SCENARIO;
+      const s = { ...withoutCorpus, pregenTransactionCount: 100000 };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
+    it('rejects pregenTransactionCount combined with replayCorpusPath', () => {
+      const s = { ...VALID_SCENARIO, pregenTransactionCount: 100000 };
+      expect(() => validateScenario(s)).toThrow(
+        'pregenTransactionCount and replayCorpusPath are mutually exclusive'
+      );
+    });
+
+    it('rejects pregenTransactionCount of 0', () => {
+      const { replayCorpusPath: _, ...withoutCorpus } = VALID_SCENARIO;
+      const s = { ...withoutCorpus, pregenTransactionCount: 0 };
+      expect(() => validateScenario(s)).toThrow('pregenTransactionCount');
+    });
+
+    it('rejects non-integer pregenTransactionCount', () => {
+      const { replayCorpusPath: _, ...withoutCorpus } = VALID_SCENARIO;
+      const s = { ...withoutCorpus, pregenTransactionCount: 1000.5 };
+      expect(() => validateScenario(s)).toThrow('pregenTransactionCount');
+    });
+
     it('accepts https URLs', () => {
       const s = {
         ...VALID_SCENARIO,
@@ -131,6 +156,16 @@ describe('validateScenario', () => {
     it('accepts zero for retryAttempts and retryDelayMs', () => {
       const s = { ...VALID_SCENARIO, retryAttempts: 0, retryDelayMs: 0 };
       expect(() => validateScenario(s)).not.toThrow();
+    });
+
+    it('accepts submitTimeoutMs when set to a positive number', () => {
+      const s = { ...VALID_SCENARIO, submitTimeoutMs: 500 };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
+    it('accepts a scenario without submitTimeoutMs (optional field)', () => {
+      const { submitTimeoutMs: _, ...withoutTimeout } = { ...VALID_SCENARIO, submitTimeoutMs: 500 };
+      expect(() => validateScenario(withoutTimeout)).not.toThrow();
     });
 
     it('accepts requestEvents mode when set to sampled', () => {
@@ -315,6 +350,18 @@ describe('validateScenario', () => {
 
     it('rejects negative retryAttempts', () => {
       expect(() => validateScenario({ ...VALID_SCENARIO, retryAttempts: -1 })).toThrow(
+        ScenarioValidationError
+      );
+    });
+
+    it('rejects submitTimeoutMs of zero', () => {
+      expect(() => validateScenario({ ...VALID_SCENARIO, submitTimeoutMs: 0 })).toThrow(
+        ScenarioValidationError
+      );
+    });
+
+    it('rejects submitTimeoutMs that is negative', () => {
+      expect(() => validateScenario({ ...VALID_SCENARIO, submitTimeoutMs: -100 })).toThrow(
         ScenarioValidationError
       );
     });

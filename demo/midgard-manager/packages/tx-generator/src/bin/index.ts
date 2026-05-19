@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-import { generateEmulatorAccountFromPrivateKey, Network } from '@lucid-evolution/lucid';
+import { Network } from '@lucid-evolution/lucid';
+import {
+  generateCorpus,
+  generateTestWallet,
+  getAddressFromPrivateKey,
+} from '@midgard-manager/tx-builder';
 import chalk from 'chalk';
 import { Command } from 'commander';
 
@@ -25,6 +30,7 @@ interface GeneratorOptions {
   replayCorpusPath?: string;
   retryAttempts?: string;
   retryDelayMs?: string;
+  submitTimeoutMs?: string;
   requestEvents?: 'off' | 'sampled' | 'all';
 }
 
@@ -59,8 +65,13 @@ program
     'generated-transactions'
   )
   .option('--seed <seed>', 'Deterministic seed for reproducible transaction generation')
-  .option('--retry-attempts <number>', 'Node submission retry attempts', '3')
+  .option('--retry-attempts <number>', 'Node submission retry attempts (1 = no retry)', '3')
   .option('--retry-delay-ms <number>', 'Delay between submission retries in milliseconds', '1000')
+  .option(
+    '--submit-timeout-ms <number>',
+    'Per-attempt submit timeout in ms; set low (e.g. 500) for fast-fail load testing',
+    '5000'
+  )
   .option('--request-events <mode>', 'Per-request submission event mode (off|sampled|all)', 'off')
   .option(
     '--replay-corpus-path <path>',
@@ -73,23 +84,23 @@ program
 
       if (options.testWallet) {
         console.log(chalk.yellow('Generating test wallet...'));
-        const account = await generateEmulatorAccountFromPrivateKey({});
-        walletSeedOrPrivateKey = account.privateKey;
+        const wallet = await generateTestWallet();
+        walletSeedOrPrivateKey = wallet.privateKey;
 
         // Create initial UTxO with test funds
         initialUTxO = {
           txHash: Buffer.from(Array(32).fill(0)).toString('hex'),
           outputIndex: 0,
-          address: account.address,
+          address: wallet.address,
           assets: {
-            lovelace: 10_000_000_000n, // 10,000 ADA for testing
+            lovelace: 10_000_000_000n,
           },
           datum: null,
           datumHash: null,
           scriptRef: null,
         };
 
-        console.log(chalk.gray(`Generated test wallet with address: ${account.address}`));
+        console.log(chalk.gray(`Generated test wallet with address: ${wallet.address}`));
       } else if (!walletSeedOrPrivateKey) {
         console.error(chalk.red('Error: Either --private-key or --test-wallet must be provided'));
         process.exit(1);
@@ -119,6 +130,9 @@ program
       }
       console.log(chalk.gray(`Retry Attempts: ${options.retryAttempts}`));
       console.log(chalk.gray(`Retry Delay: ${options.retryDelayMs}ms`));
+      console.log(
+        chalk.gray(`Submit Timeout: ${options.submitTimeoutMs ?? '5000'}ms (per attempt)`)
+      );
       console.log(chalk.gray(`Request Events: ${options.requestEvents}`));
       if (options.seed) {
         console.log(chalk.gray(`Generation Seed: ${options.seed}`));
@@ -151,6 +165,7 @@ program
             : undefined,
         nodeRetryAttempts: parseInt(options.retryAttempts ?? '3'),
         nodeRetryDelay: parseInt(options.retryDelayMs ?? '1000'),
+        nodeSubmitTimeoutMs: parseInt(options.submitTimeoutMs ?? '5000'),
         outputDir: options.outputDir,
         requestEvents: options.requestEvents ?? 'off',
         generationSeed: options.seed,
@@ -180,6 +195,96 @@ program
     console.log(chalk.blue('\nTransaction Generator Status:'));
     console.log(chalk.gray(JSON.stringify(status, null, 2)));
   });
+
+// Generate-corpus command — generates transactions without submitting them.
+// The output file is a replay corpus usable with --replay-corpus-path.
+program
+  .command('generate-corpus')
+  .description('Pre-generate transactions and write them to a JSON corpus file (no submission)')
+  .requiredOption('-o, --output <path>', 'Path to write the corpus JSON file')
+  .requiredOption('-n, --count <number>', 'Number of transactions to generate')
+  .option('-t, --type <type>', 'Transaction type (one-to-one, multi-output, mixed)', 'one-to-one')
+  .option('-r, --ratio <number>', 'Percentage of one-to-one transactions in mixed mode', '70')
+  .option('-s, --seed <seed>', 'Deterministic seed (default: random)')
+  .option('-n, --network <network>', 'Network (Preview/Mainnet)', 'Preview')
+  .option('--test-wallet', 'Generate a fresh test wallet private key', false)
+  .option('-k, --private-key <key>', 'Wallet private key')
+  .action(
+    async (opts: {
+      output: string;
+      count: string;
+      type: 'one-to-one' | 'multi-output' | 'mixed';
+      ratio: string;
+      seed?: string;
+      network?: string;
+      testWallet: boolean;
+      privateKey?: string;
+    }) => {
+      const count = parseInt(opts.count, 10);
+      if (!Number.isFinite(count) || count < 1) {
+        console.error(chalk.red('--count must be a positive integer'));
+        process.exit(1);
+      }
+
+      const network = (opts.network ?? 'Preview') as 'Preview' | 'Mainnet';
+      const networkId: 0 | 1 = network === 'Mainnet' ? 1 : 0;
+
+      let walletSeedOrPrivateKey: string;
+      let address: string;
+
+      if (opts.testWallet) {
+        const wallet = await generateTestWallet();
+        walletSeedOrPrivateKey = wallet.privateKey;
+        address = wallet.address;
+        console.log(chalk.gray(`Generated test wallet: ${address}`));
+      } else if (opts.privateKey) {
+        walletSeedOrPrivateKey = opts.privateKey;
+        address = getAddressFromPrivateKey(walletSeedOrPrivateKey, networkId);
+      } else {
+        console.error(chalk.red('Either --private-key or --test-wallet must be provided'));
+        process.exit(1);
+        return;
+      }
+
+      const seed = opts.seed ?? Math.random().toString(36).slice(2);
+      const initialUTxO = {
+        txHash: '0'.repeat(64),
+        outputIndex: 0,
+        address,
+        assets: { lovelace: 10_000_000_000n },
+        datum: null,
+        datumHash: null,
+        scriptRef: null,
+      };
+
+      console.log(chalk.blue(`Generating ${count} transactions...`));
+      console.log(chalk.gray(`Type: ${opts.type} | Seed: ${seed} | Output: ${opts.output}`));
+
+      let lastPct = -1;
+      await generateCorpus({
+        count,
+        walletSeedOrPrivateKey,
+        transactionType: opts.type,
+        oneToOneRatio: parseInt(opts.ratio, 10),
+        network,
+        initialUTxO,
+        seed,
+        outputPath: opts.output,
+        onProgress(generated: number, total: number) {
+          const pct = Math.floor((generated / total) * 100);
+          if (pct !== lastPct && pct % 5 === 0) {
+            lastPct = pct;
+            const filled = Math.floor(pct / 5);
+            const bar = '='.repeat(filled) + '-'.repeat(20 - filled);
+            process.stdout.write(`\r  [${bar}] ${pct}% (${generated}/${total})`);
+          }
+        },
+      });
+
+      process.stdout.write('\n');
+      console.log(chalk.green(`Done — corpus written to ${opts.output}`));
+    }
+  );
 
 // Parse command line arguments
 program.parse();

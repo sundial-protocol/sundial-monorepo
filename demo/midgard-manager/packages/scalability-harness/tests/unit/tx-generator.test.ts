@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScalabilityScenario } from '../../src/config/scenario.js';
 import type { LoadTier } from '../../src/config/tiers.js';
 import type { ArtifactWriter } from '../../src/evidence/artifacts.js';
+import type { ComputeSettingsSubmitOptions } from '../../src/runner/tx-generator.js';
 import { computeSettings, startTxGenerator, stopProcess } from '../../src/runner/tx-generator.js';
 
 // ---------------------------------------------------------------------------
@@ -140,14 +141,105 @@ describe('computeSettings', () => {
   });
 
   it('derives maxInFlight, generationConcurrency, and preparedQueueCapacity', () => {
+    // Standard mode: concurrency = ceil(1600 * 0.2 * 12) = 3840
+    // generationConcurrency = min(32, ceil(3840 * 0.25)) = min(32, 960) = 32
+    // preparedQueueCapacity = 3840 * 4 = 15360
     const s = computeSettings(800, 0.2);
     expect(s.maxInFlight).toBe(3840);
-    expect(s.generationConcurrency).toBe(2048);
+    expect(s.generationConcurrency).toBe(32);
     expect(s.preparedQueueCapacity).toBe(15360);
   });
 
   it('clamps concurrency to at least 1', () => {
     expect(computeSettings(1, 0.001).concurrency).toBe(1);
+  });
+
+  describe('fast-fail mode (submitOptions provided)', () => {
+    // Fast-fail mode replaces txCostSeconds with the actual max task cost derived from
+    // the submit timeout chain and uses FAIL_FAST_CONCURRENCY_HEADROOM=1.5.
+    // Uses targetTps (not effectiveTps) so connections scale to server need only.
+    // effectiveTaskCostMs = submitTimeoutMs * maxAttempts + retryDelayMs * (maxAttempts-1)
+    // concurrency = ceil(targetTps * effectiveTaskCostMs/1000 * 1.5)
+
+    it('uses submitTimeoutMs and retryAttempts to compute concurrency with headroom=1.5', () => {
+      // targetTps=800, submitTimeoutMs=500, retryAttempts=1 (no retries):
+      // taskCostMs=500, taskCostSec=0.5
+      // concurrency = ceil(800 * 0.5 * 1.5) = ceil(600) = 600
+      const opts: ComputeSettingsSubmitOptions = {
+        submitTimeoutMs: 500,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      };
+      const s = computeSettings(800, 0.2, opts);
+      expect(s.concurrency).toBe(600);
+      expect(s.maxInFlight).toBe(600);
+    });
+
+    it('fast-fail concurrency is substantially lower than standard for the same cost', () => {
+      // Standard for txCostSeconds=0.5: ceil(1600 * 0.5 * 12) = 9600
+      // Fast-fail for submitTimeoutMs=500, retryAttempts=1: ceil(800 * 0.5 * 1.5) = 600
+      const standard = computeSettings(800, 0.5);
+      const opts: ComputeSettingsSubmitOptions = {
+        submitTimeoutMs: 500,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      };
+      const fastFail = computeSettings(800, 0.2, opts);
+      expect(standard.concurrency).toBeGreaterThan(fastFail.concurrency);
+    });
+
+    it('factors in retryAttempts and retryDelayMs in the task cost', () => {
+      // submitTimeoutMs=500, retryAttempts=3, retryDelayMs=200:
+      // taskCostMs = 500*3 + 200*2 = 1900ms = 1.9s
+      // concurrency = ceil(800 * 1.9 * 1.5) = ceil(2280) = 2280
+      const opts: ComputeSettingsSubmitOptions = {
+        submitTimeoutMs: 500,
+        retryAttempts: 3,
+        retryDelayMs: 200,
+      };
+      const s = computeSettings(800, 0.2, opts);
+      expect(s.concurrency).toBe(2280);
+    });
+
+    it('clamps retryAttempts to at least 1 (retryAttempts=0 treated as 1)', () => {
+      // retryAttempts=0 → maxAttempts=1 → same as retryAttempts=1
+      const opts0: ComputeSettingsSubmitOptions = {
+        submitTimeoutMs: 500,
+        retryAttempts: 0,
+        retryDelayMs: 0,
+      };
+      const opts1: ComputeSettingsSubmitOptions = {
+        submitTimeoutMs: 500,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      };
+      expect(computeSettings(800, 0.2, opts0).concurrency).toBe(
+        computeSettings(800, 0.2, opts1).concurrency
+      );
+    });
+
+    it('ignores txCostSeconds when submitOptions is provided', () => {
+      const opts: ComputeSettingsSubmitOptions = {
+        submitTimeoutMs: 500,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      };
+      // Different txCostSeconds values should produce the same result
+      expect(computeSettings(800, 0.2, opts).concurrency).toBe(
+        computeSettings(800, 99, opts).concurrency
+      );
+    });
+
+    it('preserves targetTps and actualTpsEstimate in fast-fail mode', () => {
+      const opts: ComputeSettingsSubmitOptions = {
+        submitTimeoutMs: 500,
+        retryAttempts: 1,
+        retryDelayMs: 0,
+      };
+      const s = computeSettings(800, 0.2, opts);
+      expect(s.targetTps).toBe(800);
+      expect(s.actualTpsEstimate).toBeCloseTo(1600);
+    });
   });
 });
 
@@ -217,6 +309,7 @@ describe('startTxGenerator', () => {
     expect(args).toContain(String(BASE_SCENARIO.retryAttempts));
     expect(args).toContain('--retry-delay-ms');
     expect(args).toContain(String(BASE_SCENARIO.retryDelayMs));
+    expect(args).toContain('--submit-timeout-ms');
     expect(args).toContain('--request-events');
     expect(args).toContain('off');
     expect(args).toContain('--seed');

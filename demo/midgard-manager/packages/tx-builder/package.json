@@ -1,0 +1,23 @@
+{
+  "name": "@midgard-manager/tx-builder",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit -p tsconfig.json --skipLibCheck",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@lucid-evolution/lucid": "^0.4.30",
+    "p-limit": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.18",
+    "typescript": "^5.9.3"
+  }
+}

@@ -98,6 +98,7 @@ export class MidgardNodeClient {
   private readonly retryDelay: number;
   private readonly enableLogs: boolean;
   private readonly skipAvailabilityCheck: boolean;
+  private readonly submitTimeoutMs: number;
 
   constructor(config: MidgardNodeConfig) {
     this.baseUrl = config.baseUrl;
@@ -105,6 +106,8 @@ export class MidgardNodeClient {
     this.retryDelay = config.retryDelay ?? TRANSACTION_CONSTANTS.NODE_DEFAULTS.RETRY_DELAY;
     this.enableLogs = config.enableLogs ?? true;
     this.skipAvailabilityCheck = config.skipAvailabilityCheck ?? false;
+    this.submitTimeoutMs =
+      config.submitTimeoutMs ?? TRANSACTION_CONSTANTS.NODE_DEFAULTS.SUBMIT_TIMEOUT_MS;
   }
 
   /**
@@ -180,10 +183,7 @@ export class MidgardNodeClient {
       attempts += 1;
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          TRANSACTION_CONSTANTS.NODE_DEFAULTS.AVAILABILITY_TIMEOUT
-        );
+        const timeoutId = setTimeout(() => controller.abort(), this.submitTimeoutMs);
         let response: Response;
         try {
           response = await fetch(`${this.baseUrl}/submit?tx_cbor=${cborHex}`, {
