@@ -84,6 +84,8 @@ export interface PanelSpec {
   rate: boolean;
   unit: string;
   formatY: FormatY;
+  /** When false the Y axis auto-fits to the data range instead of anchoring at 0 */
+  scaleZero?: boolean;
 }
 
 export interface ChartRecord {
@@ -129,6 +131,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'tx',
     formatY: 'default',
+    scaleZero: false,
   },
   {
     slug: 'committed-cumulative',
@@ -138,6 +141,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'tx',
     formatY: 'default',
+    scaleZero: false,
   },
 
   // --- Queue and Mempool ---
@@ -169,6 +173,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'blocks',
     formatY: 'default',
+    scaleZero: false,
   },
   {
     slug: 'built-blocks-rate',
@@ -187,6 +192,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'blocks',
     formatY: 'default',
+    scaleZero: false,
   },
   {
     slug: 'submitted-blocks-rate',
@@ -205,6 +211,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'blocks',
     formatY: 'default',
+    scaleZero: false,
   },
   {
     slug: 'merged-blocks-rate',
@@ -240,8 +247,8 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     title: 'Block Commitment Failures',
     section: 'Failure Signals',
     metric: 'commit_block_commitment_failures_total',
-    rate: false,
-    unit: 'failures',
+    rate: true,
+    unit: 'failures/s',
     formatY: 'default',
   },
   {
@@ -249,8 +256,8 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     title: 'Merge Failures',
     section: 'Failure Signals',
     metric: 'merge_block_failures_total',
-    rate: false,
-    unit: 'failures',
+    rate: true,
+    unit: 'failures/s',
     formatY: 'default',
   },
   {
@@ -258,8 +265,8 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     title: 'Rejected Submissions',
     section: 'Failure Signals',
     metric: 'tx_submissions_rejected_total',
-    rate: false,
-    unit: 'rejected',
+    rate: true,
+    unit: 'rejects/s',
     formatY: 'default',
   },
 
@@ -426,10 +433,15 @@ function buildSpec(
   data: DataRow[],
   tierBoundaryMs: number[],
   unit: string,
-  formatY: FormatY
+  formatY: FormatY,
+  scaleZero: boolean
 ): Record<string, unknown> {
   const uniqueSeries = new Set(data.map((d) => d.series));
   const hasMultipleSeries = uniqueSeries.size > 1;
+  const maxVal = data.length > 0 ? Math.max(...data.map((d) => d.value)) : 0;
+  // When all values are 0 the vega domain collapses to [0,0] and tick labels render as NaN.
+  // Force a minimum range so the axis stays readable.
+  const yScale = maxVal === 0 ? { zero: true, domainMin: 0, domainMax: 1 } : { zero: scaleZero };
 
   const colorEncoding = hasMultipleSeries
     ? {
@@ -465,7 +477,7 @@ function buildSpec(
         y: {
           field: 'value',
           type: 'quantitative',
-          scale: { zero: true },
+          scale: yScale,
           axis: yAxisConfig(formatY, unit),
         },
         color: colorEncoding,
@@ -540,7 +552,8 @@ export async function generateCharts(
         data,
         tierBoundaryMs,
         panelSpec.unit,
-        panelSpec.formatY
+        panelSpec.formatY,
+        panelSpec.scaleZero ?? true
       );
       const svg = await renderToSvg(spec);
       await writeFile(path.join(chartsDir, fileName), svg, 'utf8');

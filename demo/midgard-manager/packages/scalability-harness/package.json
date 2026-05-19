@@ -16,7 +16,8 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint . --max-warnings=0",
     "clean": "rm -rf dist",
     "test": "vitest run --mode=test",
-    "test:watch": "vitest --mode=test"
+    "test:watch": "vitest --mode=test",
+    "regen-report": "node scripts/regen-report.mjs"
   },
   "dependencies": {
     "chalk": "^5.6.2",
