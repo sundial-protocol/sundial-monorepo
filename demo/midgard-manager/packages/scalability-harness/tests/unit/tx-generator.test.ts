@@ -59,8 +59,7 @@ const BASE_SCENARIO: ScalabilityScenario = {
   startTps: 100,
   maxTps: 800,
   stepMultiplier: 2,
-  batchSize: 50,
-  concurrency: 4,
+  txGeneratorTaskCostSeconds: 0.2,
   retryAttempts: 3,
   retryDelayMs: 500,
   stopConditions: {
@@ -92,42 +91,43 @@ function makeWriter() {
 // ---------------------------------------------------------------------------
 
 describe('computeSettings', () => {
-  it('computes intervalSeconds as batchSize / targetTps', () => {
-    // 50 / 100 = 0.5
-    expect(computeSettings(100, 50, 4).intervalSeconds).toBe(0.5);
+  it('sets concurrency = ceil(targetTps * txCostSeconds * 2)', () => {
+    // ceil(100 * 0.2 * 2) = ceil(40) = 40
+    expect(computeSettings(100, 0.2).concurrency).toBe(40);
   });
 
-  it('clamps intervalSeconds to a minimum of 0.1 s (100 ms floor)', () => {
-    // 50 / 5000 = 0.01 → clamp → 0.1
-    expect(computeSettings(5000, 50, 4).intervalSeconds).toBe(0.1);
+  it('sets batchSize equal to concurrency', () => {
+    const s = computeSettings(100, 0.2);
+    expect(s.batchSize).toBe(s.concurrency);
   });
 
-  it('computes actualTpsEstimate as batchSize / intervalSeconds', () => {
-    // interval=0.5, so estimate = 50 / 0.5 = 100
-    expect(computeSettings(100, 50, 4).actualTpsEstimate).toBe(100);
+  it('sets intervalSeconds = batchSize / targetTps', () => {
+    // concurrency=40, interval=40/100=0.4
+    expect(computeSettings(100, 0.2).intervalSeconds).toBe(0.4);
   });
 
-  it('records actual TPS estimate that may differ from targetTps when the 100 ms floor binds', () => {
-    // targetTps=5000, interval clamped to 0.1, so estimate = 50/0.1 = 500 ≠ 5000
-    const s = computeSettings(5000, 50, 4);
-    expect(s.targetTps).toBe(5000);
-    expect(s.actualTpsEstimate).toBe(500);
-    expect(s.actualTpsEstimate).not.toBe(s.targetTps);
+  it('sets actualTpsEstimate equal to targetTps', () => {
+    expect(computeSettings(100, 0.2).actualTpsEstimate).toBe(100);
+    expect(computeSettings(800, 0.2).actualTpsEstimate).toBe(800);
   });
 
-  it('concurrency does not affect intervalSeconds or actualTpsEstimate', () => {
-    // interval is batchSize/targetTps regardless of concurrency
-    const s4 = computeSettings(100, 50, 4);
-    const s8 = computeSettings(100, 50, 8);
-    expect(s4.intervalSeconds).toBe(s8.intervalSeconds);
-    expect(s4.actualTpsEstimate).toBe(s8.actualTpsEstimate);
+  it('scales concurrency linearly with targetTps', () => {
+    // 800 TPS needs 4x the concurrency of 200 TPS
+    const s200 = computeSettings(200, 0.2);
+    const s800 = computeSettings(800, 0.2);
+    expect(s800.concurrency).toBe(s200.concurrency * 4);
   });
 
-  it('preserves batchSize, concurrency, and targetTps verbatim', () => {
-    const s = computeSettings(300, 25, 6);
-    expect(s.batchSize).toBe(25);
-    expect(s.concurrency).toBe(6);
-    expect(s.targetTps).toBe(300);
+  it('interval is always 2 * txCostSeconds regardless of targetTps', () => {
+    // interval = batchSize/targetTps = ceil(tps*cost*2)/tps ≈ 2*cost
+    const s100 = computeSettings(100, 0.2);
+    const s800 = computeSettings(800, 0.2);
+    expect(s100.intervalSeconds).toBeCloseTo(0.4);
+    expect(s800.intervalSeconds).toBeCloseTo(0.4);
+  });
+
+  it('clamps concurrency to at least 1', () => {
+    expect(computeSettings(1, 0.001).concurrency).toBe(1);
   });
 });
 
@@ -373,6 +373,50 @@ describe('TxGeneratorHandle.stop', () => {
     expect(result.exitCode).toBe(0);
     expect(result.settings.targetTps).toBe(100);
     expect(result.submissionAggregate).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TxGeneratorHandle.processExited
+// ---------------------------------------------------------------------------
+
+describe('TxGeneratorHandle.processExited', () => {
+  let proc: MockProcess;
+  let writer: ArtifactWriter;
+
+  beforeEach(() => {
+    proc = new MockProcess();
+    writer = makeWriter();
+  });
+
+  it('resolves with exit code 0 on clean exit', async () => {
+    const { ...spawner } = makeMockSpawner(proc);
+    const handle = await startTxGenerator(BASE_SCENARIO, BASE_TIER, writer, '/tmp/tier-0', {
+      spawner,
+    });
+
+    proc.simulateExit(0);
+    await expect(handle.processExited).resolves.toBe(0);
+  });
+
+  it('resolves with non-zero code when generator crashes', async () => {
+    const { ...spawner } = makeMockSpawner(proc);
+    const handle = await startTxGenerator(BASE_SCENARIO, BASE_TIER, writer, '/tmp/tier-0', {
+      spawner,
+    });
+
+    proc.simulateExit(1);
+    await expect(handle.processExited).resolves.toBe(1);
+  });
+
+  it('resolves with null when process exits via signal', async () => {
+    const { ...spawner } = makeMockSpawner(proc);
+    const handle = await startTxGenerator(BASE_SCENARIO, BASE_TIER, writer, '/tmp/tier-0', {
+      spawner,
+    });
+
+    proc.simulateExit(null, 'SIGINT');
+    await expect(handle.processExited).resolves.toBeNull();
   });
 });
 

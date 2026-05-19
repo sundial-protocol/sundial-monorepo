@@ -29,8 +29,7 @@ async function makeScenario(
     startTps: 100,
     maxTps: 100,
     stepMultiplier: 2,
-    batchSize: 10,
-    concurrency: 2,
+    txGeneratorTaskCostSeconds: 0.2,
     retryAttempts: 0,
     retryDelayMs: 0,
     stopConditions: {

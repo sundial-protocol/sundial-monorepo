@@ -23,8 +23,7 @@ function makeScenario(outputDir: string): ScalabilityScenario {
     startTps: 100,
     maxTps: 800,
     stepMultiplier: 2,
-    batchSize: 50,
-    concurrency: 4,
+    txGeneratorTaskCostSeconds: 0.2,
     retryAttempts: 3,
     retryDelayMs: 500,
     stopConditions: {

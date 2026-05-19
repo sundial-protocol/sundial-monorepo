@@ -66,6 +66,11 @@ export const NODE_METRICS = [
   'commit_block_count_total',
   'submit_block_count_total',
   'commit_block_tx_count_total',
+  'commit_block_l1_user_events',
+  'commit_block_txs_per_block',
+  'commit_block_events_size_bytes',
+  'commit_block_duration_seconds_sum',
+  'commit_block_duration_seconds_count',
   'l1_commitment_fees_lovelace_total',
   'l1_commitment_fee_lovelace_last',
   'commit_block_commitment_failures_total',
@@ -103,6 +108,7 @@ export const COUNTER_NODE_METRICS = NODE_METRICS.filter(
 
 export const CADVISOR_METRICS = [
   'container_memory_usage_bytes{image!=""}',
+  'container_last_seen{image!=""}',
   'rate(container_cpu_user_seconds_total{image!=""}[1m])',
   'rate(container_network_receive_bytes_total{image!=""}[1m])',
   'rate(container_network_transmit_bytes_total{image!=""}[1m])',

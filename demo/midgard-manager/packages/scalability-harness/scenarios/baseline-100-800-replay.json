@@ -9,7 +9,7 @@
   "seed": "baseline-replay-2026-05-18",
   "l1ProviderMode": "emulator",
   "walletMode": "test-wallet",
-  "walletProvisioningNote": "test-wallet mode \u2014 node must be initialised with L2 genesis UTxOs for the generated test key",
+  "walletProvisioningNote": "test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key",
   "replayCorpusPath": "corpora/replay-baseline.json",
   "transactionType": "one-to-one",
   "tierDurationSeconds": 60,
@@ -17,8 +17,7 @@
   "startTps": 100,
   "maxTps": 800,
   "stepMultiplier": 2,
-  "batchSize": 50,
-  "concurrency": 4,
+  "txGeneratorTaskCostSeconds": 0.2,
   "retryAttempts": 3,
   "retryDelayMs": 500,
   "stopConditions": {
@@ -27,7 +26,6 @@
     "stopOnCommitmentFailure": true,
     "stopOnMergeFailure": false,
     "maxRecoveryQueueSize": 10000,
-    "maxRecoveryMempoolSize": 5000,
-    "minUsefulThroughputRatio": 0.5
+    "maxRecoveryMempoolSize": 5000
   }
 }

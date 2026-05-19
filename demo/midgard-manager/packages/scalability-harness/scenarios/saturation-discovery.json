@@ -9,7 +9,7 @@
   "seed": "saturation-2026-05-18",
   "l1ProviderMode": "emulator",
   "walletMode": "test-wallet",
-  "walletProvisioningNote": "test-wallet mode \u2014 node must be initialised with L2 genesis UTxOs for the generated test key",
+  "walletProvisioningNote": "test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key",
   "transactionType": "mixed",
   "oneToOneRatio": 70,
   "tierDurationSeconds": 120,
@@ -17,8 +17,7 @@
   "startTps": 50,
   "maxTps": 1600,
   "stepMultiplier": 2,
-  "batchSize": 100,
-  "concurrency": 8,
+  "txGeneratorTaskCostSeconds": 0.2,
   "retryAttempts": 2,
   "retryDelayMs": 250,
   "stopConditions": {
@@ -27,7 +26,6 @@
     "stopOnCommitmentFailure": true,
     "stopOnMergeFailure": true,
     "maxRecoveryQueueSize": 20000,
-    "maxRecoveryMempoolSize": 10000,
-    "minUsefulThroughputRatio": 0.3
+    "maxRecoveryMempoolSize": 10000
   }
 }

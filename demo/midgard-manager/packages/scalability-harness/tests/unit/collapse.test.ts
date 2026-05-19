@@ -26,6 +26,7 @@ function makeInputs(overrides: Partial<CollapseInputs> = {}): CollapseInputs {
     recoveryQueueSize: 0,
     recoveryMempoolSize: 0,
     mempoolAcceptedDelta: 900,
+    committedTxDelta: 900,
     tierDurationSeconds: 60,
     targetTps: 10,
     stopConditions: BASE_STOP_CONDITIONS,
@@ -127,7 +128,8 @@ describe('detectCollapse — node_unavailable', () => {
         recoveryQueueSize: 9999,
         recoveryMempoolSize: 9999,
         txGeneratorExitCode: 1,
-        mempoolAcceptedDelta: 0,
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 0,
         stopConditions: {
           ...BASE_STOP_CONDITIONS,
           stopOnPrometheusDown: true,
@@ -135,6 +137,7 @@ describe('detectCollapse — node_unavailable', () => {
           stopOnMergeFailure: true,
           maxRecoveryQueueSize: 10,
           maxRecoveryMempoolSize: 10,
+          minCommitToAcceptedRatio: 1.0,
           minUsefulThroughputRatio: 0.9,
         },
       })
@@ -190,18 +193,20 @@ describe('detectCollapse — prometheus_down', () => {
     expect(result).toBeNull();
   });
 
-  it('takes priority over commitment_failures, merge_failures, and throughput', () => {
+  it('takes priority over commitment_failures, merge_failures, drain, and throughput', () => {
     const result = detectCollapse(
       makeInputs({
         prometheusUp: null,
         commitmentFailuresDelta: 5,
         mergeFailuresDelta: 3,
-        mempoolAcceptedDelta: 0,
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 0,
         stopConditions: {
           ...BASE_STOP_CONDITIONS,
           stopOnPrometheusDown: true,
           stopOnCommitmentFailure: true,
           stopOnMergeFailure: true,
+          minCommitToAcceptedRatio: 1.0,
           minUsefulThroughputRatio: 0.9,
         },
       })
@@ -541,6 +546,18 @@ describe('detectCollapse — tx_generator_failed', () => {
     expect(detectCollapse(makeInputs({ txGeneratorExitCode: undefined }))).toBeNull();
   });
 
+  it('takes priority over commit_drain_below_threshold', () => {
+    const result = detectCollapse(
+      makeInputs({
+        txGeneratorExitCode: 1,
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 100,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result?.reason).toBe('tx_generator_failed');
+  });
+
   it('takes priority over useful_throughput_below_threshold', () => {
     const result = detectCollapse(
       makeInputs({
@@ -550,6 +567,147 @@ describe('detectCollapse — tx_generator_failed', () => {
       })
     );
     expect(result?.reason).toBe('tx_generator_failed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// commit_drain_below_threshold
+// ---------------------------------------------------------------------------
+
+describe('detectCollapse — commit_drain_below_threshold', () => {
+  it('returns commit_drain_below_threshold when committed < accepted * ratio', () => {
+    // accepted=1000, committed=800, ratio=800/1000=0.8, threshold=1.0 → fire
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 800,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result?.reason).toBe('commit_drain_below_threshold');
+  });
+
+  it('includes all supporting values', () => {
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 800,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result?.values.committedTxDelta).toBe(800);
+    expect(result?.values.mempoolAcceptedDelta).toBe(1000);
+    expect(result?.values.commitToAcceptedRatio).toBeCloseTo(0.8);
+    expect(result?.values.minCommitToAcceptedRatio).toBe(1.0);
+  });
+
+  it('does not trigger when committed equals accepted (ratio meets threshold)', () => {
+    // ratio=1.0, threshold=1.0 → not below
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 1000,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('does not trigger when committed exceeds accepted', () => {
+    // node draining old backlog: committed > accepted → ratio > 1 → no collapse
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 1200,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('does not trigger when ratio meets a partial threshold', () => {
+    // committed=800, accepted=1000, ratio=0.8, threshold=0.8 → not below
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 800,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 0.8 },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('does not trigger when threshold is not set', () => {
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 100,
+        stopConditions: BASE_STOP_CONDITIONS,
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('does not trigger when mempoolAcceptedDelta is null', () => {
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: null,
+        committedTxDelta: 100,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('does not trigger when committedTxDelta is null (evidence incomplete)', () => {
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: null,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('does not trigger when committedTxDelta is undefined (field absent)', () => {
+    const inputs = makeInputs({
+      mempoolAcceptedDelta: 1000,
+      stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (inputs as any).committedTxDelta;
+    expect(detectCollapse(inputs)).toBeNull();
+  });
+
+  it('does not trigger when mempoolAcceptedDelta is 0 (no load delivered)', () => {
+    // Division by zero guard: skip check when no txs were accepted
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 0,
+        committedTxDelta: 0,
+        stopConditions: { ...BASE_STOP_CONDITIONS, minCommitToAcceptedRatio: 1.0 },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('takes priority over useful_throughput_below_threshold', () => {
+    // Both thresholds set; drain check fires first
+    const result = detectCollapse(
+      makeInputs({
+        mempoolAcceptedDelta: 1000,
+        committedTxDelta: 500,
+        tierDurationSeconds: 60,
+        targetTps: 100,
+        stopConditions: {
+          ...BASE_STOP_CONDITIONS,
+          minCommitToAcceptedRatio: 1.0,
+          minUsefulThroughputRatio: 0.9,
+        },
+      })
+    );
+    expect(result?.reason).toBe('commit_drain_below_threshold');
   });
 });
 

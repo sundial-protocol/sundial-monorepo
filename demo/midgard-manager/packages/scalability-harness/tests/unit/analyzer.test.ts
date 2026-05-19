@@ -228,6 +228,11 @@ describe('analyzeTiers — direct bottleneck from collapse reason', () => {
     expect(c.primaryBottleneck).toContain('load generation');
   });
 
+  it('maps commit_drain_below_threshold to block commitment throughput', () => {
+    const c = analyzeTiers([makeCollapsed(0, 100, 'commit_drain_below_threshold')]);
+    expect(c.primaryBottleneck).toContain('block commitment throughput');
+  });
+
   it('does not add a heuristic note for direct collapse-reason mappings', () => {
     const directReasons = [
       'node_unavailable',
@@ -237,6 +242,7 @@ describe('analyzeTiers — direct bottleneck from collapse reason', () => {
       'queue_not_recovered',
       'mempool_not_recovered',
       'tx_generator_failed',
+      'commit_drain_below_threshold',
     ] as const;
 
     for (const reason of directReasons) {
