@@ -22,6 +22,7 @@ function makeInputs(overrides: Partial<CollapseInputs> = {}): CollapseInputs {
     txGeneratorExitCode: 0,
     commitmentFailuresDelta: 0,
     mergeFailuresDelta: 0,
+    afterLoadMempoolSize: null,
     recoveryQueueSize: 0,
     recoveryMempoolSize: 0,
     mempoolAcceptedDelta: 900,
@@ -447,6 +448,43 @@ describe('detectCollapse — mempool_not_recovered', () => {
     const result = detectCollapse(
       makeInputs({
         recoveryMempoolSize: 9999,
+        stopConditions: BASE_STOP_CONDITIONS,
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('returns mempool_not_recovered when recovery does not drain mempool backlog', () => {
+    const result = detectCollapse(
+      makeInputs({
+        afterLoadMempoolSize: 500,
+        recoveryMempoolSize: 500,
+        stopConditions: BASE_STOP_CONDITIONS,
+      })
+    );
+    expect(result?.reason).toBe('mempool_not_recovered');
+    expect(result?.values.afterLoadMempoolSize).toBe(500);
+    expect(result?.values.recoveryMempoolSize).toBe(500);
+    expect(result?.values.drainedMempoolTxCount).toBe(0);
+  });
+
+  it('returns mempool_not_recovered when recovery mempool grows after load', () => {
+    const result = detectCollapse(
+      makeInputs({
+        afterLoadMempoolSize: 400,
+        recoveryMempoolSize: 700,
+        stopConditions: BASE_STOP_CONDITIONS,
+      })
+    );
+    expect(result?.reason).toBe('mempool_not_recovered');
+    expect(result?.values.drainedMempoolTxCount).toBe(-300);
+  });
+
+  it('does not trigger non-draining check when no backlog existed after load', () => {
+    const result = detectCollapse(
+      makeInputs({
+        afterLoadMempoolSize: 0,
+        recoveryMempoolSize: 100,
         stopConditions: BASE_STOP_CONDITIONS,
       })
     );

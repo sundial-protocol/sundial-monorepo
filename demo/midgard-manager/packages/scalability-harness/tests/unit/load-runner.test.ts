@@ -1,5 +1,6 @@
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import path from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -732,6 +733,27 @@ describe('runTier', () => {
     // Generator was stopped (emitted tx_generator_stopped event)
     const events = vi.mocked(writer.appendLoadEvent).mock.calls.map(([e]) => e);
     expect(events.some((e) => e.event === 'tx_generator_stopped')).toBe(true);
+  });
+
+  it('passes an absolute --output-dir to tx-generator even when runDir is relative', async () => {
+    const relativeWriter = {
+      ...writer,
+      runDir: 'benchmark-runs/relative-test',
+    } as ArtifactWriter;
+    const { spawner, ...rest } = makeOptions();
+
+    await runTier(BASE_SCENARIO, BASE_TIER, relativeWriter, prometheusClient, {
+      ...rest,
+      runnerOptions: { spawner, sigintGraceMs: 50, sigTermGraceMs: 50 },
+    });
+
+    expect(spawner.spawn).toHaveBeenCalledOnce();
+    const [, args] = vi.mocked(spawner.spawn).mock.calls[0];
+    const outputDirIndex = args.indexOf('--output-dir');
+    expect(outputDirIndex).toBeGreaterThan(-1);
+    const outputDir = args[outputDirIndex + 1];
+    expect(path.isAbsolute(outputDir)).toBe(true);
+    expect(outputDir).toBe(path.resolve('benchmark-runs/relative-test/tier-0'));
   });
 
   it('runs probe loop during load phase', async () => {

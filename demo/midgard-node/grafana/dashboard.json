@@ -80,7 +80,7 @@
               }
             ]
           },
-          "unit": "txs"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -283,7 +283,7 @@
               }
             ]
           },
-          "unit": "reqps"
+          "unit": "suffix: tx/s"
         },
         "overrides": []
       },
@@ -378,7 +378,7 @@
               }
             ]
           },
-          "unit": "txs"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -482,7 +482,7 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "suffix: tx/s"
         },
         "overrides": []
       },
@@ -684,7 +684,7 @@
               }
             ]
           },
-          "unit": "txs"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -887,7 +887,7 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "suffix: blocks/s"
         },
         "overrides": []
       },
@@ -1086,7 +1086,7 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "suffix: blocks/s"
         },
         "overrides": []
       },
@@ -1181,7 +1181,7 @@
               }
             ]
           },
-          "unit": "txs"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -1312,11 +1312,11 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "commit_block_duration_seconds{instance=\"midgard-node:9464\"}",
+          "editorMode": "code",
+          "expr": "rate(commit_block_duration_seconds_sum{instance=\"midgard-node:9464\"}[$__rate_interval]) / rate(commit_block_duration_seconds_count{instance=\"midgard-node:9464\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "duration",
+          "legendFormat": "avg duration",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -2551,7 +2551,7 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "suffix: blocks/s"
         },
         "overrides": []
       },

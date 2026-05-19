@@ -16,6 +16,7 @@ import type { Fetcher as NodeProbeFetcher, ProbeResult } from './node-probe.js';
 import { PROBE_TIMEOUT_MS, probeNode } from './node-probe.js';
 
 const TX_GENERATOR_PREFLIGHT_TIMEOUT_MS = 30_000;
+const TX_GENERATOR_CLI_PATH = 'dist/bin/index.js';
 
 export const PREFLIGHT_CHECK_NAMES = [
   'scenario_validity',
@@ -270,24 +271,42 @@ function defaultTxGeneratorInvoker(): TxGeneratorInvoker {
           '--filter',
           '@midgard-manager/tx-generator',
           'exec',
-          'tsx',
-          'src/bin/index.ts',
+          'node',
+          TX_GENERATOR_CLI_PATH,
           '--help',
         ];
 
         const spawnOptions: SpawnOptions = {
           cwd,
-          stdio: 'ignore',
+          stdio: ['ignore', 'pipe', 'pipe'],
         };
 
         const proc = spawn('pnpm', args, spawnOptions);
+        let stdoutBuffer = '';
+        let stderrBuffer = '';
+        const MAX_CAPTURE = 4000;
+
+        const appendWithLimit = (current: string, chunk: string): string => {
+          const combined = current + chunk;
+          if (combined.length <= MAX_CAPTURE) {
+            return combined;
+          }
+          return combined.slice(combined.length - MAX_CAPTURE);
+        };
+
+        proc.stdout?.on('data', (chunk) => {
+          stdoutBuffer = appendWithLimit(stdoutBuffer, String(chunk));
+        });
+        proc.stderr?.on('data', (chunk) => {
+          stderrBuffer = appendWithLimit(stderrBuffer, String(chunk));
+        });
+
         const timeout = setTimeout(() => {
           proc.kill('SIGKILL');
           resolve({
             passed: false,
             summary: `tx-generator invocability check timed out after ${TX_GENERATOR_PREFLIGHT_TIMEOUT_MS}ms.`,
-            actionableReason:
-              'Verify pnpm workspace commands and tx-generator dependencies are executable.',
+            actionableReason: `Verify pnpm workspace commands are executable and tx-generator is built (${TX_GENERATOR_CLI_PATH}).`,
           });
         }, TX_GENERATOR_PREFLIGHT_TIMEOUT_MS);
 
@@ -297,7 +316,7 @@ function defaultTxGeneratorInvoker(): TxGeneratorInvoker {
             passed: false,
             summary: `tx-generator invocability check failed to spawn: ${err.message}`,
             actionableReason:
-              'Install pnpm/Corepack and ensure workspace scripts are runnable from the current working directory.',
+              'Install pnpm/Corepack and ensure workspace commands are runnable from the current working directory.',
           });
         });
 
@@ -311,11 +330,20 @@ function defaultTxGeneratorInvoker(): TxGeneratorInvoker {
             return;
           }
 
+          const detail = (stderrBuffer.trim() || stdoutBuffer.trim())
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .slice(-20)
+            .join(' | ');
+
           resolve({
             passed: false,
-            summary: `tx-generator invocability check exited non-zero (code=${code}, signal=${signal ?? 'none'}).`,
+            summary:
+              `tx-generator invocability check exited non-zero (code=${code}, signal=${signal ?? 'none'}).` +
+              (detail.length > 0 ? ` Detail: ${detail}` : ''),
             actionableReason:
-              'Run tx-generator standalone and fix startup/dependency issues before formal harness runs.',
+              'Run tx-generator standalone (built dist CLI) and fix startup/build issues before formal harness runs.',
           });
         });
       });

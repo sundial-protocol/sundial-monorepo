@@ -415,11 +415,24 @@ export const buildNewBlockEntry = (
             yield* Effect.logWarning(
               "🔹 chainProgram() failed with stored wallet UTxOs; refreshing wallet from provider and retrying...",
             );
-            const freshUTxOs = yield* Effect.tryPromise({
-              try: () => lucidAPI.wallet().getUtxos(),
+            const operatorWalletAddress = yield* Effect.tryPromise({
+              try: () => lucidAPI.wallet().address(),
               catch: (e) =>
                 new SDK.LucidError({
-                  message: "Failed to fetch fresh wallet UTxOs for retry",
+                  message:
+                    "Failed to resolve block-commitment wallet address for retry",
+                  cause: e,
+                }),
+            });
+            const freshUTxOs = yield* Effect.tryPromise({
+              // IMPORTANT: Do not use wallet().getUtxos() here. When Lucid
+              // has overrideUTxOs set, wallet().getUtxos() can return the
+              // overridden snapshot instead of chain state.
+              try: () => lucidAPI.utxosAt(operatorWalletAddress),
+              catch: (e) =>
+                new SDK.LucidError({
+                  message:
+                    "Failed to fetch fresh wallet UTxOs from provider for retry",
                   cause: e,
                 }),
             });

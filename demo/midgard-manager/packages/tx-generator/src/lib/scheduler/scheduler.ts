@@ -13,6 +13,7 @@ import {
   generateMultiOutputTransactions,
   generateOneToOneTransactions,
 } from '../generators/index.js';
+import { LucidPool } from '../generators/lucid-pool.js';
 import {
   DEFAULT_CONFIG,
   TRANSACTION_CONSTANTS,
@@ -642,6 +643,22 @@ export const startGenerator = async (
   // Create a limiter for concurrent transaction generation
   const concurrencyLimiter = pLimit(fullConfig.concurrency);
 
+  // Pre-initialize a pool of Lucid instances for one-to-one generation.
+  // Pool size matches concurrency so every running task gets an instance
+  // immediately without contention. Skipped for pure multi-output workloads
+  // where Lucid is constructed once per large batch anyway.
+  const needsPool =
+    fullConfig.transactionType === 'one-to-one' || fullConfig.transactionType === 'mixed';
+  const lucidPool = needsPool
+    ? await LucidPool.create(
+        fullConfig.concurrency,
+        fullConfig.walletSeedOrPrivateKey,
+        fullConfig.initialUTxO.address,
+        fullConfig.initialUTxO.assets,
+        fullConfig.network
+      )
+    : null;
+
   // Reset stats
   state.resetStats();
 
@@ -703,8 +720,15 @@ export const startGenerator = async (
 
       const tasks = taskPlans.map(async (taskPlan) => {
         return concurrencyLimiter(async () => {
-          const txs = taskPlan.useOneToOne
-            ? await generateOneToOneTransactions({
+          let txs: SerializedMidgardTransaction[];
+
+          if (taskPlan.useOneToOne) {
+            // Acquire a pre-initialized Lucid instance from the pool.
+            // Release it immediately after generation so the next task can
+            // start building its tx while this task is still submitting.
+            const pooledLucid = lucidPool !== null ? await lucidPool.acquire() : undefined;
+            try {
+              txs = await generateOneToOneTransactions({
                 network: fullConfig.network,
                 initialUTxO: taskPlan.initialUTxO,
                 txsCount: 1,
@@ -712,16 +736,24 @@ export const startGenerator = async (
                 nodeClient,
                 random,
                 deterministicStartMs,
-              })
-            : await generateMultiOutputTransactions({
-                network: fullConfig.network,
-                initialUTxO: taskPlan.initialUTxO,
-                utxosCount: TRANSACTION_CONSTANTS.OUTPUTS_PER_DISTRIBUTION,
-                finalUtxosCount: 1,
-                walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
-                nodeClient,
-                random,
+                lucid: pooledLucid,
               });
+            } finally {
+              if (pooledLucid !== undefined && lucidPool !== null) {
+                lucidPool.release(pooledLucid);
+              }
+            }
+          } else {
+            txs = await generateMultiOutputTransactions({
+              network: fullConfig.network,
+              initialUTxO: taskPlan.initialUTxO,
+              utxosCount: TRANSACTION_CONSTANTS.OUTPUTS_PER_DISTRIBUTION,
+              finalUtxosCount: 1,
+              walletSeedOrPrivateKey: fullConfig.walletSeedOrPrivateKey,
+              nodeClient,
+              random,
+            });
+          }
 
           if (!txs || !Array.isArray(txs)) {
             throw new Error('Failed to generate transactions');

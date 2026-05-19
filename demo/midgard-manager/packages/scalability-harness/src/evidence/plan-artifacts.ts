@@ -10,7 +10,6 @@ export interface PlanManifest {
   description: string | null;
   startedAt: string;
   gitSha: string;
-  workingTreeStatus: string;
   planPath: string;
   harnessVersion: string;
   scenarioPaths: string[];
@@ -26,14 +25,6 @@ export interface PlanManifest {
 function gitSha(): string {
   try {
     return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
-  } catch {
-    return 'unknown';
-  }
-}
-
-function gitStatus(): string {
-  try {
-    return execSync('git status --short', { encoding: 'utf8' }).trim();
   } catch {
     return 'unknown';
   }
@@ -74,7 +65,6 @@ export class PlanArtifactWriter {
       description: plan.description ?? null,
       startedAt: startedAt.toISOString(),
       gitSha: gitSha(),
-      workingTreeStatus: gitStatus(),
       planPath,
       harnessVersion,
       scenarioPaths: resolvedScenarioPaths,

@@ -26,6 +26,7 @@ import type { TierMetricWindow, TierWindowSummary } from '../metrics/window.js';
 import { renderReport } from '../report/markdown.js';
 import type { TierRunResult } from './load-runner.js';
 import { runTier } from './load-runner.js';
+import { computeSettings } from './tx-generator.js';
 
 function lookupCounterDelta(summary: TierWindowSummary | null, query: string): number | null {
   return summary?.counterDeltas.find((d) => d.query === query)?.deltaLoad ?? null;
@@ -59,6 +60,7 @@ function buildCollapseInputs(
       'commit_block_commitment_failures_total'
     ),
     mergeFailuresDelta: lookupCounterDelta(result.windowSummary, 'merge_block_failures_total'),
+    afterLoadMempoolSize: result.metricWindow?.afterLoad['mempool_tx_count'] ?? null,
     recoveryQueueSize: lookupGaugeFinal(result.windowSummary, 'tx_queue_size'),
     recoveryMempoolSize: lookupGaugeFinal(result.windowSummary, 'mempool_tx_count'),
     mempoolAcceptedDelta: lookupCounterDelta(
@@ -135,7 +137,19 @@ export async function runScenario(
   let harnessErrorOccurred = false;
 
   for (const tier of tiers) {
+    const generatorSettings = computeSettings(
+      tier.targetTps,
+      scenario.batchSize,
+      scenario.concurrency
+    );
     console.log(chalk.gray(`\n  [${tier.tierIndex}] ${tier.targetTps} TPS running...`));
+    console.log(
+      chalk.gray(
+        `      load=${tier.durationSeconds}s recovery=${tier.recoverySeconds}s ` +
+          `batch=${generatorSettings.batchSize} concurrency=${generatorSettings.concurrency} ` +
+          `interval=${generatorSettings.intervalSeconds}s est_tps=${generatorSettings.actualTpsEstimate.toFixed(2)}`
+      )
+    );
 
     let result: TierRunResult;
     try {
@@ -150,6 +164,36 @@ export async function runScenario(
       console.error(chalk.red(`\n  Harness error during tier ${tier.tierIndex}: ${String(err)}`));
       harnessErrorOccurred = true;
       break;
+    }
+
+    if (result.txGeneratorExitCode !== null && result.txGeneratorExitCode !== 0) {
+      console.error(
+        chalk.red(
+          `  [${tier.tierIndex}] tx-generator exited non-zero (exitCode=${result.txGeneratorExitCode}).`
+        )
+      );
+      if (result.txGeneratorErrorSnippet !== null && result.txGeneratorErrorSnippet.trim() !== '') {
+        console.error(chalk.red(`  tx-generator stderr tail:\n${result.txGeneratorErrorSnippet}`));
+      }
+    }
+
+    const submissionCounters = result.submissionAggregate?.counters;
+    if (submissionCounters !== undefined) {
+      const nodeErrorCounts: Array<{ name: string; count: number }> = [
+        { name: 'node_unavailable', count: submissionCounters.node_unavailable },
+        { name: 'timed_out', count: submissionCounters.timed_out },
+        { name: 'error', count: submissionCounters.error },
+      ].filter((entry) => entry.count > 0);
+
+      if (nodeErrorCounts.length > 0) {
+        const summary = nodeErrorCounts.map((entry) => `${entry.name}=${entry.count}`).join(', ');
+        console.error(
+          chalk.red(
+            `  [${tier.tierIndex}] node-side submission errors detected: ${summary} ` +
+              `(attempted=${submissionCounters.attempted}, submitted=${submissionCounters.submitted}).`
+          )
+        );
+      }
     }
 
     const collapseResult = detectCollapse(buildCollapseInputs(result, scenario.stopConditions));

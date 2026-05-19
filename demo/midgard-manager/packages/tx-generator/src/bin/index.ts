@@ -115,7 +115,7 @@ program
         transactionType: options.type,
         oneToOneRatio: parseInt(options.ratio),
         batchSize: parseInt(options.batchSize),
-        interval: parseInt(options.interval),
+        interval: parseFloat(options.interval),
         concurrency: parseInt(options.concurrency),
         nodeRetryAttempts: parseInt(options.retryAttempts ?? '3'),
         nodeRetryDelay: parseInt(options.retryDelayMs ?? '1000'),

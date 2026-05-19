@@ -31,6 +31,9 @@ export interface CollapseInputs {
   mergeFailuresDelta: number | null;
 
   // Recovery gauges from TierMetricWindow.afterRecovery.
+  // Optional after-load gauge snapshot enables explicit "did not drain" checks
+  // even when no absolute maxRecoveryMempoolSize threshold is configured.
+  afterLoadMempoolSize?: number | null;
   recoveryQueueSize: number | null;
   recoveryMempoolSize: number | null;
 
@@ -120,6 +123,26 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
         },
       };
     }
+  }
+
+  // If mempool had backlog at the end of load, recovery must reduce it.
+  // A flat or increasing mempool during recovery is treated as non-recovery.
+  const afterLoadMempoolSize = inputs.afterLoadMempoolSize ?? null;
+  const recoveryMempoolSize = inputs.recoveryMempoolSize;
+  if (
+    afterLoadMempoolSize !== null &&
+    afterLoadMempoolSize > 0 &&
+    recoveryMempoolSize !== null &&
+    recoveryMempoolSize >= afterLoadMempoolSize
+  ) {
+    return {
+      reason: 'mempool_not_recovered',
+      values: {
+        afterLoadMempoolSize,
+        recoveryMempoolSize,
+        drainedMempoolTxCount: afterLoadMempoolSize - recoveryMempoolSize,
+      },
+    };
   }
 
   const exitCode = inputs.txGeneratorExitCode;

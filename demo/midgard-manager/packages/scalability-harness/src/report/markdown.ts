@@ -65,14 +65,10 @@ function renderHeader(): string {
 function renderRunMetadata(manifest: RunManifest): string {
   const gb = (manifest.host.totalMemoryBytes / 1_073_741_824).toFixed(1);
   const hostInfo = `${manifest.host.hostname} (${manifest.host.platform}/${manifest.host.arch}, ${manifest.host.cpus} CPUs, ${gb} GB)`;
-  const workingTree =
-    manifest.workingTreeStatus.trim() === '' ? 'clean' : manifest.workingTreeStatus;
-
   const rows: string[][] = [
     ['Run ID', manifest.runId],
     ['Started At', manifest.startedAt],
     ['Git SHA', manifest.gitSha],
-    ['Working Tree', workingTree],
     ['Node Endpoint', manifest.nodeEndpoint],
     ['Prometheus Endpoint', manifest.prometheusEndpoint],
     ['L1 Provider Mode', manifest.l1ProviderMode ?? 'not specified'],

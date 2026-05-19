@@ -2,7 +2,7 @@
   "name": "midgard-ts",
   "version": "0.1.0",
   "description": "Pure TypeScript port of the Midgard binary codec",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "scripts": {
     "type-check": "tsc --noEmit -p tsconfig.quality.json --skipLibCheck",
     "test": "jest",

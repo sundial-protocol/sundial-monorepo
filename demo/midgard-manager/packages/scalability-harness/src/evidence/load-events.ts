@@ -35,6 +35,7 @@ export interface TxGeneratorStoppedEvent extends BaseEvent {
   targetTps: number;
   exitCode: number | null;
   signal: string | null;
+  errorSnippet?: string;
 }
 
 export interface TxGeneratorSubmissionAggregateEvent extends BaseEvent {
