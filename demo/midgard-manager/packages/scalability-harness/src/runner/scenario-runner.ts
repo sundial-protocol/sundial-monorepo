@@ -1,6 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 
+import { generateCorpus, generateTestWallet } from '@midgard-manager/tx-builder';
 import chalk from 'chalk';
 
 import {
@@ -138,8 +140,91 @@ export async function runScenario(
   const tempoCaptures: TempoTierCapture[] = [];
   let harnessErrorOccurred = false;
 
+  // Pre-generation phase: build a transaction corpus before any load tiers start.
+  // This keeps Lucid WASM signing off the event loop during submission so
+  // AbortController timers fire on time. The corpus is cycled by the
+  // tx-generator replay loop, so any count > 0 is valid.
+  let pregenCorpusPath: string | undefined;
+  if (scenario.pregenTransactionCount !== undefined) {
+    const corpusPath = path.join(writer.runDir, 'pregen-corpus.json');
+    const count = scenario.pregenTransactionCount;
+    console.log(chalk.blue(`\n  Pre-generating ${count.toLocaleString()} transactions...`));
+    const { privateKey, address } = await generateTestWallet();
+    const initialUTxO = {
+      txHash: '0'.repeat(64),
+      outputIndex: 0,
+      address,
+      assets: { lovelace: 10_000_000_000n },
+      datum: null,
+      datumHash: null,
+      scriptRef: null,
+    };
+    const pregenStart = performance.now();
+    let lastPct = -1;
+    try {
+      await generateCorpus({
+        count,
+        walletSeedOrPrivateKey: privateKey,
+        transactionType: scenario.transactionType,
+        oneToOneRatio: scenario.oneToOneRatio,
+        network: 'Preview',
+        initialUTxO,
+        seed: scenario.seed,
+        outputPath: corpusPath,
+        onProgress(generated, total) {
+          const pct = Math.floor((generated / total) * 100);
+          if (pct !== lastPct && pct % 5 === 0) {
+            lastPct = pct;
+            const filled = Math.floor(pct / 5);
+            const bar = '='.repeat(filled) + '-'.repeat(20 - filled);
+            process.stdout.write(`\r  [${bar}] ${pct}% (${generated}/${total})`);
+          }
+        },
+      });
+      process.stdout.write('\n');
+    } catch (err) {
+      process.stdout.write('\n');
+      console.error(chalk.red(`  Pre-generation failed: ${String(err)}`));
+      return {
+        tierSummaries: [],
+        conclusion: {
+          highestCompletedTier: null,
+          highestCompletedTargetTps: null,
+          firstCollapsedTier: null,
+          firstCollapsedTargetTps: null,
+          primaryBottleneck: 'harness_error',
+          classification: 'Blocked',
+          classificationReasons: [`Pre-generation failed: ${String(err)}`],
+          violatedChecks: [],
+          criteriaChecks: [],
+          policy: buildRunClassificationPolicy(scenario),
+          notes: [],
+        },
+        harnessErrorOccurred: true,
+      };
+    }
+    const pregenSec = ((performance.now() - pregenStart) / 1000).toFixed(1);
+    console.log(chalk.gray(`  Pre-generation complete in ${pregenSec}s — corpus: ${corpusPath}`));
+    pregenCorpusPath = corpusPath;
+  }
+
+  // The effective scenario for each tier: merge the pre-generated corpus path
+  // when pregen was requested, overriding any static replayCorpusPath.
+  const effectiveScenario =
+    pregenCorpusPath !== undefined ? { ...scenario, replayCorpusPath: pregenCorpusPath } : scenario;
+
   for (const tier of tiers) {
-    const generatorSettings = computeSettings(tier.targetTps, scenario.txGeneratorTaskCostSeconds);
+    const generatorSettings = computeSettings(
+      tier.targetTps,
+      effectiveScenario.txGeneratorTaskCostSeconds,
+      effectiveScenario.submitTimeoutMs !== undefined
+        ? {
+            submitTimeoutMs: effectiveScenario.submitTimeoutMs,
+            retryAttempts: effectiveScenario.retryAttempts,
+            retryDelayMs: effectiveScenario.retryDelayMs,
+          }
+        : undefined
+    );
     console.log(chalk.gray(`\n  [${tier.tierIndex}] ${tier.targetTps} TPS running...`));
     console.log(
       chalk.gray(
@@ -151,7 +236,7 @@ export async function runScenario(
 
     let result: TierRunResult;
     try {
-      result = await runTier(scenario, tier, writer, prometheusClient, {
+      result = await runTier(effectiveScenario, tier, writer, prometheusClient, {
         runnerOptions: { requestEvents: options.requestEvents ?? 'off' },
         lokiClient,
         lokiNodeQuery: scenario.lokiNodeQuery,

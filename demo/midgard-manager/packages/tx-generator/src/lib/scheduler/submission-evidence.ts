@@ -3,7 +3,7 @@ export type RequestEventsMode = (typeof REQUEST_EVENT_MODES)[number];
 
 export const REQUEST_EVENTS_SAMPLE_RATE = 0.1;
 export const LATENCY_BUCKET_UPPER_BOUNDS_MS = [
-  50, 100, 250, 500, 1_000, 2_000, 5_000, 10_000,
+  50, 100, 250, 500, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000,
 ] as const;
 
 export type SubmissionOutcome =
@@ -92,7 +92,11 @@ export interface SubmissionAggregateWithPercentiles extends SubmissionAggregate 
     schedulerMetrics: {
       generation_latency: { p50: number | null; p95: number | null; p99: number | null };
       submit_latency: { p50: number | null; p95: number | null; p99: number | null };
-      queue_backpressure_wait_latency: { p50: number | null; p95: number | null; p99: number | null };
+      queue_backpressure_wait_latency: {
+        p50: number | null;
+        p95: number | null;
+        p99: number | null;
+      };
       token_wait_latency: { p50: number | null; p95: number | null; p99: number | null };
       lucid_pool_wait_latency: { p50: number | null; p95: number | null; p99: number | null };
     };
@@ -249,7 +253,10 @@ export function recordTokenWaitLatency(aggregate: SubmissionAggregate, latencyMs
   recordHistogramLatency(aggregate.schedulerMetrics.token_wait_latency, latencyMs);
 }
 
-export function recordLucidPoolWaitLatency(aggregate: SubmissionAggregate, latencyMs: number): void {
+export function recordLucidPoolWaitLatency(
+  aggregate: SubmissionAggregate,
+  latencyMs: number
+): void {
   recordHistogramLatency(aggregate.schedulerMetrics.lucid_pool_wait_latency, latencyMs);
 }
 
@@ -296,9 +303,18 @@ export function toSubmissionAggregateWithPercentiles(
           p99: percentileFromHistogram(aggregate.schedulerMetrics.submit_latency, 99),
         },
         queue_backpressure_wait_latency: {
-          p50: percentileFromHistogram(aggregate.schedulerMetrics.queue_backpressure_wait_latency, 50),
-          p95: percentileFromHistogram(aggregate.schedulerMetrics.queue_backpressure_wait_latency, 95),
-          p99: percentileFromHistogram(aggregate.schedulerMetrics.queue_backpressure_wait_latency, 99),
+          p50: percentileFromHistogram(
+            aggregate.schedulerMetrics.queue_backpressure_wait_latency,
+            50
+          ),
+          p95: percentileFromHistogram(
+            aggregate.schedulerMetrics.queue_backpressure_wait_latency,
+            95
+          ),
+          p99: percentileFromHistogram(
+            aggregate.schedulerMetrics.queue_backpressure_wait_latency,
+            99
+          ),
         },
         token_wait_latency: {
           p50: percentileFromHistogram(aggregate.schedulerMetrics.token_wait_latency, 50),

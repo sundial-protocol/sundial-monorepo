@@ -22,11 +22,7 @@ import {
   TransactionGeneratorConfig,
   validateGeneratorConfig,
 } from '../types.js';
-import {
-  GeneratorManifest,
-  toEvidenceEntry,
-  TransactionEvidenceEntry,
-} from './artifact-metadata.js';
+import { toEvidenceEntry, TransactionEvidenceEntry } from './artifact-metadata.js';
 import { createSeededRandom, randomHex, randomInt } from './deterministic-random.js';
 import {
   createEmptySubmissionAggregate,
@@ -39,8 +35,8 @@ import {
   recordQueueBackpressureWaitLatency,
   recordSubmissionObservation,
   recordSubmitLatency,
-  recordTokenWaitLatency,
   recordTokenLate,
+  recordTokenWaitLatency,
   REQUEST_EVENTS_SAMPLE_RATE,
   type RequestEventsMode,
   type SubmissionOutcome,
@@ -48,9 +44,6 @@ import {
 } from './submission-evidence.js';
 import { inspectGeneratedTransaction } from './transaction-inspector.js';
 
-const GENERATED_TX_PREFIX_ONE_TO_ONE = 'one-to-one';
-const GENERATED_TX_PREFIX_MULTI_OUTPUT = 'multi-output';
-const GENERATED_TX_PREFIX_REPLAY = 'replay';
 const OUTPUT_INDEX_UPPER_EXCLUSIVE = 1001;
 const PROJECT_ROOT_RELATIVE_PATH = '../../../..';
 const SUBMISSION_AGGREGATE_FILE = 'submission-aggregates.json';
@@ -236,13 +229,6 @@ const formatMeanMs = (sumMs: number, count: number): string => {
   return (sumMs / count).toFixed(1);
 };
 
-const buildFilenamePrefix = (useOneToOne: boolean, mode: GenerationMode): string => {
-  if (mode === 'replay') {
-    return GENERATED_TX_PREFIX_REPLAY;
-  }
-  return useOneToOne ? GENERATED_TX_PREFIX_ONE_TO_ONE : GENERATED_TX_PREFIX_MULTI_OUTPUT;
-};
-
 const getNormalizedSeed = (seed: string | undefined): string => {
   if (seed !== undefined) {
     return seed.trim();
@@ -362,52 +348,6 @@ const loadReplayCorpus = async (
   return parseReplayCorpusContent(replayCorpusPath, raw);
 };
 
-const writeTransactionsWithManifest = async ({
-  outputDir,
-  filenamePrefix,
-  transactions,
-  manifestTransactions,
-  generationSeed,
-  fullConfig,
-  mode,
-  replayCorpusPath,
-}: {
-  outputDir: string;
-  filenamePrefix: string;
-  transactions: SerializedMidgardTransaction[];
-  manifestTransactions: TransactionEvidenceEntry[];
-  generationSeed: string;
-  fullConfig: TransactionGeneratorConfig;
-  mode: GenerationMode;
-  replayCorpusPath: string | undefined;
-}): Promise<string> => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `${filenamePrefix}-${timestamp}.json`;
-  const transactionsPath = join(resolveOutputDir(outputDir), filename);
-  const manifestPath = `${transactionsPath}.manifest.json`;
-
-  await writeFile(transactionsPath, JSON.stringify(transactions, null, 2));
-  const manifest: GeneratorManifest = {
-    mode,
-    generationSeed,
-    replayCorpusPath,
-    profile: {
-      transactionType: fullConfig.transactionType,
-      oneToOneRatio: fullConfig.oneToOneRatio,
-      batchSize: fullConfig.batchSize,
-      concurrency: fullConfig.concurrency,
-      intervalSeconds: fullConfig.interval,
-    },
-    generatedAt: new Date().toISOString(),
-    transactionCount: transactions.length,
-    transactions: manifestTransactions,
-  };
-
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
-
-  return transactionsPath;
-};
-
 async function appendRequestEvent(
   outputDir: string | undefined,
   requestEventsMode: RequestEventsMode,
@@ -484,25 +424,13 @@ async function withBackpressureCapacity(
 async function processPreparedSubmission(params: {
   prepared: PreparedSubmission;
   nodeClient: MidgardNodeClient;
-  fullConfig: TransactionGeneratorConfig;
   outputDir: string | undefined;
   requestEventsMode: RequestEventsMode;
   requestEventRandom: () => number;
-  generationSeed: string;
-  replayCorpusPath: string | undefined;
   rateLimiter: TokenBucket | null;
 }): Promise<void> {
-  const {
-    prepared,
-    nodeClient,
-    fullConfig,
-    outputDir,
-    requestEventsMode,
-    requestEventRandom,
-    generationSeed,
-    replayCorpusPath,
-    rateLimiter,
-  } = params;
+  const { prepared, nodeClient, outputDir, requestEventsMode, requestEventRandom, rateLimiter } =
+    params;
 
   if (prepared.evidenceEntry.validation.status === 'rejected') {
     prepared.evidenceEntry.submission.status = 'VALIDATION_REJECTED';
@@ -781,6 +709,7 @@ export const startGenerator = async (
     baseUrl: fullConfig.nodeEndpoint,
     retryAttempts: fullConfig.nodeRetryAttempts,
     retryDelay: fullConfig.nodeRetryDelay,
+    submitTimeoutMs: fullConfig.nodeSubmitTimeoutMs,
     enableLogs: fullConfig.nodeEnableLogs,
     skipAvailabilityCheck: true,
   });
@@ -817,12 +746,9 @@ export const startGenerator = async (
         await processPreparedSubmission({
           prepared,
           nodeClient,
-          fullConfig,
           outputDir: fullConfig.outputDir,
           requestEventsMode,
           requestEventRandom,
-          generationSeed,
-          replayCorpusPath: fullConfig.replayCorpusPath,
           rateLimiter,
         });
       } finally {
@@ -878,9 +804,10 @@ export const startGenerator = async (
 
     const queueDepth = aggregate.schedulerMetrics.prepared_queue_depth.current;
     const inFlight = aggregate.schedulerMetrics.in_flight_submits.current;
-    const queueCapacityUtilization = ((queueDepth / Math.max(1, preparedQueueCapacity)) * 100).toFixed(
-      1
-    );
+    const queueCapacityUtilization = (
+      (queueDepth / Math.max(1, preparedQueueCapacity)) *
+      100
+    ).toFixed(1);
 
     const submitP95Ms = submissionPercentiles.schedulerMetrics.submit_latency.p95 ?? 0;
     const generationP95Ms = submissionPercentiles.schedulerMetrics.generation_latency.p95 ?? 0;
@@ -913,9 +840,16 @@ export const startGenerator = async (
       `[telemetry] gen=${formatRate(generatedDelta, elapsedMs)}/s attempt=${formatRate(attemptedDelta, elapsedMs)}/s submit=${formatRate(submittedDelta, elapsedMs)}/s timeout=${formatRate(timedOutDelta, elapsedMs)}/s error=${formatRate(errorDelta, elapsedMs)}/s inflight=${inFlight}/${maxInFlight} queue=${queueDepth}/${preparedQueueCapacity} (${queueCapacityUtilization}%) p95ms{submit=${submitP95Ms},gen=${generationP95Ms},qwait=${queueWaitP95Ms},token=${tokenWaitP95Ms},pool=${poolWaitP95Ms}} meanms{submit=${submitMeanMs},qwait=${queueWaitMeanMs},token=${tokenWaitMeanMs},pool=${poolWaitMeanMs}}`
     );
 
-    if (submitP95Ms >= 5_000 && queueDepth >= Math.floor(preparedQueueCapacity * 0.8)) {
+    const submitSaturationThresholdMs = Math.floor(
+      (fullConfig.nodeSubmitTimeoutMs ?? TRANSACTION_CONSTANTS.NODE_DEFAULTS.SUBMIT_TIMEOUT_MS) *
+        0.8
+    );
+    if (
+      submitP95Ms >= submitSaturationThresholdMs &&
+      queueDepth >= Math.floor(preparedQueueCapacity * 0.8)
+    ) {
       console.warn(
-        `[telemetry][bottleneck] submit path saturated: submit p95=${submitP95Ms}ms with prepared queue utilization ${queueCapacityUtilization}%`
+        `[telemetry][bottleneck] submit path saturated: submit p95=${submitP95Ms}ms (threshold=${submitSaturationThresholdMs}ms) with queue utilization ${queueCapacityUtilization}%`
       );
     } else if (generationP95Ms >= 1_000 && queueDepth < Math.floor(preparedQueueCapacity * 0.2)) {
       console.warn(

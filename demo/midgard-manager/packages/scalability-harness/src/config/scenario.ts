@@ -84,6 +84,13 @@ export interface ScalabilityScenario {
   outputDir: string;
   seed: string;
   replayCorpusPath?: string;
+  // Number of transactions to pre-generate before the load tiers begin.
+  // When set, the harness generates a corpus in the run directory and passes
+  // it to the tx-generator as the replay corpus for all tiers. The replay
+  // corpus cycles, so any count > 0 works; use a count large enough to avoid
+  // duplicate txId submissions during sustained high-TPS runs.
+  // Cannot be combined with a static replayCorpusPath.
+  pregenTransactionCount?: number;
   // L1 provider mode used for this run. Recorded in the run manifest and report
   // so before/after comparisons carry the provider context. Use "emulator" for
   // local/test runs that do not connect to a live L1 provider.
@@ -124,6 +131,12 @@ export interface ScalabilityScenario {
   txGeneratorTaskCostSeconds: number;
   retryAttempts: number;
   retryDelayMs: number;
+  // Per-attempt HTTP submit timeout in milliseconds. When set, the harness uses this
+  // to size maxInFlight so workers recycle quickly instead of holding connections open
+  // for the full retry chain. Set low (e.g. 500 ms) for high-throughput load testing.
+  // Pairs with retryAttempts=1 for "fire once and move on" behaviour.
+  // Defaults to the tx-generator default (5000 ms) when omitted.
+  submitTimeoutMs?: number;
   requestEvents?: RequestEventsMode;
   grafanaScreenshots?: GrafanaScreenshotsConfig;
   runClassificationPolicy?: RunClassificationPolicyConfig;
@@ -212,6 +225,23 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     if (typeof s.replayCorpusPath !== 'string' || s.replayCorpusPath.trim().length === 0) {
       throw new ScenarioValidationError(
         'replayCorpusPath must be a non-empty string when provided'
+      );
+    }
+  }
+
+  if (s.pregenTransactionCount !== undefined) {
+    if (
+      typeof s.pregenTransactionCount !== 'number' ||
+      !Number.isInteger(s.pregenTransactionCount) ||
+      s.pregenTransactionCount < 1
+    ) {
+      throw new ScenarioValidationError(
+        `pregenTransactionCount must be a positive integer when provided, got: ${s.pregenTransactionCount}`
+      );
+    }
+    if (s.replayCorpusPath !== undefined) {
+      throw new ScenarioValidationError(
+        'pregenTransactionCount and replayCorpusPath are mutually exclusive'
       );
     }
   }
@@ -480,6 +510,9 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
 
   assertNonNegativeInteger(s.retryAttempts, 'retryAttempts');
   assertNonNegativeInteger(s.retryDelayMs, 'retryDelayMs');
+  if (s.submitTimeoutMs !== undefined) {
+    assertPositiveNumber(s.submitTimeoutMs, 'submitTimeoutMs');
+  }
   if (s.requestEvents !== undefined) {
     if (
       typeof s.requestEvents !== 'string' ||

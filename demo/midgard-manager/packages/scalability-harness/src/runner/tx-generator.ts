@@ -80,30 +80,38 @@ export interface SubmissionAggregate {
   };
 }
 
-// Generator settings are fully derived from targetTps and txCostSeconds.
+// Generator settings are fully derived from targetTps and txCostSeconds (or submitTimeoutMs).
 //
 // effectiveTps = targetTps * CLIENT_OVERSEND_RATIO
-// concurrency  = ceil(effectiveTps * txCostSeconds * SUBMISSION_PARALLELISM_HEADROOM)
-// batchSize    = concurrency   (one parallel wave per batch)
-// maxInFlight  = concurrency
-// generationConcurrency = min(MAX_GENERATION_CONCURRENCY, maxInFlight * GENERATION_TO_SUBMISSION_CONCURRENCY_RATIO)
-// preparedQueueCapacity = maxInFlight * PREPARED_QUEUE_HEADROOM
-// interval     = batchSize / effectiveTps
 //
-// With SUBMISSION_PARALLELISM_HEADROOM=12 the interval is always
-// 12*txCostSeconds / CLIENT_OVERSEND_RATIO regardless of effectiveTps, so batch execution time
-// (~txCostSeconds, all tasks in
-// parallel) is well inside the interval and the wall-clock scheduler fires
-// exactly on time. Scaling TPS only changes how many concurrent workers run
-// per batch.
+// Standard mode (no submitTimeoutMs):
+//   concurrency  = ceil(effectiveTps * txCostSeconds * SUBMISSION_PARALLELISM_HEADROOM)
+//   interval     = batchSize / effectiveTps  ≈ HEADROOM * txCostSeconds / OVERSEND_RATIO
 //
-// CLIENT_OVERSEND_RATIO drives the client slightly above the scenario target so
-// that measurement overhead, startup latency, and scheduling jitter do not
-// cause the effective send rate to fall below the target.
+// Fast-fail mode (submitTimeoutMs provided):
+//   effectiveTaskCostSec = (submitTimeoutMs * retryAttempts + retryDelayMs * max(0, retryAttempts-1)) / 1000
+//   concurrency  = ceil(targetTps * effectiveTaskCostSec * FAIL_FAST_CONCURRENCY_HEADROOM)
+//   interval     = batchSize / effectiveTps
+//   Uses targetTps (not effectiveTps) so concurrency is proportional to what the server
+//   actually needs to handle, not the 2× oversend rate. For 800 TPS, 500ms timeout:
+//   ceil(800 × 0.5 × 1.5) = 600 connections — enough to sustain 800 TPS with headroom
+//   but not so many that the OS accept queue or event loop saturates.
+//
+// CLIENT_OVERSEND_RATIO drives the token bucket above target TPS so scheduling jitter
+// does not drop below the configured rate. It is intentionally NOT applied to the
+// concurrency calculation in fast-fail mode.
 const SUBMISSION_PARALLELISM_HEADROOM = 12;
+const FAIL_FAST_CONCURRENCY_HEADROOM = 1.5;
 const CLIENT_OVERSEND_RATIO = 2;
-const GENERATION_TO_SUBMISSION_CONCURRENCY_RATIO = 2;
-const MAX_GENERATION_CONCURRENCY = 2048;
+// Keep generation concurrency well below submission concurrency. Lucid's
+// WASM transaction-signing is synchronous-from-Node's-perspective and
+// saturates the event loop when too many workers run in parallel. At high
+// counts the AbortController timers for the 500ms submit timeout starve and
+// fire late, causing all submissions to appear in-flight indefinitely.
+// When a pre-generated corpus is used, generation runs before the load phase
+// so this constant only matters for ad-hoc (non-corpus) runs.
+const GENERATION_TO_SUBMISSION_CONCURRENCY_RATIO = 0.25;
+const MAX_GENERATION_CONCURRENCY = 32;
 const PREPARED_QUEUE_HEADROOM = 4;
 
 export interface GeneratorSettings {
@@ -154,12 +162,44 @@ export interface RunnerOptions {
   requestEvents?: RequestEventsMode;
 }
 
-export function computeSettings(targetTps: number, txCostSeconds: number): GeneratorSettings {
+export interface ComputeSettingsSubmitOptions {
+  submitTimeoutMs: number;
+  retryAttempts: number;
+  retryDelayMs: number;
+}
+
+export function computeSettings(
+  targetTps: number,
+  txCostSeconds: number,
+  submitOptions?: ComputeSettingsSubmitOptions
+): GeneratorSettings {
   const effectiveTps = targetTps * CLIENT_OVERSEND_RATIO;
-  const concurrency = Math.max(
-    1,
-    Math.ceil(effectiveTps * txCostSeconds * SUBMISSION_PARALLELISM_HEADROOM)
-  );
+
+  let concurrency: number;
+  if (submitOptions !== undefined) {
+    // Fast-fail mode: derive task cost from the submit timeout chain so that
+    // maxInFlight stays proportional to the actual max blocking time per worker,
+    // not the (often mismatched) txCostSeconds estimate.
+    const { submitTimeoutMs, retryAttempts, retryDelayMs } = submitOptions;
+    const maxAttempts = Math.max(1, retryAttempts);
+    const effectiveTaskCostMs =
+      submitTimeoutMs * maxAttempts + retryDelayMs * Math.max(0, maxAttempts - 1);
+    const effectiveTaskCostSec = effectiveTaskCostMs / 1000;
+    // Use targetTps (not effectiveTps) so that concurrent connections stay
+    // proportional to what the server needs to handle. effectiveTps already
+    // has a 2× oversend ratio built in; applying it to the concurrency formula
+    // would triple the connection count without benefit.
+    concurrency = Math.max(
+      1,
+      Math.ceil(targetTps * effectiveTaskCostSec * FAIL_FAST_CONCURRENCY_HEADROOM)
+    );
+  } else {
+    concurrency = Math.max(
+      1,
+      Math.ceil(effectiveTps * txCostSeconds * SUBMISSION_PARALLELISM_HEADROOM)
+    );
+  }
+
   const batchSize = concurrency;
   const maxInFlight = concurrency;
   const generationConcurrency = Math.max(
@@ -230,6 +270,8 @@ function buildArgs(
     String(scenario.retryAttempts),
     '--retry-delay-ms',
     String(scenario.retryDelayMs),
+    '--submit-timeout-ms',
+    String(scenario.submitTimeoutMs ?? 5000),
     '--request-events',
     requestEvents,
     '--seed',
@@ -337,7 +379,17 @@ export async function startTxGenerator(
     requestEvents = 'off',
   } = options;
 
-  const settings = computeSettings(tier.targetTps, scenario.txGeneratorTaskCostSeconds);
+  const settings = computeSettings(
+    tier.targetTps,
+    scenario.txGeneratorTaskCostSeconds,
+    scenario.submitTimeoutMs !== undefined
+      ? {
+          submitTimeoutMs: scenario.submitTimeoutMs,
+          retryAttempts: scenario.retryAttempts,
+          retryDelayMs: scenario.retryDelayMs,
+        }
+      : undefined
+  );
   const args = buildArgs(scenario, tier, settings, tierArtifactDir, requestEvents, cwd);
   const startedAt = new Date().toISOString();
 

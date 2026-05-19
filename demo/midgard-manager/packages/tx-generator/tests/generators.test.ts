@@ -9,7 +9,7 @@ import {
 import { txTest } from './setup';
 
 // Mock the transaction generation functions
-vi.mock('../src/lib/generators/one-to-one.js', () => {
+vi.mock('@midgard-manager/tx-builder', () => {
   return {
     generateOneToOneTransactions: vi.fn().mockImplementation(async (config) => {
       // Validate config
@@ -42,11 +42,6 @@ vi.mock('../src/lib/generators/one-to-one.js', () => {
           txId: `test_tx_${i + 1}`,
         }));
     }),
-  };
-});
-
-vi.mock('../src/lib/generators/multi-output.js', () => {
-  return {
     generateMultiOutputTransactions: vi.fn().mockImplementation(async (config) => {
       // Validate config
       if (!config.walletSeedOrPrivateKey) {
