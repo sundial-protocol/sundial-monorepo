@@ -47,6 +47,19 @@ export interface SubmissionAggregate {
     timed_out: SubmissionLatencyHistogram;
     error: SubmissionLatencyHistogram;
   };
+  schedulerMetrics: {
+    prepared_queue_depth: {
+      current: number;
+      max: number;
+    };
+    in_flight_submits: {
+      current: number;
+      max: number;
+    };
+    send_tokens_late_total: number;
+    generation_latency: SubmissionLatencyHistogram;
+    submit_latency: SubmissionLatencyHistogram;
+  };
 }
 
 export interface SubmissionRequestEvent {
@@ -73,6 +86,10 @@ export interface SubmissionAggregateWithPercentiles extends SubmissionAggregate 
     node_unavailable: { p50: number | null; p95: number | null; p99: number | null };
     timed_out: { p50: number | null; p95: number | null; p99: number | null };
     error: { p50: number | null; p95: number | null; p99: number | null };
+    schedulerMetrics: {
+      generation_latency: { p50: number | null; p95: number | null; p99: number | null };
+      submit_latency: { p50: number | null; p95: number | null; p99: number | null };
+    };
   };
 }
 
@@ -143,6 +160,19 @@ export function createEmptySubmissionAggregate(): SubmissionAggregate {
       timed_out: createHistogram(),
       error: createHistogram(),
     },
+    schedulerMetrics: {
+      prepared_queue_depth: {
+        current: 0,
+        max: 0,
+      },
+      in_flight_submits: {
+        current: 0,
+        max: 0,
+      },
+      send_tokens_late_total: 0,
+      generation_latency: createHistogram(),
+      submit_latency: createHistogram(),
+    },
   };
 }
 
@@ -169,6 +199,34 @@ export function recordSubmissionObservation(
   if (latencyMs !== null) {
     recordHistogramLatency(aggregate.latencyMs[outcome], latencyMs);
   }
+}
+
+export function recordPreparedQueueDepth(aggregate: SubmissionAggregate, depth: number): void {
+  aggregate.schedulerMetrics.prepared_queue_depth.current = depth;
+  aggregate.schedulerMetrics.prepared_queue_depth.max = Math.max(
+    aggregate.schedulerMetrics.prepared_queue_depth.max,
+    depth
+  );
+}
+
+export function recordInFlightSubmits(aggregate: SubmissionAggregate, inFlight: number): void {
+  aggregate.schedulerMetrics.in_flight_submits.current = inFlight;
+  aggregate.schedulerMetrics.in_flight_submits.max = Math.max(
+    aggregate.schedulerMetrics.in_flight_submits.max,
+    inFlight
+  );
+}
+
+export function recordTokenLate(aggregate: SubmissionAggregate): void {
+  aggregate.schedulerMetrics.send_tokens_late_total += 1;
+}
+
+export function recordGenerationLatency(aggregate: SubmissionAggregate, latencyMs: number): void {
+  recordHistogramLatency(aggregate.schedulerMetrics.generation_latency, latencyMs);
+}
+
+export function recordSubmitLatency(aggregate: SubmissionAggregate, latencyMs: number): void {
+  recordHistogramLatency(aggregate.schedulerMetrics.submit_latency, latencyMs);
 }
 
 export function toSubmissionAggregateWithPercentiles(
@@ -201,6 +259,18 @@ export function toSubmissionAggregateWithPercentiles(
         p50: percentileFromHistogram(aggregate.latencyMs.error, 50),
         p95: percentileFromHistogram(aggregate.latencyMs.error, 95),
         p99: percentileFromHistogram(aggregate.latencyMs.error, 99),
+      },
+      schedulerMetrics: {
+        generation_latency: {
+          p50: percentileFromHistogram(aggregate.schedulerMetrics.generation_latency, 50),
+          p95: percentileFromHistogram(aggregate.schedulerMetrics.generation_latency, 95),
+          p99: percentileFromHistogram(aggregate.schedulerMetrics.generation_latency, 99),
+        },
+        submit_latency: {
+          p50: percentileFromHistogram(aggregate.schedulerMetrics.submit_latency, 50),
+          p95: percentileFromHistogram(aggregate.schedulerMetrics.submit_latency, 95),
+          p99: percentileFromHistogram(aggregate.schedulerMetrics.submit_latency, 99),
+        },
       },
     },
   };
