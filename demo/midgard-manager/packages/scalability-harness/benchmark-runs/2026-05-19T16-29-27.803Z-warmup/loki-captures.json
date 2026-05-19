@@ -1,0 +1,1739 @@
+[
+  {
+    "tierIndex": 0,
+    "targetTps": 100,
+    "capturedAt": "2026-05-19T16:41:27.939Z",
+    "query": "{job=\"containerlogs\"}",
+    "startedAt": "2026-05-19T16:29:27.811Z",
+    "recoveryStoppedAt": "2026-05-19T16:41:27.833Z",
+    "result": {
+      "streams": [
+        {
+          "labels": {
+            "container": "midgard-midgard-node-1",
+            "detected_level": "info",
+            "job": "containerlogs",
+            "logstream": "stdout",
+            "service_name": "midgard-midgard-node-1"
+          },
+          "entries": [
+            {
+              "timestampNs": "1779208177074467283",
+              "line": "[16:29:37.074] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208178094910282",
+              "line": "[16:29:38.094] INFO (#20): 🔸 Merging of oldest block started."
+            },
+            {
+              "timestampNs": "1779208178094929181",
+              "line": "[16:29:38.094] INFO (#20): 🔸 Fetching confirmed state and the first block in queue from L1..."
+            },
+            {
+              "timestampNs": "1779208179439888706",
+              "line": "[16:29:39.439] INFO (#20): 🔸 First block found: f8e4504502665337911c254ae7ad32be9629df121cc0b9454080b6131b23d21d#1"
+            },
+            {
+              "timestampNs": "1779208179440246311",
+              "line": "[16:29:39.439] INFO (#20): 🔸 Looking up its transactions from BlocksTxsDB..."
+            },
+            {
+              "timestampNs": "1779208179444727870",
+              "line": "[16:29:39.444] INFO (#20): 🔸 Building merge transaction..."
+            },
+            {
+              "timestampNs": "1779208184969356734",
+              "line": "[16:29:44.969] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208184969494867",
+              "line": "timestamp=2026-05-19T16:29:44.969Z level=INFO fiber=#627903 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208187060283193",
+              "line": "timestamp=2026-05-19T16:29:47.058Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208187076994706",
+              "line": "[16:29:47.076] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208187088616158",
+              "line": "timestamp=2026-05-19T16:29:47.088Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208187294019070",
+              "line": "timestamp=2026-05-19T16:29:47.284Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208188007628905",
+              "line": "timestamp=2026-05-19T16:29:47.286Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208188007650258",
+              "line": "timestamp=2026-05-19T16:29:47.287Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (1760) transactions...\""
+            },
+            {
+              "timestampNs": "1779208188640707335",
+              "line": "timestamp=2026-05-19T16:29:48.553Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208188640726749",
+              "line": "timestamp=2026-05-19T16:29:48.593Z level=INFO fiber=#0 message=\"🔹 New header hash is: d6d81031b9f5cdb0ffacf1ba8b306cbf2ab4cbdcbdf5f5d690f848ab\""
+            },
+            {
+              "timestampNs": "1779208188640729571",
+              "line": "timestamp=2026-05-19T16:29:48.593Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208188650314835",
+              "line": "timestamp=2026-05-19T16:29:48.649Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":1760,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":386666}}).\""
+            },
+            {
+              "timestampNs": "1779208188650337043",
+              "line": "[16:29:48.650] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208197080970611",
+              "line": "[16:29:57.080] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208197262038719",
+              "line": "[16:29:57.261] INFO (#18): 🔗 🚀 Block commitment submitted: 6239b9d6892598731aad80da2d29ad25f66b63bb1a037eff2b02c59acc393972"
+            },
+            {
+              "timestampNs": "1779208207548039762",
+              "line": "[16:30:07.547] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208214283468225",
+              "line": "[16:30:14.283] INFO (#19): 🏦 No user events found within [1779190113404, 1779208211868)"
+            },
+            {
+              "timestampNs": "1779208217551421914",
+              "line": "[16:30:17.551] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208218650824951",
+              "line": "[16:30:18.650] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208218650972852",
+              "line": "timestamp=2026-05-19T16:30:18.650Z level=INFO fiber=#638326 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208220752171297",
+              "line": "timestamp=2026-05-19T16:30:20.750Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208220779491494",
+              "line": "timestamp=2026-05-19T16:30:20.779Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208221007125197",
+              "line": "timestamp=2026-05-19T16:30:21.000Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208222388878957",
+              "line": "timestamp=2026-05-19T16:30:21.004Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208222388900218",
+              "line": "timestamp=2026-05-19T16:30:21.006Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3320) transactions...\""
+            },
+            {
+              "timestampNs": "1779208223544625556",
+              "line": "timestamp=2026-05-19T16:30:23.458Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208223544650677",
+              "line": "timestamp=2026-05-19T16:30:23.497Z level=INFO fiber=#0 message=\"🔹 New header hash is: d40242acd55f87352c03fab1e319ae5cea7dece0710ac092508b0d25\""
+            },
+            {
+              "timestampNs": "1779208223544653645",
+              "line": "timestamp=2026-05-19T16:30:23.497Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208223557159290",
+              "line": "timestamp=2026-05-19T16:30:23.556Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3320,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":729473}}).\""
+            },
+            {
+              "timestampNs": "1779208223557428038",
+              "line": "[16:30:23.557] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208227556134311",
+              "line": "[16:30:27.555] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208227679756870",
+              "line": "[16:30:27.679] INFO (#18): 🔗 🚀 Block commitment submitted: 63f2860a0b2b7e0c505fb75cc1d39145b732d3d19db7df28ffc01a5d46287979"
+            },
+            {
+              "timestampNs": "1779208228873882230",
+              "line": "[16:30:28.873] INFO (#20): ✍  Signing tx with addr_test1qq9g96hnrd2y7atjffu2f4j77yktf5n5n6pu77sqe7d30gdlascyryuu7r2frk3wn4d7e4sga3wz9er9hy4ukk5ntp8sk0fvtj"
+            },
+            {
+              "timestampNs": "1779208238072779436",
+              "line": "[16:30:38.072] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208248076216347",
+              "line": "[16:30:48.076] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208253562932601",
+              "line": "[16:30:53.562] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208253563046772",
+              "line": "timestamp=2026-05-19T16:30:53.562Z level=INFO fiber=#649332 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208255632618795",
+              "line": "timestamp=2026-05-19T16:30:55.628Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208255657000839",
+              "line": "timestamp=2026-05-19T16:30:55.656Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208255831348942",
+              "line": "timestamp=2026-05-19T16:30:55.830Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208257283191160",
+              "line": "timestamp=2026-05-19T16:30:55.833Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208257283213471",
+              "line": "timestamp=2026-05-19T16:30:55.834Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208258079094373",
+              "line": "[16:30:58.078] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208258494707568",
+              "line": "timestamp=2026-05-19T16:30:58.408Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208258494728335",
+              "line": "timestamp=2026-05-19T16:30:58.447Z level=INFO fiber=#0 message=\"🔹 New header hash is: 6d0723e00c59b83c4b4ddf4cae9668bb4d2ea69673be3efdd84610a0\""
+            },
+            {
+              "timestampNs": "1779208258494731231",
+              "line": "timestamp=2026-05-19T16:30:58.447Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208258505803667",
+              "line": "timestamp=2026-05-19T16:30:58.505Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764607}}).\""
+            },
+            {
+              "timestampNs": "1779208258506137481",
+              "line": "[16:30:58.506] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208268081785259",
+              "line": "[16:31:08.081] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208268213568150",
+              "line": "[16:31:08.213] INFO (#18): 🔗 🚀 Block commitment submitted: cccdf714be6546d1932657bdd9677e687c1d690109edd55e6f8bf6ae32c5e8a6"
+            },
+            {
+              "timestampNs": "1779208276697605566",
+              "line": "[16:31:16.697] INFO (#19): 🏦 No user events found within [1779190113404, 1779208274283)"
+            },
+            {
+              "timestampNs": "1779208277890843591",
+              "line": "[16:31:17.890] INFO (#20): Signed tx CBOR is:"
+            },
+            {
+              "timestampNs": "1779208277890887809",
+              "line": "[16:31:17.890] INFO (#20): ✉️  Submitting transaction..."
+            },
+            {
+              "timestampNs": "1779208277955279319",
+              "line": "[16:31:17.954] INFO (#20): 🚀 Transaction submitted: df7058fc8117d3bcadbd12c7de821ffaf9ebc5a0e42e8547dfd271e0054a1b3a"
+            },
+            {
+              "timestampNs": "1779208277955317266",
+              "line": "[16:31:17.955] INFO (#20): ⏳ Confirming Transaction..."
+            },
+            {
+              "timestampNs": "1779208278589324977",
+              "line": "[16:31:18.589] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208288506471148",
+              "line": "[16:31:28.506] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208288506546357",
+              "line": "timestamp=2026-05-19T16:31:28.506Z level=INFO fiber=#660310 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208288602420186",
+              "line": "[16:31:28.602] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208290631534396",
+              "line": "timestamp=2026-05-19T16:31:30.630Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208290659262973",
+              "line": "timestamp=2026-05-19T16:31:30.658Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208290894811253",
+              "line": "timestamp=2026-05-19T16:31:30.884Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208292341467193",
+              "line": "timestamp=2026-05-19T16:31:30.886Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208292341487573",
+              "line": "timestamp=2026-05-19T16:31:30.887Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3506) transactions...\""
+            },
+            {
+              "timestampNs": "1779208293558647888",
+              "line": "timestamp=2026-05-19T16:31:33.470Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208293558668099",
+              "line": "timestamp=2026-05-19T16:31:33.508Z level=INFO fiber=#0 message=\"🔹 New header hash is: e5d5d0e43cfddbd23c0b5f31c8a4a53c69d698f48b305d3d771c186f\""
+            },
+            {
+              "timestampNs": "1779208293558670911",
+              "line": "timestamp=2026-05-19T16:31:33.509Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208293574177366",
+              "line": "timestamp=2026-05-19T16:31:33.572Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3506,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":770307}}).\""
+            },
+            {
+              "timestampNs": "1779208293574196383",
+              "line": "[16:31:33.573] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208298606502365",
+              "line": "[16:31:38.606] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208298687054144",
+              "line": "[16:31:38.686] INFO (#18): 🔗 🚀 Block commitment submitted: 892b38526ca473949444afa9b760052d03513276d2e36b521cb9328e891731b9"
+            },
+            {
+              "timestampNs": "1779208309042826267",
+              "line": "[16:31:49.042] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208319052399238",
+              "line": "[16:31:59.051] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208319052904362",
+              "line": "[16:31:59.052] INFO (#20): 🎉 Transaction confirmed: df7058fc8117d3bcadbd12c7de821ffaf9ebc5a0e42e8547dfd271e0054a1b3a"
+            },
+            {
+              "timestampNs": "1779208319052953820",
+              "line": "[16:31:59.052] INFO (#20): ⌛ Pausing for 5 seconds..."
+            },
+            {
+              "timestampNs": "1779208323575145103",
+              "line": "[16:32:03.574] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208323575234883",
+              "line": "timestamp=2026-05-19T16:32:03.575Z level=INFO fiber=#671448 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208324053245382",
+              "line": "[16:32:04.053] INFO (#20): ✅ Pause ended."
+            },
+            {
+              "timestampNs": "1779208324053266007",
+              "line": "[16:32:04.053] INFO (#20): 🔸 Merge transaction submitted, updating the db..."
+            },
+            {
+              "timestampNs": "1779208324053286218",
+              "line": "[16:32:04.053] INFO (#20): 🔸 Clear confirmed ledger db..."
+            },
+            {
+              "timestampNs": "1779208324053296513",
+              "line": "[16:32:04.053] INFO (#20): 🔸 Insert produced UTxOs..."
+            },
+            {
+              "timestampNs": "1779208324053299647",
+              "line": "[16:32:04.053] INFO (#20): 🔸 Clear block from BlocksTxsDB..."
+            },
+            {
+              "timestampNs": "1779208324056167819",
+              "line": "[16:32:04.056] INFO (#20): 🔸 ☑️  Merge transaction completed."
+            },
+            {
+              "timestampNs": "1779208325668537023",
+              "line": "timestamp=2026-05-19T16:32:05.667Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208325707931743",
+              "line": "timestamp=2026-05-19T16:32:05.697Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208325913389903",
+              "line": "timestamp=2026-05-19T16:32:05.912Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208327361399544",
+              "line": "timestamp=2026-05-19T16:32:05.914Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208327361414813",
+              "line": "timestamp=2026-05-19T16:32:05.915Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3494) transactions...\""
+            },
+            {
+              "timestampNs": "1779208328576474825",
+              "line": "timestamp=2026-05-19T16:32:08.487Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208328576497520",
+              "line": "timestamp=2026-05-19T16:32:08.528Z level=INFO fiber=#0 message=\"🔹 New header hash is: 0f7bddcb916f252990e1f0a159869963be9566a23737b87997304e6c\""
+            },
+            {
+              "timestampNs": "1779208328576510028",
+              "line": "timestamp=2026-05-19T16:32:08.528Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208328587874728",
+              "line": "timestamp=2026-05-19T16:32:08.586Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3494,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":767721}}).\""
+            },
+            {
+              "timestampNs": "1779208328587894269",
+              "line": "[16:32:08.587] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208329063260865",
+              "line": "[16:32:09.062] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208329171696886",
+              "line": "[16:32:09.171] INFO (#18): 🔗 🚀 Block commitment submitted: 61abf98dcd2ac872ec0e55ef9bbe991a47a41718f8620bcf9ff7b3ef37bb33d7"
+            },
+            {
+              "timestampNs": "1779208339005520548",
+              "line": "[16:32:19.005] INFO (#19): 🏦 No user events found within [1779190113404, 1779208336697)"
+            },
+            {
+              "timestampNs": "1779208339540844922",
+              "line": "[16:32:19.540] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208349542751122",
+              "line": "[16:32:29.542] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208358589312631",
+              "line": "[16:32:38.589] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208358589423214",
+              "line": "timestamp=2026-05-19T16:32:38.589Z level=INFO fiber=#682538 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208359544431164",
+              "line": "[16:32:39.544] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208360665605863",
+              "line": "timestamp=2026-05-19T16:32:40.664Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208360694477591",
+              "line": "timestamp=2026-05-19T16:32:40.694Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208360937055610",
+              "line": "timestamp=2026-05-19T16:32:40.926Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208362379796268",
+              "line": "timestamp=2026-05-19T16:32:40.928Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208362379816305",
+              "line": "timestamp=2026-05-19T16:32:40.929Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3520) transactions...\""
+            },
+            {
+              "timestampNs": "1779208363600598124",
+              "line": "timestamp=2026-05-19T16:32:43.513Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208363600623315",
+              "line": "timestamp=2026-05-19T16:32:43.552Z level=INFO fiber=#0 message=\"🔹 New header hash is: 3ecd4a833160d90de74866dca495e06083cc012e9c8255295bc4bed3\""
+            },
+            {
+              "timestampNs": "1779208363600626943",
+              "line": "timestamp=2026-05-19T16:32:43.552Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208363617125947",
+              "line": "timestamp=2026-05-19T16:32:43.616Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3520,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":773396}}).\""
+            },
+            {
+              "timestampNs": "1779208363617146512",
+              "line": "[16:32:43.616] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208369546561761",
+              "line": "[16:32:49.546] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208369664249528",
+              "line": "[16:32:49.663] INFO (#18): 🔗 🚀 Block commitment submitted: 6c71aea88a71605e8072d459feed243a490265ca0501e4475fc1776e73b3f2f8"
+            },
+            {
+              "timestampNs": "1779208380120925494",
+              "line": "[16:33:00.120] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208384086081915",
+              "line": "[16:33:04.085] INFO (#20): 🔸 Merging of oldest block started."
+            },
+            {
+              "timestampNs": "1779208384086105514",
+              "line": "[16:33:04.085] INFO (#20): 🔸 Fetching confirmed state and the first block in queue from L1..."
+            },
+            {
+              "timestampNs": "1779208385394204890",
+              "line": "[16:33:05.393] INFO (#20): 🔸 First block found: 3ed2ff4ba494464eff15d70c3a86d536c07df75f0ac9143e373e6b262889819a#1"
+            },
+            {
+              "timestampNs": "1779208385394277091",
+              "line": "[16:33:05.394] INFO (#20): 🔸 Looking up its transactions from BlocksTxsDB..."
+            },
+            {
+              "timestampNs": "1779208385400043819",
+              "line": "[16:33:05.399] INFO (#20): 🔸 Building merge transaction..."
+            },
+            {
+              "timestampNs": "1779208390124245699",
+              "line": "[16:33:10.124] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208393617464873",
+              "line": "[16:33:13.617] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208393617595558",
+              "line": "timestamp=2026-05-19T16:33:13.617Z level=INFO fiber=#693603 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208395679810650",
+              "line": "timestamp=2026-05-19T16:33:15.678Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208395707160859",
+              "line": "timestamp=2026-05-19T16:33:15.706Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208395943119842",
+              "line": "timestamp=2026-05-19T16:33:15.942Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208397404719450",
+              "line": "timestamp=2026-05-19T16:33:15.950Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208397404753847",
+              "line": "timestamp=2026-05-19T16:33:15.954Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208398609973371",
+              "line": "timestamp=2026-05-19T16:33:18.519Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208398609993129",
+              "line": "timestamp=2026-05-19T16:33:18.557Z level=INFO fiber=#0 message=\"🔹 New header hash is: fdc85043ce66100dd949291ddb5f32f8019693dc8c0085abeace5f1c\""
+            },
+            {
+              "timestampNs": "1779208398609996119",
+              "line": "timestamp=2026-05-19T16:33:18.557Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208398633601901",
+              "line": "timestamp=2026-05-19T16:33:18.621Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764601}}).\""
+            },
+            {
+              "timestampNs": "1779208398633709756",
+              "line": "[16:33:18.633] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208400125336067",
+              "line": "[16:33:20.125] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208400181801904",
+              "line": "[16:33:20.181] INFO (#18): 🔗 🚀 Block commitment submitted: 826b7dcb02e22fc7426955ad30fa34377f617ec703d8225d389d52526ff10583"
+            },
+            {
+              "timestampNs": "1779208401434918117",
+              "line": "[16:33:21.434] INFO (#19): 🏦 No user events found within [1779190113404, 1779208399006)"
+            },
+            {
+              "timestampNs": "1779208410569858304",
+              "line": "[16:33:30.569] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208420572434276",
+              "line": "[16:33:40.572] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208428634719064",
+              "line": "[16:33:48.634] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208428634923072",
+              "line": "timestamp=2026-05-19T16:33:48.634Z level=INFO fiber=#704620 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208430573968464",
+              "line": "[16:33:50.573] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208430697002821",
+              "line": "timestamp=2026-05-19T16:33:50.695Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208430723647754",
+              "line": "timestamp=2026-05-19T16:33:50.723Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208430916837895",
+              "line": "timestamp=2026-05-19T16:33:50.916Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208432407596059",
+              "line": "timestamp=2026-05-19T16:33:50.924Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208432407628987",
+              "line": "timestamp=2026-05-19T16:33:50.927Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208433620232337",
+              "line": "timestamp=2026-05-19T16:33:53.530Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208433620251661",
+              "line": "timestamp=2026-05-19T16:33:53.569Z level=INFO fiber=#0 message=\"🔹 New header hash is: 3d7072ed0b2e5d636ccf399c9f83f834b35736e26c5d51c52d607211\""
+            },
+            {
+              "timestampNs": "1779208433620254600",
+              "line": "timestamp=2026-05-19T16:33:53.569Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208433639635581",
+              "line": "timestamp=2026-05-19T16:33:53.632Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764651}}).\""
+            },
+            {
+              "timestampNs": "1779208433639818896",
+              "line": "[16:33:53.639] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208434712437323",
+              "line": "[16:33:54.712] INFO (#20): ✍  Signing tx with addr_test1qq9g96hnrd2y7atjffu2f4j77yktf5n5n6pu77sqe7d30gdlascyryuu7r2frk3wn4d7e4sga3wz9er9hy4ukk5ntp8sk0fvtj"
+            },
+            {
+              "timestampNs": "1779208440576103267",
+              "line": "[16:34:00.575] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208440687437894",
+              "line": "[16:34:00.687] INFO (#18): 🔗 🚀 Block commitment submitted: a8e93bc60ae024f3768da43cac22a473530ede47b4e277d3fd93556f9a2447f3"
+            },
+            {
+              "timestampNs": "1779208451051403984",
+              "line": "[16:34:11.050] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208461054014992",
+              "line": "[16:34:21.053] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208463640629591",
+              "line": "[16:34:23.640] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208463640938668",
+              "line": "timestamp=2026-05-19T16:34:23.640Z level=INFO fiber=#715630 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208463924709539",
+              "line": "[16:34:23.924] INFO (#19): 🏦 No user events found within [1779190113404, 1779208461435)"
+            },
+            {
+              "timestampNs": "1779208465730227696",
+              "line": "timestamp=2026-05-19T16:34:25.719Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208465752587118",
+              "line": "timestamp=2026-05-19T16:34:25.749Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208465952626688",
+              "line": "timestamp=2026-05-19T16:34:25.952Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208467405997594",
+              "line": "timestamp=2026-05-19T16:34:25.954Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208467406019973",
+              "line": "timestamp=2026-05-19T16:34:25.954Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3513) transactions...\""
+            },
+            {
+              "timestampNs": "1779208468632816369",
+              "line": "timestamp=2026-05-19T16:34:28.546Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208468632839709",
+              "line": "timestamp=2026-05-19T16:34:28.585Z level=INFO fiber=#0 message=\"🔹 New header hash is: e01f8a993b314d75b5b92b4b7b2edfcf7ca67da3b56405d76b17b1c0\""
+            },
+            {
+              "timestampNs": "1779208468632842507",
+              "line": "timestamp=2026-05-19T16:34:28.585Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208468651694753",
+              "line": "timestamp=2026-05-19T16:34:28.648Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3513,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":771886}}).\""
+            },
+            {
+              "timestampNs": "1779208468651717784",
+              "line": "[16:34:28.649] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208471059029611",
+              "line": "[16:34:31.058] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208471173160261",
+              "line": "[16:34:31.173] INFO (#18): 🔗 🚀 Block commitment submitted: d353dc7ad5bd644ec028e774a5f4906fc8527ad67cfa45326a47a44bf2a4d70d"
+            },
+            {
+              "timestampNs": "1779208481759336848",
+              "line": "[16:34:41.758] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208484425931957",
+              "line": "[16:34:44.425] INFO (#20): Signed tx CBOR is:"
+            },
+            {
+              "timestampNs": "1779208484425974910",
+              "line": "[16:34:44.425] INFO (#20): ✉️  Submitting transaction..."
+            },
+            {
+              "timestampNs": "1779208484557171300",
+              "line": "[16:34:44.556] INFO (#20): 🚀 Transaction submitted: 2a2aceea465c2c869f333ffad1a0543a7239160edbc7bf0e3f99f5a4c5df007f"
+            },
+            {
+              "timestampNs": "1779208484557762373",
+              "line": "[16:34:44.557] INFO (#20): ⏳ Confirming Transaction..."
+            },
+            {
+              "timestampNs": "1779208491762569919",
+              "line": "[16:34:51.762] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208498650738555",
+              "line": "[16:34:58.650] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208498650997295",
+              "line": "timestamp=2026-05-19T16:34:58.650Z level=INFO fiber=#726650 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208500701146769",
+              "line": "timestamp=2026-05-19T16:35:00.699Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208500728016732",
+              "line": "timestamp=2026-05-19T16:35:00.727Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208500931411111",
+              "line": "timestamp=2026-05-19T16:35:00.924Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208501765723709",
+              "line": "[16:35:01.764] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208502361243391",
+              "line": "timestamp=2026-05-19T16:35:00.932Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208502361264211",
+              "line": "timestamp=2026-05-19T16:35:00.936Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3421) transactions...\""
+            },
+            {
+              "timestampNs": "1779208503562402324",
+              "line": "timestamp=2026-05-19T16:35:03.466Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208503562426660",
+              "line": "timestamp=2026-05-19T16:35:03.505Z level=INFO fiber=#0 message=\"🔹 New header hash is: 0b962e4e877bbbca8fd3e059eac649b4b50234839c1942267d707f73\""
+            },
+            {
+              "timestampNs": "1779208503562430421",
+              "line": "timestamp=2026-05-19T16:35:03.505Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208503575285049",
+              "line": "timestamp=2026-05-19T16:35:03.568Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3421,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":751654}}).\""
+            },
+            {
+              "timestampNs": "1779208503575418915",
+              "line": "[16:35:03.575] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208511769096372",
+              "line": "[16:35:11.768] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208511895973809",
+              "line": "[16:35:11.895] INFO (#18): 🔗 🚀 Block commitment submitted: dceddd72a88324f0e6a5937217373263b7e7f83b0986b644360c1de48d64c464"
+            },
+            {
+              "timestampNs": "1779208522254523400",
+              "line": "[16:35:22.254] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208526359301943",
+              "line": "[16:35:26.358] INFO (#19): 🏦 No user events found within [1779190113404, 1779208523925)"
+            },
+            {
+              "timestampNs": "1779208532255061459",
+              "line": "[16:35:32.254] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208533576201875",
+              "line": "[16:35:33.575] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208533576783458",
+              "line": "timestamp=2026-05-19T16:35:33.576Z level=INFO fiber=#737663 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208535712406041",
+              "line": "timestamp=2026-05-19T16:35:35.711Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208535739395081",
+              "line": "timestamp=2026-05-19T16:35:35.739Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208535964428843",
+              "line": "timestamp=2026-05-19T16:35:35.963Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208537425658215",
+              "line": "timestamp=2026-05-19T16:35:35.971Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208537425688573",
+              "line": "timestamp=2026-05-19T16:35:35.975Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3506) transactions...\""
+            },
+            {
+              "timestampNs": "1779208538642049912",
+              "line": "timestamp=2026-05-19T16:35:38.556Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208538642070481",
+              "line": "timestamp=2026-05-19T16:35:38.594Z level=INFO fiber=#0 message=\"🔹 New header hash is: b7eda25516d815eb56dc66518661852ef849c9177e6cd3fec93af1ff\""
+            },
+            {
+              "timestampNs": "1779208538642073798",
+              "line": "timestamp=2026-05-19T16:35:38.594Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208538656418928",
+              "line": "timestamp=2026-05-19T16:35:38.655Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3506,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":770319}}).\""
+            },
+            {
+              "timestampNs": "1779208538656551592",
+              "line": "[16:35:38.656] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208542257172743",
+              "line": "[16:35:42.257] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208542368172259",
+              "line": "[16:35:42.367] INFO (#18): 🔗 🚀 Block commitment submitted: 9e3d8712e6c1fd37832c6897e7ae8990599bc39fdfe64c64b867a79afc26c9ff"
+            },
+            {
+              "timestampNs": "1779208552766508451",
+              "line": "[16:35:52.766] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208555671758279",
+              "line": "[16:35:55.671] INFO (#20): 🎉 Transaction confirmed: 2a2aceea465c2c869f333ffad1a0543a7239160edbc7bf0e3f99f5a4c5df007f"
+            },
+            {
+              "timestampNs": "1779208555671816022",
+              "line": "[16:35:55.671] INFO (#20): ⌛ Pausing for 5 seconds..."
+            },
+            {
+              "timestampNs": "1779208560673310778",
+              "line": "[16:36:00.672] INFO (#20): ✅ Pause ended."
+            },
+            {
+              "timestampNs": "1779208560673796236",
+              "line": "[16:36:00.673] INFO (#20): 🔸 Merge transaction submitted, updating the db..."
+            },
+            {
+              "timestampNs": "1779208560673895051",
+              "line": "[16:36:00.673] INFO (#20): 🔸 Clear confirmed ledger db..."
+            },
+            {
+              "timestampNs": "1779208560673912620",
+              "line": "[16:36:00.673] INFO (#20): 🔸 Insert produced UTxOs..."
+            },
+            {
+              "timestampNs": "1779208560674025238",
+              "line": "[16:36:00.673] INFO (#20): 🔸 Clear block from BlocksTxsDB..."
+            },
+            {
+              "timestampNs": "1779208560677059344",
+              "line": "[16:36:00.676] INFO (#20): 🔸 ☑️  Merge transaction completed."
+            },
+            {
+              "timestampNs": "1779208562767392520",
+              "line": "[16:36:02.767] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208568656934285",
+              "line": "[16:36:08.656] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208568657368935",
+              "line": "timestamp=2026-05-19T16:36:08.657Z level=INFO fiber=#748801 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208570709544562",
+              "line": "timestamp=2026-05-19T16:36:10.708Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208570736695185",
+              "line": "timestamp=2026-05-19T16:36:10.736Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208570942807728",
+              "line": "timestamp=2026-05-19T16:36:10.940Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208572376621049",
+              "line": "timestamp=2026-05-19T16:36:10.942Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208572376643543",
+              "line": "timestamp=2026-05-19T16:36:10.943Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208572768527237",
+              "line": "[16:36:12.768] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208573585184310",
+              "line": "timestamp=2026-05-19T16:36:13.498Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208573585207496",
+              "line": "timestamp=2026-05-19T16:36:13.536Z level=INFO fiber=#0 message=\"🔹 New header hash is: 5111d03f9e24a749f964c0c142b52d158e4138999b9417dffda517ec\""
+            },
+            {
+              "timestampNs": "1779208573585220832",
+              "line": "timestamp=2026-05-19T16:36:13.537Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208573596930035",
+              "line": "timestamp=2026-05-19T16:36:13.596Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764672}}).\""
+            },
+            {
+              "timestampNs": "1779208573597078269",
+              "line": "[16:36:13.597] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208582769797213",
+              "line": "[16:36:22.769] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208582894385259",
+              "line": "[16:36:22.893] INFO (#18): 🔗 🚀 Block commitment submitted: 6cafa8ae622a61f21cb87d4a37304b2c361c441b1b2cf52956742af47eb122ef"
+            },
+            {
+              "timestampNs": "1779208588748822516",
+              "line": "[16:36:28.748] INFO (#19): 🏦 No user events found within [1779190113404, 1779208586360)"
+            },
+            {
+              "timestampNs": "1779208593329268397",
+              "line": "[16:36:33.329] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208603330325576",
+              "line": "[16:36:43.330] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208603600131652",
+              "line": "[16:36:43.599] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208603600719659",
+              "line": "timestamp=2026-05-19T16:36:43.600Z level=INFO fiber=#759699 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208605735410104",
+              "line": "timestamp=2026-05-19T16:36:45.734Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208605762878211",
+              "line": "timestamp=2026-05-19T16:36:45.762Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208606029239872",
+              "line": "timestamp=2026-05-19T16:36:46.017Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208607468080787",
+              "line": "timestamp=2026-05-19T16:36:46.019Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208607468100100",
+              "line": "timestamp=2026-05-19T16:36:46.020Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3520) transactions...\""
+            },
+            {
+              "timestampNs": "1779208608681759488",
+              "line": "timestamp=2026-05-19T16:36:48.596Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208608681779271",
+              "line": "timestamp=2026-05-19T16:36:48.634Z level=INFO fiber=#0 message=\"🔹 New header hash is: 1b7d1fb0e4922cb2f02e84cccf4f1939c50612b08ae4aa194c01fb84\""
+            },
+            {
+              "timestampNs": "1779208608681782628",
+              "line": "timestamp=2026-05-19T16:36:48.635Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208608695146864",
+              "line": "timestamp=2026-05-19T16:36:48.694Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3520,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":773401}}).\""
+            },
+            {
+              "timestampNs": "1779208608695610361",
+              "line": "[16:36:48.695] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208613332728200",
+              "line": "[16:36:53.332] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208613462484831",
+              "line": "[16:36:53.462] INFO (#18): 🔗 🚀 Block commitment submitted: 8e43e6917c13a92ed6a88f020ceb7a931da07c9e3efc80de1a17b9712a1088c2"
+            },
+            {
+              "timestampNs": "1779208620705476981",
+              "line": "[16:37:00.705] INFO (#20): 🔸 Merging of oldest block started."
+            },
+            {
+              "timestampNs": "1779208620705501520",
+              "line": "[16:37:00.705] INFO (#20): 🔸 Fetching confirmed state and the first block in queue from L1..."
+            },
+            {
+              "timestampNs": "1779208621970877932",
+              "line": "[16:37:01.970] INFO (#20): 🔸 First block found: cf460a9c65f25650ed0c5572d491dc99e45e9d930c38aedddd1776a66bf0d266#1"
+            },
+            {
+              "timestampNs": "1779208621970891526",
+              "line": "[16:37:01.970] INFO (#20): 🔸 Looking up its transactions from BlocksTxsDB..."
+            },
+            {
+              "timestampNs": "1779208621972032246",
+              "line": "[16:37:01.971] INFO (#20): 🔸 Building merge transaction..."
+            },
+            {
+              "timestampNs": "1779208623811583959",
+              "line": "[16:37:03.811] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208633812264358",
+              "line": "[16:37:13.812] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208638695051529",
+              "line": "[16:37:18.694] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208638695179674",
+              "line": "timestamp=2026-05-19T16:37:18.695Z level=INFO fiber=#770839 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208640796953529",
+              "line": "timestamp=2026-05-19T16:37:20.795Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208640823868498",
+              "line": "timestamp=2026-05-19T16:37:20.823Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208641040579426",
+              "line": "timestamp=2026-05-19T16:37:21.039Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208642515858376",
+              "line": "timestamp=2026-05-19T16:37:21.047Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208642515876961",
+              "line": "timestamp=2026-05-19T16:37:21.051Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208643729319007",
+              "line": "timestamp=2026-05-19T16:37:23.641Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208643729339151",
+              "line": "timestamp=2026-05-19T16:37:23.681Z level=INFO fiber=#0 message=\"🔹 New header hash is: 4065a5caaeebf3108bde2850f9c444be7ce161b185dc0704a395b0e4\""
+            },
+            {
+              "timestampNs": "1779208643729341801",
+              "line": "timestamp=2026-05-19T16:37:23.681Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208643740587331",
+              "line": "timestamp=2026-05-19T16:37:23.739Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764666}}).\""
+            },
+            {
+              "timestampNs": "1779208643740610808",
+              "line": "[16:37:23.740] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208643813630738",
+              "line": "[16:37:23.813] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208643932781416",
+              "line": "[16:37:23.932] INFO (#18): 🔗 🚀 Block commitment submitted: 34034f57096d5a647fdb4c0ee918bd881bd06c75fce73df4dd0e56a020f96f92"
+            },
+            {
+              "timestampNs": "1779208651163311860",
+              "line": "[16:37:31.163] INFO (#19): 🏦 No user events found within [1779190113404, 1779208648749)"
+            },
+            {
+              "timestampNs": "1779208654289055769",
+              "line": "[16:37:34.288] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208664290648655",
+              "line": "[16:37:44.290] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208671142371459",
+              "line": "[16:37:51.142] INFO (#20): ✍  Signing tx with addr_test1qq9g96hnrd2y7atjffu2f4j77yktf5n5n6pu77sqe7d30gdlascyryuu7r2frk3wn4d7e4sga3wz9er9hy4ukk5ntp8sk0fvtj"
+            },
+            {
+              "timestampNs": "1779208673741416563",
+              "line": "[16:37:53.741] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208673741720561",
+              "line": "timestamp=2026-05-19T16:37:53.741Z level=INFO fiber=#781864 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208674291949932",
+              "line": "[16:37:54.291] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208675851992588",
+              "line": "timestamp=2026-05-19T16:37:55.850Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208675878895082",
+              "line": "timestamp=2026-05-19T16:37:55.878Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208676086705072",
+              "line": "timestamp=2026-05-19T16:37:56.085Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208677559150746",
+              "line": "timestamp=2026-05-19T16:37:56.093Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208677559179349",
+              "line": "timestamp=2026-05-19T16:37:56.099Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208678771377702",
+              "line": "timestamp=2026-05-19T16:37:58.682Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208678771403019",
+              "line": "timestamp=2026-05-19T16:37:58.722Z level=INFO fiber=#0 message=\"🔹 New header hash is: 5da5e2815a62a8fb75f388c7b6a45a2673b56e0b44236b5bc94721e2\""
+            },
+            {
+              "timestampNs": "1779208678771405853",
+              "line": "timestamp=2026-05-19T16:37:58.722Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208678787739225",
+              "line": "timestamp=2026-05-19T16:37:58.787Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764630}}).\""
+            },
+            {
+              "timestampNs": "1779208678788002708",
+              "line": "[16:37:58.787] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208684296507601",
+              "line": "[16:38:04.296] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208684456647360",
+              "line": "[16:38:04.456] INFO (#18): 🔗 🚀 Block commitment submitted: a7e0e06aa632150351533103015e0138a9dca784702caf9cd8409de3c79abcd8"
+            },
+            {
+              "timestampNs": "1779208694851292113",
+              "line": "[16:38:14.851] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208704853982835",
+              "line": "[16:38:24.853] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208708788570476",
+              "line": "[16:38:28.788] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208708788801117",
+              "line": "timestamp=2026-05-19T16:38:28.788Z level=INFO fiber=#792984 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208710887615151",
+              "line": "timestamp=2026-05-19T16:38:30.886Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208710915280080",
+              "line": "timestamp=2026-05-19T16:38:30.914Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208711124026291",
+              "line": "timestamp=2026-05-19T16:38:31.122Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208712566962346",
+              "line": "timestamp=2026-05-19T16:38:31.124Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208712566979175",
+              "line": "timestamp=2026-05-19T16:38:31.125Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208713561590217",
+              "line": "[16:38:33.561] INFO (#19): 🏦 No user events found within [1779190113404, 1779208711163)"
+            },
+            {
+              "timestampNs": "1779208713779946996",
+              "line": "timestamp=2026-05-19T16:38:33.693Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208713779975778",
+              "line": "timestamp=2026-05-19T16:38:33.732Z level=INFO fiber=#0 message=\"🔹 New header hash is: 0025ad45bd46f4b5051290b22ebf33a00a3086af1b6c9ea2f8994ae2\""
+            },
+            {
+              "timestampNs": "1779208713779978787",
+              "line": "timestamp=2026-05-19T16:38:33.732Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208713792277249",
+              "line": "timestamp=2026-05-19T16:38:33.791Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764544}}).\""
+            },
+            {
+              "timestampNs": "1779208713792297881",
+              "line": "[16:38:33.792] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208714855513963",
+              "line": "[16:38:34.855] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208714936534344",
+              "line": "[16:38:34.936] INFO (#18): 🔗 🚀 Block commitment submitted: cf1431394259745cdbfc87ba3a141c362b67ea7f0d42e237c36c886f7efa62ba"
+            },
+            {
+              "timestampNs": "1779208720424616855",
+              "line": "[16:38:40.424] INFO (#20): Signed tx CBOR is:"
+            },
+            {
+              "timestampNs": "1779208720424652768",
+              "line": "[16:38:40.424] INFO (#20): ✉️  Submitting transaction..."
+            },
+            {
+              "timestampNs": "1779208720526362142",
+              "line": "[16:38:40.525] INFO (#20): 🚀 Transaction submitted: c40e05fb558341676d90fc2645a10af1d9db20b18046453869bfaa5d23dc3659"
+            },
+            {
+              "timestampNs": "1779208720526390450",
+              "line": "[16:38:40.526] INFO (#20): ⏳ Confirming Transaction..."
+            },
+            {
+              "timestampNs": "1779208725277724394",
+              "line": "[16:38:45.277] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208735279149581",
+              "line": "[16:38:55.278] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208743793087719",
+              "line": "[16:39:03.792] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208743793187064",
+              "line": "timestamp=2026-05-19T16:39:03.793Z level=INFO fiber=#803998 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208745280448812",
+              "line": "[16:39:05.280] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208745868481029",
+              "line": "timestamp=2026-05-19T16:39:05.867Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208745895355406",
+              "line": "timestamp=2026-05-19T16:39:05.894Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208746122615206",
+              "line": "timestamp=2026-05-19T16:39:06.121Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208747581275933",
+              "line": "timestamp=2026-05-19T16:39:06.129Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208747581293510",
+              "line": "timestamp=2026-05-19T16:39:06.132Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (3480) transactions...\""
+            },
+            {
+              "timestampNs": "1779208748790153010",
+              "line": "timestamp=2026-05-19T16:39:08.700Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208748790173275",
+              "line": "timestamp=2026-05-19T16:39:08.740Z level=INFO fiber=#0 message=\"🔹 New header hash is: 32b7285e9dd0850864af3c22cb6c21287fbee5a731ceca11e2a3415d\""
+            },
+            {
+              "timestampNs": "1779208748790176761",
+              "line": "timestamp=2026-05-19T16:39:08.740Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208748804019773",
+              "line": "timestamp=2026-05-19T16:39:08.803Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":3480,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":764656}}).\""
+            },
+            {
+              "timestampNs": "1779208748804106858",
+              "line": "[16:39:08.803] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208755284244199",
+              "line": "[16:39:15.283] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208755406329603",
+              "line": "[16:39:15.406] INFO (#18): 🔗 🚀 Block commitment submitted: c3114357f14eb9d84b5b01cbac03623970a7c0239e7edc2ccfa34e881e928a65"
+            },
+            {
+              "timestampNs": "1779208765926403006",
+              "line": "[16:39:25.926] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208771631169817",
+              "line": "[16:39:31.630] INFO (#20): 🎉 Transaction confirmed: c40e05fb558341676d90fc2645a10af1d9db20b18046453869bfaa5d23dc3659"
+            },
+            {
+              "timestampNs": "1779208771631233703",
+              "line": "[16:39:31.631] INFO (#20): ⌛ Pausing for 5 seconds..."
+            },
+            {
+              "timestampNs": "1779208775918775523",
+              "line": "[16:39:35.918] INFO (#19): 🏦 No user events found within [1779190113404, 1779208773562)"
+            },
+            {
+              "timestampNs": "1779208775927621201",
+              "line": "[16:39:35.927] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208776632066114",
+              "line": "[16:39:36.631] INFO (#20): ✅ Pause ended."
+            },
+            {
+              "timestampNs": "1779208776632251393",
+              "line": "[16:39:36.632] INFO (#20): 🔸 Merge transaction submitted, updating the db..."
+            },
+            {
+              "timestampNs": "1779208776632341429",
+              "line": "[16:39:36.632] INFO (#20): 🔸 Clear confirmed ledger db..."
+            },
+            {
+              "timestampNs": "1779208776632575741",
+              "line": "[16:39:36.632] INFO (#20): 🔸 Insert produced UTxOs..."
+            },
+            {
+              "timestampNs": "1779208776632616651",
+              "line": "[16:39:36.632] INFO (#20): 🔸 Clear block from BlocksTxsDB..."
+            },
+            {
+              "timestampNs": "1779208776635329452",
+              "line": "[16:39:36.635] INFO (#20): 🔸 ☑️  Merge transaction completed."
+            },
+            {
+              "timestampNs": "1779208778805585505",
+              "line": "[16:39:38.805] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208778806142612",
+              "line": "timestamp=2026-05-19T16:39:38.805Z level=INFO fiber=#811596 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208780869635817",
+              "line": "timestamp=2026-05-19T16:39:40.868Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208780898333346",
+              "line": "timestamp=2026-05-19T16:39:40.898Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208781126148203",
+              "line": "timestamp=2026-05-19T16:39:41.125Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208782053596466",
+              "line": "timestamp=2026-05-19T16:39:41.133Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208782053618133",
+              "line": "timestamp=2026-05-19T16:39:41.137Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (2200) transactions...\""
+            },
+            {
+              "timestampNs": "1779208782814286601",
+              "line": "timestamp=2026-05-19T16:39:42.728Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208782814306172",
+              "line": "timestamp=2026-05-19T16:39:42.766Z level=INFO fiber=#0 message=\"🔹 New header hash is: d95cd305c3acfef034246ad4a175bc0bf0279726e4735719ff7bb3b1\""
+            },
+            {
+              "timestampNs": "1779208782814336787",
+              "line": "timestamp=2026-05-19T16:39:42.766Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208782845830474",
+              "line": "timestamp=2026-05-19T16:39:42.845Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":2200,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":483400}}).\""
+            },
+            {
+              "timestampNs": "1779208782845943256",
+              "line": "[16:39:42.845] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208785933002954",
+              "line": "[16:39:45.932] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208786072932074",
+              "line": "[16:39:46.072] INFO (#18): 🔗 🚀 Block commitment submitted: 1f3b91ae10ae7aef6e45626b32578121f4626f8b50769a077ee13540476a466a"
+            },
+            {
+              "timestampNs": "1779208796546883308",
+              "line": "[16:39:56.546] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208806551320194",
+              "line": "[16:40:06.550] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208812847774109",
+              "line": "[16:40:12.847] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208812848590811",
+              "line": "timestamp=2026-05-19T16:40:12.848Z level=INFO fiber=#811793 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208814914745638",
+              "line": "timestamp=2026-05-19T16:40:14.913Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208814941782157",
+              "line": "timestamp=2026-05-19T16:40:14.941Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208815151718271",
+              "line": "timestamp=2026-05-19T16:40:15.150Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208815274414970",
+              "line": "timestamp=2026-05-19T16:40:15.158Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208815274433145",
+              "line": "timestamp=2026-05-19T16:40:15.162Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (0) transactions...\""
+            },
+            {
+              "timestampNs": "1779208815274436480",
+              "line": "timestamp=2026-05-19T16:40:15.166Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208815274439099",
+              "line": "timestamp=2026-05-19T16:40:15.224Z level=INFO fiber=#0 message=\"🔹 New header hash is: 49445ff05323cf931917c617ce83e82fae80d15c2be4d567b4e27f5f\""
+            },
+            {
+              "timestampNs": "1779208815274441728",
+              "line": "timestamp=2026-05-19T16:40:15.224Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208815286942999",
+              "line": "timestamp=2026-05-19T16:40:15.286Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":0,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":0}}).\""
+            },
+            {
+              "timestampNs": "1779208815287121423",
+              "line": "[16:40:15.287] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208816554168018",
+              "line": "[16:40:16.554] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208816665083155",
+              "line": "[16:40:16.664] INFO (#18): 🔗 🚀 Block commitment submitted: f00f06d0a1ea1bc57558183373a620719d9e9497c31d50cc72dbb3cbc0c28796"
+            },
+            {
+              "timestampNs": "1779208826686332642",
+              "line": "[16:40:26.686] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208836699769874",
+              "line": "[16:40:36.699] INFO (#20): 🔸 Merging of oldest block started."
+            },
+            {
+              "timestampNs": "1779208836699841125",
+              "line": "[16:40:36.699] INFO (#20): 🔸 Fetching confirmed state and the first block in queue from L1..."
+            },
+            {
+              "timestampNs": "1779208836702378350",
+              "line": "[16:40:36.702] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208837968807758",
+              "line": "[16:40:37.968] INFO (#20): 🔸 First block found: 47ca95729032ebf7ab62560c35f8bd7b9741e79a823d49a092904c5ff355ebc1#1"
+            },
+            {
+              "timestampNs": "1779208837968968982",
+              "line": "[16:40:37.968] INFO (#20): 🔸 Looking up its transactions from BlocksTxsDB..."
+            },
+            {
+              "timestampNs": "1779208837977053676",
+              "line": "[16:40:37.976] INFO (#20): 🔸 Building merge transaction..."
+            },
+            {
+              "timestampNs": "1779208838306628346",
+              "line": "[16:40:38.306] INFO (#19): 🏦 No user events found within [1779190113404, 1779208835920)"
+            },
+            {
+              "timestampNs": "1779208845288268208",
+              "line": "[16:40:45.287] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208845288887052",
+              "line": "timestamp=2026-05-19T16:40:45.288Z level=INFO fiber=#811818 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208846703641539",
+              "line": "[16:40:46.703] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208847329977121",
+              "line": "timestamp=2026-05-19T16:40:47.328Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208847357048803",
+              "line": "timestamp=2026-05-19T16:40:47.356Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208847570810708",
+              "line": "timestamp=2026-05-19T16:40:47.569Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208847690252179",
+              "line": "timestamp=2026-05-19T16:40:47.577Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208847690284890",
+              "line": "timestamp=2026-05-19T16:40:47.581Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (0) transactions...\""
+            },
+            {
+              "timestampNs": "1779208847690288229",
+              "line": "timestamp=2026-05-19T16:40:47.585Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208847690290336",
+              "line": "timestamp=2026-05-19T16:40:47.640Z level=INFO fiber=#0 message=\"🔹 New header hash is: 3ca3941057d411c9fdbae7d37133b879ee34e7def21752ff60ba1297\""
+            },
+            {
+              "timestampNs": "1779208847690292378",
+              "line": "timestamp=2026-05-19T16:40:47.640Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208847705505937",
+              "line": "timestamp=2026-05-19T16:40:47.704Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":0,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":0}}).\""
+            },
+            {
+              "timestampNs": "1779208847705862625",
+              "line": "[16:40:47.705] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208856708423078",
+              "line": "[16:40:56.708] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208856847701581",
+              "line": "[16:40:56.847] INFO (#18): 🔗 🚀 Block commitment submitted: 1518d8b691f4fa0a25e92cf855dd2622d3f8f6429e44207ca1145e7f50778caa"
+            },
+            {
+              "timestampNs": "1779208866867597717",
+              "line": "[16:41:06.867] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208876872115296",
+              "line": "[16:41:16.871] INFO (#18): No unsubmitted blocks in queue."
+            },
+            {
+              "timestampNs": "1779208877707596650",
+              "line": "[16:41:17.707] INFO (#17): 🔹 New block commitment process started."
+            },
+            {
+              "timestampNs": "1779208877708323977",
+              "line": "timestamp=2026-05-19T16:41:17.707Z level=INFO fiber=#811835 message=\"👷 Starting block commitment worker...\""
+            },
+            {
+              "timestampNs": "1779208879786270983",
+              "line": "timestamp=2026-05-19T16:41:19.785Z level=INFO fiber=#0 message=\"📚 Opening connection to db...\""
+            },
+            {
+              "timestampNs": "1779208879814071430",
+              "line": "timestamp=2026-05-19T16:41:19.813Z level=INFO fiber=#0 message=\"🔹 Starting block commitment process...\""
+            },
+            {
+              "timestampNs": "1779208880021766819",
+              "line": "timestamp=2026-05-19T16:41:20.020Z level=INFO fiber=#0 message=\"🔹 Applying 0 withdrawal(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208880134145892",
+              "line": "timestamp=2026-05-19T16:41:20.028Z level=INFO fiber=#0 message=\"🔹 Applying 0 tx order(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208880134170410",
+              "line": "timestamp=2026-05-19T16:41:20.031Z level=INFO fiber=#0 message=\"🔹 Going through mempool and processing (0) transactions...\""
+            },
+            {
+              "timestampNs": "1779208880134173960",
+              "line": "timestamp=2026-05-19T16:41:20.034Z level=INFO fiber=#0 message=\"🔹 Applying 0 deposit(s) to the ledgerTrie\""
+            },
+            {
+              "timestampNs": "1779208880134187363",
+              "line": "timestamp=2026-05-19T16:41:20.083Z level=INFO fiber=#0 message=\"🔹 New header hash is: 21b8399a7a5ba75022560ea7fd1e172f56a839f4c0efe765a1c2dde1\""
+            },
+            {
+              "timestampNs": "1779208880134189686",
+              "line": "timestamp=2026-05-19T16:41:20.083Z level=INFO fiber=#0 message=\"🔹 Building block commitment transaction...\""
+            },
+            {
+              "timestampNs": "1779208880145885244",
+              "line": "timestamp=2026-05-19T16:41:20.145Z level=INFO fiber=#45 message=\"👷 Block commitment work completed ({\\\"type\\\":\\\"SuccessfulCommitmentOutput\\\",\\\"stats\\\":{\\\"deposits_count\\\":0,\\\"tx_requests_count\\\":0,\\\"tx_orders_count\\\":0,\\\"withdrawals_count\\\":0,\\\"total_events_size\\\":0}}).\""
+            },
+            {
+              "timestampNs": "1779208880145906593",
+              "line": "[16:41:20.145] INFO (#17): 🔹 ☑️  Block submission completed."
+            },
+            {
+              "timestampNs": "1779208886877253207",
+              "line": "[16:41:26.876] INFO (#18): 🔗 ✉️  Submitting block commitment..."
+            },
+            {
+              "timestampNs": "1779208887018717747",
+              "line": "[16:41:27.018] INFO (#20): ✍  Signing tx with addr_test1qq9g96hnrd2y7atjffu2f4j77yktf5n5n6pu77sqe7d30gdlascyryuu7r2frk3wn4d7e4sga3wz9er9hy4ukk5ntp8sk0fvtj"
+            },
+            {
+              "timestampNs": "1779208887020869681",
+              "line": "[16:41:27.020] INFO (#18): 🔗 🚀 Block commitment submitted: ef9e3600f52e2816b6689894752a935b8df71569afe201803e408a423de7eb9c"
+            }
+          ]
+        },
+        {
+          "labels": {
+            "container": "midgard-midgard-node-1",
+            "detected_level": "unknown",
+            "job": "containerlogs",
+            "logstream": "stdout",
+            "service_name": "midgard-midgard-node-1"
+          },
+          "entries": [
+            {
+              "timestampNs": "1779208179444535484",
+              "line": "[16:29:39.444] WARN (#20): 🔸 No transactions found in BlocksTxsDB for block e5dad5178949ca80d3106c3bdcbec422f8febdef8038596eb43b9613; block was likely seeded from chain or committed with no mempool txs. Proceeding with merge; ConfirmedLedgerDB will not be updated for this block."
+            },
+            {
+              "timestampNs": "1779208277890867090",
+              "line": "84a800d90102828258201298b320c08e9aa922c61208c19b7ba1905ca0c31a6dc6125a30d85c058113b000825820f8e4504502665337911c254ae7ad32be9629df121cc0b9454080b6131b23d21d010182a300581d708226facffd8361c6d7ae9fffeb0738ea1a4ee0cdf91449788d0bd53601821a001a80e2a1581c565e23bcb46916d008be00384a247c1f06e98ed8b51307605012ec2ea1444e6f646501028201d818589ed8799fd87a80d8799f581cf52513d4692b1de7cfbbc22852f8b040924f7eb351933adb74a4f04dffd8799f581ce5dad5178949ca80d3106c3bdcbec422f8febdef8038596eb43b9613581c48096f293c897ee7594c751f5258401fd10ae6063b2c033d698605f9582056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b4211b0000019e3ff787731b0000019e3ff805ab00ffff825839000a82eaf31b544f75724a78a4d65ef12cb4d2749e83cf7a00cf9b17a1bfec3041939cf0d491da2e9d5becd608ec5c22e465b92bcb5a93584f1a00246d23021a0003086d09a1581c565e23bcb46916d008be00384a247c1f06e98ed8b51307605012ec2ea158204e6f6465e5dad5178949ca80d3106c3bdcbec422f8febdef8038596eb43b9613200b58202852bd63c702b3e99d3ef9d5e9e8b1802fc12ccbfccb82c7ce7d1f77bbf7fd7e0dd9010281825820a6ba1a13c6b9f0602fdefe1f482989e3a6d430ce2e1e5e116511c749e74437100010825839000a82eaf31b544f75724a78a4d65ef12cb4d2749e83cf7a00cf9b17a1bfec3041939cf0d491da2e9d5becd608ec5c22e465b92bcb5a93584f1b0000000253bf98c0111a004c4b40a300d90102818258203700e2a3be3b902135e8c75279524e796298c544b7a50f335e01fda7c678959d584038561129dc74c40914a87653f222adad4d61c3dd6c1290517256fa707d7bdb90bc667dd4a8560295b993522c6e9f6b132c77d7b07895412a5b4fa8115151dc0c0583840000d87c8082190a491a00082c5f840001d87c8082190a491a00082c5f840100d8798082190a491a00082c5f07d9010282585f585d0101002332259800a998012481224d6964676172642044656d6f20e28093205374617465205175657565205370656e640014a3149a2a660049211856616c696461746f722072657475726e65642066616c736500136564004ae715cd01585e585c0101002332259800a998012481214d6964676172642044656d6f20e28093205374617465205175657565204d696e740014a3149a2a660049211856616c696461746f722072657475726e65642066616c736500136564004ae715cd01f5f6"
+            },
+            {
+              "timestampNs": "1779208277890885712",
+              "line": ""
+            },
+            {
+              "timestampNs": "1779208385399988982",
+              "line": "[16:33:05.399] WARN (#20): 🔸 No transactions found in BlocksTxsDB for block f52513d4692b1de7cfbbc22852f8b040924f7eb351933adb74a4f04d; block was likely seeded from chain or committed with no mempool txs. Proceeding with merge; ConfirmedLedgerDB will not be updated for this block."
+            },
+            {
+              "timestampNs": "1779208484425954122",
+              "line": "84a800d90102828258203ed2ff4ba494464eff15d70c3a86d536c07df75f0ac9143e373e6b262889819a01825820df7058fc8117d3bcadbd12c7de821ffaf9ebc5a0e42e8547dfd271e0054a1b3a000182a300581d708226facffd8361c6d7ae9fffeb0738ea1a4ee0cdf91449788d0bd53601821a001a80e2a1581c565e23bcb46916d008be00384a247c1f06e98ed8b51307605012ec2ea1444e6f646501028201d818589ed8799fd87a80d8799f581ccaf1824def2d8d65b041357d20735ae88819a22a55d23f7ace91287affd8799f581cf52513d4692b1de7cfbbc22852f8b040924f7eb351933adb74a4f04d581ce5dad5178949ca80d3106c3bdcbec422f8febdef8038596eb43b9613582056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b4211b0000019e3ff805ab1b0000019e3ff883f800ffff825839000a82eaf31b544f75724a78a4d65ef12cb4d2749e83cf7a00cf9b17a1bfec3041939cf0d491da2e9d5becd608ec5c22e465b92bcb5a93584f1a00246d23021a0003086d09a1581c565e23bcb46916d008be00384a247c1f06e98ed8b51307605012ec2ea158204e6f6465f52513d4692b1de7cfbbc22852f8b040924f7eb351933adb74a4f04d200b58202852bd63c702b3e99d3ef9d5e9e8b1802fc12ccbfccb82c7ce7d1f77bbf7fd7e0dd9010281825820a6ba1a13c6b9f0602fdefe1f482989e3a6d430ce2e1e5e116511c749e74437100010825839000a82eaf31b544f75724a78a4d65ef12cb4d2749e83cf7a00cf9b17a1bfec3041939cf0d491da2e9d5becd608ec5c22e465b92bcb5a93584f1b0000000253bf98c0111a004c4b40a300d90102818258203700e2a3be3b902135e8c75279524e796298c544b7a50f335e01fda7c678959d584049cae5a110949e8ad6a546c8801d641c77ca13ea43493864d8cc7aeda7c2fc2b2dc8f6f9d259fcb8ac7d2253f760364d5bfe1834f79d204ca940e5aefbe73b0d0583840000d87c8082190a491a00082c5f840001d87c8082190a491a00082c5f840100d8798082190a491a00082c5f07d9010282585f585d0101002332259800a998012481224d6964676172642044656d6f20e28093205374617465205175657565205370656e640014a3149a2a660049211856616c696461746f722072657475726e65642066616c736500136564004ae715cd01585e585c0101002332259800a998012481214d6964676172642044656d6f20e28093205374617465205175657565204d696e740014a3149a2a660049211856616c696461746f722072657475726e65642066616c736500136564004ae715cd01f5f6"
+            },
+            {
+              "timestampNs": "1779208484425972865",
+              "line": ""
+            },
+            {
+              "timestampNs": "1779208621972019612",
+              "line": "[16:37:01.971] WARN (#20): 🔸 No transactions found in BlocksTxsDB for block caf1824def2d8d65b041357d20735ae88819a22a55d23f7ace91287a; block was likely seeded from chain or committed with no mempool txs. Proceeding with merge; ConfirmedLedgerDB will not be updated for this block."
+            },
+            {
+              "timestampNs": "1779208720424639477",
+              "line": "84a800d90102828258202a2aceea465c2c869f333ffad1a0543a7239160edbc7bf0e3f99f5a4c5df007f00825820cf460a9c65f25650ed0c5572d491dc99e45e9d930c38aedddd1776a66bf0d266010182a300581d708226facffd8361c6d7ae9fffeb0738ea1a4ee0cdf91449788d0bd53601821a001a80e2a1581c565e23bcb46916d008be00384a247c1f06e98ed8b51307605012ec2ea1444e6f646501028201d818589ed8799fd87a80d8799f581c8cb36e407d31f1e9c27d0253805ba3e4f2bad118c85f307fbf0c7f2effd8799f581ccaf1824def2d8d65b041357d20735ae88819a22a55d23f7ace91287a581cf52513d4692b1de7cfbbc22852f8b040924f7eb351933adb74a4f04d582056e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b4211b0000019e3ff883f81b0000019e3ff902f300ffff825839000a82eaf31b544f75724a78a4d65ef12cb4d2749e83cf7a00cf9b17a1bfec3041939cf0d491da2e9d5becd608ec5c22e465b92bcb5a93584f1a00246d23021a0003086d09a1581c565e23bcb46916d008be00384a247c1f06e98ed8b51307605012ec2ea158204e6f6465caf1824def2d8d65b041357d20735ae88819a22a55d23f7ace91287a200b58202852bd63c702b3e99d3ef9d5e9e8b1802fc12ccbfccb82c7ce7d1f77bbf7fd7e0dd9010281825820a6ba1a13c6b9f0602fdefe1f482989e3a6d430ce2e1e5e116511c749e74437100010825839000a82eaf31b544f75724a78a4d65ef12cb4d2749e83cf7a00cf9b17a1bfec3041939cf0d491da2e9d5becd608ec5c22e465b92bcb5a93584f1b0000000253bf98c0111a004c4b40a300d90102818258203700e2a3be3b902135e8c75279524e796298c544b7a50f335e01fda7c678959d5840156754d7431c2f50adaeaaab7be04a3113999a6c622fd75f38d059624dbec9a4a9d01acf7f8fa1ab6f2358574003ae5fd7d6c67fd758e928b40270dac2a6870c0583840000d87c8082190a491a00082c5f840001d87c8082190a491a00082c5f840100d8798082190a491a00082c5f07d9010282585f585d0101002332259800a998012481224d6964676172642044656d6f20e28093205374617465205175657565205370656e640014a3149a2a660049211856616c696461746f722072657475726e65642066616c736500136564004ae715cd01585e585c0101002332259800a998012481214d6964676172642044656d6f20e28093205374617465205175657565204d696e740014a3149a2a660049211856616c696461746f722072657475726e65642066616c736500136564004ae715cd01f5f6"
+            },
+            {
+              "timestampNs": "1779208720424650402",
+              "line": ""
+            },
+            {
+              "timestampNs": "1779208837976930691",
+              "line": "[16:40:37.976] WARN (#20): 🔸 No transactions found in BlocksTxsDB for block 8cb36e407d31f1e9c27d0253805ba3e4f2bad118c85f307fbf0c7f2e; block was likely seeded from chain or committed with no mempool txs. Proceeding with merge; ConfirmedLedgerDB will not be updated for this block."
+            }
+          ]
+        }
+      ],
+      "totalEntries": 425,
+      "truncated": false
+    },
+    "error": null
+  }
+]

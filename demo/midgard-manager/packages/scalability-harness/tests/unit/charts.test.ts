@@ -94,9 +94,10 @@ describe('PANEL_SPECS catalog', () => {
   });
 
   it('rate panels reuse the same metric as a corresponding direct panel (counter reuse)', () => {
-    const rateSpecs = PANEL_SPECS.filter((s) => s.rate);
+    // Failure-signal panels are rate-only: they show Δ/s with no paired cumulative panel
+    const failureOnlySlugs = new Set(['commit-failures', 'merge-failures', 'rejected-submissions']);
+    const rateSpecs = PANEL_SPECS.filter((s) => s.rate && !failureOnlySlugs.has(s.slug));
     for (const rateSpec of rateSpecs) {
-      // Every rate panel must have a corresponding direct panel for the same metric
       const hasDirect = PANEL_SPECS.some((s) => !s.rate && s.metric === rateSpec.metric);
       expect(hasDirect, `no direct panel for rate slug ${rateSpec.slug}`).toBe(true);
     }

@@ -1,0 +1,28 @@
+{
+  "mode": "generated",
+  "generationSeed": "7761726d75702d323032362d30352d31383a746965723a303a7470733a313030",
+  "profile": {
+    "transactionType": "one-to-one",
+    "oneToOneRatio": 70,
+    "batchSize": 40,
+    "concurrency": 40,
+    "intervalSeconds": 0.4
+  },
+  "generatedAt": "2026-05-19T16:30:31.596Z",
+  "transactionCount": 1,
+  "transactions": [
+    {
+      "txId": "779ce3e517c23029ff2a7b93a6325875ef6fe1ae76db9944b7a8565df9c7cc1d",
+      "computedTxId": "779ce3e517c23029ff2a7b93a6325875ef6fe1ae76db9944b7a8565df9c7cc1d",
+      "cborByteSize": 220,
+      "midgardByteSize": 288,
+      "profile": "one-to-one",
+      "validation": {
+        "status": "accepted"
+      },
+      "submission": {
+        "status": "SUBMITTED"
+      }
+    }
+  ]
+}
