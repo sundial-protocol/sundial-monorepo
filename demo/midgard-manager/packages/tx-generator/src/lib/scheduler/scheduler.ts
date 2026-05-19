@@ -4,8 +4,8 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { UTxO } from '@lucid-evolution/lucid';
-import * as fastq from 'fastq';
 import type { queueAsPromised } from 'fastq';
+import * as fastq from 'fastq';
 import pLimit from 'p-limit';
 
 import type { SubmitTransactionResult } from '../client/node-client.js';
@@ -32,7 +32,12 @@ import {
   createEmptySubmissionAggregate,
   recordAttemptedSubmission,
   recordGeneratedTransactions,
+  recordGenerationLatency,
+  recordInFlightSubmits,
+  recordPreparedQueueDepth,
   recordSubmissionObservation,
+  recordSubmitLatency,
+  recordTokenLate,
   REQUEST_EVENTS_SAMPLE_RATE,
   type RequestEventsMode,
   type SubmissionOutcome,
@@ -51,6 +56,7 @@ const SUBMISSION_AGGREGATE_FLUSH_INTERVAL_MS = 1_000;
 const AVAILABILITY_RECHECK_MS = 1_000;
 const AVAILABILITY_TIMEOUT_MS = 750;
 const QUEUE_BACKPRESSURE_SLEEP_MS = 1;
+const TOKEN_LATE_THRESHOLD_MS = 10;
 
 // Get the directory path for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -165,10 +171,12 @@ class TokenBucket {
   private lastRefillMs = Date.now();
   private readonly ratePerSecond: number;
   private readonly maxTokens: number;
+  private readonly onLateToken: (() => void) | undefined;
 
-  constructor(ratePerSecond: number, maxTokens = 1) {
+  constructor(ratePerSecond: number, maxTokens = 1, onLateToken?: () => void) {
     this.ratePerSecond = ratePerSecond;
     this.maxTokens = Math.max(1, maxTokens);
+    this.onLateToken = onLateToken;
   }
 
   async waitForToken(shouldStop: () => boolean): Promise<boolean> {
@@ -184,6 +192,9 @@ class TokenBucket {
       }
 
       const waitMs = Math.max(1, Math.ceil(((1 - this.tokens) / this.ratePerSecond) * 1000));
+      if (waitMs >= TOKEN_LATE_THRESHOLD_MS) {
+        this.onLateToken?.();
+      }
       await sleep(waitMs);
     }
   }
@@ -201,23 +212,75 @@ class TokenBucket {
 }
 
 interface NodeAvailabilityTracker {
-  checkNow(): Promise<boolean>;
+  probeNow(): Promise<boolean>;
+  isAvailable(): boolean;
+  start(): void;
+  stop(): Promise<void>;
 }
 
 function createNodeAvailabilityTracker(nodeClient: MidgardNodeClient): NodeAvailabilityTracker {
-  let lastCheckedMs = 0;
-  let lastValue = true;
+  let running = false;
+  let available = true;
+  let loopPromise: Promise<void> | null = null;
+  let inFlightProbe: Promise<boolean> | null = null;
+  let waitResolver: (() => void) | null = null;
+  let waitTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const probeNow = async (): Promise<boolean> => {
+    if (inFlightProbe !== null) {
+      return inFlightProbe;
+    }
+    inFlightProbe = nodeClient
+      .isAvailable(AVAILABILITY_TIMEOUT_MS)
+      .then((result) => {
+        available = result;
+        return result;
+      })
+      .catch(() => {
+        available = false;
+        return false;
+      })
+      .finally(() => {
+        inFlightProbe = null;
+      });
+    return inFlightProbe;
+  };
 
   return {
-    async checkNow() {
-      const now = Date.now();
-      if (now - lastCheckedMs < AVAILABILITY_RECHECK_MS) {
-        return lastValue;
+    probeNow,
+    isAvailable() {
+      return available;
+    },
+    start() {
+      if (running) {
+        return;
       }
-
-      lastCheckedMs = now;
-      lastValue = await nodeClient.isAvailable(AVAILABILITY_TIMEOUT_MS);
-      return lastValue;
+      running = true;
+      loopPromise = (async () => {
+        while (running && !state.shouldStop) {
+          await probeNow();
+          await new Promise<void>((resolve) => {
+            waitResolver = resolve;
+            waitTimer = setTimeout(resolve, AVAILABILITY_RECHECK_MS);
+          });
+          waitResolver = null;
+          waitTimer = null;
+        }
+      })();
+    },
+    async stop() {
+      running = false;
+      if (waitTimer !== null) {
+        clearTimeout(waitTimer);
+        waitTimer = null;
+      }
+      if (waitResolver !== null) {
+        waitResolver();
+        waitResolver = null;
+      }
+      if (loopPromise !== null) {
+        await loopPromise;
+      }
     },
   };
 }
@@ -465,6 +528,7 @@ async function withBackpressureCapacity(
   while (!state.shouldStop) {
     const queued = queue.length();
     const inFlight = getActiveWorkers();
+    recordPreparedQueueDepth(state.stats.submissionAggregate, queued + inFlight);
     if (queued + inFlight < queueCapacity) {
       return;
     }
@@ -483,8 +547,6 @@ async function processPreparedSubmission(params: {
   generationSeed: string;
   replayCorpusPath: string | undefined;
   rateLimiter: TokenBucket | null;
-  isNodeUnavailableLatched: () => boolean;
-  latchNodeUnavailable: () => void;
 }): Promise<void> {
   const {
     prepared,
@@ -497,8 +559,6 @@ async function processPreparedSubmission(params: {
     generationSeed,
     replayCorpusPath,
     rateLimiter,
-    isNodeUnavailableLatched,
-    latchNodeUnavailable,
   } = params;
 
   if (prepared.evidenceEntry.validation.status === 'rejected') {
@@ -522,32 +582,7 @@ async function processPreparedSubmission(params: {
     return;
   }
 
-  if (isNodeUnavailableLatched()) {
-    prepared.evidenceEntry.submission.status = 'NODE_UNAVAILABLE';
-    recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
-    await appendRequestEvent(outputDir, requestEventsMode, requestEventRandom, {
-      sourceTx: prepared.sourceTx,
-      evidenceEntry: prepared.evidenceEntry,
-      outcome: 'node_unavailable',
-      latencyMs: null,
-      retryCount: 0,
-      httpStatusCode: null,
-      responseClass: 'node_unavailable',
-      errorClass: 'node_unavailable',
-    });
-    return;
-  }
-
-  if (rateLimiter !== null) {
-    const gotToken = await rateLimiter.waitForToken(() => state.shouldStop);
-    if (!gotToken) {
-      return;
-    }
-  }
-
-  const isNodeAvailable = await nodeAvailabilityTracker.checkNow();
-  if (!isNodeAvailable) {
-    latchNodeUnavailable();
+  if (!nodeAvailabilityTracker.isAvailable()) {
     prepared.evidenceEntry.submission.status = 'NODE_UNAVAILABLE';
     recordSubmissionObservation(state.stats.submissionAggregate, 'node_unavailable', null, 0);
     await appendRequestEvent(outputDir, requestEventsMode, requestEventRandom, {
@@ -579,9 +614,17 @@ async function processPreparedSubmission(params: {
     return;
   }
 
+  if (rateLimiter !== null) {
+    const gotToken = await rateLimiter.waitForToken(() => state.shouldStop);
+    if (!gotToken) {
+      return;
+    }
+  }
+
   recordAttemptedSubmission(state.stats.submissionAggregate);
 
   const result = await nodeClient.submitTransaction(prepared.sourceTx.cborHex);
+  recordSubmitLatency(state.stats.submissionAggregate, result.latencyMs);
 
   const submissionOutcome = submissionOutcomeFromResult(result);
   recordSubmissionObservation(
@@ -604,7 +647,6 @@ async function processPreparedSubmission(params: {
   });
 
   if (result.status === 'NODE_UNAVAILABLE') {
-    latchNodeUnavailable();
     prepared.evidenceEntry.submission.status = 'NODE_UNAVAILABLE';
     return;
   }
@@ -644,6 +686,7 @@ async function prepareAndEnqueueTaskPlan(params: {
   } = params;
 
   let txs: SerializedMidgardTransaction[];
+  const generationStartedAtMs = Date.now();
 
   if (taskPlan.useOneToOne) {
     const pooledLucid = lucidPool !== null ? await lucidPool.acquire() : undefined;
@@ -675,9 +718,17 @@ async function prepareAndEnqueueTaskPlan(params: {
 
   recordGeneratedTransactions(state.stats.submissionAggregate, txs.length);
   state.stats.transactionsGenerated += txs.length;
+  const generationLatencyPerTxMs = Math.max(
+    1,
+    Math.floor((Date.now() - generationStartedAtMs) / Math.max(1, txs.length))
+  );
 
   for (const sourceTx of txs) {
-    const evidenceEntry = toEvidenceEntry(inspectGeneratedTransaction(sourceTx, fullConfig.network), mode);
+    recordGenerationLatency(state.stats.submissionAggregate, generationLatencyPerTxMs);
+    const evidenceEntry = toEvidenceEntry(
+      inspectGeneratedTransaction(sourceTx, fullConfig.network),
+      mode
+    );
     if (state.shouldStop) {
       return;
     }
@@ -693,6 +744,10 @@ async function prepareAndEnqueueTaskPlan(params: {
       }
       state.shouldStop = true;
     });
+    recordPreparedQueueDepth(
+      state.stats.submissionAggregate,
+      submissionQueue.length() + getActiveWorkers()
+    );
   }
 }
 
@@ -710,22 +765,32 @@ async function prepareAndEnqueueReplay(params: {
       return;
     }
 
+    recordGenerationLatency(state.stats.submissionAggregate, 1);
     recordGeneratedTransactions(state.stats.submissionAggregate, 1);
     state.stats.transactionsGenerated += 1;
 
-    const evidenceEntry = toEvidenceEntry(inspectGeneratedTransaction(sourceTx, fullConfig.network), 'replay');
+    const evidenceEntry = toEvidenceEntry(
+      inspectGeneratedTransaction(sourceTx, fullConfig.network),
+      'replay'
+    );
 
     await withBackpressureCapacity(submissionQueue, queueCapacity, getActiveWorkers);
     if (state.shouldStop) {
       return;
     }
 
-    void submissionQueue.push({ sourceTx, evidenceEntry, mode: 'replay' }).catch((error: unknown) => {
-      if (state.stats.lastError === null && error instanceof Error) {
-        state.stats.lastError = error.message;
-      }
-      state.shouldStop = true;
-    });
+    void submissionQueue
+      .push({ sourceTx, evidenceEntry, mode: 'replay' })
+      .catch((error: unknown) => {
+        if (state.stats.lastError === null && error instanceof Error) {
+          state.stats.lastError = error.message;
+        }
+        state.shouldStop = true;
+      });
+    recordPreparedQueueDepth(
+      state.stats.submissionAggregate,
+      submissionQueue.length() + getActiveWorkers()
+    );
   }
 }
 
@@ -811,12 +876,24 @@ export const startGenerator = async (
     : null;
 
   let activeSubmissionWorkers = 0;
-  let nodeUnavailableLatched = false;
-  const rateLimiter = resolvedTargetTps !== null ? new TokenBucket(resolvedTargetTps, 1) : null;
+  const rateLimiter =
+    resolvedTargetTps !== null
+      ? new TokenBucket(resolvedTargetTps, 1, () => {
+          recordTokenLate(state.stats.submissionAggregate);
+        })
+      : null;
+
+  await nodeAvailabilityTracker.probeNow();
+  nodeAvailabilityTracker.start();
 
   const submissionQueue: queueAsPromised<PreparedSubmission> = fastq.promise(
     async (prepared) => {
       activeSubmissionWorkers += 1;
+      recordInFlightSubmits(state.stats.submissionAggregate, activeSubmissionWorkers);
+      recordPreparedQueueDepth(
+        state.stats.submissionAggregate,
+        submissionQueue.length() + activeSubmissionWorkers
+      );
       try {
         await processPreparedSubmission({
           prepared,
@@ -829,13 +906,14 @@ export const startGenerator = async (
           generationSeed,
           replayCorpusPath: fullConfig.replayCorpusPath,
           rateLimiter,
-          isNodeUnavailableLatched: () => nodeUnavailableLatched,
-          latchNodeUnavailable: () => {
-            nodeUnavailableLatched = true;
-          },
         });
       } finally {
         activeSubmissionWorkers = Math.max(0, activeSubmissionWorkers - 1);
+        recordInFlightSubmits(state.stats.submissionAggregate, activeSubmissionWorkers);
+        recordPreparedQueueDepth(
+          state.stats.submissionAggregate,
+          submissionQueue.length() + activeSubmissionWorkers
+        );
       }
     },
     Math.max(1, maxInFlight)
@@ -917,7 +995,9 @@ export const startGenerator = async (
     const generationWorkers: Promise<void>[] = [];
     const oneToOneRatio = fullConfig.oneToOneRatio ?? DEFAULT_CONFIG.oneToOneRatio ?? 70;
 
-    const taskBudget = fullConfig.autoStopAfterBatch ? fullConfig.batchSize : Number.POSITIVE_INFINITY;
+    const taskBudget = fullConfig.autoStopAfterBatch
+      ? fullConfig.batchSize
+      : Number.POSITIVE_INFINITY;
     let reservedTasks = 0;
 
     const reserveTask = (): boolean => {
@@ -993,6 +1073,7 @@ export const startGenerator = async (
       console.error('Generator failed:', errorMessage);
     })
     .finally(async () => {
+      await nodeAvailabilityTracker.stop();
       state.currentPromise = null;
       state.stopHook = null;
       if (aggregateFlushTimer !== null) {

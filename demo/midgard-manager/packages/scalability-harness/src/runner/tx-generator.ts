@@ -60,6 +60,23 @@ export interface SubmissionAggregate {
     node_unavailable: { p50: number | null; p95: number | null; p99: number | null };
     timed_out: { p50: number | null; p95: number | null; p99: number | null };
     error: { p50: number | null; p95: number | null; p99: number | null };
+    schedulerMetrics?: {
+      generation_latency: { p50: number | null; p95: number | null; p99: number | null };
+      submit_latency: { p50: number | null; p95: number | null; p99: number | null };
+    };
+  };
+  schedulerMetrics?: {
+    prepared_queue_depth: {
+      current: number;
+      max: number;
+    };
+    in_flight_submits: {
+      current: number;
+      max: number;
+    };
+    send_tokens_late_total: number;
+    generation_latency: SubmissionLatencyHistogram;
+    submit_latency: SubmissionLatencyHistogram;
   };
 }
 

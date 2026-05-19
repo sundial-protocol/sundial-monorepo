@@ -166,14 +166,23 @@ describe('Scheduler submission outcome counting (H-31)', () => {
   });
 
   it('does not count NODE_UNAVAILABLE as submitted or failed', async () => {
-    mockSubmitTransaction.mockResolvedValueOnce({
-      status: 'NODE_UNAVAILABLE',
-      responseClass: 'node_unavailable',
-      message: 'node is down',
-      latencyMs: 5,
-      attempts: 0,
-      retriesUsed: 0,
-    });
+    mockSubmitTransaction
+      .mockResolvedValueOnce({
+        status: 'NODE_UNAVAILABLE',
+        responseClass: 'node_unavailable',
+        message: 'node is down',
+        latencyMs: 5,
+        attempts: 0,
+        retriesUsed: 0,
+      })
+      .mockResolvedValueOnce({
+        status: 'NODE_UNAVAILABLE',
+        responseClass: 'node_unavailable',
+        message: 'node is down',
+        latencyMs: 5,
+        attempts: 0,
+        retriesUsed: 0,
+      });
 
     await startGenerator(baseConfig);
     await waitForGeneratorStop();
