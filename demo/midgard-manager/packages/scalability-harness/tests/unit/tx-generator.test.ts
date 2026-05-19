@@ -92,27 +92,35 @@ function makeWriter() {
 // ---------------------------------------------------------------------------
 
 describe('computeSettings', () => {
-  it('computes intervalSeconds as floor((batchSize * concurrency) / targetTps)', () => {
-    // (50 * 4) / 100 = 2.0
-    expect(computeSettings(100, 50, 4).intervalSeconds).toBe(2);
+  it('computes intervalSeconds as batchSize / targetTps', () => {
+    // 50 / 100 = 0.5
+    expect(computeSettings(100, 50, 4).intervalSeconds).toBe(0.5);
   });
 
-  it('clamps intervalSeconds to a minimum of 1', () => {
-    // (50 * 4) / 800 = 0.25 → floor → 0 → clamp → 1
-    expect(computeSettings(800, 50, 4).intervalSeconds).toBe(1);
+  it('clamps intervalSeconds to a minimum of 0.1 s (100 ms floor)', () => {
+    // 50 / 5000 = 0.01 → clamp → 0.1
+    expect(computeSettings(5000, 50, 4).intervalSeconds).toBe(0.1);
   });
 
-  it('computes actualTpsEstimate as (batchSize * concurrency) / intervalSeconds', () => {
-    // interval=2, so estimate = (50*4)/2 = 100
+  it('computes actualTpsEstimate as batchSize / intervalSeconds', () => {
+    // interval=0.5, so estimate = 50 / 0.5 = 100
     expect(computeSettings(100, 50, 4).actualTpsEstimate).toBe(100);
   });
 
-  it('records actual TPS estimate that may differ from targetTps when clamped', () => {
-    // targetTps=800, interval clamped to 1, so estimate = 50*4/1 = 200 ≠ 800
-    const s = computeSettings(800, 50, 4);
-    expect(s.targetTps).toBe(800);
-    expect(s.actualTpsEstimate).toBe(200);
+  it('records actual TPS estimate that may differ from targetTps when the 100 ms floor binds', () => {
+    // targetTps=5000, interval clamped to 0.1, so estimate = 50/0.1 = 500 ≠ 5000
+    const s = computeSettings(5000, 50, 4);
+    expect(s.targetTps).toBe(5000);
+    expect(s.actualTpsEstimate).toBe(500);
     expect(s.actualTpsEstimate).not.toBe(s.targetTps);
+  });
+
+  it('concurrency does not affect intervalSeconds or actualTpsEstimate', () => {
+    // interval is batchSize/targetTps regardless of concurrency
+    const s4 = computeSettings(100, 50, 4);
+    const s8 = computeSettings(100, 50, 8);
+    expect(s4.intervalSeconds).toBe(s8.intervalSeconds);
+    expect(s4.actualTpsEstimate).toBe(s8.actualTpsEstimate);
   });
 
   it('preserves batchSize, concurrency, and targetTps verbatim', () => {
@@ -140,7 +148,7 @@ describe('startTxGenerator', () => {
     vi.restoreAllMocks();
   });
 
-  it('spawns tx-generator source CLI through pnpm exec tsx with the node endpoint', async () => {
+  it('spawns tx-generator built CLI through pnpm exec node with the node endpoint', async () => {
     const { spawnFn, ...spawner } = makeMockSpawner(proc);
     proc.simulateExit(0);
 
@@ -152,22 +160,22 @@ describe('startTxGenerator', () => {
     expect(args).toContain('--filter');
     expect(args).toContain('@midgard-manager/tx-generator');
     expect(args).toContain('exec');
-    expect(args).toContain('tsx');
-    expect(args).toContain('src/bin/index.ts');
+    expect(args).toContain('node');
+    expect(args).toContain('dist/bin/index.js');
     expect(args).toContain('--endpoint');
     expect(args).toContain('http://localhost:3000');
   });
 
-  it('passes the Commander start subcommand as the first positional after --', async () => {
+  it('passes the Commander start subcommand as the next positional after dist CLI path', async () => {
     const { spawnFn, ...spawner } = makeMockSpawner(proc);
     proc.simulateExit(0);
 
     await startTxGenerator(BASE_SCENARIO, BASE_TIER, writer, '/tmp/tier-0', { spawner });
 
     const [, args] = spawnFn.mock.calls[0];
-    const dashDashIdx = args.indexOf('--');
-    expect(dashDashIdx).toBeGreaterThan(-1);
-    expect(args[dashDashIdx + 1]).toBe('start');
+    const distIndex = args.indexOf('dist/bin/index.js');
+    expect(distIndex).toBeGreaterThan(-1);
+    expect(args[distIndex + 1]).toBe('start');
   });
 
   it('passes --type, --batch-size, --interval, --concurrency, retry options, --seed, --output-dir, --test-wallet', async () => {
@@ -188,7 +196,7 @@ describe('startTxGenerator', () => {
     expect(args).toContain('--request-events');
     expect(args).toContain('off');
     expect(args).toContain('--seed');
-    expect(args).toContain(BASE_TIER.seed);
+    expect(args).toContain(Buffer.from(BASE_TIER.seed, 'utf8').toString('hex'));
     expect(args).toContain('--output-dir');
     expect(args).toContain('/tmp/tier-0');
     expect(args).toContain('--test-wallet');

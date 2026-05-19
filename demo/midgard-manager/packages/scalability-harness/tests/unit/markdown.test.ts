@@ -16,7 +16,6 @@ function makeManifest(overrides: Partial<RunManifest> = {}): RunManifest {
     runId: 'test-run-001',
     startedAt: '2025-01-01T00:00:00.000Z',
     gitSha: 'abc1234',
-    workingTreeStatus: '',
     nodeEndpoint: 'http://localhost:3000',
     prometheusEndpoint: 'http://localhost:9090',
     scenarioPath: '/runs/scenario.json',
@@ -577,12 +576,6 @@ describe('renderReport — Run Metadata', () => {
   it('includes the git SHA', () => {
     const out = renderReport(makeInput());
     expect(out).toContain('abc1234');
-  });
-
-  it('shows "clean" when workingTreeStatus is empty', () => {
-    const manifest = makeManifest({ workingTreeStatus: '' });
-    const out = renderReport(makeInput({ manifest }));
-    expect(out).toContain('clean');
   });
 
   it('includes the node endpoint', () => {

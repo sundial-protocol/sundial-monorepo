@@ -170,6 +170,9 @@ importers:
       effect:
         specifier: ^3.21.2
         version: 3.21.2
+      midgard-ts:
+        specifier: link:../../../midgard-ts
+        version: link:../../../midgard-ts
       p-limit:
         specifier: ^5.0.0
         version: 5.0.0

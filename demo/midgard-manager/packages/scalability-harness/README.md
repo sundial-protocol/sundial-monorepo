@@ -58,6 +58,19 @@ pnpm run start -- tiers --scenario scenarios/practical-24985.json
 pnpm run start -- tiers --scenario scenarios/saturation-ramp-25pct.json --max-tier 4
 ```
 
+### Collateral top-up (block commitment wallet)
+
+If block commitments fail with collateral errors (for example "required 5000000 Lovelace collateral"),
+top up the block-commitment operator wallet before running formal scalability scenarios.
+
+```bash
+# From demo/ (workspace shortcut)
+npm run wallet:topup:block-commitment
+
+# Directly in demo/midgard-node
+npm --prefix midgard-node run wallet:topup-block-commitment
+```
+
 ### Flags reference
 
 | Flag                      | Commands                    | Description                                          |

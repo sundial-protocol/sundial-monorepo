@@ -167,7 +167,6 @@ export function renderPlanReport(input: PlanReportInput): string {
         ['Description', s(manifest.description)],
         ['Started at', manifest.startedAt],
         ['Git SHA', manifest.gitSha],
-        ['Working tree', manifest.workingTreeStatus || 'clean'],
         ['Harness version', manifest.harnessVersion],
         ['Scenarios', String(manifest.scenarioPaths.length)],
         ['Host', `${manifest.host.hostname} (${manifest.host.platform}/${manifest.host.arch})`],

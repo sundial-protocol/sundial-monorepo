@@ -455,7 +455,9 @@ async function executePlan(opts: {
     );
   }
 
-  if (planHarnessError) process.exit(1);
+  const planFailed =
+    planConclusion.classification === 'Failed' || planConclusion.classification === 'Blocked';
+  if (planHarnessError || planFailed) process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
@@ -643,7 +645,10 @@ program
         console.log(chalk.green('\nAll tiers completed without collapse.'));
       }
 
-      if (result.harnessErrorOccurred) process.exit(1);
+      const runFailed =
+        result.conclusion.classification === 'Failed' ||
+        result.conclusion.classification === 'Blocked';
+      if (result.harnessErrorOccurred || runFailed) process.exit(1);
     }
   );
 

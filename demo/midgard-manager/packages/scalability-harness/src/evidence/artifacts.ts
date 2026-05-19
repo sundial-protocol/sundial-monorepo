@@ -18,7 +18,6 @@ export interface RunManifest {
   runId: string;
   startedAt: string;
   gitSha: string;
-  workingTreeStatus: string;
   nodeEndpoint: string;
   prometheusEndpoint: string;
   scenarioPath: string;
@@ -63,14 +62,6 @@ export interface TierSummary {
 function gitSha(): string {
   try {
     return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
-  } catch {
-    return 'unknown';
-  }
-}
-
-function gitStatus(): string {
-  try {
-    return execSync('git status --short', { encoding: 'utf8' }).trim();
   } catch {
     return 'unknown';
   }
@@ -140,7 +131,6 @@ export class ArtifactWriter {
       runId: scenario.runId,
       startedAt: startedAt.toISOString(),
       gitSha: gitSha(),
-      workingTreeStatus: gitStatus(),
       nodeEndpoint: scenario.nodeEndpoint,
       prometheusEndpoint: scenario.prometheusEndpoint,
       scenarioPath,
@@ -189,7 +179,6 @@ export class ArtifactWriter {
       runId: scenario.runId,
       startedAt: startedAt.toISOString(),
       gitSha: gitSha(),
-      workingTreeStatus: gitStatus(),
       nodeEndpoint: scenario.nodeEndpoint,
       prometheusEndpoint: scenario.prometheusEndpoint,
       scenarioPath,

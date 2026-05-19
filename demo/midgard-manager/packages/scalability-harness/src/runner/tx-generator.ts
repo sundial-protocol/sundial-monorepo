@@ -15,7 +15,9 @@ import { makeEvent } from '../evidence/load-events.js';
 
 export const SIGINT_GRACE_MS = 5_000;
 export const SIGTERM_GRACE_MS = 5_000;
-const SUBMISSION_AGGREGATES_FILE = 'submission-aggregates.json';
+export const SUBMISSION_AGGREGATES_FILE = 'submission-aggregates.json';
+const TX_GENERATOR_CLI_PATH = 'dist/bin/index.js';
+const MAX_TAIL_LINES = 40;
 
 export const REQUEST_EVENT_MODES = ['off', 'sampled', 'all'] as const;
 export type RequestEventsMode = (typeof REQUEST_EVENT_MODES)[number];
@@ -61,9 +63,12 @@ export interface SubmissionAggregate {
   };
 }
 
-// Deliberately coarse: the tx-generator is batch/interval based, not exact-TPS based.
-// intervalSeconds is derived from batchSize, concurrency, and targetTps but is a floor
-// approximation that may under-drive at high TPS targets.
+// The generator fires one batch of batchSize tasks every intervalSeconds.
+// intervalSeconds = max(0.1, batchSize / targetTps), floored at 100 ms so
+// that the schedule accurately reflects actual batch throughput without
+// spinning arbitrarily fast. actualTpsEstimate may fall below targetTps when
+// batchSize < targetTps * 0.1 (the 100 ms floor binds); raise batchSize to
+// increase the ceiling.
 export interface GeneratorSettings {
   intervalSeconds: number;
   batchSize: number;
@@ -79,6 +84,7 @@ export interface TxGeneratorResult {
   stoppedAt: string;
   exitCode: number | null;
   signal: string | null;
+  stderrTail: string | null;
   settings: GeneratorSettings;
   submissionAggregate: SubmissionAggregate | null;
 }
@@ -111,9 +117,17 @@ export function computeSettings(
   batchSize: number,
   concurrency: number
 ): GeneratorSettings {
-  const intervalSeconds = Math.max(1, Math.floor((batchSize * concurrency) / targetTps));
-  const actualTpsEstimate = (batchSize * concurrency) / intervalSeconds;
+  const intervalSeconds = Math.max(0.1, batchSize / targetTps);
+  const actualTpsEstimate = batchSize / intervalSeconds;
   return { intervalSeconds, batchSize, concurrency, targetTps, actualTpsEstimate };
+}
+
+function toGeneratorSeed(seed: string): string {
+  const normalized = seed.trim();
+  if (normalized.length === 0) {
+    return '00';
+  }
+  return Buffer.from(normalized, 'utf8').toString('hex');
 }
 
 function buildArgs(
@@ -124,13 +138,13 @@ function buildArgs(
   requestEvents: RequestEventsMode,
   cwd: string
 ): string[] {
+  const generatorSeed = toGeneratorSeed(tier.seed);
   const args = [
     '--filter',
     '@midgard-manager/tx-generator',
     'exec',
-    'tsx',
-    'src/bin/index.ts',
-    '--',
+    'node',
+    TX_GENERATOR_CLI_PATH,
     'start',
     '--endpoint',
     scenario.nodeEndpoint,
@@ -149,7 +163,7 @@ function buildArgs(
     '--request-events',
     requestEvents,
     '--seed',
-    tier.seed,
+    generatorSeed,
     '--output-dir',
     tierArtifactDir,
     '--test-wallet',
@@ -261,6 +275,13 @@ export async function startTxGenerator(
     stdio: ['ignore', 'pipe', 'pipe'],
     cwd,
   });
+  const stderrTailLines: string[] = [];
+  const appendTailLine = (line: string): void => {
+    stderrTailLines.push(line);
+    if (stderrTailLines.length > MAX_TAIL_LINES) {
+      stderrTailLines.shift();
+    }
+  };
 
   if (proc.stdout) {
     const rl = createInterface({ input: proc.stdout, crlfDelay: Infinity });
@@ -272,6 +293,7 @@ export async function startTxGenerator(
   if (proc.stderr) {
     const rl = createInterface({ input: proc.stderr, crlfDelay: Infinity });
     rl.on('line', (line) => {
+      appendTailLine(line);
       void writer.logStderr(line);
     });
   }
@@ -295,6 +317,7 @@ export async function startTxGenerator(
       const { exitCode, signal } = await stopProcess(proc, sigintGraceMs, sigTermGraceMs);
       const stoppedAt = new Date().toISOString();
       const submissionAggregate = await readSubmissionAggregate(tierArtifactDir);
+      const stderrTail = stderrTailLines.length > 0 ? stderrTailLines.join('\n') : null;
 
       await writer.appendLoadEvent(
         makeEvent<TxGeneratorStoppedEvent>({
@@ -304,6 +327,9 @@ export async function startTxGenerator(
           targetTps: tier.targetTps,
           exitCode,
           signal,
+          ...(exitCode !== null && exitCode !== 0 && stderrTail !== null
+            ? { errorSnippet: stderrTail }
+            : {}),
         })
       );
 
@@ -327,6 +353,7 @@ export async function startTxGenerator(
         stoppedAt,
         exitCode,
         signal,
+        stderrTail,
         settings,
         submissionAggregate,
       };

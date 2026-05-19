@@ -140,30 +140,36 @@ const makeSignedBuilder = () => ({
 
 const makeLucidFixture = (freshWalletUTxOs: readonly UTxO[]) => {
   const overrideUTxOs = vi.fn((_utxos: readonly UTxO[]) => undefined);
-  const getUtxos = vi.fn(() => Promise.resolve([...freshWalletUTxOs]));
-  const lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet"> = {
-    overrideUTxOs,
-    wallet: () => ({
-      overrideUTxOs: vi.fn(),
-      address: vi.fn(),
-      rewardAddress: vi.fn(),
-      getUtxos,
-      getUtxosCore: vi.fn(),
-      getDelegation: vi.fn(),
-      signTx: vi.fn(),
-      signMessage: vi.fn(),
-      submitTx: vi.fn(),
-    }),
-  };
+  const walletAddress = "addr_test1qpt3xyr5xq0dummyaddressvalue";
+  const getAddress = vi.fn(() => Promise.resolve(walletAddress));
+  const utxosAt = vi.fn(() => Promise.resolve([...freshWalletUTxOs]));
+  const lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet" | "utxosAt"> =
+    {
+      overrideUTxOs,
+      utxosAt,
+      wallet: () => ({
+        overrideUTxOs: vi.fn(),
+        address: getAddress,
+        rewardAddress: vi.fn(),
+        getUtxos: vi.fn(),
+        getUtxosCore: vi.fn(),
+        getDelegation: vi.fn(),
+        signTx: vi.fn(),
+        signMessage: vi.fn(),
+        submitTx: vi.fn(),
+      }),
+    };
   return {
     lucidApi,
     overrideUTxOs,
-    getUtxos,
+    getAddress,
+    utxosAt,
+    walletAddress,
   };
 };
 
 const makeRuntimeLayer = (
-  lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet">,
+  lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet" | "utxosAt">,
 ) =>
   Layer.mergeAll(
     Layer.succeed(AlwaysSucceedsContract, {
@@ -228,9 +234,8 @@ describe("buildNewBlockEntry wallet topup retry", () => {
       const returnedWalletUtxos: readonly UTxO[] = [makeUtxo("c")];
       const producedUtxos: readonly UTxO[] = [makeUtxo("d")];
 
-      const { lucidApi, overrideUTxOs, getUtxos } = makeLucidFixture(
-        freshWalletUtxosFromProvider,
-      );
+      const { lucidApi, overrideUTxOs, getAddress, utxosAt, walletAddress } =
+        makeLucidFixture(freshWalletUtxosFromProvider);
       setupPrerequisites(staleWalletUtxos);
       dbCommonMocks.serializeUTxOsForStorage.mockReturnValue(
         Effect.succeed(Buffer.from([0x42])),
@@ -265,7 +270,9 @@ describe("buildNewBlockEntry wallet topup retry", () => {
       ).toHaveBeenCalledTimes(2);
       expect(firstBuilder.chainProgram).toHaveBeenCalledTimes(1);
       expect(secondBuilder.chainProgram).toHaveBeenCalledTimes(1);
-      expect(getUtxos).toHaveBeenCalledTimes(1);
+      expect(getAddress).toHaveBeenCalledTimes(1);
+      expect(utxosAt).toHaveBeenCalledTimes(1);
+      expect(utxosAt).toHaveBeenCalledWith(walletAddress);
       expect(overrideUTxOs).toHaveBeenCalledWith(staleWalletUtxos);
       expect(overrideUTxOs).toHaveBeenLastCalledWith(
         freshWalletUtxosFromProvider,
@@ -282,7 +289,7 @@ describe("buildNewBlockEntry wallet topup retry", () => {
       const serializedWallet = Buffer.from([0xa1]);
       const serializedProduced = Buffer.from([0xb2]);
 
-      const { lucidApi, getUtxos } = makeLucidFixture(
+      const { lucidApi, utxosAt } = makeLucidFixture(
         freshWalletUtxosFromProvider,
       );
       setupPrerequisites(staleWalletUtxos);
@@ -323,7 +330,7 @@ describe("buildNewBlockEntry wallet topup retry", () => {
         makeStats(),
       ).pipe(Effect.provide(makeRuntimeLayer(lucidApi)));
 
-      expect(getUtxos).not.toHaveBeenCalled();
+      expect(utxosAt).not.toHaveBeenCalled();
       expect(result[BlocksDB.Columns.NEW_WALLET_UTXOS]).toEqual(
         serializedWallet,
       );

@@ -33,6 +33,10 @@ export interface OneToOneTransactionConfig {
   };
   random?: () => number;
   deterministicStartMs?: number;
+  // Pre-initialized Lucid instance from a pool. When provided, the per-call
+  // Emulator + Lucid construction is skipped; the instance is reconfigured
+  // via selectWallet.fromAddress for this task's UTxO instead.
+  lucid?: LucidEvolution;
 }
 
 // Constants for transaction generation
@@ -113,28 +117,35 @@ const generateOneToOneTransactions = async (
     walletSeedOrPrivateKey,
     random = Math.random,
     deterministicStartMs = Date.now(),
+    lucid: pooledLucid,
   } = config;
 
   // Validate configuration
   validateConfig(config);
 
-  // Setup emulator environment
-  const account: EmulatorAccount = {
-    seedPhrase: '',
-    address: initialUTxO.address,
-    assets: initialUTxO.assets,
-    privateKey: walletSeedOrPrivateKey,
-  };
+  let lucid: LucidEvolution;
+  if (pooledLucid !== undefined) {
+    // Reuse a pre-initialized instance from the pool; only reset wallet state.
+    lucid = pooledLucid;
+  } else {
+    // Cold path: construct a fresh Emulator + Lucid instance (used when no
+    // pool is available, e.g. direct API callers or tests).
+    const account: EmulatorAccount = {
+      seedPhrase: '',
+      address: initialUTxO.address,
+      assets: initialUTxO.assets,
+      privateKey: walletSeedOrPrivateKey,
+    };
+    const emulator = new Emulator([account]);
+    emulator.ledger = {
+      [`${initialUTxO.txHash}${initialUTxO.outputIndex}`]: {
+        utxo: initialUTxO,
+        spent: false,
+      },
+    };
+    lucid = await initializeLucid(emulator, network);
+  }
 
-  const emulator = new Emulator([account]);
-  emulator.ledger = {
-    [`${initialUTxO.txHash}${initialUTxO.outputIndex}`]: {
-      utxo: initialUTxO,
-      spent: false,
-    },
-  };
-
-  const lucid = await initializeLucid(emulator, network);
   lucid.selectWallet.fromAddress(initialUTxO.address, [initialUTxO]);
 
   // Generate mock transactions

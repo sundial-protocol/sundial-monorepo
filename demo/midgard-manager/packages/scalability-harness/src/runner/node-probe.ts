@@ -21,6 +21,12 @@ export interface ProbeConfig {
   maxConsecutiveFailures: number;
   intervalMs?: number;
   timeoutMs?: number;
+  onProbeResult?: (input: {
+    result: ProbeResult;
+    consecutiveFailures: number;
+    totalProbes: number;
+    failedProbes: number;
+  }) => void;
 }
 
 export interface ProbeLoopResult {
@@ -98,6 +104,7 @@ export async function runProbeLoop(
     maxConsecutiveFailures,
     intervalMs = PROBE_INTERVAL_MS,
     timeoutMs = PROBE_TIMEOUT_MS,
+    onProbeResult,
   } = config;
 
   let consecutiveFailures = 0;
@@ -131,6 +138,12 @@ export async function runProbeLoop(
       consecutiveFailures++;
 
       if (consecutiveFailures >= maxConsecutiveFailures) {
+        onProbeResult?.({
+          result,
+          consecutiveFailures,
+          totalProbes,
+          failedProbes,
+        });
         await writer.appendLoadEvent(
           makeEvent<StopConditionEvent>({
             event: 'stop_condition',
@@ -147,6 +160,13 @@ export async function runProbeLoop(
         break;
       }
     }
+
+    onProbeResult?.({
+      result,
+      consecutiveFailures,
+      totalProbes,
+      failedProbes,
+    });
 
     // Wait for the next interval or an external abort — whichever comes first.
     const completed = await delayOrAbort(intervalMs, signal);
