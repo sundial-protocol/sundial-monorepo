@@ -112,10 +112,7 @@ const mainProgram: Effect.Effect<
         const nodeConfig = yield* NodeConfig;
         const currentDate = new Date();
         const { withdrawals, txOrders, txRequests, deposits } =
-          yield* BlocksDB.retrieveEvents(
-            latestBlock[BlocksDB.Columns.EVENT_END_TIME],
-            currentDate,
-          );
+          yield* BlocksDB.retrieveEventsForCommitment(latestBlock, currentDate);
         const ledgerTrie = yield* MidgardMpt.create(
           "ledger",
           nodeConfig.LEDGER_MPT_DB_PATH,

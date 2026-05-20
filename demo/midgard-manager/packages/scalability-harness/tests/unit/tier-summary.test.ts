@@ -398,6 +398,30 @@ describe('buildTierSummary — normal tier', () => {
     expect(s.submittedBlockDelta).toBe(8);
   });
 
+  it('falls back to afterLoad-baseline(0) when before sample is missing for merged block counter', () => {
+    const s = buildTierSummary(
+      makeInput({
+        windowSummary: {
+          counterDeltas: [{ query: 'merge_block_count_total', deltaLoad: null, deltaRecovery: null }],
+          gaugeSummaries: [],
+        },
+        metricWindow: {
+          tierIndex: 0,
+          targetTps: 10,
+          startedAt: STARTED_AT,
+          stoppedAt: STOPPED_AT,
+          recoveryStartedAt: STOPPED_AT,
+          recoveryStoppedAt: STOPPED_AT,
+          before: { merge_block_count_total: null },
+          afterLoad: { merge_block_count_total: 4 },
+          afterRecovery: {},
+          ranges: {},
+        },
+      })
+    );
+    expect(s.mergedBlockDelta).toBe(4);
+  });
+
   it('extracts mergeFailureDelta from merge_block_failures_total', () => {
     const s = buildTierSummary(
       makeInput({ windowSummary: makeWindowSummary({ mergeFailureDelta: 2 }) })

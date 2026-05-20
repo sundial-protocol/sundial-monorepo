@@ -278,9 +278,11 @@ Runtime prerequisite: install `playwright` in this package and ensure Chromium i
 | `maxConsecutiveNodeProbeFailures` | number        | Abort after N consecutive probe failures                                              |
 | `stopOnPrometheusDown`            | boolean       | Abort if Prometheus becomes unreachable                                               |
 | `stopOnCommitmentFailure`         | boolean       | Abort if block commitment stops advancing                                             |
+| `maxCommitmentFailureRatio`       | number? (0–1) | Optional budget for commitment failures (`commitment_failures / mempool_accepted`)   |
 | `stopOnMergeFailure`              | boolean       | Abort if merge stops advancing                                                        |
 | `maxRecoveryQueueSize`            | number?       | Abort if queue depth exceeds this during recovery                                     |
 | `maxRecoveryMempoolSize`          | number?       | Abort if mempool depth exceeds this during recovery                                   |
+| `minCommitToAcceptedRatio`        | number? (0–1) | Abort if committed tx ratio (`committed / mempool_accepted`) falls below this floor  |
 | `minUsefulThroughputRatio`        | number? (0–1) | Abort if observed durable mempool accepted TPS divided by target TPS falls below this |
 
 ## Metric Contract

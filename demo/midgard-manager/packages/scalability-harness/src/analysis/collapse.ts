@@ -86,10 +86,36 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
   if (stopConditions.stopOnCommitmentFailure) {
     const delta = inputs.commitmentFailuresDelta;
     if (delta !== null && delta > 0) {
-      return {
-        reason: 'commitment_failures',
-        values: { commitmentFailuresDelta: delta },
-      };
+      if (stopConditions.maxCommitmentFailureRatio !== undefined) {
+        const accepted = inputs.mempoolAcceptedDelta;
+        if (accepted !== null && accepted > 0) {
+          const commitmentFailureRatio = delta / accepted;
+          if (commitmentFailureRatio <= stopConditions.maxCommitmentFailureRatio) {
+            // Keep running until the configured commitment-failure budget is exceeded.
+            // Other stop conditions still apply and may collapse the tier earlier.
+          } else {
+            return {
+              reason: 'commitment_failures',
+              values: {
+                commitmentFailuresDelta: delta,
+                mempoolAcceptedDelta: accepted,
+                commitmentFailureRatio,
+                maxCommitmentFailureRatio: stopConditions.maxCommitmentFailureRatio,
+              },
+            };
+          }
+        } else {
+          return {
+            reason: 'commitment_failures',
+            values: { commitmentFailuresDelta: delta },
+          };
+        }
+      } else {
+        return {
+          reason: 'commitment_failures',
+          values: { commitmentFailuresDelta: delta },
+        };
+      }
     }
   }
 

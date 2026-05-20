@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { access, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -40,7 +39,6 @@ interface PregenCorpusIdentity {
   transactionType: ScalabilityScenario['transactionType'];
   oneToOneRatio: number | null;
   transactionCount: number;
-  seed: string;
   network: 'Preview';
 }
 
@@ -64,23 +62,28 @@ function buildPregenCorpusIdentity(scenario: ScalabilityScenario): PregenCorpusI
         ? (scenario.oneToOneRatio ?? DEFAULT_MIXED_ONE_TO_ONE_RATIO)
         : null,
     transactionCount: scenario.pregenTransactionCount ?? 0,
-    seed: scenario.seed,
     network: 'Preview',
   };
 }
 
 function buildPregenCorpusBaseName(identity: PregenCorpusIdentity): string {
-  const identityHash = createHash('sha256')
-    .update(JSON.stringify(identity))
-    .digest('hex')
-    .slice(0, 16);
+  const networkToken = sanitizeFileToken(identity.network);
   const typeToken = sanitizeFileToken(identity.transactionType);
-  const seedToken = sanitizeFileToken(identity.seed);
   const ratioToken =
     identity.oneToOneRatio === null
       ? 'na'
       : identity.oneToOneRatio.toString().replace(/[^0-9]/g, '');
-  return `corpus-${identity.schemaVersion}-t-${typeToken}-r-${ratioToken}-n-${identity.transactionCount}-s-${seedToken}-${identityHash}`;
+  return `corpus-${identity.schemaVersion}-net-${networkToken}-t-${typeToken}-r-${ratioToken}-n-${identity.transactionCount}`;
+}
+
+function buildPregenCorpusCompatibilityPrefix(identity: PregenCorpusIdentity): string {
+  const networkToken = sanitizeFileToken(identity.network);
+  const typeToken = sanitizeFileToken(identity.transactionType);
+  const ratioToken =
+    identity.oneToOneRatio === null
+      ? 'na'
+      : identity.oneToOneRatio.toString().replace(/[^0-9]/g, '');
+  return `corpus-${identity.schemaVersion}-net-${networkToken}-t-${typeToken}-r-${ratioToken}-n-${identity.transactionCount}`;
 }
 
 function cacheDataDirFromRunDir(runDir: string): string {
@@ -95,6 +98,49 @@ async function hasNonEmptyFile(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function findCompatibleCachedCorpusPath(
+  cacheDataDir: string,
+  identity: PregenCorpusIdentity,
+  preferredCorpusPath: string
+): Promise<string | null> {
+  if (await hasNonEmptyFile(preferredCorpusPath)) {
+    return preferredCorpusPath;
+  }
+
+  let entries: string[] = [];
+  try {
+    entries = await readdir(cacheDataDir);
+  } catch {
+    return null;
+  }
+
+  const prefix = buildPregenCorpusCompatibilityPrefix(identity);
+  const candidates: Array<{ path: string; mtimeMs: number }> = [];
+  for (const entry of entries) {
+    const matchesCanonicalName = entry === `${prefix}.jsonl`;
+    const matchesLegacyName = entry.startsWith(`${prefix}-s-`) && entry.endsWith('.jsonl');
+    if (!matchesCanonicalName && !matchesLegacyName) {
+      continue;
+    }
+    const candidatePath = path.join(cacheDataDir, entry);
+    try {
+      const details = await stat(candidatePath);
+      if (details.isFile() && details.size > 0) {
+        candidates.push({ path: candidatePath, mtimeMs: details.mtimeMs });
+      }
+    } catch {
+      // Ignore files that disappear or become unreadable between readdir and stat.
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return candidates[0]!.path;
 }
 
 function lookupCounterDelta(summary: TierWindowSummary | null, query: string): number | null {
@@ -219,9 +265,9 @@ export async function runScenario(
     const corpusPath = path.join(cacheDataDir, `${corpusBaseName}.jsonl`);
     const metadataPath = path.join(cacheDataDir, `${corpusBaseName}.meta.json`);
     const count = scenario.pregenTransactionCount;
-    const cachedCorpusExists = await hasNonEmptyFile(corpusPath);
-    if (cachedCorpusExists) {
-      console.log(chalk.gray(`\n  Reusing cached pre-generated corpus: ${corpusPath}`));
+    const reusableCorpusPath = await findCompatibleCachedCorpusPath(cacheDataDir, identity, corpusPath);
+    if (reusableCorpusPath !== null) {
+      console.log(chalk.gray(`\n  Reusing cached pre-generated corpus: ${reusableCorpusPath}`));
     } else {
       console.log(chalk.blue(`\n  Pre-generating ${count.toLocaleString()} transactions...`));
       const { privateKey, address } = await generateTestWallet();
@@ -323,7 +369,7 @@ export async function runScenario(
       );
       console.log(chalk.gray(`  Pre-generation complete in ${pregenSec}s — corpus: ${corpusPath}`));
     }
-    pregenCorpusPath = corpusPath;
+    pregenCorpusPath = reusableCorpusPath ?? corpusPath;
   }
 
   // The effective scenario for each tier: merge the pre-generated corpus path

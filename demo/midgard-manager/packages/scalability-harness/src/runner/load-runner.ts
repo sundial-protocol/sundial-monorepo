@@ -70,6 +70,7 @@ export interface MetricStopCondition {
 interface LiveMetricBaseline {
   commitmentFailuresTotal: number | null;
   mergeFailuresTotal: number | null;
+  mempoolAcceptedTotal: number | null;
 }
 
 export interface TierRunResult {
@@ -322,6 +323,27 @@ export function checkMetricStopConditions(
       (d) => d.query === 'commit_block_commitment_failures_total'
     );
     if (delta !== undefined && delta.deltaLoad !== null && delta.deltaLoad > 0) {
+      if (stopConditions.maxCommitmentFailureRatio !== undefined) {
+        const mempoolAcceptedDelta =
+          windowSummary.counterDeltas.find(
+            (d) => d.query === 'tx_submissions_mempool_accepted_total'
+          )?.deltaLoad ?? null;
+        if (mempoolAcceptedDelta !== null && mempoolAcceptedDelta > 0) {
+          const commitmentFailureRatio = delta.deltaLoad / mempoolAcceptedDelta;
+          if (commitmentFailureRatio <= stopConditions.maxCommitmentFailureRatio) {
+            return null;
+          }
+          return {
+            reason: 'commitment_failure',
+            metricValues: {
+              commit_block_commitment_failures_total: delta.deltaLoad,
+              mempoolAcceptedDelta,
+              commitmentFailureRatio,
+              maxCommitmentFailureRatio: stopConditions.maxCommitmentFailureRatio,
+            },
+          };
+        }
+      }
       return {
         reason: 'commitment_failure',
         metricValues: { commit_block_commitment_failures_total: delta.deltaLoad },
@@ -430,21 +452,25 @@ async function captureLiveMetricBaseline(
   prometheusClient: PrometheusClient
 ): Promise<LiveMetricBaseline> {
   if (!stopConditions.stopOnCommitmentFailure && !stopConditions.stopOnMergeFailure) {
-    return { commitmentFailuresTotal: null, mergeFailuresTotal: null };
+    return { commitmentFailuresTotal: null, mergeFailuresTotal: null, mempoolAcceptedTotal: null };
   }
 
   try {
-    const [commitmentFailuresTotal, mergeFailuresTotal] = await Promise.all([
+    const [commitmentFailuresTotal, mergeFailuresTotal, mempoolAcceptedTotal] = await Promise.all([
       stopConditions.stopOnCommitmentFailure
         ? queryInstantScalar(prometheusClient, 'commit_block_commitment_failures_total')
         : Promise.resolve(null),
       stopConditions.stopOnMergeFailure
         ? queryInstantScalar(prometheusClient, 'merge_block_failures_total')
         : Promise.resolve(null),
+      stopConditions.stopOnCommitmentFailure &&
+      stopConditions.maxCommitmentFailureRatio !== undefined
+        ? queryInstantScalar(prometheusClient, 'tx_submissions_mempool_accepted_total')
+        : Promise.resolve(null),
     ]);
-    return { commitmentFailuresTotal, mergeFailuresTotal };
+    return { commitmentFailuresTotal, mergeFailuresTotal, mempoolAcceptedTotal };
   } catch {
-    return { commitmentFailuresTotal: null, mergeFailuresTotal: null };
+    return { commitmentFailuresTotal: null, mergeFailuresTotal: null, mempoolAcceptedTotal: null };
   }
 }
 
@@ -475,20 +501,45 @@ async function checkLiveMetricStopCondition(
     }
 
     if (stopConditions.stopOnCommitmentFailure) {
-      const currentFailures = await queryInstantScalar(
-        prometheusClient,
-        'commit_block_commitment_failures_total'
-      );
+      const [currentFailures, currentMempoolAccepted] = await Promise.all([
+        queryInstantScalar(prometheusClient, 'commit_block_commitment_failures_total'),
+        stopConditions.maxCommitmentFailureRatio !== undefined
+          ? queryInstantScalar(prometheusClient, 'tx_submissions_mempool_accepted_total')
+          : Promise.resolve(null),
+      ]);
       if (
         currentFailures !== null &&
         baseline.commitmentFailuresTotal !== null &&
         currentFailures > baseline.commitmentFailuresTotal
       ) {
+        const commitmentFailuresDelta = currentFailures - baseline.commitmentFailuresTotal;
+        if (
+          stopConditions.maxCommitmentFailureRatio !== undefined &&
+          currentMempoolAccepted !== null &&
+          baseline.mempoolAcceptedTotal !== null
+        ) {
+          const mempoolAcceptedDelta = currentMempoolAccepted - baseline.mempoolAcceptedTotal;
+          if (mempoolAcceptedDelta > 0) {
+            const commitmentFailureRatio = commitmentFailuresDelta / mempoolAcceptedDelta;
+            if (commitmentFailureRatio <= stopConditions.maxCommitmentFailureRatio) {
+              // Stay in the tier until the failure ratio exceeds the configured budget.
+              return null;
+            }
+            return {
+              reason: 'commitment_failure',
+              metricValues: {
+                commit_block_commitment_failures_total: commitmentFailuresDelta,
+                mempoolAcceptedDelta,
+                commitmentFailureRatio,
+                maxCommitmentFailureRatio: stopConditions.maxCommitmentFailureRatio,
+              },
+            };
+          }
+        }
         return {
           reason: 'commitment_failure',
           metricValues: {
-            commit_block_commitment_failures_total:
-              currentFailures - baseline.commitmentFailuresTotal,
+            commit_block_commitment_failures_total: commitmentFailuresDelta,
           },
         };
       }

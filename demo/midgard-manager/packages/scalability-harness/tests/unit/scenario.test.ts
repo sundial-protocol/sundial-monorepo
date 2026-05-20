@@ -124,6 +124,14 @@ describe('validateScenario', () => {
       expect(() => validateScenario(s)).not.toThrow();
     });
 
+    it('accepts maxCommitmentFailureRatio as a stop condition', () => {
+      const s = {
+        ...VALID_SCENARIO,
+        stopConditions: { ...VALID_SCENARIO.stopConditions, maxCommitmentFailureRatio: 0.0001 },
+      };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
     it('accepts ramp with multiply strategy', () => {
       const { stepMultiplier: _sm, ...withoutStepMultiplier } = VALID_SCENARIO;
       const s = {
@@ -403,6 +411,36 @@ describe('validateScenario', () => {
           stopConditions: {
             ...VALID_SCENARIO.stopConditions,
             minCommitToAcceptedRatio: Number.NaN,
+          },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects maxCommitmentFailureRatio above 1', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: { ...VALID_SCENARIO.stopConditions, maxCommitmentFailureRatio: 1.1 },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects maxCommitmentFailureRatio below 0', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: { ...VALID_SCENARIO.stopConditions, maxCommitmentFailureRatio: -0.1 },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects non-finite maxCommitmentFailureRatio', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: {
+            ...VALID_SCENARIO.stopConditions,
+            maxCommitmentFailureRatio: Number.NaN,
           },
         })
       ).toThrow(ScenarioValidationError);

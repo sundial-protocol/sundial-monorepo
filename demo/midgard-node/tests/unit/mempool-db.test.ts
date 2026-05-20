@@ -86,6 +86,7 @@ const sqlHarness = createMockSqlHarness();
 beforeEach(() => {
   sqlHarness.reset();
   vi.clearAllMocks();
+  sqlHarness.setRows([{ tx_id: txIdA }]);
   vi.mocked(AddressHistoryDB.aggregateProcessedTxs).mockReturnValue(
     Effect.succeed({
       allTxEntries: [{ tx_id: txIdA, tx: txCborA }],
@@ -105,14 +106,12 @@ beforeEach(() => {
 
 it.effect("insertMultiple stores tx and updates ledger", () =>
   MempoolDB.insertMultiple([processedTx]).pipe(
-    Effect.map(() => {
+    Effect.map((insertedCount) => {
+      expect(insertedCount).toBe(1);
       expect(
         vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
       ).toHaveBeenCalled();
-      expect(vi.mocked(Tx.insertEntries)).toHaveBeenCalledWith(
-        "mempool",
-        expect.any(Array),
-      );
+      expect(vi.mocked(Tx.insertEntries)).not.toHaveBeenCalled();
       expect(vi.mocked(AddressHistoryDB.upsertEntries)).toHaveBeenCalled();
       expect(vi.mocked(MempoolLedgerDB.insert)).toHaveBeenCalled();
       expect(vi.mocked(MempoolLedgerDB.clearUTxOs)).toHaveBeenCalled();
@@ -153,6 +152,22 @@ it.effect(
     );
   },
 );
+
+it.effect("insertMultiple no-ops on duplicate mempool insert", () => {
+  sqlHarness.setRows([]);
+  return MempoolDB.insertMultiple([processedTx]).pipe(
+    Effect.map((insertedCount) => {
+      expect(insertedCount).toBe(0);
+      expect(
+        vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
+      ).not.toHaveBeenCalled();
+      expect(vi.mocked(AddressHistoryDB.upsertEntries)).not.toHaveBeenCalled();
+      expect(vi.mocked(MempoolLedgerDB.insert)).not.toHaveBeenCalled();
+      expect(vi.mocked(MempoolLedgerDB.clearUTxOs)).not.toHaveBeenCalled();
+    }),
+    Effect.provide(sqlHarness.layer),
+  );
+});
 
 it.effect("retrieveTxCount returns parsed bigint from SQL count row", () => {
   sqlHarness.setRows([{ count: "7" }]);

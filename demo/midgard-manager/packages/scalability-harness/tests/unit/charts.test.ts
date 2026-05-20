@@ -161,6 +161,27 @@ describe('buildDataRows — direct metric', () => {
     const rows = buildDataRows([], spec);
     expect(rows).toHaveLength(0);
   });
+
+  it('normalizes built-blocks cumulative series to delta from window start', () => {
+    const spec = PANEL_SPECS.find((s) => s.slug === 'built-blocks')!;
+    const rows = buildDataRows(realWindows, spec);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].value).toBe(0);
+  });
+
+  it('normalizes submitted-blocks cumulative series to delta from window start', () => {
+    const spec = PANEL_SPECS.find((s) => s.slug === 'submitted-blocks')!;
+    const rows = buildDataRows(realWindows, spec);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].value).toBe(0);
+  });
+
+  it('normalizes merged-blocks cumulative series to delta from window start', () => {
+    const spec = PANEL_SPECS.find((s) => s.slug === 'merged-blocks')!;
+    const rows = buildDataRows(realWindows, spec);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0].value).toBe(0);
+  });
 });
 
 describe('buildDataRows — rate computation', () => {

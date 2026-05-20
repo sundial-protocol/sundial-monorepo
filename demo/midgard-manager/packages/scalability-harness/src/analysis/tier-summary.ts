@@ -31,6 +31,7 @@ export interface TierSummary {
   committedBlockDelta: number | null;
   // L1 submission progress.
   submittedBlockDelta: number | null;
+  mergedBlockDelta?: number | null;
   mergeFailureDelta: number | null;
   commitmentFailureDelta: number | null;
   l1CommitmentFeesDeltaLovelace: number | null;
@@ -90,6 +91,27 @@ function lookupGauge(summaries: GaugeSummary[], query: string): GaugeSummary | u
   return summaries.find((s) => s.query === query);
 }
 
+function lookupCounterDeltaWithZeroBaselineFallback(
+  deltas: CounterDelta[],
+  metricWindow: TierMetricWindow | null,
+  query: string
+): number | null {
+  const delta = lookupDelta(deltas, query);
+  if (delta !== null) {
+    return delta;
+  }
+  if (metricWindow === null) {
+    return null;
+  }
+
+  const afterLoad = metricWindow.afterLoad[query] ?? null;
+  if (afterLoad === null) {
+    return null;
+  }
+  const before = metricWindow.before[query] ?? 0;
+  return afterLoad - before;
+}
+
 function deriveTps(delta: number | null, durationSeconds: number): number | null {
   if (delta === null || durationSeconds <= 0) return null;
   return delta / durationSeconds;
@@ -133,11 +155,24 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
   const counterDeltas = windowSummary?.counterDeltas ?? [];
   const gaugeSummaries = windowSummary?.gaugeSummaries ?? [];
 
-  const enqueuedDelta = lookupDelta(counterDeltas, 'tx_submissions_enqueued_total');
-  const mempoolAcceptedDelta = lookupDelta(counterDeltas, 'tx_submissions_mempool_accepted_total');
-  const committedTxDelta = lookupDelta(counterDeltas, 'commit_block_tx_count_total');
-  const l1CommitmentFeesDeltaLovelace = lookupDelta(
+  const enqueuedDelta = lookupCounterDeltaWithZeroBaselineFallback(
     counterDeltas,
+    metricWindow,
+    'tx_submissions_enqueued_total'
+  );
+  const mempoolAcceptedDelta = lookupCounterDeltaWithZeroBaselineFallback(
+    counterDeltas,
+    metricWindow,
+    'tx_submissions_mempool_accepted_total'
+  );
+  const committedTxDelta = lookupCounterDeltaWithZeroBaselineFallback(
+    counterDeltas,
+    metricWindow,
+    'commit_block_tx_count_total'
+  );
+  const l1CommitmentFeesDeltaLovelace = lookupCounterDeltaWithZeroBaselineFallback(
+    counterDeltas,
+    metricWindow,
     'l1_commitment_fees_lovelace_total'
   );
   const l1CommitmentFeeLastLovelace =
@@ -157,14 +192,43 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     result,
     ...(collapse !== null ? { collapseReason: collapse.reason } : {}),
     enqueuedDelta,
-    rejectedDelta: lookupDelta(counterDeltas, 'tx_submissions_rejected_total'),
+    rejectedDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'tx_submissions_rejected_total'
+    ),
     mempoolAcceptedDelta,
-    processingFailedDelta: lookupDelta(counterDeltas, 'tx_submissions_processing_failed_total'),
+    processingFailedDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'tx_submissions_processing_failed_total'
+    ),
     committedTxDelta,
-    committedBlockDelta: lookupDelta(counterDeltas, 'commit_block_count_total'),
-    submittedBlockDelta: lookupDelta(counterDeltas, 'submit_block_count_total'),
-    mergeFailureDelta: lookupDelta(counterDeltas, 'merge_block_failures_total'),
-    commitmentFailureDelta: lookupDelta(counterDeltas, 'commit_block_commitment_failures_total'),
+    committedBlockDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'commit_block_count_total'
+    ),
+    submittedBlockDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'submit_block_count_total'
+    ),
+    mergedBlockDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'merge_block_count_total'
+    ),
+    mergeFailureDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'merge_block_failures_total'
+    ),
+    commitmentFailureDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'commit_block_commitment_failures_total'
+    ),
     l1CommitmentFeesDeltaLovelace,
     l1CommitmentFeeLastLovelace,
     l1FeePerCommittedL2TxLovelace: deriveL1FeePerCommittedL2Tx(

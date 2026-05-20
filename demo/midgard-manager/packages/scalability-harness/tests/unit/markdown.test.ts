@@ -76,6 +76,7 @@ function makeTier(overrides: Partial<TierSummary> = {}): TierSummary {
     committedTxDelta: 5600,
     committedBlockDelta: 10,
     submittedBlockDelta: 10,
+    mergedBlockDelta: 9,
     mergeFailureDelta: 0,
     commitmentFailureDelta: 0,
     l1CommitmentFeesDeltaLovelace: 24_000_000,
@@ -123,6 +124,7 @@ function makeCollapsedTier(overrides: Partial<TierSummary> = {}): TierSummary {
     committedTxDelta: 100,
     committedBlockDelta: 2,
     submittedBlockDelta: 1,
+    mergedBlockDelta: 1,
     commitmentFailureDelta: 5,
     mergeFailureDelta: 0,
     l1CommitmentFeesDeltaLovelace: 4_000_000,
@@ -311,6 +313,11 @@ describe('renderReport — required wording', () => {
     const out = renderReport(makeInput());
     expect(out).toContain('cohort_counter_alignment_v1');
     expect(out).toContain('Confidence Notes');
+  });
+
+  it('includes Merged Blocks Δ in Commit/Submit/Merge progress table', () => {
+    const out = renderReport(makeInput());
+    expect(out).toContain('Merged Blocks Δ');
   });
 });
 

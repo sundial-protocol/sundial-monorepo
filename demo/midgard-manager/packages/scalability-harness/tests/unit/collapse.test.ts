@@ -271,6 +271,37 @@ describe('detectCollapse — commitment_failures', () => {
     expect(result).toBeNull();
   });
 
+  it('does not trigger when commitment failure ratio is within maxCommitmentFailureRatio budget', () => {
+    const result = detectCollapse(
+      makeInputs({
+        commitmentFailuresDelta: 1,
+        mempoolAcceptedDelta: 10000,
+        stopConditions: {
+          ...BASE_STOP_CONDITIONS,
+          stopOnCommitmentFailure: true,
+          maxCommitmentFailureRatio: 0.0001,
+        },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('returns commitment_failures when commitment failure ratio exceeds maxCommitmentFailureRatio', () => {
+    const result = detectCollapse(
+      makeInputs({
+        commitmentFailuresDelta: 2,
+        mempoolAcceptedDelta: 10000,
+        stopConditions: {
+          ...BASE_STOP_CONDITIONS,
+          stopOnCommitmentFailure: true,
+          maxCommitmentFailureRatio: 0.0001,
+        },
+      })
+    );
+    expect(result?.reason).toBe('commitment_failures');
+    expect(result?.values.commitmentFailureRatio).toBe(0.0002);
+  });
+
   it('takes priority over merge_failures', () => {
     const result = detectCollapse(
       makeInputs({

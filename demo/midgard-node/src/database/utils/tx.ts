@@ -216,3 +216,30 @@ export const retrieveTimeBoundEntries = (
     ),
     sqlErrorToDatabaseError(tableName, "Failed to retrieve all UTxOs"),
   );
+
+export const retrieveEntriesBeforeTime = (
+  tableName: string,
+  endTime: Date,
+): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(
+      `${tableName} db: attempt to retrieveEntriesBeforeTime`,
+    );
+    const sql = yield* SqlClient.SqlClient;
+    const result = yield* sql<EntryWithTimeStamp>`SELECT * FROM ${sql(
+      tableName,
+    )} WHERE ${sql(Columns.TIMESTAMPTZ)} < ${endTime}
+    ORDER BY ${sql(Columns.TIMESTAMPTZ)} ASC`;
+    return result;
+  }).pipe(
+    Effect.withLogSpan(`retrieveEntriesBeforeTime ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: retrieveEntriesBeforeTime: ${JSON.stringify(e)}`,
+      ),
+    ),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to retrieve entries before the given time",
+    ),
+  );
