@@ -1,0 +1,30 @@
+{
+  "mode": "generated",
+  "generationSeed": "m42-seed-replayable",
+  "profile": {
+    "transactionType": "mixed",
+    "oneToOneRatio": 40,
+    "batchSize": 6,
+    "concurrency": 2,
+    "intervalSeconds": 0
+  },
+  "generatedAt": "2026-05-15T17:49:24.174Z",
+  "transactionCount": 1,
+  "transactions": [
+    {
+      "txId": "one-2CD3F635AB69BD7362EE472220C9EDCF6789FC34AB5266CF5E2ABE01391BF932",
+      "computedTxId": null,
+      "cborByteSize": 0,
+      "midgardByteSize": null,
+      "profile": "one-to-one",
+      "validation": {
+        "status": "rejected",
+        "rejectCode": "E_CBOR_DESERIALIZATION",
+        "detail": "cborHex must be a non-empty even-length hexadecimal string"
+      },
+      "submission": {
+        "status": "VALIDATION_REJECTED"
+      }
+    }
+  ]
+}

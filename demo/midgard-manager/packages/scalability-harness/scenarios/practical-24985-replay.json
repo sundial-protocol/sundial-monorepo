@@ -1,5 +1,5 @@
 {
-  "runId": "practical-24985",
+  "runId": "practical-24985-replay",
   "description": "Practical estimate target tier (§8.1): validates or falsifies the architecture's estimated practical TPS ceiling of ~24,985 TPS derived from internal-docs/architecture/scaling.md. Runs one-to-one for 20 minutes; either sustains the target or produces clear bottleneck evidence.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",
@@ -10,6 +10,7 @@
   "l1ProviderMode": "emulator",
   "walletMode": "test-wallet",
   "walletProvisioningNote": "test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key",
+  "replayCorpusPath": "corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-1500000.jsonl",
   "transactionType": "one-to-one",
   "tierDurationSeconds": 1200,
   "recoverySeconds": 300,

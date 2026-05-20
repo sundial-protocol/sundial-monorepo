@@ -1,5 +1,5 @@
 {
-  "runId": "stress-10000",
+  "runId": "stress-10000-replay",
   "description": "Institutional stress tier (§8.1): identifies bottlenecks and resource ceilings before the practical estimate target. Sustains 10,000 TPS for 30 minutes with a mixed payload (70% one-to-one, 30% multi-output).",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",

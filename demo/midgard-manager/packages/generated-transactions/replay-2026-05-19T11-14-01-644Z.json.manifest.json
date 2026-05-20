@@ -1,0 +1,46 @@
+{
+  "mode": "replay",
+  "generationSeed": "60c123730ea130020181a0501e601591",
+  "replayCorpusPath": "/tmp/m42-corpus-vkGKNw/corpus.json",
+  "profile": {
+    "transactionType": "mixed",
+    "oneToOneRatio": 70,
+    "batchSize": 6,
+    "concurrency": 1,
+    "intervalSeconds": 0
+  },
+  "generatedAt": "2026-05-19T11:14:01.644Z",
+  "transactionCount": 2,
+  "transactions": [
+    {
+      "txId": "replay-1",
+      "computedTxId": null,
+      "cborByteSize": 0,
+      "midgardByteSize": null,
+      "profile": "replay",
+      "validation": {
+        "status": "rejected",
+        "rejectCode": "E_CBOR_DESERIALIZATION",
+        "detail": "cborHex must be a non-empty even-length hexadecimal string"
+      },
+      "submission": {
+        "status": "VALIDATION_REJECTED"
+      }
+    },
+    {
+      "txId": "replay-2",
+      "computedTxId": null,
+      "cborByteSize": 0,
+      "midgardByteSize": null,
+      "profile": "replay",
+      "validation": {
+        "status": "rejected",
+        "rejectCode": "E_CBOR_DESERIALIZATION",
+        "detail": "cborHex must be a non-empty even-length hexadecimal string"
+      },
+      "submission": {
+        "status": "VALIDATION_REJECTED"
+      }
+    }
+  ]
+}

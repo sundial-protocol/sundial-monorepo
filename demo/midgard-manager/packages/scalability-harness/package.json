@@ -19,7 +19,10 @@
     "test:integration": "vitest run --mode=test tests/integration",
     "test": "npm run test:unit && npm run test:integration",
     "test:watch": "vitest --mode=test",
-    "regen-report": "node scripts/regen-report.mjs"
+    "regen-report": "node scripts/regen-report.mjs",
+    "tx:corpus:generate:one": "mkdir -p corpora && npm --prefix ../tx-generator run build && npm --prefix ../tx-generator run start -- generate-corpus --test-wallet --network ${TX_CORPUS_NETWORK:-Preview} --type ${TX_CORPUS_TYPE:-one-to-one} --count ${TX_CORPUS_COUNT:-5000000} --seed ${TX_CORPUS_SEED:-benchmark-runs-corpus} --output ${TX_CORPUS_OUTPUT:-corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl}",
+    "tx:corpus:generate:multi": "mkdir -p corpora && npm --prefix ../tx-generator run build && npm --prefix ../tx-generator run start -- generate-corpus --test-wallet --network ${TX_CORPUS_NETWORK:-Preview} --type ${TX_CORPUS_TYPE:-multi-output} --count ${TX_CORPUS_COUNT:-5000000} --seed ${TX_CORPUS_SEED:-benchmark-runs-corpus-multi-output} --output ${TX_CORPUS_OUTPUT:-corpora/corpus-v1-net-preview-t-multi-output-r-na-n-5000000.jsonl}",
+    "tx:corpus:generate:mix": "mkdir -p corpora && npm --prefix ../tx-generator run build && npm --prefix ../tx-generator run start -- generate-corpus --test-wallet --network ${TX_CORPUS_NETWORK:-Preview} --type ${TX_CORPUS_TYPE:-mixed} --ratio ${TX_CORPUS_RATIO:-70} --count ${TX_CORPUS_COUNT:-5000000} --seed ${TX_CORPUS_SEED:-benchmark-runs-corpus-mixed-70} --output ${TX_CORPUS_OUTPUT:-corpora/corpus-v1-net-preview-t-mixed-r-70-n-5000000.jsonl}"
   },
   "dependencies": {
     "@midgard-manager/tx-builder": "workspace:*",

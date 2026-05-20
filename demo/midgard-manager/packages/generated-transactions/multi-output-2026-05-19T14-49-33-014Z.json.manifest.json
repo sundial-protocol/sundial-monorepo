@@ -1,0 +1,45 @@
+{
+  "mode": "generated",
+  "generationSeed": "f089c38ab1ecb86e0d70cc014ed91822",
+  "profile": {
+    "transactionType": "multi-output",
+    "oneToOneRatio": 70,
+    "batchSize": 2,
+    "concurrency": 5,
+    "intervalSeconds": 0.1
+  },
+  "generatedAt": "2026-05-19T14:49:33.015Z",
+  "transactionCount": 2,
+  "transactions": [
+    {
+      "txId": "test_tx_3",
+      "computedTxId": null,
+      "cborByteSize": 0,
+      "midgardByteSize": null,
+      "profile": "multi-output-distribution",
+      "validation": {
+        "status": "rejected",
+        "rejectCode": "E_CBOR_DESERIALIZATION",
+        "detail": "cborHex must be a non-empty even-length hexadecimal string"
+      },
+      "submission": {
+        "status": "VALIDATION_REJECTED"
+      }
+    },
+    {
+      "txId": "test_tx_4",
+      "computedTxId": null,
+      "cborByteSize": 0,
+      "midgardByteSize": null,
+      "profile": "multi-output-collection",
+      "validation": {
+        "status": "rejected",
+        "rejectCode": "E_CBOR_DESERIALIZATION",
+        "detail": "cborHex must be a non-empty even-length hexadecimal string"
+      },
+      "submission": {
+        "status": "VALIDATION_REJECTED"
+      }
+    }
+  ]
+}

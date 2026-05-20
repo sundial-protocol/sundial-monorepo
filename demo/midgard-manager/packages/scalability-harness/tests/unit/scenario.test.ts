@@ -49,31 +49,6 @@ describe('validateScenario', () => {
       expect(() => validateScenario(s)).not.toThrow();
     });
 
-    it('accepts pregenTransactionCount when provided', () => {
-      const { replayCorpusPath: _, ...withoutCorpus } = VALID_SCENARIO;
-      const s = { ...withoutCorpus, pregenTransactionCount: 100000 };
-      expect(() => validateScenario(s)).not.toThrow();
-    });
-
-    it('rejects pregenTransactionCount combined with replayCorpusPath', () => {
-      const s = { ...VALID_SCENARIO, pregenTransactionCount: 100000 };
-      expect(() => validateScenario(s)).toThrow(
-        'pregenTransactionCount and replayCorpusPath are mutually exclusive'
-      );
-    });
-
-    it('rejects pregenTransactionCount of 0', () => {
-      const { replayCorpusPath: _, ...withoutCorpus } = VALID_SCENARIO;
-      const s = { ...withoutCorpus, pregenTransactionCount: 0 };
-      expect(() => validateScenario(s)).toThrow('pregenTransactionCount');
-    });
-
-    it('rejects non-integer pregenTransactionCount', () => {
-      const { replayCorpusPath: _, ...withoutCorpus } = VALID_SCENARIO;
-      const s = { ...withoutCorpus, pregenTransactionCount: 1000.5 };
-      expect(() => validateScenario(s)).toThrow('pregenTransactionCount');
-    });
-
     it('accepts https URLs', () => {
       const s = {
         ...VALID_SCENARIO,

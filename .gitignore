@@ -44,6 +44,8 @@ gitleaks-report.json
 # build and package manager artifacts
 node_modules/
 dist/
+corpora
+data
 out/
 .turbo/
 .pnp

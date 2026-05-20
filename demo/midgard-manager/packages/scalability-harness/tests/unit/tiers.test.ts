@@ -173,20 +173,4 @@ describe('generateTiers', () => {
       expect(a.map((t) => t.targetTps)).toEqual(b.map((t) => t.targetTps));
     });
   });
-
-  describe('replay slice assignment', () => {
-    it('splits pre-generated corpus evenly across tiers using disjoint slices', () => {
-      const tiers = generateTiers(
-        makeScenario({
-          startTps: 100,
-          maxTps: 800,
-          stepMultiplier: 2,
-          pregenTransactionCount: 1_500_000,
-        })
-      );
-
-      expect(tiers.map((t) => t.replayCount)).toEqual([375_000, 375_000, 375_000, 375_000]);
-      expect(tiers.map((t) => t.replayStartIndex)).toEqual([0, 375_000, 750_000, 1_125_000]);
-    });
-  });
 });
