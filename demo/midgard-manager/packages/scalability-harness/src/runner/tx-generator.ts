@@ -288,6 +288,12 @@ function buildArgs(
   const replayCorpusPath = resolveReplayCorpusPath(scenario.replayCorpusPath, cwd);
   if (replayCorpusPath !== undefined) {
     args.push('--replay-corpus-path', replayCorpusPath);
+    if (tier.replayStartIndex !== undefined) {
+      args.push('--replay-start-index', String(tier.replayStartIndex));
+    }
+    if (tier.replayCount !== undefined) {
+      args.push('--replay-count', String(tier.replayCount));
+    }
   }
 
   return args;

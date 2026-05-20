@@ -38,7 +38,11 @@ export interface StopConditions {
   // When provided with stopOnCommitmentFailure=true, collapse only when the observed
   // ratio exceeds this threshold. Use 0.0001 for a 0.01% budget.
   maxCommitmentFailureRatio?: number;
+  // Queue growth threshold over the full tier window:
+  // (tx_queue_size_after_recovery - tx_queue_size_before_tier).
   maxRecoveryQueueSize?: number;
+  // Mempool growth threshold over the full tier window:
+  // (mempool_tx_count_after_recovery - mempool_tx_count_before_tier).
   maxRecoveryMempoolSize?: number;
   // Node-health drain check: requires committedTxDelta >= mempoolAcceptedDelta * ratio.
   // Fires when the node commits fewer transactions than it accepted during the load window,
@@ -47,6 +51,10 @@ export interface StopConditions {
   // Load-driver adequacy check: requires mempoolAcceptedTps / targetTps >= ratio.
   // Fires when the load driver itself failed to deliver the target rate regardless of node health.
   minUsefulThroughputRatio?: number;
+  // End-of-tier submission-path check: measure unsubmitted backlog growth over
+  // the full tier window as (unsubmitted_block_backlog_after_recovery -
+  // unsubmitted_block_backlog_before_tier). Collapse when growth exceeds this threshold.
+  maxUnsubmittedBlockBacklogGrowth?: number;
 }
 
 export interface MultiplyRamp {
@@ -118,6 +126,9 @@ export interface ScalabilityScenario {
   tempoEndpoint?: string;
   // LogQL query passed to Loki query_range. Defaults to {job="containerlogs"}.
   lokiNodeQuery?: string;
+  // Optional post-window tail duration for Loki captures in seconds.
+  // This captures delayed asynchronous errors emitted shortly after tier stop.
+  lokiPostWindowTailSeconds?: number;
   // OpenTelemetry service name used for Tempo trace search. Defaults to "midgard-node".
   tempoServiceName?: string;
   transactionType: 'one-to-one' | 'multi-output' | 'mixed';
@@ -290,6 +301,10 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     if (typeof s.lokiNodeQuery !== 'string' || s.lokiNodeQuery.trim().length === 0) {
       throw new ScenarioValidationError('lokiNodeQuery must be a non-empty string when provided');
     }
+  }
+
+  if (s.lokiPostWindowTailSeconds !== undefined) {
+    assertNonNegativeInteger(s.lokiPostWindowTailSeconds, 'lokiPostWindowTailSeconds');
   }
 
   if (s.tempoServiceName !== undefined) {
@@ -700,6 +715,18 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     ) {
       throw new ScenarioValidationError(
         `stopConditions.minUsefulThroughputRatio must be between 0 and 1 when provided, got: ${sc.minUsefulThroughputRatio}`
+      );
+    }
+  }
+
+  if (sc.maxUnsubmittedBlockBacklogGrowth !== undefined) {
+    if (
+      typeof sc.maxUnsubmittedBlockBacklogGrowth !== 'number' ||
+      !isFinite(sc.maxUnsubmittedBlockBacklogGrowth) ||
+      sc.maxUnsubmittedBlockBacklogGrowth < 0
+    ) {
+      throw new ScenarioValidationError(
+        `stopConditions.maxUnsubmittedBlockBacklogGrowth must be a non-negative number when provided, got: ${sc.maxUnsubmittedBlockBacklogGrowth}`
       );
     }
   }

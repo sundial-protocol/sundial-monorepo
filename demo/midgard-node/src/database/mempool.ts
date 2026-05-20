@@ -13,6 +13,13 @@ import { AddressHistoryDB, MempoolLedgerDB, Tx } from "./index.js";
 
 export const tableName = "mempool";
 
+const normalizeTxIdToHex = (txId: Buffer | Uint8Array | string): string =>
+  typeof txId === "string"
+    ? txId.startsWith("\\x")
+      ? txId.slice(2)
+      : txId
+    : Buffer.from(txId).toString("hex");
+
 /**
  * Along with insertions to MempoolDB, applies transactions to MempoolLedgerDB,
  * updating it. Also adds corresponding entries to AddressHistoryDB.
@@ -35,7 +42,9 @@ export const insertMultiple = (
     }));
 
     const sql = yield* SqlClient.SqlClient;
-    const insertedTxRows = yield* sql<Pick<Tx.EntryNoTimeStamp, Tx.Columns.TX_ID>>`
+    const insertedTxRows = yield* sql<{
+      [Tx.Columns.TX_ID]: Buffer | Uint8Array | string;
+    }>`
       INSERT INTO ${sql(tableName)} ${sql.insert(txEntries)}
       ON CONFLICT (${sql(Tx.Columns.TX_ID)}) DO NOTHING
       RETURNING ${sql(Tx.Columns.TX_ID)}`;
@@ -45,7 +54,7 @@ export const insertMultiple = (
     }
 
     const insertedTxIdsHex = new Set(
-      insertedTxRows.map((row) => row[Tx.Columns.TX_ID].toString("hex")),
+      insertedTxRows.map((row) => normalizeTxIdToHex(row[Tx.Columns.TX_ID])),
     );
     const newlyInsertedProcessedTxs = processedTxs.filter((processedTx) =>
       insertedTxIdsHex.has(processedTx.txId.toString("hex")),
@@ -81,10 +90,15 @@ export const insertMultiple = (
   }).pipe(
     Effect.withLogSpan(`insert ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>
-      Effect.logError(`${tableName} db: insert sql error: ${JSON.stringify(e)}`),
+      Effect.logError(
+        `${tableName} db: insert sql error: ${JSON.stringify(e)}`,
+      ),
     ),
     Effect.tapError((e) => Effect.logError(`${tableName} db: insert: ${e}`)),
-    sqlErrorToDatabaseError(tableName, "Failed to insert the given transactions"),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to insert the given transactions",
+    ),
   );
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>

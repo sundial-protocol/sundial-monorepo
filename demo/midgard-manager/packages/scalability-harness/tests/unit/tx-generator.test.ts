@@ -92,9 +92,9 @@ function makeWriter() {
 // ---------------------------------------------------------------------------
 
 describe('computeSettings', () => {
-  // CLIENT_OVERSEND_RATIO = 2: the client targets 200% of the scenario TPS to
+  // CLIENT_OVERSEND_RATIO = 1.3: the client targets 130% of scenario TPS to
   // absorb scheduling jitter without falling below the configured target.
-  // effectiveTps = targetTps * 2
+  // effectiveTps = targetTps * 1.3
   // concurrency  = ceil(effectiveTps * txCostSeconds * 12)
   // interval     = concurrency / effectiveTps  (≈ 6 * txCostSeconds)
   //
@@ -106,15 +106,15 @@ describe('computeSettings', () => {
     expect(s.batchSize).toBe(s.concurrency);
   });
 
-  it('sets concurrency proportional to effectiveTps (targetTps * 2)', () => {
-    // effectiveTps = 200; concurrency = ceil(200 * 0.2 * 12) = 480
+  it('sets concurrency proportional to effectiveTps (targetTps * 1.3)', () => {
+    // effectiveTps = 130; concurrency = ceil(130 * 0.2 * 12) = 312
     const s = computeSettings(100, 0.2);
-    expect(s.concurrency).toBe(480);
+    expect(s.concurrency).toBe(312);
   });
 
-  it('sets actualTpsEstimate to effectiveTps (targetTps * 2)', () => {
-    expect(computeSettings(100, 0.2).actualTpsEstimate).toBeCloseTo(200);
-    expect(computeSettings(800, 0.2).actualTpsEstimate).toBeCloseTo(1600);
+  it('sets actualTpsEstimate to effectiveTps (targetTps * 1.3)', () => {
+    expect(computeSettings(100, 0.2).actualTpsEstimate).toBeCloseTo(130);
+    expect(computeSettings(800, 0.2).actualTpsEstimate).toBeCloseTo(1040);
   });
 
   it('preserves targetTps as the scenario-configured value, not the effective rate', () => {
@@ -141,13 +141,13 @@ describe('computeSettings', () => {
   });
 
   it('derives maxInFlight, generationConcurrency, and preparedQueueCapacity', () => {
-    // Standard mode: concurrency = ceil(1600 * 0.2 * 12) = 3840
-    // generationConcurrency = min(32, ceil(3840 * 0.25)) = min(32, 960) = 32
-    // preparedQueueCapacity = 3840 * 4 = 15360
+    // Standard mode: concurrency = ceil(1040 * 0.2 * 12) = 2496
+    // generationConcurrency = min(32, ceil(2496 * 0.25)) = min(32, 624) = 32
+    // preparedQueueCapacity = 2496 * 4 = 9984
     const s = computeSettings(800, 0.2);
-    expect(s.maxInFlight).toBe(3840);
+    expect(s.maxInFlight).toBe(2496);
     expect(s.generationConcurrency).toBe(32);
-    expect(s.preparedQueueCapacity).toBe(15360);
+    expect(s.preparedQueueCapacity).toBe(9984);
   });
 
   it('clamps concurrency to at least 1', () => {
@@ -238,7 +238,7 @@ describe('computeSettings', () => {
       };
       const s = computeSettings(800, 0.2, opts);
       expect(s.targetTps).toBe(800);
-      expect(s.actualTpsEstimate).toBeCloseTo(1600);
+      expect(s.actualTpsEstimate).toBeCloseTo(1040);
     });
   });
 });
@@ -350,6 +350,31 @@ describe('startTxGenerator', () => {
     expect(args[replayFlagIndex + 1]).toBe(
       '/workdir/demo/midgard-manager/packages/scalability-harness/scenarios/corpora/replay-baseline.json'
     );
+  });
+
+  it('passes replay window args when tier replay slice is configured', async () => {
+    const { spawnFn, ...spawner } = makeMockSpawner(proc);
+    proc.simulateExit(0);
+
+    const scenario = {
+      ...BASE_SCENARIO,
+      replayCorpusPath: 'scenarios/corpora/replay-baseline.json',
+    };
+    const tierWithSlice: LoadTier = {
+      ...BASE_TIER,
+      replayStartIndex: 375_000,
+      replayCount: 375_000,
+    };
+    await startTxGenerator(scenario, tierWithSlice, writer, '/tmp/tier-0', {
+      spawner,
+      cwd: '/workdir/demo/midgard-manager/packages/scalability-harness',
+    });
+
+    const [, args] = spawnFn.mock.calls[0];
+    expect(args).toContain('--replay-start-index');
+    expect(args).toContain('375000');
+    expect(args).toContain('--replay-count');
+    expect(args).toContain('375000');
   });
 
   it('omits --ratio when transactionType is not mixed', async () => {

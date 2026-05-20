@@ -10,7 +10,9 @@ import { metricDelta } from "./harness/metric-snapshot.js";
 // Hoisted so values can be swapped per test.
 const retrieveFn = vi.hoisted(() => vi.fn());
 const setStatusFn = vi.hoisted(() => vi.fn());
+const countByStatusFn = vi.hoisted(() => vi.fn());
 const SUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 91_337);
+const UNSUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 0);
 const fromCborBytesFn = vi.hoisted(() => vi.fn());
 
 vi.mock("@/database/index.js", () => ({
@@ -19,6 +21,8 @@ vi.mock("@/database/index.js", () => ({
       return retrieveFn();
     },
     setStatusOfEntry: (...args: unknown[]) => setStatusFn(...args),
+    countByStatus: (...args: unknown[]) => countByStatusFn(...args),
+    countWithMinimumStatus: () => Effect.succeed(0n),
     retrieveEvents: () =>
       Effect.succeed({
         withdrawals: [],
@@ -32,7 +36,10 @@ vi.mock("@/database/index.js", () => ({
       EVENT_END_TIME: "event_end_time",
       HEADER_HASH: "header_hash",
     },
-    Status: { SUBMITTED: SUBMITTED_STATUS_SENTINEL },
+    Status: {
+      UNSUBMITTED: UNSUBMITTED_STATUS_SENTINEL,
+      SUBMITTED: SUBMITTED_STATUS_SENTINEL,
+    },
   },
   LatestLedgerDB: {
     tableName: "latest_ledger",
@@ -163,6 +170,7 @@ beforeEach(() => {
   sqlHarness.reset();
   retrieveFn.mockReturnValue(Effect.succeed(Option.none()));
   setStatusFn.mockReturnValue(Effect.succeed(undefined));
+  countByStatusFn.mockReturnValue(Effect.succeed(0n));
   fakeSubmitProgram.mockReturnValue(Effect.succeed("faketxhash"));
   fakeCompleteProgram.mockReturnValue(
     Effect.succeed({ submitProgram: fakeSubmitProgram }),

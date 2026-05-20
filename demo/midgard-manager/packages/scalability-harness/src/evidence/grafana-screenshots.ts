@@ -612,20 +612,22 @@ export class GrafanaScreenshotService {
 
     if (reason === 'recovery_queue_exceeded') {
       if (stopConditions.maxRecoveryQueueSize === undefined) return fallback;
+      const baseline = window.before['tx_queue_size'] ?? 0;
       return (
         findFirstSeriesValueByPredicate(
           window.ranges['tx_queue_size'],
-          (value) => value > stopConditions.maxRecoveryQueueSize!
+          (value) => value - baseline > stopConditions.maxRecoveryQueueSize!
         ) ?? fallback
       );
     }
 
     if (reason === 'recovery_mempool_exceeded') {
       if (stopConditions.maxRecoveryMempoolSize === undefined) return fallback;
+      const baseline = window.before['mempool_tx_count'] ?? 0;
       return (
         findFirstSeriesValueByPredicate(
           window.ranges['mempool_tx_count'],
-          (value) => value > stopConditions.maxRecoveryMempoolSize!
+          (value) => value - baseline > stopConditions.maxRecoveryMempoolSize!
         ) ?? fallback
       );
     }

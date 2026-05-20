@@ -108,6 +108,11 @@ describe('validateScenario', () => {
       expect(() => validateScenario(s)).not.toThrow();
     });
 
+    it('accepts lokiPostWindowTailSeconds when provided', () => {
+      const s = { ...VALID_SCENARIO, lokiPostWindowTailSeconds: 90 };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
     it('accepts minCommitToAcceptedRatio as a node-health stop condition', () => {
       const s = {
         ...VALID_SCENARIO,
@@ -128,6 +133,17 @@ describe('validateScenario', () => {
       const s = {
         ...VALID_SCENARIO,
         stopConditions: { ...VALID_SCENARIO.stopConditions, maxCommitmentFailureRatio: 0.0001 },
+      };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
+    it('accepts maxUnsubmittedBlockBacklogGrowth as a stop condition', () => {
+      const s = {
+        ...VALID_SCENARIO,
+        stopConditions: {
+          ...VALID_SCENARIO.stopConditions,
+          maxUnsubmittedBlockBacklogGrowth: 0,
+        },
       };
       expect(() => validateScenario(s)).not.toThrow();
     });
@@ -293,6 +309,18 @@ describe('validateScenario', () => {
     });
   });
 
+  describe('invalid Loki post-window tail config', () => {
+    it('rejects negative lokiPostWindowTailSeconds', () => {
+      const s = { ...VALID_SCENARIO, lokiPostWindowTailSeconds: -1 };
+      expect(() => validateScenario(s)).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects non-integer lokiPostWindowTailSeconds', () => {
+      const s = { ...VALID_SCENARIO, lokiPostWindowTailSeconds: 0.5 };
+      expect(() => validateScenario(s)).toThrow(ScenarioValidationError);
+    });
+  });
+
   describe('invalid numeric ranges', () => {
     it('rejects startTps of zero', () => {
       expect(() => validateScenario({ ...VALID_SCENARIO, startTps: 0 })).toThrow(
@@ -441,6 +469,18 @@ describe('validateScenario', () => {
           stopConditions: {
             ...VALID_SCENARIO.stopConditions,
             maxCommitmentFailureRatio: Number.NaN,
+          },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects maxUnsubmittedBlockBacklogGrowth below 0', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: {
+            ...VALID_SCENARIO.stopConditions,
+            maxUnsubmittedBlockBacklogGrowth: -1,
           },
         })
       ).toThrow(ScenarioValidationError);

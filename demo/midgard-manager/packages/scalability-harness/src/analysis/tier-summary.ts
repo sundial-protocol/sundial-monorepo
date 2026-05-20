@@ -44,8 +44,10 @@ export interface TierSummary {
   // Queue and mempool gauge summaries over the full tier window.
   peakQueueSize: number | null;
   finalQueueSizeAfterRecovery: number | null;
+  finalQueueDeltaAfterRecovery: number | null;
   peakMempoolSize: number | null;
   finalMempoolSizeAfterRecovery: number | null;
+  finalMempoolDeltaAfterRecovery: number | null;
   clientSubmittedCount: number | null;
   clientRejectedCount: number | null;
   clientNodeUnavailableCount: number | null;
@@ -128,6 +130,17 @@ function deriveL1FeePerCommittedL2Tx(
     return null;
   }
   return l1CommitmentFeesDeltaLovelace / committedTxDelta;
+}
+
+function deriveFinalGaugeDeltaAfterRecovery(
+  metricWindow: TierMetricWindow | null,
+  query: string
+): number | null {
+  if (metricWindow === null) return null;
+  const before = metricWindow.before[query] ?? null;
+  const afterRecovery = metricWindow.afterRecovery[query] ?? null;
+  if (before === null || afterRecovery === null) return null;
+  return afterRecovery - before;
 }
 
 export function buildTierSummary(input: TierSummaryInput): TierSummary {
@@ -240,8 +253,13 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     observedCommittedTps: deriveTps(committedTxDelta, loadDurationSeconds),
     peakQueueSize: queueGauge?.peak ?? null,
     finalQueueSizeAfterRecovery: queueGauge?.final ?? null,
+    finalQueueDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(metricWindow, 'tx_queue_size'),
     peakMempoolSize: mempoolGauge?.peak ?? null,
     finalMempoolSizeAfterRecovery: mempoolGauge?.final ?? null,
+    finalMempoolDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(
+      metricWindow,
+      'mempool_tx_count'
+    ),
     clientSubmittedCount: submissionAggregate?.counters.submitted ?? null,
     clientRejectedCount: submissionAggregate?.counters.rejected ?? null,
     clientNodeUnavailableCount: submissionAggregate?.counters.node_unavailable ?? null,

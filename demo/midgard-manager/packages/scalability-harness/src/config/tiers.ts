@@ -6,6 +6,10 @@ export interface LoadTier {
   durationSeconds: number;
   recoverySeconds: number;
   seed: string;
+  // Optional replay-corpus window. When provided, tx-generator replays only
+  // this disjoint slice for the tier so tiers do not resend the same tx IDs.
+  replayStartIndex?: number;
+  replayCount?: number;
 }
 
 function roundTargetTps(value: number): number {
@@ -74,6 +78,20 @@ export function generateTiers(scenario: ScalabilityScenario): LoadTier[] {
         continue;
       }
       tps = next;
+    }
+  }
+
+  const pregenTransactionCount = scenario.pregenTransactionCount;
+  if (pregenTransactionCount !== undefined && pregenTransactionCount > 0 && tiers.length > 0) {
+    const baseCount = Math.floor(pregenTransactionCount / tiers.length);
+    const remainder = pregenTransactionCount % tiers.length;
+    let nextStartIndex = 0;
+
+    for (const tier of tiers) {
+      const tierCount = baseCount + (tier.tierIndex < remainder ? 1 : 0);
+      tier.replayStartIndex = nextStartIndex;
+      tier.replayCount = tierCount;
+      nextStartIndex += tierCount;
     }
   }
 

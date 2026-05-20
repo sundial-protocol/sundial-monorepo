@@ -29,6 +29,8 @@ const MAX_MISSING_METRICS_IN_ERROR = 5;
 const PROGRESS_TICK_INTERVAL_MS = 1_000;
 const PROGRESS_LOG_EVERY_N_TICKS = 5;
 const PROGRESS_BAR_WIDTH = 24;
+const DEFAULT_LOKI_POST_WINDOW_TAIL_SECONDS = 60;
+const DEFAULT_MAX_UNSUBMITTED_BLOCK_BACKLOG_GROWTH = 0;
 
 type SnapshotCapture = PrometheusSnapshotEvent['capture'];
 type TierExecutionPhase = 'load' | 'recovery';
@@ -362,22 +364,67 @@ export function checkMetricStopConditions(
   }
 
   if (stopConditions.maxRecoveryQueueSize !== undefined) {
-    const size = window.afterRecovery['tx_queue_size'] ?? null;
-    if (size !== null && size > stopConditions.maxRecoveryQueueSize) {
-      return {
-        reason: 'recovery_queue_exceeded',
-        metricValues: { tx_queue_size: size },
-      };
+    const beforeQueueSize = window.before['tx_queue_size'] ?? null;
+    const afterRecoveryQueueSize = window.afterRecovery['tx_queue_size'] ?? null;
+    if (beforeQueueSize !== null && afterRecoveryQueueSize !== null) {
+      const queueGrowth = afterRecoveryQueueSize - beforeQueueSize;
+      if (queueGrowth > stopConditions.maxRecoveryQueueSize) {
+        return {
+          reason: 'recovery_queue_exceeded',
+          metricValues: {
+            beforeQueueSize,
+            afterRecoveryQueueSize,
+            queueGrowth,
+            maxRecoveryQueueGrowth: stopConditions.maxRecoveryQueueSize,
+          },
+        };
+      }
     }
   }
 
   if (stopConditions.maxRecoveryMempoolSize !== undefined) {
-    const size = window.afterRecovery['mempool_tx_count'] ?? null;
-    if (size !== null && size > stopConditions.maxRecoveryMempoolSize) {
-      return {
-        reason: 'recovery_mempool_exceeded',
-        metricValues: { mempool_tx_count: size },
-      };
+    const beforeMempoolSize = window.before['mempool_tx_count'] ?? null;
+    const afterRecoveryMempoolSize = window.afterRecovery['mempool_tx_count'] ?? null;
+    if (beforeMempoolSize !== null && afterRecoveryMempoolSize !== null) {
+      const mempoolGrowth = afterRecoveryMempoolSize - beforeMempoolSize;
+      if (mempoolGrowth > stopConditions.maxRecoveryMempoolSize) {
+        return {
+          reason: 'recovery_mempool_exceeded',
+          metricValues: {
+            beforeMempoolSize,
+            afterRecoveryMempoolSize,
+            mempoolGrowth,
+            maxRecoveryMempoolGrowth: stopConditions.maxRecoveryMempoolSize,
+          },
+        };
+      }
+    }
+  }
+
+  {
+    const maxUnsubmittedBlockBacklogGrowth =
+      stopConditions.maxUnsubmittedBlockBacklogGrowth ??
+      DEFAULT_MAX_UNSUBMITTED_BLOCK_BACKLOG_GROWTH;
+    const beforeBacklog = window.before['unsubmitted_block_backlog'] ?? null;
+    const afterRecoveryBacklog = window.afterRecovery['unsubmitted_block_backlog'] ?? null;
+    if (
+      beforeBacklog !== null &&
+      afterRecoveryBacklog !== null &&
+      beforeBacklog >= 0 &&
+      afterRecoveryBacklog >= 0
+    ) {
+      const unsubmittedBacklogGrowth = afterRecoveryBacklog - beforeBacklog;
+      if (unsubmittedBacklogGrowth > maxUnsubmittedBlockBacklogGrowth) {
+        return {
+          reason: 'unsubmitted_backlog_growth',
+          metricValues: {
+            beforeUnsubmittedBlockBacklog: beforeBacklog,
+            afterRecoveryUnsubmittedBlockBacklog: afterRecoveryBacklog,
+            unsubmittedBacklogGrowth,
+            maxUnsubmittedBlockBacklogGrowth,
+          },
+        };
+      }
     }
   }
 
@@ -851,14 +898,21 @@ export async function runTier(
       );
     }
 
-    // Loki/Tempo evidence capture — covers the full tier window (load + recovery).
+    // Loki/Tempo evidence capture.
+    // Loki includes an optional post-window tail so delayed async errors are visible.
     // Errors are recorded in the capture object and do not affect tier outcome.
     let lokiCapture: LokiTierCapture | null = null;
     if (lokiClient !== undefined) {
       const capturedAt = new Date().toISOString();
       const query = lokiNodeQuery ?? '{job="containerlogs"}';
+      const postWindowTailSeconds = Math.max(
+        0,
+        scenario.lokiPostWindowTailSeconds ?? DEFAULT_LOKI_POST_WINDOW_TAIL_SECONDS
+      );
+      const captureStartedAt = startedAt;
+      const captureStoppedAt = new Date(recoveryStoppedAt.getTime() + postWindowTailSeconds * 1000);
       try {
-        const result = await lokiClient.queryRange(query, startedAt, recoveryStoppedAt);
+        const result = await lokiClient.queryRange(query, captureStartedAt, captureStoppedAt);
         lokiCapture = {
           tierIndex: tier.tierIndex,
           targetTps: tier.targetTps,
@@ -866,6 +920,9 @@ export async function runTier(
           query,
           startedAt: startedAt.toISOString(),
           recoveryStoppedAt: recoveryStoppedAt.toISOString(),
+          captureStartedAt: captureStartedAt.toISOString(),
+          captureStoppedAt: captureStoppedAt.toISOString(),
+          postWindowTailSeconds,
           result,
           error: null,
         };
@@ -877,6 +934,9 @@ export async function runTier(
           query,
           startedAt: startedAt.toISOString(),
           recoveryStoppedAt: recoveryStoppedAt.toISOString(),
+          captureStartedAt: captureStartedAt.toISOString(),
+          captureStoppedAt: captureStoppedAt.toISOString(),
+          postWindowTailSeconds,
           result: null,
           error: err instanceof Error ? err.message : String(err),
         };

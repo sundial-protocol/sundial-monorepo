@@ -36,6 +36,11 @@ export interface LokiTierCapture {
   query: string;
   startedAt: string;
   recoveryStoppedAt: string;
+  // Actual range sent to Loki query_range. May include a post-window tail.
+  captureStartedAt?: string;
+  captureStoppedAt?: string;
+  // Tail length appended to recoveryStoppedAt for delayed error visibility.
+  postWindowTailSeconds?: number;
   result: LokiQueryResult | null;
   error: string | null;
 }

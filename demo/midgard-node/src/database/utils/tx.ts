@@ -174,6 +174,33 @@ export const insertEntries = (
     ),
   );
 
+export const insertEntriesOrIgnore = (
+  tableName: string,
+  pairs: Entry[],
+): Effect.Effect<void, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    yield* Effect.logDebug(
+      `${tableName} db: attempt to insertTXs (ignore conflicts)`,
+    );
+    const sql = yield* SqlClient.SqlClient;
+    if (pairs.length <= 0) {
+      yield* Effect.logDebug("No pairs provided, skipping insertion.");
+      return;
+    }
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(pairs)} ON CONFLICT (${sql(Columns.TX_ID)}) DO NOTHING`;
+  }).pipe(
+    Effect.withLogSpan(`insertTXsOrIgnore ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(
+        `${tableName} db: insertTXsOrIgnore: ${JSON.stringify(e)}`,
+      ),
+    ),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to insert the given transactions",
+    ),
+  );
+
 export const retrieveAllEntries = (
   tableName: string,
 ): Effect.Effect<readonly EntryWithTimeStamp[], DatabaseError, Database> =>

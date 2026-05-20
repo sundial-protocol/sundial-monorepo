@@ -1,5 +1,6 @@
 import * as SDK from "@al-ft/midgard-sdk";
 import { CML } from "@lucid-evolution/lucid";
+import { SqlClient } from "@effect/sql";
 import { DatabaseError, NotFoundError } from "@/database/utils/common.js";
 import {
   AlwaysSucceedsContract,
@@ -50,10 +51,17 @@ const l1CommitmentFeeLovelaceLastGauge = Metric.gauge(
   },
 ).register();
 
+const unsubmittedBlockBacklogGauge = Metric.gauge("unsubmitted_block_backlog", {
+  description:
+    "Current number of rows in unsubmitted_blocks with status=UNSUBMITTED",
+  bigint: true,
+}).register();
+
 export const blockSubmissionMetrics = {
   submitBlockCounter,
   l1CommitmentFeesLovelaceCounter,
   l1CommitmentFeeLovelaceLastGauge,
+  unsubmittedBlockBacklogGauge,
 } as const;
 
 export const initializeSubmissionMetrics = Effect.all([
@@ -63,7 +71,47 @@ export const initializeSubmissionMetrics = Effect.all([
     0n,
   ),
   Metric.set(blockSubmissionMetrics.l1CommitmentFeeLovelaceLastGauge, 0n),
+  Metric.set(blockSubmissionMetrics.unsubmittedBlockBacklogGauge, 0n),
 ]);
+
+const loadSubmissionMetricsBaselineFromDb = Effect.gen(function* () {
+  const [submittedOrLaterCount, unsubmittedCount] = yield* Effect.all(
+    [
+      BlocksDB.countWithMinimumStatus(BlocksDB.Status.SUBMITTED),
+      BlocksDB.countByStatus(BlocksDB.Status.UNSUBMITTED),
+    ],
+    { concurrency: "unbounded" },
+  );
+  return {
+    submittedOrLaterCount,
+    unsubmittedCount,
+  };
+});
+
+const reconcileSubmissionMetricsFromDb = Effect.gen(function* () {
+  // On node boot, restore counters/gauges from persisted block statuses.
+  yield* initializeSubmissionMetrics;
+  const { submittedOrLaterCount, unsubmittedCount } =
+    yield* loadSubmissionMetricsBaselineFromDb;
+  yield* Metric.incrementBy(
+    blockSubmissionMetrics.submitBlockCounter,
+    submittedOrLaterCount,
+  );
+  yield* Metric.set(
+    blockSubmissionMetrics.unsubmittedBlockBacklogGauge,
+    unsubmittedCount,
+  );
+});
+
+const refreshUnsubmittedBacklogGaugeFromDb = Effect.gen(function* () {
+  const unsubmittedCount = yield* BlocksDB.countByStatus(
+    BlocksDB.Status.UNSUBMITTED,
+  );
+  yield* Metric.set(
+    blockSubmissionMetrics.unsubmittedBlockBacklogGauge,
+    unsubmittedCount,
+  );
+});
 
 // For database operations.
 const BATCH_SIZE = 100;
@@ -288,7 +336,11 @@ const processEventsForLedgerApplication = (
 export const submitEarliestBlock = Effect.gen(function* () {
   const optUnsubmittedBlock = yield* BlocksDB.retrieveEarliestUnsubmittedEntry;
   yield* Option.match(optUnsubmittedBlock, {
-    onNone: () => Effect.logInfo("No unsubmitted blocks in queue."),
+    onNone: () =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo("No unsubmitted blocks in queue.");
+        yield* refreshUnsubmittedBacklogGaugeFromDb;
+      }),
     onSome: (blockEntry) =>
       Effect.gen(function* () {
         yield* Effect.logInfo("🔗 ✉️  Submitting block commitment...");
@@ -336,9 +388,10 @@ export const submitEarliestBlock = Effect.gen(function* () {
           allProducedLedgerEntries.length,
           "Insert new entries to LatestLedgerDB",
           (startIndex, endIndex) =>
-            LatestLedgerDB.insertMultiple(
+            LatestLedgerDB.insertMultipleOrIgnore(
               allProducedLedgerEntries.slice(startIndex, endIndex),
             ),
+          1,
         );
 
         const removeFromLedgerProgram = batchProgram(
@@ -349,15 +402,15 @@ export const submitEarliestBlock = Effect.gen(function* () {
             LatestLedgerDB.clearUTxOs(
               allSpentOutRefs.slice(startIndex, endIndex),
             ),
+          1,
         );
 
-        // Note that this does NOT have unbounded concurrency. We first want to
-        // add any new UTxOs before deleting the spent ones, as some
-        // transactions could have spent UTxOs produced by other transactions.
-        const updateLatestLedgerDBProgram = Effect.all([
-          addToLedgerProgram,
-          removeFromLedgerProgram,
-        ]);
+        // We intentionally apply inserts before removals so same-block spends
+        // of newly produced UTxOs are resolved deterministically.
+        const updateLatestLedgerDBProgram = Effect.gen(function* () {
+          yield* addToLedgerProgram;
+          yield* removeFromLedgerProgram;
+        });
 
         const transferMempoolTxsProgram = batchProgram(
           BATCH_SIZE,
@@ -366,18 +419,16 @@ export const submitEarliestBlock = Effect.gen(function* () {
           (startIndex, endIndex) => {
             const txsBatch = txRequests.slice(startIndex, endIndex);
             const txHashesBatch = mempoolTxHashes.slice(startIndex, endIndex);
-            return Effect.all(
-              [
-                MempoolDB.clearTxs(txHashesBatch),
-                ImmutableDB.insertTxs(txsBatch),
-                BlocksTxsDB.insert(
-                  blockEntry[BlocksDB.Columns.HEADER_HASH],
-                  txHashesBatch,
-                ),
-              ],
-              { concurrency: "unbounded" },
-            );
+            return Effect.gen(function* () {
+              yield* ImmutableDB.insertTxsOrIgnore(txsBatch);
+              yield* BlocksTxsDB.insertOrIgnore(
+                blockEntry[BlocksDB.Columns.HEADER_HASH],
+                txHashesBatch,
+              );
+              yield* MempoolDB.clearTxs(txHashesBatch);
+            });
           },
+          1,
         );
 
         const addToAddressHistoryProgram = batchProgram(
@@ -388,18 +439,23 @@ export const submitEarliestBlock = Effect.gen(function* () {
             AddressHistoryDB.upsertEntries(
               allAddressHistoryEntries.slice(startIndex, endIndex),
             ),
+          1,
         );
 
-        yield* Effect.all(
-          [
-            updateLatestLedgerDBProgram,
-            transferMempoolTxsProgram,
-            addToAddressHistoryProgram,
-            BlocksDB.setStatusOfEntry(blockEntry, BlocksDB.Status.SUBMITTED),
-          ],
-          { concurrency: "unbounded" },
+        const sql = yield* SqlClient.SqlClient;
+        yield* sql.withTransaction(
+          Effect.gen(function* () {
+            yield* updateLatestLedgerDBProgram;
+            yield* transferMempoolTxsProgram;
+            yield* addToAddressHistoryProgram;
+            yield* BlocksDB.setStatusOfEntry(
+              blockEntry,
+              BlocksDB.Status.SUBMITTED,
+            );
+          }),
         );
         yield* Metric.increment(blockSubmissionMetrics.submitBlockCounter);
+        yield* refreshUnsubmittedBacklogGaugeFromDb;
       }),
   });
 });
@@ -413,7 +469,9 @@ export const blockSubmissionFiber = (
 > =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔗 Block submission fiber started.");
-    yield* initializeSubmissionMetrics;
+    yield* reconcileSubmissionMetricsFromDb.pipe(
+      Effect.catchAllCause(Effect.logWarning),
+    );
     const action = submitEarliestBlock.pipe(
       Effect.withSpan("submit-blocks-fiber"),
       Effect.catchAllCause(Effect.logWarning),

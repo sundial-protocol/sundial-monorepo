@@ -22,6 +22,8 @@ function makeInputs(overrides: Partial<CollapseInputs> = {}): CollapseInputs {
     txGeneratorExitCode: 0,
     commitmentFailuresDelta: 0,
     mergeFailuresDelta: 0,
+    beforeQueueSize: 0,
+    beforeMempoolSize: 0,
     afterLoadMempoolSize: null,
     recoveryQueueSize: 0,
     recoveryMempoolSize: 0,
@@ -394,7 +396,7 @@ describe('detectCollapse — queue_not_recovered', () => {
     );
     expect(result?.reason).toBe('queue_not_recovered');
     expect(result?.values.recoveryQueueSize).toBe(150);
-    expect(result?.values.maxRecoveryQueueSize).toBe(100);
+    expect(result?.values.maxRecoveryQueueGrowth).toBe(100);
   });
 
   it('does not trigger when size equals threshold', () => {
@@ -467,7 +469,7 @@ describe('detectCollapse — mempool_not_recovered', () => {
     );
     expect(result?.reason).toBe('mempool_not_recovered');
     expect(result?.values.recoveryMempoolSize).toBe(600);
-    expect(result?.values.maxRecoveryMempoolSize).toBe(500);
+    expect(result?.values.maxRecoveryMempoolGrowth).toBe(500);
   });
 
   it('does not trigger when size equals threshold', () => {
@@ -546,6 +548,36 @@ describe('detectCollapse — mempool_not_recovered', () => {
       })
     );
     expect(result?.reason).toBe('mempool_not_recovered');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unsubmitted_backlog_growth
+// ---------------------------------------------------------------------------
+
+describe('detectCollapse — unsubmitted_backlog_growth', () => {
+  it('returns unsubmitted_backlog_growth when growth exceeds threshold', () => {
+    const result = detectCollapse(
+      makeInputs({
+        committedBlocksDeltaRecovery: 20,
+        submittedBlocksDeltaRecovery: 16,
+        stopConditions: { ...BASE_STOP_CONDITIONS, maxUnsubmittedBlockBacklogGrowth: 2 },
+      })
+    );
+    expect(result?.reason).toBe('unsubmitted_backlog_growth');
+    expect(result?.values.unsubmittedBacklogGrowth).toBe(4);
+  });
+
+  it('does not trigger when growth is within threshold', () => {
+    expect(
+      detectCollapse(
+        makeInputs({
+          committedBlocksDeltaRecovery: 20,
+          submittedBlocksDeltaRecovery: 18,
+          stopConditions: { ...BASE_STOP_CONDITIONS, maxUnsubmittedBlockBacklogGrowth: 2 },
+        })
+      )
+    ).toBeNull();
   });
 });
 

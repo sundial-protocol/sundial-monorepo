@@ -87,6 +87,7 @@ export interface StopConditionEvent extends BaseEvent {
     | 'merge_failure'
     | 'recovery_queue_exceeded'
     | 'recovery_mempool_exceeded'
+    | 'unsubmitted_backlog_growth'
     | 'commit_drain_below_threshold'
     | 'throughput_below_minimum';
   metricValues?: Record<string, number | boolean>;

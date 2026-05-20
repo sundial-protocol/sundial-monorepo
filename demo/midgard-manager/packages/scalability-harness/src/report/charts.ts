@@ -401,8 +401,7 @@ export function buildDataRows(windows: TierMetricWindow[], spec: PanelSpec): Dat
   for (const { metric, values } of merged) {
     const label = seriesLabel(metric);
     const processed = spec.rate ? computeRate(values) : values;
-    const baseline =
-      spec.normalizeToWindowStart && processed.length > 0 ? processed[0][1] : 0;
+    const baseline = spec.normalizeToWindowStart && processed.length > 0 ? processed[0][1] : 0;
     for (const [ts, value] of processed) {
       rows.push({
         ts: new Date(ts * 1000).toISOString(),

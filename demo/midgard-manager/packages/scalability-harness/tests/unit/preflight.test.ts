@@ -143,8 +143,10 @@ describe('runExecutionReadinessPreflight', () => {
           tx_submissions_rejected_total: [],
           tx_submissions_mempool_accepted_total: [],
           tx_submissions_processing_failed_total: [],
-          commit_block_count_total: [{ value: [1, '0'] }],
-          submit_block_count_total: [{ value: [1, '0'] }],
+          // commit pipeline readiness is now a separate blocking gate; keep these warm
+          // here so this test remains focused on required_metrics_presence behavior.
+          commit_block_count_total: [{ value: [1, '1'] }],
+          submit_block_count_total: [{ value: [1, '1'] }],
           commit_block_tx_count_total: [],
           l1_commitment_fees_lovelace_total: [],
           l1_commitment_fee_lovelace_last: [],
@@ -162,6 +164,93 @@ describe('runExecutionReadinessPreflight', () => {
     const metricsCheck = result.checks.find((c) => c.name === 'required_metrics_presence');
     expect(metricsCheck?.passed).toBe(true);
     expect(metricsCheck?.summary).toMatch(/not yet active/);
+  });
+
+  it('does not block when small unsubmitted backlog remains on an idle pipeline', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-submit-delta-one-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory({
+          commit_block_count_total: [{ value: [1, '319'] }],
+          submit_block_count_total: [{ value: [1, '317'] }],
+          mempool_tx_count: [{ value: [1, '0'] }],
+          tx_queue_size: [{ value: [1, '0'] }],
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
+      },
+    });
+
+    expect(result.passed).toBe(true);
+    const backlogCheck = result.checks.find((c) => c.name === 'no_unsubmitted_block_backlog');
+    expect(backlogCheck?.passed).toBe(false);
+    expect(backlogCheck?.blocking).toBe(false);
+    expect(backlogCheck?.summary).toMatch(
+      /Pre-existing unsubmitted-block backlog remained stable/i
+    );
+  });
+
+  it('does not block when submit drift is +1 and queue/mempool are idle', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-submit-drift-idle-'));
+    let commitCalls = 0;
+    let submitCalls = 0;
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: () => ({
+          queryInstant: async (query: string) => {
+            if (query === 'commit_block_count_total') {
+              // initial + 5 rechecks: commit grows once
+              const values = ['100', '100', '100', '101', '101', '101'];
+              const value = values[Math.min(commitCalls, values.length - 1)];
+              commitCalls += 1;
+              return [{ value: [1, value] as [number, string] }];
+            }
+            if (query === 'submit_block_count_total') {
+              // submit stays flat
+              submitCalls += 1;
+              return [{ value: [1, '99'] as [number, string] }];
+            }
+            if (query === 'tx_queue_size') {
+              return [{ value: [1, '0'] as [number, string] }];
+            }
+            if (query === 'mempool_tx_count') {
+              return [{ value: [1, '0'] as [number, string] }];
+            }
+            return [{ value: [1, '1'] as [number, string] }];
+          },
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
+      },
+    });
+
+    expect(result.passed).toBe(true);
+    const backlogCheck = result.checks.find((c) => c.name === 'no_unsubmitted_block_backlog');
+    expect(backlogCheck?.passed).toBe(false);
+    expect(backlogCheck?.blocking).toBe(false);
+    expect(backlogCheck?.summary).toMatch(/Submit backlog increased slightly during preflight/i);
+  });
+
+  it('blocks when commit pipeline is cold at run start', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-commit-cold-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory({
+          commit_block_count_total: [{ value: [1, '0'] }],
+          submit_block_count_total: [{ value: [1, '0'] }],
+          mempool_tx_count: [{ value: [1, '0'] }],
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
+      },
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.classification).toBe('Blocked');
+    expect(result.checks.find((c) => c.name === 'commit_pipeline_ready')?.passed).toBe(false);
   });
 
   it('blocks when artifact output directory is not writable', async () => {

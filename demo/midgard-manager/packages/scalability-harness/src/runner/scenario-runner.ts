@@ -175,9 +175,14 @@ function buildCollapseInputs(
       'commit_block_commitment_failures_total'
     ),
     mergeFailuresDelta: lookupCounterDelta(result.windowSummary, 'merge_block_failures_total'),
+    beforeQueueSize: result.metricWindow?.before['tx_queue_size'] ?? null,
+    beforeMempoolSize: result.metricWindow?.before['mempool_tx_count'] ?? null,
     afterLoadMempoolSize: result.metricWindow?.afterLoad['mempool_tx_count'] ?? null,
     recoveryQueueSize: lookupGaugeFinal(result.windowSummary, 'tx_queue_size'),
     recoveryMempoolSize: lookupGaugeFinal(result.windowSummary, 'mempool_tx_count'),
+    beforeUnsubmittedBlockBacklog: result.metricWindow?.before['unsubmitted_block_backlog'] ?? null,
+    recoveryUnsubmittedBlockBacklog:
+      result.metricWindow?.afterRecovery['unsubmitted_block_backlog'] ?? null,
     mempoolAcceptedDelta: lookupCounterDelta(
       result.windowSummary,
       'tx_submissions_mempool_accepted_total'
@@ -265,7 +270,11 @@ export async function runScenario(
     const corpusPath = path.join(cacheDataDir, `${corpusBaseName}.jsonl`);
     const metadataPath = path.join(cacheDataDir, `${corpusBaseName}.meta.json`);
     const count = scenario.pregenTransactionCount;
-    const reusableCorpusPath = await findCompatibleCachedCorpusPath(cacheDataDir, identity, corpusPath);
+    const reusableCorpusPath = await findCompatibleCachedCorpusPath(
+      cacheDataDir,
+      identity,
+      corpusPath
+    );
     if (reusableCorpusPath !== null) {
       console.log(chalk.gray(`\n  Reusing cached pre-generated corpus: ${reusableCorpusPath}`));
     } else {
