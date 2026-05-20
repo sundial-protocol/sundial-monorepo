@@ -96,13 +96,6 @@ export interface ScalabilityScenario {
   outputDir: string;
   seed: string;
   replayCorpusPath?: string;
-  // Number of transactions to pre-generate before the load tiers begin.
-  // When set, the harness generates a corpus in the run directory and passes
-  // it to the tx-generator as the replay corpus for all tiers. The replay
-  // corpus cycles, so any count > 0 works; use a count large enough to avoid
-  // duplicate txId submissions during sustained high-TPS runs.
-  // Cannot be combined with a static replayCorpusPath.
-  pregenTransactionCount?: number;
   // L1 provider mode used for this run. Recorded in the run manifest and report
   // so before/after comparisons carry the provider context. Use "emulator" for
   // local/test runs that do not connect to a live L1 provider.
@@ -240,23 +233,6 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     if (typeof s.replayCorpusPath !== 'string' || s.replayCorpusPath.trim().length === 0) {
       throw new ScenarioValidationError(
         'replayCorpusPath must be a non-empty string when provided'
-      );
-    }
-  }
-
-  if (s.pregenTransactionCount !== undefined) {
-    if (
-      typeof s.pregenTransactionCount !== 'number' ||
-      !Number.isInteger(s.pregenTransactionCount) ||
-      s.pregenTransactionCount < 1
-    ) {
-      throw new ScenarioValidationError(
-        `pregenTransactionCount must be a positive integer when provided, got: ${s.pregenTransactionCount}`
-      );
-    }
-    if (s.replayCorpusPath !== undefined) {
-      throw new ScenarioValidationError(
-        'pregenTransactionCount and replayCorpusPath are mutually exclusive'
       );
     }
   }

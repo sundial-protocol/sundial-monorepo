@@ -81,19 +81,5 @@ export function generateTiers(scenario: ScalabilityScenario): LoadTier[] {
     }
   }
 
-  const pregenTransactionCount = scenario.pregenTransactionCount;
-  if (pregenTransactionCount !== undefined && pregenTransactionCount > 0 && tiers.length > 0) {
-    const baseCount = Math.floor(pregenTransactionCount / tiers.length);
-    const remainder = pregenTransactionCount % tiers.length;
-    let nextStartIndex = 0;
-
-    for (const tier of tiers) {
-      const tierCount = baseCount + (tier.tierIndex < remainder ? 1 : 0);
-      tier.replayStartIndex = nextStartIndex;
-      tier.replayCount = tierCount;
-      nextStartIndex += tierCount;
-    }
-  }
-
   return tiers;
 }

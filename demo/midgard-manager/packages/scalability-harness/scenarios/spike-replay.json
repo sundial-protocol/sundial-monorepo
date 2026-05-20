@@ -1,5 +1,5 @@
 {
-  "runId": "spike",
+  "runId": "spike-replay",
   "description": "Peak spike tier (§8.1): simulates short burst demand at 2x the practical estimate target (49,970 TPS) for 5 minutes. Mixed payload (70% one-to-one, 30% multi-output). Measures recovery behaviour and service stability after burst load.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",

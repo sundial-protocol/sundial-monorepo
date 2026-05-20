@@ -1,5 +1,5 @@
 {
-  "runId": "saturation-discovery",
+  "runId": "saturation-discovery-replay",
   "description": "Saturation discovery run (§8.3): step-ramps from 50 to 1,600 TPS using a 2x multiplier with short tiers to locate the stability ceiling. Mixed payload (70% one-to-one, 30% multi-output). Run only after formal benchmark tiers have been completed and reviewed.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",

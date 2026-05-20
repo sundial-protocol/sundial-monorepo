@@ -1,5 +1,5 @@
 {
-  "runId": "institutional-5000",
+  "runId": "institutional-5000-replay",
   "description": "Institutional load tier (§8.1): exercises high-volume mempool depth, queue drain, block commitment throughput, and infrastructure resource behaviour. Sustains 5,000 TPS for 30 minutes with a mixed payload (70% one-to-one, 30% multi-output).",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",

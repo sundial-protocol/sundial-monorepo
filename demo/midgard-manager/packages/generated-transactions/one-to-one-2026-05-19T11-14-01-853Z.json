@@ -1,0 +1,14 @@
+[
+  {
+    "txId": "test_tx_1",
+    "cborHex": "mock_cbor_1",
+    "type": "Midgard L2 User Transaction",
+    "description": "One-to-One Self Transfer"
+  },
+  {
+    "txId": "test_tx_2",
+    "cborHex": "mock_cbor_2",
+    "type": "Midgard L2 User Transaction",
+    "description": "One-to-One Self Transfer"
+  }
+]

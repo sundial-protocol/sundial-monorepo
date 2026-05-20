@@ -1,5 +1,5 @@
 {
-  "runId": "warmup",
+  "runId": "warmup-replay",
   "description": "Instrumentation warm-up tier (§8.1): confirms environment readiness, harness operation, dashboard population, and log/report pipelines before any formal load. Runs 100 TPS one-to-one for 10 minutes.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",
@@ -10,6 +10,7 @@
   "l1ProviderMode": "emulator",
   "walletMode": "test-wallet",
   "walletProvisioningNote": "test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key",
+  "replayCorpusPath": "corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-1500000.jsonl",
   "transactionType": "one-to-one",
   "tierDurationSeconds": 600,
   "recoverySeconds": 120,

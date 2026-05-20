@@ -1,0 +1,413 @@
+{
+  "counters": {
+    "generated": 1056,
+    "attempted": 0,
+    "submitted": 0,
+    "rejected": 1056,
+    "node_unavailable": 0,
+    "timed_out": 0,
+    "error": 0
+  },
+  "retries": {
+    "totalRetries": 0,
+    "submissionsRetried": 0,
+    "maxRetryCount": 0
+  },
+  "latencyMs": {
+    "submitted": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 0,
+      "sumMs": 0,
+      "minMs": null,
+      "maxMs": null
+    },
+    "rejected": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 0,
+      "sumMs": 0,
+      "minMs": null,
+      "maxMs": null
+    },
+    "node_unavailable": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 0,
+      "sumMs": 0,
+      "minMs": null,
+      "maxMs": null
+    },
+    "timed_out": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 0,
+      "sumMs": 0,
+      "minMs": null,
+      "maxMs": null
+    },
+    "error": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 0,
+      "sumMs": 0,
+      "minMs": null,
+      "maxMs": null
+    }
+  },
+  "schedulerMetrics": {
+    "prepared_queue_depth": {
+      "current": 0,
+      "max": 6
+    },
+    "in_flight_submits": {
+      "current": 0,
+      "max": 5
+    },
+    "send_tokens_late_total": 0,
+    "generation_latency": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        1056,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 1056,
+      "sumMs": 1056,
+      "minMs": 1,
+      "maxMs": 1
+    },
+    "submit_latency": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 0,
+      "sumMs": 0,
+      "minMs": null,
+      "maxMs": null
+    },
+    "queue_backpressure_wait_latency": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        1056,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 1056,
+      "sumMs": 1,
+      "minMs": 0,
+      "maxMs": 1
+    },
+    "token_wait_latency": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 0,
+      "sumMs": 0,
+      "minMs": null,
+      "maxMs": null
+    },
+    "lucid_pool_wait_latency": {
+      "boundsMs": [
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2000,
+        5000,
+        10000,
+        20000,
+        30000,
+        60000
+      ],
+      "counts": [
+        528,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "overflowCount": 0,
+      "count": 528,
+      "sumMs": 4,
+      "minMs": 0,
+      "maxMs": 1
+    }
+  },
+  "percentilesMs": {
+    "submitted": {
+      "p50": null,
+      "p95": null,
+      "p99": null
+    },
+    "rejected": {
+      "p50": null,
+      "p95": null,
+      "p99": null
+    },
+    "node_unavailable": {
+      "p50": null,
+      "p95": null,
+      "p99": null
+    },
+    "timed_out": {
+      "p50": null,
+      "p95": null,
+      "p99": null
+    },
+    "error": {
+      "p50": null,
+      "p95": null,
+      "p99": null
+    },
+    "schedulerMetrics": {
+      "generation_latency": {
+        "p50": 50,
+        "p95": 50,
+        "p99": 50
+      },
+      "submit_latency": {
+        "p50": null,
+        "p95": null,
+        "p99": null
+      },
+      "queue_backpressure_wait_latency": {
+        "p50": 50,
+        "p95": 50,
+        "p99": 50
+      },
+      "token_wait_latency": {
+        "p50": null,
+        "p95": null,
+        "p99": null
+      },
+      "lucid_pool_wait_latency": {
+        "p50": 50,
+        "p95": 50,
+        "p99": 50
+      }
+    }
+  }
+}
