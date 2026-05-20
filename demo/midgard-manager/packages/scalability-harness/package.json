@@ -15,7 +15,9 @@
     "start": "node ./dist/bin/index.js",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint . --max-warnings=0",
     "clean": "rm -rf dist",
-    "test": "vitest run --mode=test",
+    "test:unit": "vitest run --mode=test tests/unit",
+    "test:integration": "vitest run --mode=test tests/integration",
+    "test": "npm run test:unit && npm run test:integration",
     "test:watch": "vitest --mode=test",
     "regen-report": "node scripts/regen-report.mjs"
   },
