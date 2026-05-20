@@ -6,52 +6,52 @@
 
 ## Run Metadata
 
-| Field | Value |
-| --- | --- |
-| Run ID | initial-800 |
-| Started At | 2026-05-20T05:46:32.549Z |
-| Git SHA | 226228272d3c6ab88c29d0eb45fcae2ab0545b6b |
-| Node Endpoint | http://localhost:3000 |
-| Prometheus Endpoint | http://localhost:9090 |
-| L1 Provider Mode | emulator |
-| Wallet Mode | test-wallet |
+| Field                    | Value                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| Run ID                   | initial-800                                                                                  |
+| Started At               | 2026-05-20T05:46:32.549Z                                                                     |
+| Git SHA                  | 226228272d3c6ab88c29d0eb45fcae2ab0545b6b                                                     |
+| Node Endpoint            | http://localhost:3000                                                                        |
+| Prometheus Endpoint      | http://localhost:9090                                                                        |
+| L1 Provider Mode         | emulator                                                                                     |
+| Wallet Mode              | test-wallet                                                                                  |
 | Wallet Provisioning Note | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key |
-| Harness Version | 0.1.0 |
-| Replay Corpus Path | n/a |
-| Replay Corpus SHA256 | n/a |
-| Host | dev3 (linux/x64, 6 CPUs, 31.0 GB) |
+| Harness Version          | 0.1.0                                                                                        |
+| Replay Corpus Path       | n/a                                                                                          |
+| Replay Corpus SHA256     | n/a                                                                                          |
+| Host                     | dev3 (linux/x64, 6 CPUs, 31.0 GB)                                                            |
 
 ## Scenario
 
-| Parameter | Value |
-| --- | --- |
-| Transaction Type | one-to-one |
-| L1 Provider Mode | emulator |
-| Wallet Mode | test-wallet |
-| Wallet Provisioning Note | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key |
-| Start TPS | 800 |
-| Max TPS | 800 |
-| Step Multiplier | 2 |
-| Tier Duration | 1800 s |
-| Recovery Duration | 300 s |
-| Tx Cost (s) | 0.2 |
-| Retry Attempts | 1 |
-| Retry Delay | 0 ms |
-| Request Events Mode | off |
-| Seed | initial-800-2026-05-20 |
-| Replay Corpus Path | n/a |
-| Max Consecutive Probe Failures | 5 |
-| Stop On Prometheus Down | true |
-| Stop On Commitment Failure | true |
-| Stop On Merge Failure | true |
-| Max Recovery Queue Size | 25000 |
-| Max Recovery Mempool Size | 15000 |
+| Parameter                      | Value                                                                                        |
+| ------------------------------ | -------------------------------------------------------------------------------------------- |
+| Transaction Type               | one-to-one                                                                                   |
+| L1 Provider Mode               | emulator                                                                                     |
+| Wallet Mode                    | test-wallet                                                                                  |
+| Wallet Provisioning Note       | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key |
+| Start TPS                      | 800                                                                                          |
+| Max TPS                        | 800                                                                                          |
+| Step Multiplier                | 2                                                                                            |
+| Tier Duration                  | 1800 s                                                                                       |
+| Recovery Duration              | 300 s                                                                                        |
+| Tx Cost (s)                    | 0.2                                                                                          |
+| Retry Attempts                 | 1                                                                                            |
+| Retry Delay                    | 0 ms                                                                                         |
+| Request Events Mode            | off                                                                                          |
+| Seed                           | initial-800-2026-05-20                                                                       |
+| Replay Corpus Path             | n/a                                                                                          |
+| Max Consecutive Probe Failures | 5                                                                                            |
+| Stop On Prometheus Down        | true                                                                                         |
+| Stop On Commitment Failure     | true                                                                                         |
+| Stop On Merge Failure          | true                                                                                         |
+| Max Recovery Queue Size        | 25000                                                                                        |
+| Max Recovery Mempool Size      | 15000                                                                                        |
 
 ## Tier Results
 
-| Tier | Target TPS | Result | Enqueued Δ | Mempool Accepted Δ | Committed Tx Δ | Submitted Blocks Δ | Peak Queue | Peak Mempool | Commit Failures Δ | Merge Failures Δ | Collapse Reason |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 800 | collapsed | 1176077 | 1175787 | 339535 | 1 | 1564 | 1147638 | 1 | 0 | commitment_failures |
+| Tier | Target TPS | Result    | Enqueued Δ | Mempool Accepted Δ | Committed Tx Δ | Submitted Blocks Δ | Peak Queue | Peak Mempool | Commit Failures Δ | Merge Failures Δ | Collapse Reason     |
+| ---- | ---------- | --------- | ---------- | ------------------ | -------------- | ------------------ | ---------- | ------------ | ----------------- | ---------------- | ------------------- |
+| 0    | 800        | collapsed | 1176077    | 1175787            | 339535         | 1                  | 1564       | 1147638      | 1                 | 0                | commitment_failures |
 
 ## Formal Run Classification
 
@@ -70,11 +70,11 @@
 
 **Violated checks:**
 
-| Check | Severity | Expected | Observed | Details |
-| --- | --- | --- | --- | --- |
-| Collapsed tiers are within threshold | failure | <= 0 | 1 | Collapsed tier count exceeds threshold by 1. |
-| Minimum completed tiers reached | failure | >= 1 | 0 | Completed tier count is below required minimum by 1. |
-| Final mempool size after recovery | failure | <= 15000 | 1147638 | Observed as the maximum final mempool size across all tiers. |
+| Check                                | Severity | Expected | Observed | Details                                                      |
+| ------------------------------------ | -------- | -------- | -------- | ------------------------------------------------------------ |
+| Collapsed tiers are within threshold | failure  | <= 0     | 1        | Collapsed tier count exceeds threshold by 1.                 |
+| Minimum completed tiers reached      | failure  | >= 1     | 0        | Completed tier count is below required minimum by 1.         |
+| Final mempool size after recovery    | failure  | <= 15000 | 1147638  | Observed as the maximum final mempool size across all tiers. |
 
 ## Collapse Point
 
@@ -99,8 +99,8 @@ The columns below reflect three distinct pipeline stages:
 Gaps between adjacent columns identify where the pipeline loses throughput.
 
 | Tier | Target TPS | Enqueued TPS | Mempool Accepted TPS | Committed TPS |
-| --- | --- | --- | --- | --- |
-| 0 | 800 | 1376.51 | 1376.17 | 397.40 |
+| ---- | ---------- | ------------ | -------------------- | ------------- |
+| 0    | 800        | 1376.51      | 1376.17              | 397.40        |
 
 ![Received Transactions Per Second](charts/received-tps.svg)
 
@@ -120,8 +120,8 @@ require per-request JSONL.
 - Submitted-latency p95 is derived from bounded histogram buckets.
 
 | Tier | Target TPS | Submitted | Rejected | Node Unavailable | Error | Total Retries | Retried Submissions | Submitted Latency p95 (ms) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 800 | 1158931 | 0 | 0 | 0 | 0 | 0 | 500 |
+| ---- | ---------- | --------- | -------- | ---------------- | ----- | ------------- | ------------------- | -------------------------- |
+| 0    | 800        | 1158931   | 0        | 0                | 0     | 0             | 0                   | 500                        |
 
 ## Accepted-to-Committed Latency Evidence
 
@@ -137,9 +137,9 @@ cohort alignment (`cohort_counter_alignment_v1`):
 Confidence notes indicate scrape-resolution limits and unresolved cohorts
 (right-censoring at tier window end).
 
-| Tier | Target TPS | Method | Confidence | Resolved Tx Ratio | Accepted→Committed p50 (ms) | Accepted→Committed p95 (ms) | Accepted→Committed p99 (ms) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 800 | cohort_counter_alignment_v1 | low | 27.7% | 285000 | 390000 | 390000 |
+| Tier | Target TPS | Method                      | Confidence | Resolved Tx Ratio | Accepted→Committed p50 (ms) | Accepted→Committed p95 (ms) | Accepted→Committed p99 (ms) |
+| ---- | ---------- | --------------------------- | ---------- | ----------------- | --------------------------- | --------------------------- | --------------------------- |
+| 0    | 800        | cohort_counter_alignment_v1 | low        | 27.7%             | 285000                      | 390000                      | 390000                      |
 
 **Confidence Notes:**
 
@@ -148,8 +148,8 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 ## Queue and Mempool Behavior
 
 | Tier | Target TPS | Peak Queue | Final Queue (after recovery) | Peak Mempool | Final Mempool (after recovery) |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 800 | 1564 | 651 | 1147638 | 1147638 |
+| ---- | ---------- | ---------- | ---------------------------- | ------------ | ------------------------------ |
+| 0    | 800        | 1564       | 651                          | 1147638      | 1147638                        |
 
 ![Midgard Transactions in Queue](charts/tx-queue.svg)
 
@@ -158,13 +158,14 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 ## Commit/Submit/Merge Progress
 
 L1 commitment fee fields are derived as follows:
+
 - `L1 Fees Δ` from `l1_commitment_fees_lovelace_total` counter delta over load phase.
 - `Last L1 Fee` from `l1_commitment_fee_lovelace_last` instant value at load stop.
 - `L1 Fee / Committed L2 Tx` = `L1 Fees Δ / Committed Tx Δ` when `Committed Tx Δ > 0`.
 
 | Tier | Target TPS | Committed Blocks Δ | Submitted Blocks Δ | Merged Blocks Δ | Merge Failures Δ | Commit Failures Δ | L1 Fees Δ (lovelace) | Last L1 Fee (lovelace) | L1 Fee / Committed L2 Tx (lovelace) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 800 | 4 | 1 | n/a | 0 | 1 | 673209 | 224403 | 1.98 |
+| ---- | ---------- | ------------------ | ------------------ | --------------- | ---------------- | ----------------- | -------------------- | ---------------------- | ----------------------------------- |
+| 0    | 800        | 4                  | 1                  | n/a             | 0                | 1                 | 673209               | 224403                 | 1.98                                |
 
 ![Built Blocks](charts/built-blocks.svg)
 
@@ -185,8 +186,8 @@ L1 commitment fee fields are derived as follows:
 ## Failure Signals
 
 | Tier | Target TPS | Commit Failures Δ | Merge Failures Δ | Rejected Δ | Processing Failed Δ |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 800 | 1 | 0 | 0 | 0 |
+| ---- | ---------- | ----------------- | ---------------- | ---------- | ------------------- |
+| 0    | 800        | 1                 | 0                | 0          | 0                   |
 
 ![Block Commitment Failures](charts/commit-failures.svg)
 
@@ -213,18 +214,18 @@ L1 commitment fee fields are derived as follows:
 Per-tier log capture from Loki over the full tier window (load phase + recovery).
 Full log streams are in `loki-captures.json`.
 
-| Tier | Target TPS | Window | Query | Streams | Entries | Truncated | Error |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 800 | 2026-05-20T06:16:27Z → 2026-05-20T06:30:41Z | `{job="containerlogs"}` | 2 | 1350 | false |  |
+| Tier | Target TPS | Window                                      | Query                   | Streams | Entries | Truncated | Error |
+| ---- | ---------- | ------------------------------------------- | ----------------------- | ------- | ------- | --------- | ----- |
+| 0    | 800        | 2026-05-20T06:16:27Z → 2026-05-20T06:30:41Z | `{job="containerlogs"}` | 2       | 1350    | false     |       |
 
 ## Trace Evidence (Tempo)
 
 Per-tier trace capture from Tempo over the full tier window (load phase + recovery).
 Full trace summaries are in `tempo-captures.json`.
 
-| Tier | Target TPS | Window | Service | Traces | Inspected | Truncated | Error |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 800 | 2026-05-20T06:16:27Z → 2026-05-20T06:30:41Z | midgard-node | 1 | 1 | false |  |
+| Tier | Target TPS | Window                                      | Service      | Traces | Inspected | Truncated | Error |
+| ---- | ---------- | ------------------------------------------- | ------------ | ------ | --------- | --------- | ----- |
+| 0    | 800        | 2026-05-20T06:16:27Z → 2026-05-20T06:30:41Z | midgard-node | 1      | 1         | false     |       |
 
 ## Artifact Index
 

@@ -63,6 +63,7 @@ export const NODE_METRICS = [
   'tx_queue_size',
   'tx_queue_peak_size',
   'mempool_tx_count',
+  'unsubmitted_block_backlog',
   'commit_block_count_total',
   'submit_block_count_total',
   'commit_block_tx_count_total',
@@ -90,6 +91,7 @@ export const ALWAYS_PRESENT_NODE_METRICS = [
   'tx_queue_size',
   'tx_queue_peak_size',
   'mempool_tx_count',
+  'unsubmitted_block_backlog',
 ] as const;
 
 export type AlwaysPresentNodeMetric = (typeof ALWAYS_PRESENT_NODE_METRICS)[number];

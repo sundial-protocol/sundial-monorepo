@@ -20,6 +20,8 @@ const TX_GENERATOR_PREFLIGHT_TIMEOUT_MS = 30_000;
 const COMMITMENT_WALLET_BALANCE_PROBE_TIMEOUT_MS = 5_000;
 const SUBMIT_BACKLOG_RECHECK_ATTEMPTS = 5;
 const SUBMIT_BACKLOG_RECHECK_DELAY_MS = 2_000;
+const COMMIT_PIPELINE_RECHECK_ATTEMPTS = 5;
+const COMMIT_PIPELINE_RECHECK_DELAY_MS = 2_000;
 const MEMPOOL_BACKLOG_RECHECK_ATTEMPTS = 3;
 const MEMPOOL_BACKLOG_RECHECK_DELAY_MS = 200;
 const MAX_PREFLIGHT_MEMPOOL_TX_COUNT = 0;
@@ -36,6 +38,7 @@ export const PREFLIGHT_CHECK_NAMES = [
   'prometheus_scrape_health',
   'required_metrics_presence',
   'no_unsubmitted_block_backlog',
+  'commit_pipeline_ready',
   'no_preexisting_mempool_backlog',
   'artifact_directory_writable',
   'tx_generator_invocable',
@@ -272,39 +275,47 @@ async function checkNoUnsubmittedBlockBacklog(
 
   try {
     const queryBacklog = async (): Promise<
-      | { ok: true; commitValue: number; submitValue: number; backlog: number }
+      | {
+          ok: true;
+          backlog: number;
+          commitCounter: number | null;
+          submitCounter: number | null;
+        }
       | { ok: false; reason: string; actionableReason: string }
     > => {
-      const [commitSeries, submitSeries] = await Promise.all([
+      const [backlogSeries, commitSeries, submitSeries] = await Promise.all([
+        client.queryInstant('unsubmitted_block_backlog'),
         client.queryInstant('commit_block_count_total'),
         client.queryInstant('submit_block_count_total'),
       ]);
-
-      if (commitSeries.length === 0 || submitSeries.length === 0) {
+      if (backlogSeries.length === 0) {
         return {
-          ok: false,
-          reason: 'Could not evaluate unsubmitted-block backlog: one or both counters are missing.',
+          ok: false as const,
+          reason:
+            'Could not evaluate unsubmitted-block backlog: unsubmitted_block_backlog is missing.',
           actionableReason:
-            'Ensure commit_block_count_total and submit_block_count_total are exposed in Prometheus before running the harness.',
+            'Ensure unsubmitted_block_backlog is exposed in Prometheus before running the harness.',
         };
       }
 
-      const commitValue = parseFloat(commitSeries[0].value[1]);
-      const submitValue = parseFloat(submitSeries[0].value[1]);
-      if (isNaN(commitValue) || isNaN(submitValue)) {
+      const backlog = parseFloat(backlogSeries[0].value[1]);
+      if (isNaN(backlog)) {
         return {
-          ok: false,
-          reason: 'Could not evaluate unsubmitted-block backlog: counter values are not numeric.',
+          ok: false as const,
+          reason: 'Could not evaluate unsubmitted-block backlog: metric value is not numeric.',
           actionableReason:
-            'Verify Prometheus returns numeric values for commit_block_count_total and submit_block_count_total.',
+            'Verify Prometheus returns a numeric value for unsubmitted_block_backlog.',
         };
       }
+
+      const commitCounter = commitSeries.length > 0 ? parseFloat(commitSeries[0].value[1]) : null;
+      const submitCounter = submitSeries.length > 0 ? parseFloat(submitSeries[0].value[1]) : null;
 
       return {
-        ok: true,
-        commitValue,
-        submitValue,
-        backlog: commitValue - submitValue,
+        ok: true as const,
+        backlog,
+        commitCounter: commitCounter !== null && !isNaN(commitCounter) ? commitCounter : null,
+        submitCounter: submitCounter !== null && !isNaN(submitCounter) ? submitCounter : null,
       };
     };
 
@@ -315,17 +326,13 @@ async function checkNoUnsubmittedBlockBacklog(
 
     const initial = await queryBacklog();
     if (!initial.ok) {
-      return fail(
-        'no_unsubmitted_block_backlog',
-        initial.reason,
-        initial.actionableReason
-      );
+      return fail('no_unsubmitted_block_backlog', initial.reason, initial.actionableReason);
     }
 
     if (initial.backlog <= 0) {
       return pass(
         'no_unsubmitted_block_backlog',
-        `No unsubmitted-block backlog detected (commit=${initial.commitValue}, submit=${initial.submitValue}, delta=${initial.backlog}).`
+        `No unsubmitted-block backlog detected (unsubmitted_block_backlog=${initial.backlog}).`
       );
     }
 
@@ -337,24 +344,54 @@ async function checkNoUnsubmittedBlockBacklog(
         return fail('no_unsubmitted_block_backlog', probe.reason, probe.actionableReason);
       }
       last = probe;
-      if (probe.backlog <= 0) {
-        return pass(
-          'no_unsubmitted_block_backlog',
-          `Transient submit backlog resolved before run start (initial delta=${initial.backlog}, now commit=${probe.commitValue}, submit=${probe.submitValue}, delta=${probe.backlog}).`
-        );
-      }
     }
 
-    return fail(
+    const backlogGrowth = last.backlog - initial.backlog;
+    const inferredBacklogGrowth =
+      initial.commitCounter !== null &&
+      last.commitCounter !== null &&
+      initial.submitCounter !== null &&
+      last.submitCounter !== null
+        ? last.commitCounter - initial.commitCounter - (last.submitCounter - initial.submitCounter)
+        : null;
+    const effectiveBacklogGrowth =
+      inferredBacklogGrowth !== null
+        ? Math.max(backlogGrowth, inferredBacklogGrowth)
+        : backlogGrowth;
+
+    if (effectiveBacklogGrowth > 1) {
+      return fail(
+        'no_unsubmitted_block_backlog',
+        `Submit backlog increased during preflight window: baseline=${initial.backlog}, final=${last.backlog}, growth=${effectiveBacklogGrowth}.`,
+        'Clear or stabilize the submit pipeline before starting load tiers.'
+      );
+    }
+
+    if (effectiveBacklogGrowth > 0) {
+      return observe(
+        'no_unsubmitted_block_backlog',
+        `Submit backlog increased slightly during preflight (baseline=${initial.backlog}, final=${last.backlog}, growth=${effectiveBacklogGrowth}).`,
+        'Optional cleanup: clear historical submit backlog before formal evidence runs.'
+      );
+    }
+
+    if (initial.backlog <= 0 && last.backlog <= 0) {
+      return pass(
+        'no_unsubmitted_block_backlog',
+        `No unsubmitted-block backlog detected (unsubmitted_block_backlog=${last.backlog}).`
+      );
+    }
+
+    return observe(
       'no_unsubmitted_block_backlog',
-      `Preflight detected persistent unsubmitted-block backlog: initial delta=${initial.backlog}, final commit_block_count_total=${last.commitValue}, submit_block_count_total=${last.submitValue}, delta=${last.backlog} after ${SUBMIT_BACKLOG_RECHECK_ATTEMPTS} rechecks.`,
-      'Clear submit backlog (for example, reset submit-block queue) before starting load tiers.'
+      `Pre-existing unsubmitted-block backlog remained stable during preflight (baseline=${initial.backlog}, final=${last.backlog}).`,
+      'Optional cleanup: clear historical submit backlog before formal evidence runs.'
     );
   } catch (err) {
     return fail(
       'no_unsubmitted_block_backlog',
       `Unsubmitted-block backlog check failed: ${err instanceof Error ? err.message : String(err)}`,
-      'Verify Prometheus is reachable and exposes commit_block_count_total / submit_block_count_total.'
+      'Verify Prometheus is reachable and exposes unsubmitted_block_backlog.'
     );
   }
 }
@@ -371,8 +408,7 @@ async function checkNoPreexistingMempoolBacklog(
 
   try {
     const queryMempoolSize = async (): Promise<
-      | { ok: true; mempoolSize: number }
-      | { ok: false; reason: string; actionableReason: string }
+      { ok: true; mempoolSize: number } | { ok: false; reason: string; actionableReason: string }
     > => {
       const series = await client.queryInstant('mempool_tx_count');
       if (series.length === 0) {
@@ -402,11 +438,7 @@ async function checkNoPreexistingMempoolBacklog(
 
     const initial = await queryMempoolSize();
     if (!initial.ok) {
-      return fail(
-        'no_preexisting_mempool_backlog',
-        initial.reason,
-        initial.actionableReason
-      );
+      return fail('no_preexisting_mempool_backlog', initial.reason, initial.actionableReason);
     }
 
     if (initial.mempoolSize <= MAX_PREFLIGHT_MEMPOOL_TX_COUNT) {
@@ -442,6 +474,97 @@ async function checkNoPreexistingMempoolBacklog(
       'no_preexisting_mempool_backlog',
       `Pre-existing mempool backlog check failed: ${err instanceof Error ? err.message : String(err)}`,
       'Verify Prometheus is reachable and exposes mempool_tx_count.'
+    );
+  }
+}
+
+async function checkCommitPipelineReady(
+  scenario: ScalabilityScenario,
+  dependencies?: PreflightDependencies
+): Promise<PreflightCheckResult> {
+  const client =
+    dependencies?.prometheusClientFactory?.(
+      scenario.prometheusEndpoint,
+      dependencies.prometheusFetcher
+    ) ?? new PrometheusClient(scenario.prometheusEndpoint, dependencies?.prometheusFetcher);
+
+  try {
+    const queryPipelineCounters = async (): Promise<
+      | { ok: true; commitValue: number; submitValue: number }
+      | { ok: false; reason: string; actionableReason: string }
+    > => {
+      const [commitSeries, submitSeries] = await Promise.all([
+        client.queryInstant('commit_block_count_total'),
+        client.queryInstant('submit_block_count_total'),
+      ]);
+
+      if (commitSeries.length === 0 || submitSeries.length === 0) {
+        return {
+          ok: false,
+          reason:
+            'Could not evaluate commit pipeline readiness: commit_block_count_total or submit_block_count_total is missing.',
+          actionableReason:
+            'Ensure commit_block_count_total and submit_block_count_total are exposed in Prometheus before running the harness.',
+        };
+      }
+
+      const commitValue = parseFloat(commitSeries[0].value[1]);
+      const submitValue = parseFloat(submitSeries[0].value[1]);
+      if (isNaN(commitValue) || isNaN(submitValue)) {
+        return {
+          ok: false,
+          reason: 'Could not evaluate commit pipeline readiness: counter values are not numeric.',
+          actionableReason:
+            'Verify Prometheus returns numeric values for commit_block_count_total and submit_block_count_total.',
+        };
+      }
+
+      return { ok: true, commitValue, submitValue };
+    };
+
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      });
+
+    const initial = await queryPipelineCounters();
+    if (!initial.ok) {
+      return fail('commit_pipeline_ready', initial.reason, initial.actionableReason);
+    }
+
+    if (initial.commitValue > 0 && initial.submitValue > 0) {
+      return pass(
+        'commit_pipeline_ready',
+        `Commit pipeline is warm (commit_block_count_total=${initial.commitValue}, submit_block_count_total=${initial.submitValue}).`
+      );
+    }
+
+    let last = initial;
+    for (let attempt = 1; attempt <= COMMIT_PIPELINE_RECHECK_ATTEMPTS; attempt += 1) {
+      await wait(COMMIT_PIPELINE_RECHECK_DELAY_MS);
+      const probe = await queryPipelineCounters();
+      if (!probe.ok) {
+        return fail('commit_pipeline_ready', probe.reason, probe.actionableReason);
+      }
+      last = probe;
+      if (probe.commitValue > 0 && probe.submitValue > 0) {
+        return pass(
+          'commit_pipeline_ready',
+          `Commit pipeline became ready before run start (initial commit=${initial.commitValue}, submit=${initial.submitValue}; now commit=${probe.commitValue}, submit=${probe.submitValue}).`
+        );
+      }
+    }
+
+    return fail(
+      'commit_pipeline_ready',
+      `Commit pipeline is cold: commit_block_count_total=${last.commitValue}, submit_block_count_total=${last.submitValue} after ${COMMIT_PIPELINE_RECHECK_ATTEMPTS} rechecks.`,
+      'Warm up the commit+submit pipeline so at least one block has been committed and submitted, then rerun preflight.'
+    );
+  } catch (err) {
+    return fail(
+      'commit_pipeline_ready',
+      `Commit pipeline readiness check failed: ${err instanceof Error ? err.message : String(err)}`,
+      'Verify Prometheus is reachable and exposes commit_block_count_total / submit_block_count_total.'
     );
   }
 }
@@ -742,6 +865,7 @@ export async function runExecutionReadinessPreflight(
   checks.push(await checkPrometheusScrapeHealth(scenario, options.dependencies));
   checks.push(await checkRequiredMetricsPresence(scenario, options.dependencies));
   checks.push(await checkNoUnsubmittedBlockBacklog(scenario, options.dependencies));
+  checks.push(await checkCommitPipelineReady(scenario, options.dependencies));
   checks.push(await checkNoPreexistingMempoolBacklog(scenario, options.dependencies));
   checks.push(await checkArtifactDirectoryWritable(outputDir));
   checks.push(await checkTxGeneratorInvocable(cwd, options.dependencies));

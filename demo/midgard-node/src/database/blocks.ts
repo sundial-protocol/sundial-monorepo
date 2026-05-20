@@ -186,22 +186,24 @@ export const retrieveEventsForCommitment = (
 ): Effect.Effect<Events, DatabaseError, Database> =>
   Effect.gen(function* () {
     const startDate = latestBlock[Columns.EVENT_END_TIME];
-    const [withdrawals, txOrders, deposits, txRequestsInWindow] = yield* Effect.all(
-      [
-        WithdrawalsDB.retrieveTimeBoundEntries(startDate, endDate),
-        TxOrdersDB.retrieveTimeBoundEntries(startDate, endDate),
-        DepositsDB.retrieveTimeBoundEntries(startDate, endDate),
-        MempoolDB.retrieveTimeBoundEntries(startDate, endDate),
-      ],
-      { concurrency: "unbounded" },
-    );
+    const [withdrawals, txOrders, deposits, txRequestsInWindow] =
+      yield* Effect.all(
+        [
+          WithdrawalsDB.retrieveTimeBoundEntries(startDate, endDate),
+          TxOrdersDB.retrieveTimeBoundEntries(startDate, endDate),
+          DepositsDB.retrieveTimeBoundEntries(startDate, endDate),
+          MempoolDB.retrieveTimeBoundEntries(startDate, endDate),
+        ],
+        { concurrency: "unbounded" },
+      );
 
     // When no mempool entries are in the current interval, stale rows may
     // exist with timestamps older than the moving startDate. Re-timestamping
     // those rows makes them visible to both commitment and subsequent
     // submission retrieval for this exact interval.
     const txRequests =
-      txRequestsInWindow.length > 0 || latestBlock[Columns.STATUS] === Status.UNSUBMITTED
+      txRequestsInWindow.length > 0 ||
+      latestBlock[Columns.STATUS] === Status.UNSUBMITTED
         ? txRequestsInWindow
         : yield* Effect.gen(function* () {
             const staleTxRequests =
@@ -336,6 +338,37 @@ export const setStatusOfEntry = (
     sqlErrorToDatabaseError(
       tableName,
       "Failed to update status of given block entry",
+    ),
+  );
+
+export const countByStatus = (
+  status: Status,
+): Effect.Effect<bigint, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{
+      count: string;
+    }>`SELECT COUNT(*) AS count FROM ${sql(tableName)} WHERE ${sql(Columns.STATUS)} = ${status}`;
+    return BigInt(rows[0]?.count ?? "0");
+  }).pipe(
+    Effect.withLogSpan(`countByStatus ${tableName}`),
+    sqlErrorToDatabaseError(tableName, "Failed to count blocks by status"),
+  );
+
+export const countWithMinimumStatus = (
+  minimumStatus: Status,
+): Effect.Effect<bigint, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{
+      count: string;
+    }>`SELECT COUNT(*) AS count FROM ${sql(tableName)} WHERE ${sql(Columns.STATUS)} >= ${minimumStatus}`;
+    return BigInt(rows[0]?.count ?? "0");
+  }).pipe(
+    Effect.withLogSpan(`countWithMinimumStatus ${tableName}`),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to count blocks at or above status threshold",
     ),
   );
 

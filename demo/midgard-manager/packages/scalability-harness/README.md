@@ -100,6 +100,9 @@ Preflight checks:
 - `node_probe`
 - `prometheus_scrape_health`
 - `required_metrics_presence`
+- `no_unsubmitted_block_backlog`
+- `commit_pipeline_ready`
+- `no_preexisting_mempool_backlog`
 - `artifact_directory_writable`
 - `tx_generator_invocable`
 
@@ -209,36 +212,38 @@ Scenario subdirectories are named `<NN>-<runId>` so they sort in execution order
 
 ## Scenario Fields
 
-| Field                     | Type    | Description                                                                                         |
-| ------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
-| `runId`                   | string  | Filesystem-safe identifier (alphanumeric, `-`, `_`)                                                 |
-| `description`             | string? | Free-text description; recorded in manifest and report                                              |
-| `nodeEndpoint`            | string  | Midgard node HTTP endpoint                                                                          |
-| `prometheusEndpoint`      | string  | Prometheus HTTP endpoint                                                                            |
-| `lokiEndpoint`            | string? | Loki endpoint for log evidence capture                                                              |
-| `tempoEndpoint`           | string? | Tempo endpoint for trace evidence capture                                                           |
-| `outputDir`               | string  | Parent directory for run artifacts                                                                  |
-| `seed`                    | string  | Deterministic generation seed                                                                       |
-| `replayCorpusPath`        | string? | Path to a pre-built transaction corpus (relative to scenario file)                                  |
-| `l1ProviderMode`          | string? | `kupmios` \| `blockfrost` \| `emulator` \| `unknown`                                                |
-| `walletMode`              | string? | `test-wallet` \| `external-key`                                                                     |
-| `walletProvisioningNote`  | string? | Free-text provisioning note; recorded in manifest                                                   |
-| `transactionType`         | string  | `one-to-one` \| `multi-output` \| `mixed`                                                           |
-| `oneToOneRatio`           | number? | Percentage of one-to-one txs when `mixed` (0–100)                                                   |
-| `startTps`                | number  | First tier target TPS                                                                               |
-| `maxTps`                  | number  | Maximum tier target TPS                                                                             |
-| `stepMultiplier`          | number? | TPS multiplier between tiers (legacy; prefer `ramp`)                                                |
-| `ramp`                    | object? | `{ strategy: "multiply", stepMultiplier }` or `{ strategy: "percent_increment", percentIncrement }` |
-| `tierOverrides`           | array?  | Per-tier duration/recovery overrides by `tierIndex`                                                 |
-| `tierDurationSeconds`     | number  | How long each tier runs                                                                             |
-| `recoverySeconds`         | number  | Cool-down between tiers                                                                             |
-| `batchSize`               | number  | Transactions per generator batch                                                                    |
-| `concurrency`             | number  | Concurrent generator batches                                                                        |
-| `retryAttempts`           | number  | Submission retry count                                                                              |
-| `retryDelayMs`            | number  | Delay between retries (ms)                                                                          |
-| `grafanaScreenshots`      | object? | Opt-in Grafana screenshot capture configuration                                                     |
-| `runClassificationPolicy` | object? | Optional overrides for formal run-classification thresholds                                         |
-| `stopConditions`          | object  | Conditions that abort the run early                                                                 |
+| Field                       | Type    | Description                                                                                         |
+| --------------------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `runId`                     | string  | Filesystem-safe identifier (alphanumeric, `-`, `_`)                                                 |
+| `description`               | string? | Free-text description; recorded in manifest and report                                              |
+| `nodeEndpoint`              | string  | Midgard node HTTP endpoint                                                                          |
+| `prometheusEndpoint`        | string  | Prometheus HTTP endpoint                                                                            |
+| `lokiEndpoint`              | string? | Loki endpoint for log evidence capture                                                              |
+| `lokiNodeQuery`             | string? | Optional LogQL query override (default: `{job="containerlogs"}`)                                    |
+| `lokiPostWindowTailSeconds` | number? | Optional post-window Loki capture tail in seconds (captures delayed async errors after tier stop)   |
+| `tempoEndpoint`             | string? | Tempo endpoint for trace evidence capture                                                           |
+| `outputDir`                 | string  | Parent directory for run artifacts                                                                  |
+| `seed`                      | string  | Deterministic generation seed                                                                       |
+| `replayCorpusPath`          | string? | Path to a pre-built transaction corpus (relative to scenario file)                                  |
+| `l1ProviderMode`            | string? | `kupmios` \| `blockfrost` \| `emulator` \| `unknown`                                                |
+| `walletMode`                | string? | `test-wallet` \| `external-key`                                                                     |
+| `walletProvisioningNote`    | string? | Free-text provisioning note; recorded in manifest                                                   |
+| `transactionType`           | string  | `one-to-one` \| `multi-output` \| `mixed`                                                           |
+| `oneToOneRatio`             | number? | Percentage of one-to-one txs when `mixed` (0–100)                                                   |
+| `startTps`                  | number  | First tier target TPS                                                                               |
+| `maxTps`                    | number  | Maximum tier target TPS                                                                             |
+| `stepMultiplier`            | number? | TPS multiplier between tiers (legacy; prefer `ramp`)                                                |
+| `ramp`                      | object? | `{ strategy: "multiply", stepMultiplier }` or `{ strategy: "percent_increment", percentIncrement }` |
+| `tierOverrides`             | array?  | Per-tier duration/recovery overrides by `tierIndex`                                                 |
+| `tierDurationSeconds`       | number  | How long each tier runs                                                                             |
+| `recoverySeconds`           | number  | Cool-down between tiers                                                                             |
+| `batchSize`                 | number  | Transactions per generator batch                                                                    |
+| `concurrency`               | number  | Concurrent generator batches                                                                        |
+| `retryAttempts`             | number  | Submission retry count                                                                              |
+| `retryDelayMs`              | number  | Delay between retries (ms)                                                                          |
+| `grafanaScreenshots`        | object? | Opt-in Grafana screenshot capture configuration                                                     |
+| `runClassificationPolicy`   | object? | Optional overrides for formal run-classification thresholds                                         |
+| `stopConditions`            | object  | Conditions that abort the run early                                                                 |
 
 ### Grafana Screenshots
 
@@ -273,17 +278,18 @@ Runtime prerequisite: install `playwright` in this package and ensure Chromium i
 
 ## Stop Conditions
 
-| Field                             | Type          | Description                                                                           |
-| --------------------------------- | ------------- | ------------------------------------------------------------------------------------- |
-| `maxConsecutiveNodeProbeFailures` | number        | Abort after N consecutive probe failures                                              |
-| `stopOnPrometheusDown`            | boolean       | Abort if Prometheus becomes unreachable                                               |
-| `stopOnCommitmentFailure`         | boolean       | Abort if block commitment stops advancing                                             |
-| `maxCommitmentFailureRatio`       | number? (0–1) | Optional budget for commitment failures (`commitment_failures / mempool_accepted`)   |
-| `stopOnMergeFailure`              | boolean       | Abort if merge stops advancing                                                        |
-| `maxRecoveryQueueSize`            | number?       | Abort if queue depth exceeds this during recovery                                     |
-| `maxRecoveryMempoolSize`          | number?       | Abort if mempool depth exceeds this during recovery                                   |
-| `minCommitToAcceptedRatio`        | number? (0–1) | Abort if committed tx ratio (`committed / mempool_accepted`) falls below this floor  |
-| `minUsefulThroughputRatio`        | number? (0–1) | Abort if observed durable mempool accepted TPS divided by target TPS falls below this |
+| Field                              | Type          | Description                                                                                                                     |
+| ---------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `maxConsecutiveNodeProbeFailures`  | number        | Abort after N consecutive probe failures                                                                                        |
+| `stopOnPrometheusDown`             | boolean       | Abort if Prometheus becomes unreachable                                                                                         |
+| `stopOnCommitmentFailure`          | boolean       | Abort if block commitment stops advancing                                                                                       |
+| `maxCommitmentFailureRatio`        | number? (0–1) | Optional budget for commitment failures (`commitment_failures / mempool_accepted`)                                              |
+| `stopOnMergeFailure`               | boolean       | Abort if merge stops advancing                                                                                                  |
+| `maxRecoveryQueueSize`             | number?       | Abort if queue growth `(tx_queue_size_after_recovery - tx_queue_size_before_tier)` exceeds this                                 |
+| `maxRecoveryMempoolSize`           | number?       | Abort if mempool growth `(mempool_tx_count_after_recovery - mempool_tx_count_before_tier)` exceeds this                         |
+| `maxUnsubmittedBlockBacklogGrowth` | number?       | Abort if `(commit_block_count_total Δ - submit_block_count_total Δ)` exceeds this over the tier window (default threshold: `0`) |
+| `minCommitToAcceptedRatio`         | number? (0–1) | Abort if committed tx ratio (`committed / mempool_accepted`) falls below this floor                                             |
+| `minUsefulThroughputRatio`         | number? (0–1) | Abort if observed durable mempool accepted TPS divided by target TPS falls below this                                           |
 
 ## Metric Contract
 

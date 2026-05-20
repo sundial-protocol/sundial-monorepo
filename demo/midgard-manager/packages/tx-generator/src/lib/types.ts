@@ -38,6 +38,11 @@ export interface TransactionGeneratorConfig {
   oneToOneRatio?: number;
   generationSeed?: string;
   replayCorpusPath?: string;
+  // 0-based replay starting index into the corpus (transaction index for JSON,
+  // non-empty line index for JSONL). Used by scalability harness tier slicing.
+  replayStartIndex?: number;
+  // Maximum number of replay transactions to consume from replayStartIndex.
+  replayCount?: number;
 
   // Batch settings
   batchSize: number;
@@ -90,6 +95,8 @@ export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
   oneToOneRatio: 70,
   generationSeed: undefined,
   replayCorpusPath: undefined,
+  replayStartIndex: undefined,
+  replayCount: undefined,
 
   // Batch defaults
   batchSize: 10,
@@ -159,6 +166,18 @@ export const validateGeneratorConfig = (config: TransactionGeneratorConfig): voi
   }
   if (config.replayCorpusPath !== undefined && config.replayCorpusPath.trim().length === 0) {
     throw new Error('Replay corpus path must not be empty when provided');
+  }
+  if (
+    config.replayStartIndex !== undefined &&
+    (!Number.isFinite(config.replayStartIndex) || config.replayStartIndex < 0)
+  ) {
+    throw new Error('Replay start index must be a non-negative number when provided');
+  }
+  if (
+    config.replayCount !== undefined &&
+    (!Number.isFinite(config.replayCount) || config.replayCount < 0)
+  ) {
+    throw new Error('Replay count must be a non-negative number when provided');
   }
 
   // Batch validation

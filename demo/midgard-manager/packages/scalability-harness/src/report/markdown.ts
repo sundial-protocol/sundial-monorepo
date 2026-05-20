@@ -533,7 +533,8 @@ function renderLokiEvidence(captures: LokiTierCapture[] | undefined): string | n
   const headers = [
     'Tier',
     'Target TPS',
-    'Window',
+    'Tier Window',
+    'Capture Range',
     'Query',
     'Streams',
     'Entries',
@@ -544,6 +545,10 @@ function renderLokiEvidence(captures: LokiTierCapture[] | undefined): string | n
     String(c.tierIndex),
     String(c.targetTps),
     `${c.startedAt.slice(0, 19)}Z → ${c.recoveryStoppedAt.slice(0, 19)}Z`,
+    `${(c.captureStartedAt ?? c.startedAt).slice(
+      0,
+      19
+    )}Z → ${(c.captureStoppedAt ?? c.recoveryStoppedAt).slice(0, 19)}Z`,
     `\`${c.query}\``,
     c.result !== null ? String(c.result.streams.length) : 'n/a',
     c.result !== null ? String(c.result.totalEntries) : 'n/a',
@@ -554,7 +559,7 @@ function renderLokiEvidence(captures: LokiTierCapture[] | undefined): string | n
   return [
     '## Log Evidence (Loki)',
     '',
-    'Per-tier log capture from Loki over the full tier window (load phase + recovery).',
+    'Per-tier log capture from Loki over the tier window plus a short post-window tail.',
     'Full log streams are in `loki-captures.json`.',
     '',
     mdTable(headers, rows),

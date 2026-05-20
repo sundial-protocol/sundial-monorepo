@@ -15,6 +15,11 @@ export const insertTxs = (
 ): Effect.Effect<void, DatabaseError, Database> =>
   Tx.insertEntries(tableName, txs);
 
+export const insertTxsOrIgnore = (
+  txs: Tx.Entry[],
+): Effect.Effect<void, DatabaseError, Database> =>
+  Tx.insertEntriesOrIgnore(tableName, txs);
+
 export const retrieve = Tx.retrieveAllEntries(tableName);
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>

@@ -70,6 +70,8 @@ function bottleneckFromCollapseReason(reason: string): string | null {
       return 'queue processor or transaction parsing (tx queue did not recover after load)';
     case 'mempool_not_recovered':
       return 'block commitment (mempool did not recover after load)';
+    case 'unsubmitted_backlog_growth':
+      return 'L1 submission path (unsubmitted block backlog grew during tier)';
     case 'tx_generator_failed':
       return 'load generation (tx generator process crashed)';
     case 'commit_drain_below_threshold':
@@ -287,56 +289,56 @@ function buildCriteriaChecks(
         : `Computed from aggregate processing_failed (${totalProcessingFailed}) / enqueued (${totalEnqueued}).`,
   });
 
-  const maxFinalQueue = maxNumber(summaries.map((s) => s.finalQueueSizeAfterRecovery));
+  const maxFinalQueueDelta = maxNumber(summaries.map((s) => s.finalQueueDeltaAfterRecovery));
   checks.push({
     id: 'max_final_queue_size_after_recovery',
-    name: 'Final queue size after recovery',
+    name: 'Final queue growth after recovery',
     severity: 'failure',
     outcome:
       policy.maxFinalQueueSizeAfterRecovery === undefined
         ? 'not_evaluable'
-        : maxFinalQueue === null
+        : maxFinalQueueDelta === null
           ? 'not_evaluable'
-          : maxFinalQueue <= policy.maxFinalQueueSizeAfterRecovery
+          : maxFinalQueueDelta <= policy.maxFinalQueueSizeAfterRecovery
             ? 'passed'
             : 'violated',
     expected:
       policy.maxFinalQueueSizeAfterRecovery === undefined
         ? 'disabled'
         : `<= ${formatNumber(policy.maxFinalQueueSizeAfterRecovery)}`,
-    observed: maxFinalQueue === null ? 'n/a' : formatNumber(maxFinalQueue),
+    observed: maxFinalQueueDelta === null ? 'n/a' : formatNumber(maxFinalQueueDelta),
     details:
       policy.maxFinalQueueSizeAfterRecovery === undefined
-        ? 'No threshold configured for final queue size.'
-        : maxFinalQueue === null
-          ? 'No final queue-size metrics were available.'
-          : 'Observed as the maximum final queue size across all tiers.',
+        ? 'No threshold configured for final queue growth.'
+        : maxFinalQueueDelta === null
+          ? 'No queue baseline/final metrics were available.'
+          : 'Observed as the maximum (afterRecovery - before) queue delta across all tiers.',
   });
 
-  const maxFinalMempool = maxNumber(summaries.map((s) => s.finalMempoolSizeAfterRecovery));
+  const maxFinalMempoolDelta = maxNumber(summaries.map((s) => s.finalMempoolDeltaAfterRecovery));
   checks.push({
     id: 'max_final_mempool_size_after_recovery',
-    name: 'Final mempool size after recovery',
+    name: 'Final mempool growth after recovery',
     severity: 'failure',
     outcome:
       policy.maxFinalMempoolSizeAfterRecovery === undefined
         ? 'not_evaluable'
-        : maxFinalMempool === null
+        : maxFinalMempoolDelta === null
           ? 'not_evaluable'
-          : maxFinalMempool <= policy.maxFinalMempoolSizeAfterRecovery
+          : maxFinalMempoolDelta <= policy.maxFinalMempoolSizeAfterRecovery
             ? 'passed'
             : 'violated',
     expected:
       policy.maxFinalMempoolSizeAfterRecovery === undefined
         ? 'disabled'
         : `<= ${formatNumber(policy.maxFinalMempoolSizeAfterRecovery)}`,
-    observed: maxFinalMempool === null ? 'n/a' : formatNumber(maxFinalMempool),
+    observed: maxFinalMempoolDelta === null ? 'n/a' : formatNumber(maxFinalMempoolDelta),
     details:
       policy.maxFinalMempoolSizeAfterRecovery === undefined
-        ? 'No threshold configured for final mempool size.'
-        : maxFinalMempool === null
-          ? 'No final mempool-size metrics were available.'
-          : 'Observed as the maximum final mempool size across all tiers.',
+        ? 'No threshold configured for final mempool growth.'
+        : maxFinalMempoolDelta === null
+          ? 'No mempool baseline/final metrics were available.'
+          : 'Observed as the maximum (afterRecovery - before) mempool delta across all tiers.',
   });
 
   // p95 inclusion latency — observation-severity: the cohort-alignment estimator

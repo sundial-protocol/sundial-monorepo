@@ -402,7 +402,9 @@ describe('buildTierSummary — normal tier', () => {
     const s = buildTierSummary(
       makeInput({
         windowSummary: {
-          counterDeltas: [{ query: 'merge_block_count_total', deltaLoad: null, deltaRecovery: null }],
+          counterDeltas: [
+            { query: 'merge_block_count_total', deltaLoad: null, deltaRecovery: null },
+          ],
           gaugeSummaries: [],
         },
         metricWindow: {
@@ -525,6 +527,27 @@ describe('buildTierSummary — normal tier', () => {
     expect(s.finalQueueSizeAfterRecovery).toBe(2);
   });
 
+  it('derives finalQueueDeltaAfterRecovery from metricWindow (afterRecovery - before)', () => {
+    const s = buildTierSummary(
+      makeInput({
+        windowSummary: makeWindowSummary({ queueFinal: 15 }),
+        metricWindow: {
+          tierIndex: 0,
+          targetTps: 10,
+          startedAt: STARTED_AT,
+          stoppedAt: STOPPED_AT,
+          recoveryStartedAt: STOPPED_AT,
+          recoveryStoppedAt: STOPPED_AT,
+          before: { tx_queue_size: 4 },
+          afterLoad: {},
+          afterRecovery: { tx_queue_size: 15 },
+          ranges: {},
+        },
+      })
+    );
+    expect(s.finalQueueDeltaAfterRecovery).toBe(11);
+  });
+
   it('extracts peakMempoolSize from mempool_tx_count gauge peak', () => {
     const s = buildTierSummary(
       makeInput({ windowSummary: makeWindowSummary({ mempoolPeak: 120 }) })
@@ -537,6 +560,27 @@ describe('buildTierSummary — normal tier', () => {
       makeInput({ windowSummary: makeWindowSummary({ mempoolFinal: 10 }) })
     );
     expect(s.finalMempoolSizeAfterRecovery).toBe(10);
+  });
+
+  it('derives finalMempoolDeltaAfterRecovery from metricWindow (afterRecovery - before)', () => {
+    const s = buildTierSummary(
+      makeInput({
+        windowSummary: makeWindowSummary({ mempoolFinal: 12 }),
+        metricWindow: {
+          tierIndex: 0,
+          targetTps: 10,
+          startedAt: STARTED_AT,
+          stoppedAt: STOPPED_AT,
+          recoveryStartedAt: STOPPED_AT,
+          recoveryStoppedAt: STOPPED_AT,
+          before: { mempool_tx_count: 3 },
+          afterLoad: {},
+          afterRecovery: { mempool_tx_count: 12 },
+          ranges: {},
+        },
+      })
+    );
+    expect(s.finalMempoolDeltaAfterRecovery).toBe(9);
   });
 
   it('maps client submission aggregate counters and retry evidence', () => {
@@ -746,6 +790,7 @@ describe('buildTierSummary — collapsed tier', () => {
       'merge_failures',
       'queue_not_recovered',
       'mempool_not_recovered',
+      'unsubmitted_backlog_growth',
       'tx_generator_failed',
       'useful_throughput_below_threshold',
     ] as const;

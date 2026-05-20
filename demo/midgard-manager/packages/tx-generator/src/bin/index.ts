@@ -28,6 +28,8 @@ interface GeneratorOptions {
   outputDir?: string;
   seed?: string;
   replayCorpusPath?: string;
+  replayStartIndex?: string;
+  replayCount?: string;
   retryAttempts?: string;
   retryDelayMs?: string;
   submitTimeoutMs?: string;
@@ -77,6 +79,11 @@ program
     '--replay-corpus-path <path>',
     'Replay transactions from a JSON corpus (array or { transactions: [] })'
   )
+  .option(
+    '--replay-start-index <number>',
+    '0-based start index in replay corpus (transaction index for JSON, non-empty line index for JSONL)'
+  )
+  .option('--replay-count <number>', 'Maximum number of replay entries to consume')
   .action(async (options: GeneratorOptions) => {
     try {
       let walletSeedOrPrivateKey = options.privateKey;
@@ -139,6 +146,12 @@ program
       }
       if (options.replayCorpusPath) {
         console.log(chalk.gray(`Replay Corpus Path: ${options.replayCorpusPath}`));
+        if (options.replayStartIndex !== undefined) {
+          console.log(chalk.gray(`Replay Start Index: ${options.replayStartIndex}`));
+        }
+        if (options.replayCount !== undefined) {
+          console.log(chalk.gray(`Replay Count: ${options.replayCount}`));
+        }
       }
 
       await startGenerator({
@@ -170,6 +183,12 @@ program
         requestEvents: options.requestEvents ?? 'off',
         generationSeed: options.seed,
         replayCorpusPath: options.replayCorpusPath,
+        replayStartIndex:
+          options.replayStartIndex !== undefined
+            ? Number.parseInt(options.replayStartIndex, 10)
+            : undefined,
+        replayCount:
+          options.replayCount !== undefined ? Number.parseInt(options.replayCount, 10) : undefined,
       });
 
       console.log(chalk.green('\nGenerator started successfully!'));

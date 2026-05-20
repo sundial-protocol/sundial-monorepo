@@ -461,8 +461,11 @@ describe('checkMetricStopConditions', () => {
     ).toBeNull();
   });
 
-  it('returns recovery_queue_exceeded when tx_queue_size exceeds threshold', () => {
-    const window = makeEmptyWindow({ afterRecovery: { tx_queue_size: 15000 } });
+  it('returns recovery_queue_exceeded when tx_queue growth exceeds threshold', () => {
+    const window = makeEmptyWindow({
+      before: { tx_queue_size: 1000 },
+      afterRecovery: { tx_queue_size: 15000 },
+    });
     const result = checkMetricStopConditions(
       { ...BASE_SC, maxRecoveryQueueSize: 10000 },
       window,
@@ -471,11 +474,14 @@ describe('checkMetricStopConditions', () => {
       100
     );
     expect(result?.reason).toBe('recovery_queue_exceeded');
-    expect(result?.metricValues?.tx_queue_size).toBe(15000);
+    expect(result?.metricValues?.queueGrowth).toBe(14000);
   });
 
-  it('returns null when tx_queue_size is at or below threshold', () => {
-    const window = makeEmptyWindow({ afterRecovery: { tx_queue_size: 10000 } });
+  it('returns null when tx_queue growth is at or below threshold', () => {
+    const window = makeEmptyWindow({
+      before: { tx_queue_size: 1000 },
+      afterRecovery: { tx_queue_size: 11000 },
+    });
     expect(
       checkMetricStopConditions(
         { ...BASE_SC, maxRecoveryQueueSize: 10000 },
@@ -515,8 +521,11 @@ describe('checkMetricStopConditions', () => {
     ).toBeNull();
   });
 
-  it('returns recovery_mempool_exceeded when mempool_tx_count exceeds threshold', () => {
-    const window = makeEmptyWindow({ afterRecovery: { mempool_tx_count: 6000 } });
+  it('returns recovery_mempool_exceeded when mempool growth exceeds threshold', () => {
+    const window = makeEmptyWindow({
+      before: { mempool_tx_count: 1000 },
+      afterRecovery: { mempool_tx_count: 7001 },
+    });
     const result = checkMetricStopConditions(
       { ...BASE_SC, maxRecoveryMempoolSize: 5000 },
       window,
@@ -525,14 +534,51 @@ describe('checkMetricStopConditions', () => {
       100
     );
     expect(result?.reason).toBe('recovery_mempool_exceeded');
-    expect(result?.metricValues?.mempool_tx_count).toBe(6000);
+    expect(result?.metricValues?.mempoolGrowth).toBe(6001);
   });
 
-  it('returns null when mempool_tx_count is at threshold', () => {
-    const window = makeEmptyWindow({ afterRecovery: { mempool_tx_count: 5000 } });
+  it('returns null when mempool growth is at threshold', () => {
+    const window = makeEmptyWindow({
+      before: { mempool_tx_count: 1000 },
+      afterRecovery: { mempool_tx_count: 6000 },
+    });
     expect(
       checkMetricStopConditions(
         { ...BASE_SC, maxRecoveryMempoolSize: 5000 },
+        window,
+        emptyWindowSummary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  // ---- maxUnsubmittedBlockBacklogGrowth ------------------------------------
+
+  it('returns unsubmitted_backlog_growth when DB backlog growth exceeds threshold', () => {
+    const window = makeEmptyWindow({
+      before: { unsubmitted_block_backlog: 2 },
+      afterRecovery: { unsubmitted_block_backlog: 5 },
+    });
+    const result = checkMetricStopConditions(
+      { ...BASE_SC, maxUnsubmittedBlockBacklogGrowth: 2 },
+      window,
+      emptyWindowSummary,
+      60,
+      100
+    );
+    expect(result?.reason).toBe('unsubmitted_backlog_growth');
+    expect(result?.metricValues?.unsubmittedBacklogGrowth).toBe(3);
+  });
+
+  it('returns null when DB backlog growth is within threshold', () => {
+    const window = makeEmptyWindow({
+      before: { unsubmitted_block_backlog: 2 },
+      afterRecovery: { unsubmitted_block_backlog: 4 },
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, maxUnsubmittedBlockBacklogGrowth: 2 },
         window,
         emptyWindowSummary,
         60,
@@ -1094,6 +1140,7 @@ describe('runTier', () => {
 
   it('returns shouldContinue: false when metric stop condition fires', async () => {
     const window = makeEmptyWindow({
+      before: { mempool_tx_count: 1000 },
       afterRecovery: { mempool_tx_count: 9000 },
     });
     const opts = makeOptions({
@@ -1115,6 +1162,7 @@ describe('runTier', () => {
 
   it('emits stop_condition event when metric stop condition fires', async () => {
     const window = makeEmptyWindow({
+      before: { tx_queue_size: 1000 },
       afterRecovery: { tx_queue_size: 20000 },
     });
     const opts = makeOptions({

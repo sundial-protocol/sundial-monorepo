@@ -1,5 +1,7 @@
 import type { StopConditions } from '../config/scenario.js';
 
+const DEFAULT_MAX_UNSUBMITTED_BLOCK_BACKLOG_GROWTH = 0;
+
 export type CollapseReason =
   | 'node_unavailable'
   | 'prometheus_down'
@@ -7,6 +9,7 @@ export type CollapseReason =
   | 'merge_failures'
   | 'queue_not_recovered'
   | 'mempool_not_recovered'
+  | 'unsubmitted_backlog_growth'
   | 'tx_generator_failed'
   | 'commit_drain_below_threshold'
   | 'useful_throughput_below_threshold';
@@ -34,9 +37,17 @@ export interface CollapseInputs {
   // Recovery gauges from TierMetricWindow.afterRecovery.
   // Optional after-load gauge snapshot enables explicit "did not drain" checks
   // even when no absolute maxRecoveryMempoolSize threshold is configured.
+  beforeQueueSize?: number | null;
+  beforeMempoolSize?: number | null;
   afterLoadMempoolSize?: number | null;
   recoveryQueueSize: number | null;
   recoveryMempoolSize: number | null;
+  beforeUnsubmittedBlockBacklog?: number | null;
+  recoveryUnsubmittedBlockBacklog?: number | null;
+  // Legacy fallback inputs: before explicit backlog gauge wiring, some callers
+  // derived backlog growth from commit/submission counter deltas.
+  committedBlocksDeltaRecovery?: number | null;
+  submittedBlocksDeltaRecovery?: number | null;
 
   // Node drain health inputs.
   // mempoolAcceptedDelta is the tx_submissions_mempool_accepted_total counter delta
@@ -58,9 +69,10 @@ export interface CollapseInputs {
 // 4. merge_failures                — L2 protocol failure (when enabled)
 // 5. queue_not_recovered           — tx queue did not drain (when threshold set)
 // 6. mempool_not_recovered         — mempool did not drain (when threshold set)
-// 7. tx_generator_failed           — load generation process crashed (unreliable data)
-// 8. commit_drain_below_threshold  — node committed fewer txs than it accepted (node-health)
-// 9. useful_throughput_below_threshold — load-driver delivered below ratio threshold (when set)
+// 7. unsubmitted_backlog_growth    — DB-backed submission backlog grew during tier
+// 8. tx_generator_failed           — load generation process crashed (unreliable data)
+// 9. commit_drain_below_threshold  — node committed fewer txs than it accepted (node-health)
+// 10. useful_throughput_below_threshold — load-driver delivered below ratio threshold (when set)
 export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
   const { stopConditions } = inputs;
 
@@ -130,28 +142,40 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
   }
 
   if (stopConditions.maxRecoveryQueueSize !== undefined) {
-    const size = inputs.recoveryQueueSize;
-    if (size !== null && size > stopConditions.maxRecoveryQueueSize) {
-      return {
-        reason: 'queue_not_recovered',
-        values: {
-          recoveryQueueSize: size,
-          maxRecoveryQueueSize: stopConditions.maxRecoveryQueueSize,
-        },
-      };
+    const beforeQueueSize = inputs.beforeQueueSize ?? null;
+    const recoveryQueueSize = inputs.recoveryQueueSize;
+    if (beforeQueueSize !== null && recoveryQueueSize !== null) {
+      const queueGrowth = recoveryQueueSize - beforeQueueSize;
+      if (queueGrowth > stopConditions.maxRecoveryQueueSize) {
+        return {
+          reason: 'queue_not_recovered',
+          values: {
+            beforeQueueSize,
+            recoveryQueueSize,
+            queueGrowth,
+            maxRecoveryQueueGrowth: stopConditions.maxRecoveryQueueSize,
+          },
+        };
+      }
     }
   }
 
   if (stopConditions.maxRecoveryMempoolSize !== undefined) {
-    const size = inputs.recoveryMempoolSize;
-    if (size !== null && size > stopConditions.maxRecoveryMempoolSize) {
-      return {
-        reason: 'mempool_not_recovered',
-        values: {
-          recoveryMempoolSize: size,
-          maxRecoveryMempoolSize: stopConditions.maxRecoveryMempoolSize,
-        },
-      };
+    const beforeMempoolSize = inputs.beforeMempoolSize ?? null;
+    const recoveryMempoolSize = inputs.recoveryMempoolSize;
+    if (beforeMempoolSize !== null && recoveryMempoolSize !== null) {
+      const mempoolGrowth = recoveryMempoolSize - beforeMempoolSize;
+      if (mempoolGrowth > stopConditions.maxRecoveryMempoolSize) {
+        return {
+          reason: 'mempool_not_recovered',
+          values: {
+            beforeMempoolSize,
+            recoveryMempoolSize,
+            mempoolGrowth,
+            maxRecoveryMempoolGrowth: stopConditions.maxRecoveryMempoolSize,
+          },
+        };
+      }
     }
   }
 
@@ -173,6 +197,52 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
         drainedMempoolTxCount: afterLoadMempoolSize - recoveryMempoolSize,
       },
     };
+  }
+
+  {
+    const maxUnsubmittedBlockBacklogGrowth =
+      stopConditions.maxUnsubmittedBlockBacklogGrowth ??
+      DEFAULT_MAX_UNSUBMITTED_BLOCK_BACKLOG_GROWTH;
+    const beforeBacklog = inputs.beforeUnsubmittedBlockBacklog ?? null;
+    const recoveryBacklog = inputs.recoveryUnsubmittedBlockBacklog ?? null;
+    const legacyCommittedBlocksDeltaRecovery = inputs.committedBlocksDeltaRecovery ?? null;
+    const legacySubmittedBlocksDeltaRecovery = inputs.submittedBlocksDeltaRecovery ?? null;
+    if (
+      beforeBacklog !== null &&
+      recoveryBacklog !== null &&
+      beforeBacklog >= 0 &&
+      recoveryBacklog >= 0
+    ) {
+      const unsubmittedBacklogGrowth = recoveryBacklog - beforeBacklog;
+      if (unsubmittedBacklogGrowth > maxUnsubmittedBlockBacklogGrowth) {
+        return {
+          reason: 'unsubmitted_backlog_growth',
+          values: {
+            beforeUnsubmittedBlockBacklog: beforeBacklog,
+            recoveryUnsubmittedBlockBacklog: recoveryBacklog,
+            unsubmittedBacklogGrowth,
+            maxUnsubmittedBlockBacklogGrowth,
+          },
+        };
+      }
+    } else if (
+      legacyCommittedBlocksDeltaRecovery !== null &&
+      legacySubmittedBlocksDeltaRecovery !== null
+    ) {
+      const unsubmittedBacklogGrowth =
+        legacyCommittedBlocksDeltaRecovery - legacySubmittedBlocksDeltaRecovery;
+      if (unsubmittedBacklogGrowth > maxUnsubmittedBlockBacklogGrowth) {
+        return {
+          reason: 'unsubmitted_backlog_growth',
+          values: {
+            committedBlocksDeltaRecovery: legacyCommittedBlocksDeltaRecovery,
+            submittedBlocksDeltaRecovery: legacySubmittedBlocksDeltaRecovery,
+            unsubmittedBacklogGrowth,
+            maxUnsubmittedBlockBacklogGrowth,
+          },
+        };
+      }
+    }
   }
 
   const exitCode = inputs.txGeneratorExitCode;

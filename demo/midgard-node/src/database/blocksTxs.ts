@@ -78,6 +78,31 @@ export const insert = (
     sqlErrorToDatabaseError(tableName, "Failed to insert the given block"),
   );
 
+export const insertOrIgnore = (
+  headerHash: Buffer,
+  txHashes: Buffer[],
+): Effect.Effect<void, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    if (txHashes.length <= 0) {
+      yield* Effect.logDebug("No txHashes provided, skipping block insertion.");
+      return;
+    }
+    const rowsToInsert: EntryNoHeightAndTS[] = txHashes.map(
+      (txHash: Buffer) => ({
+        [Columns.HEADER_HASH]: headerHash,
+        [Columns.TX_ID]: txHash,
+      }),
+    );
+    yield* sql`INSERT INTO ${sql(tableName)} ${sql.insert(rowsToInsert)} ON CONFLICT (${sql(Columns.TX_ID)}) DO NOTHING`;
+  }).pipe(
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(`${tableName} db: insertOrIgnore error: ${e}`),
+    ),
+    Effect.withLogSpan(`insertOrIgnore ${tableName}`),
+    sqlErrorToDatabaseError(tableName, "Failed to insert the given block"),
+  );
+
 export const retrieveTxHashesByHeaderHash = (
   headerHash: Buffer,
 ): Effect.Effect<readonly Buffer[], DatabaseError, Database> =>

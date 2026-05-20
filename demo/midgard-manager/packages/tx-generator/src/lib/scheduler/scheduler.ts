@@ -144,9 +144,14 @@ interface ReplayCorpusFile {
   transactions: SerializedMidgardTransaction[];
 }
 
+interface ReplaySlice {
+  startIndex: number;
+  count: number | null;
+}
+
 type ReplayCorpus =
-  | { type: 'array'; transactions: SerializedMidgardTransaction[] }
-  | { type: 'jsonl'; resolvedPath: string; sourcePath: string };
+  | { type: 'array'; transactions: SerializedMidgardTransaction[]; slice: ReplaySlice }
+  | { type: 'jsonl'; resolvedPath: string; sourcePath: string; slice: ReplaySlice };
 
 export interface TaskPlan {
   initialUTxO: UTxO;
@@ -381,11 +386,17 @@ const parseReplayCorpusLine = (
 };
 
 const loadReplayCorpus = async (
-  replayCorpusPath: string | undefined
+  replayCorpusPath: string | undefined,
+  replayStartIndex: number | undefined,
+  replayCount: number | undefined
 ): Promise<ReplayCorpus | null> => {
   if (replayCorpusPath === undefined) {
     return null;
   }
+  const slice: ReplaySlice = {
+    startIndex: replayStartIndex ?? 0,
+    count: replayCount ?? null,
+  };
 
   const resolvedPath = isAbsolute(replayCorpusPath)
     ? replayCorpusPath
@@ -396,13 +407,21 @@ const loadReplayCorpus = async (
       type: 'jsonl',
       resolvedPath,
       sourcePath: replayCorpusPath,
+      slice,
     };
   }
 
   const raw = await readFile(resolvedPath, 'utf8');
+  const parsedTransactions = parseReplayCorpusContent(replayCorpusPath, raw);
+  const startIndex = Math.min(slice.startIndex, parsedTransactions.length);
+  const endIndex =
+    slice.count === null
+      ? parsedTransactions.length
+      : Math.min(parsedTransactions.length, startIndex + slice.count);
   return {
     type: 'array',
-    transactions: parseReplayCorpusContent(replayCorpusPath, raw),
+    transactions: parsedTransactions.slice(startIndex, endIndex),
+    slice,
   };
 };
 
@@ -714,7 +733,9 @@ async function prepareAndEnqueueReplay(params: {
     input: createReadStream(replayCorpus.resolvedPath, { encoding: 'utf8' }),
     crlfDelay: Infinity,
   });
-  let lineNumber = 0;
+  let fileLineNumber = 0;
+  let replayLineIndex = 0;
+  let consumedInSlice = 0;
   let sawAtLeastOneLine = false;
 
   for await (const rawLine of rl) {
@@ -722,17 +743,32 @@ async function prepareAndEnqueueReplay(params: {
       rl.close();
       return;
     }
+    fileLineNumber += 1;
     const line = rawLine.trim();
     if (line.length === 0) {
       continue;
     }
+    if (replayLineIndex < replayCorpus.slice.startIndex) {
+      replayLineIndex += 1;
+      continue;
+    }
+    if (replayCorpus.slice.count !== null && consumedInSlice >= replayCorpus.slice.count) {
+      rl.close();
+      break;
+    }
     sawAtLeastOneLine = true;
-    lineNumber += 1;
-    const sourceTx = parseReplayCorpusLine(replayCorpus.sourcePath, lineNumber, line);
+    replayLineIndex += 1;
+    consumedInSlice += 1;
+    const sourceTx = parseReplayCorpusLine(replayCorpus.sourcePath, fileLineNumber, line);
     await processSourceTx(sourceTx);
   }
 
   if (!sawAtLeastOneLine) {
+    if (replayCorpus.slice.startIndex > 0 || replayCorpus.slice.count !== null) {
+      throw new Error(
+        `Replay corpus "${replayCorpus.sourcePath}" does not contain entries for requested slice (start=${replayCorpus.slice.startIndex}, count=${replayCorpus.slice.count ?? 'all'})`
+      );
+    }
     throw new Error(`Replay corpus "${replayCorpus.sourcePath}" is empty`);
   }
 }
@@ -786,7 +822,11 @@ export const startGenerator = async (
   const random = createSeededRandom(generationSeed);
   const requestEventsMode: RequestEventsMode = fullConfig.requestEvents ?? 'off';
   const requestEventRandom = createSeededRandom(`${generationSeed}:request-events`);
-  const replayCorpus = await loadReplayCorpus(fullConfig.replayCorpusPath);
+  const replayCorpus = await loadReplayCorpus(
+    fullConfig.replayCorpusPath,
+    fullConfig.replayStartIndex,
+    fullConfig.replayCount
+  );
 
   const resolvedTargetTps = resolveTargetTps(fullConfig);
   const maxInFlight = fullConfig.maxInFlight ?? fullConfig.concurrency;
@@ -983,6 +1023,12 @@ export const startGenerator = async (
   }
   if (fullConfig.replayCorpusPath) {
     console.log(`• Replay Corpus Path: ${fullConfig.replayCorpusPath}`);
+    if (fullConfig.replayStartIndex !== undefined) {
+      console.log(`• Replay Start Index: ${fullConfig.replayStartIndex}`);
+    }
+    if (fullConfig.replayCount !== undefined) {
+      console.log(`• Replay Count: ${fullConfig.replayCount}`);
+    }
   }
   if (fullConfig.autoStopAfterBatch) {
     console.log('• Auto-stop: Enabled (bounded prefill then drain)');

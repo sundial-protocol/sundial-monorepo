@@ -15,6 +15,7 @@ function makeTier(overrides: Partial<TierSummary> = {}): TierSummary {
     startedAt: '2025-01-01T00:00:00.000Z',
     stoppedAt: '2025-01-01T00:01:00.000Z',
     durationSeconds: 60,
+    loadDurationSeconds: 60,
     result: 'completed',
     collapseReason: undefined,
     enqueuedDelta: 6000,
@@ -34,8 +35,10 @@ function makeTier(overrides: Partial<TierSummary> = {}): TierSummary {
     observedCommittedTps: 93.33,
     peakQueueSize: 50,
     finalQueueSizeAfterRecovery: 0,
+    finalQueueDeltaAfterRecovery: 0,
     peakMempoolSize: 200,
     finalMempoolSizeAfterRecovery: 0,
+    finalMempoolDeltaAfterRecovery: 0,
     clientSubmittedCount: 5800,
     clientRejectedCount: 50,
     clientNodeUnavailableCount: 0,
@@ -223,6 +226,11 @@ describe('analyzeTiers — direct bottleneck from collapse reason', () => {
     expect(c.primaryBottleneck).toContain('block commitment');
   });
 
+  it('maps unsubmitted_backlog_growth to L1 submission path', () => {
+    const c = analyzeTiers([makeCollapsed(0, 100, 'unsubmitted_backlog_growth')]);
+    expect(c.primaryBottleneck).toContain('L1 submission path');
+  });
+
   it('maps tx_generator_failed to load generation', () => {
     const c = analyzeTiers([makeCollapsed(0, 100, 'tx_generator_failed')]);
     expect(c.primaryBottleneck).toContain('load generation');
@@ -241,6 +249,7 @@ describe('analyzeTiers — direct bottleneck from collapse reason', () => {
       'merge_failures',
       'queue_not_recovered',
       'mempool_not_recovered',
+      'unsubmitted_backlog_growth',
       'tx_generator_failed',
       'commit_drain_below_threshold',
     ] as const;
