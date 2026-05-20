@@ -11,7 +11,9 @@
     "type-check": "tsc --noEmit -p tsconfig.json --skipLibCheck",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
-    "test": "vitest run --mode=test",
+    "test:unit": "vitest run --mode=test tests/unit",
+    "test:integration": "vitest run --mode=test tests/integration",
+    "test": "npm run test:unit && npm run test:integration",
     "test:watch": "vitest --mode=test"
   },
   "dependencies": {
