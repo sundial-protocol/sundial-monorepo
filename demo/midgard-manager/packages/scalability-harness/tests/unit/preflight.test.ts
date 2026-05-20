@@ -38,10 +38,14 @@ function makeScenario(outputDir: string): ScalabilityScenario {
 
 function makePromFactory(overrides?: Partial<Record<string, Array<{ value: [number, string] }>>>) {
   const defaultSeries: Array<{ value: [number, string] }> = [{ value: [1, '1'] }];
+  const defaultMempoolSeries: Array<{ value: [number, string] }> = [{ value: [1, '0'] }];
   return () => ({
     queryInstant: async (query: string) => {
       if (overrides && query in overrides) {
         return overrides[query] ?? [];
+      }
+      if (query === 'mempool_tx_count') {
+        return defaultMempoolSeries;
       }
       return defaultSeries;
     },
@@ -108,6 +112,26 @@ describe('runExecutionReadinessPreflight', () => {
     expect(result.checks.find((c) => c.name === 'required_metrics_presence')?.passed).toBe(false);
   });
 
+  it('blocks when pre-existing mempool backlog is non-zero', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-mempool-backlog-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory({
+          mempool_tx_count: [{ value: [1, '42'] }],
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
+      },
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.classification).toBe('Blocked');
+    expect(result.checks.find((c) => c.name === 'no_preexisting_mempool_backlog')?.passed).toBe(
+      false
+    );
+  });
+
   it('passes when counter metrics are absent on a freshly-started idle node', async () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-cold-start-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
@@ -119,8 +143,8 @@ describe('runExecutionReadinessPreflight', () => {
           tx_submissions_rejected_total: [],
           tx_submissions_mempool_accepted_total: [],
           tx_submissions_processing_failed_total: [],
-          commit_block_count_total: [],
-          submit_block_count_total: [],
+          commit_block_count_total: [{ value: [1, '0'] }],
+          submit_block_count_total: [{ value: [1, '0'] }],
           commit_block_tx_count_total: [],
           l1_commitment_fees_lovelace_total: [],
           l1_commitment_fee_lovelace_last: [],

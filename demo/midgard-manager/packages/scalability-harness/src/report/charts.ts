@@ -86,6 +86,11 @@ export interface PanelSpec {
   formatY: FormatY;
   /** When false the Y axis auto-fits to the data range instead of anchoring at 0 */
   scaleZero?: boolean;
+  /**
+   * For cumulative counter charts, subtract the first in-window value so charts
+   * display delta from test start instead of absolute process lifetime totals.
+   */
+  normalizeToWindowStart?: boolean;
 }
 
 export interface ChartRecord {
@@ -173,7 +178,8 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'blocks',
     formatY: 'default',
-    scaleZero: false,
+    scaleZero: true,
+    normalizeToWindowStart: true,
   },
   {
     slug: 'built-blocks-rate',
@@ -192,7 +198,8 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'blocks',
     formatY: 'default',
-    scaleZero: false,
+    scaleZero: true,
+    normalizeToWindowStart: true,
   },
   {
     slug: 'submitted-blocks-rate',
@@ -211,7 +218,8 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'blocks',
     formatY: 'default',
-    scaleZero: false,
+    scaleZero: true,
+    normalizeToWindowStart: true,
   },
   {
     slug: 'merged-blocks-rate',
@@ -393,8 +401,14 @@ export function buildDataRows(windows: TierMetricWindow[], spec: PanelSpec): Dat
   for (const { metric, values } of merged) {
     const label = seriesLabel(metric);
     const processed = spec.rate ? computeRate(values) : values;
+    const baseline =
+      spec.normalizeToWindowStart && processed.length > 0 ? processed[0][1] : 0;
     for (const [ts, value] of processed) {
-      rows.push({ ts: new Date(ts * 1000).toISOString(), value, series: label });
+      rows.push({
+        ts: new Date(ts * 1000).toISOString(),
+        value: spec.normalizeToWindowStart ? value - baseline : value,
+        series: label,
+      });
     }
   }
   return rows;
@@ -434,7 +448,8 @@ function buildSpec(
   tierBoundaryMs: number[],
   unit: string,
   formatY: FormatY,
-  scaleZero: boolean
+  scaleZero: boolean,
+  xDomain: [string, string] | null
 ): Record<string, unknown> {
   const uniqueSeries = new Set(data.map((d) => d.series));
   const hasMultipleSeries = uniqueSeries.size > 1;
@@ -455,6 +470,7 @@ function buildSpec(
   const xEncoding = {
     field: 'ts',
     type: 'temporal',
+    ...(xDomain !== null ? { scale: { domain: xDomain } } : {}),
     axis: {
       format: '%H:%M',
       title: 'Time (UTC)',
@@ -537,6 +553,10 @@ export async function generateCharts(
 
   // Tier boundaries: start of each tier after the first, in milliseconds
   const tierBoundaryMs = windows.slice(1).map((w) => new Date(w.startedAt).getTime());
+  const xDomain: [string, string] | null =
+    windows.length > 0
+      ? [windows[0].startedAt, windows[windows.length - 1].recoveryStoppedAt]
+      : null;
 
   const records: ChartRecord[] = [];
 
@@ -553,7 +573,8 @@ export async function generateCharts(
         tierBoundaryMs,
         panelSpec.unit,
         panelSpec.formatY,
-        panelSpec.scaleZero ?? true
+        panelSpec.scaleZero ?? true,
+        xDomain
       );
       const svg = await renderToSvg(spec);
       await writeFile(path.join(chartsDir, fileName), svg, 'utf8');

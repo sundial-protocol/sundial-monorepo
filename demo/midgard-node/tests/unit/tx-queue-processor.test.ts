@@ -53,7 +53,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   sqlHarness.reset();
   breakDownTxFn.mockReturnValue(Effect.succeed(fakeProcessedTx));
-  mempoolInsertFn.mockReturnValue(Effect.succeed(undefined));
+  mempoolInsertFn.mockImplementation((processedTxs: unknown[]) =>
+    Effect.succeed(processedTxs.length),
+  );
 });
 
 describe("txQueueProcessorAction — tx_submissions_mempool_accepted counter", () => {

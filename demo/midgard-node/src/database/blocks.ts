@@ -180,6 +180,53 @@ export const retrieveEvents = (
     };
   });
 
+export const retrieveEventsForCommitment = (
+  latestBlock: Entry,
+  endDate: Date,
+): Effect.Effect<Events, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    const startDate = latestBlock[Columns.EVENT_END_TIME];
+    const [withdrawals, txOrders, deposits, txRequestsInWindow] = yield* Effect.all(
+      [
+        WithdrawalsDB.retrieveTimeBoundEntries(startDate, endDate),
+        TxOrdersDB.retrieveTimeBoundEntries(startDate, endDate),
+        DepositsDB.retrieveTimeBoundEntries(startDate, endDate),
+        MempoolDB.retrieveTimeBoundEntries(startDate, endDate),
+      ],
+      { concurrency: "unbounded" },
+    );
+
+    // When no mempool entries are in the current interval, stale rows may
+    // exist with timestamps older than the moving startDate. Re-timestamping
+    // those rows makes them visible to both commitment and subsequent
+    // submission retrieval for this exact interval.
+    const txRequests =
+      txRequestsInWindow.length > 0 || latestBlock[Columns.STATUS] === Status.UNSUBMITTED
+        ? txRequestsInWindow
+        : yield* Effect.gen(function* () {
+            const staleTxRequests =
+              yield* MempoolDB.retrieveEntriesBeforeTime(startDate);
+            if (staleTxRequests.length === 0) {
+              return txRequestsInWindow;
+            }
+            const staleTxHashes = staleTxRequests.map(
+              (entry) => entry[Tx.Columns.TX_ID],
+            );
+            yield* MempoolDB.touchTxs(staleTxHashes, startDate);
+            yield* Effect.logInfo(
+              `Recovered ${staleTxRequests.length} stale mempool tx(s) by retimestamping them into current commitment window.`,
+            );
+            return staleTxRequests;
+          });
+
+    return {
+      withdrawals,
+      txOrders,
+      txRequests,
+      deposits,
+    };
+  });
+
 export const retrieveEarliestUnsubmittedEntry: Effect.Effect<
   Option.Option<Entry>,
   DatabaseError,

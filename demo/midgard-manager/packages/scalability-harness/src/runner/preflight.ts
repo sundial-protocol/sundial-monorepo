@@ -18,6 +18,11 @@ import { PROBE_TIMEOUT_MS, probeNode } from './node-probe.js';
 
 const TX_GENERATOR_PREFLIGHT_TIMEOUT_MS = 30_000;
 const COMMITMENT_WALLET_BALANCE_PROBE_TIMEOUT_MS = 5_000;
+const SUBMIT_BACKLOG_RECHECK_ATTEMPTS = 5;
+const SUBMIT_BACKLOG_RECHECK_DELAY_MS = 2_000;
+const MEMPOOL_BACKLOG_RECHECK_ATTEMPTS = 3;
+const MEMPOOL_BACKLOG_RECHECK_DELAY_MS = 200;
+const MAX_PREFLIGHT_MEMPOOL_TX_COUNT = 0;
 const FALLBACK_FEE_PER_BLOCK_LOVELACE = 300_000n;
 const FALLBACK_BLOCK_RATE_PER_SECOND = 1 / 30;
 const BALANCE_SAFETY_MULTIPLIER_NUMERATOR = 3n;
@@ -30,6 +35,8 @@ export const PREFLIGHT_CHECK_NAMES = [
   'node_probe',
   'prometheus_scrape_health',
   'required_metrics_presence',
+  'no_unsubmitted_block_backlog',
+  'no_preexisting_mempool_backlog',
   'artifact_directory_writable',
   'tx_generator_invocable',
   'commitment_wallet_balance',
@@ -251,6 +258,192 @@ async function checkRequiredMetricsPresence(
 
   const total = ALWAYS_PRESENT_NODE_METRICS.length + COUNTER_NODE_METRICS.length;
   return pass('required_metrics_presence', `All ${total} metrics are queryable.`);
+}
+
+async function checkNoUnsubmittedBlockBacklog(
+  scenario: ScalabilityScenario,
+  dependencies?: PreflightDependencies
+): Promise<PreflightCheckResult> {
+  const client =
+    dependencies?.prometheusClientFactory?.(
+      scenario.prometheusEndpoint,
+      dependencies.prometheusFetcher
+    ) ?? new PrometheusClient(scenario.prometheusEndpoint, dependencies?.prometheusFetcher);
+
+  try {
+    const queryBacklog = async (): Promise<
+      | { ok: true; commitValue: number; submitValue: number; backlog: number }
+      | { ok: false; reason: string; actionableReason: string }
+    > => {
+      const [commitSeries, submitSeries] = await Promise.all([
+        client.queryInstant('commit_block_count_total'),
+        client.queryInstant('submit_block_count_total'),
+      ]);
+
+      if (commitSeries.length === 0 || submitSeries.length === 0) {
+        return {
+          ok: false,
+          reason: 'Could not evaluate unsubmitted-block backlog: one or both counters are missing.',
+          actionableReason:
+            'Ensure commit_block_count_total and submit_block_count_total are exposed in Prometheus before running the harness.',
+        };
+      }
+
+      const commitValue = parseFloat(commitSeries[0].value[1]);
+      const submitValue = parseFloat(submitSeries[0].value[1]);
+      if (isNaN(commitValue) || isNaN(submitValue)) {
+        return {
+          ok: false,
+          reason: 'Could not evaluate unsubmitted-block backlog: counter values are not numeric.',
+          actionableReason:
+            'Verify Prometheus returns numeric values for commit_block_count_total and submit_block_count_total.',
+        };
+      }
+
+      return {
+        ok: true,
+        commitValue,
+        submitValue,
+        backlog: commitValue - submitValue,
+      };
+    };
+
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      });
+
+    const initial = await queryBacklog();
+    if (!initial.ok) {
+      return fail(
+        'no_unsubmitted_block_backlog',
+        initial.reason,
+        initial.actionableReason
+      );
+    }
+
+    if (initial.backlog <= 0) {
+      return pass(
+        'no_unsubmitted_block_backlog',
+        `No unsubmitted-block backlog detected (commit=${initial.commitValue}, submit=${initial.submitValue}, delta=${initial.backlog}).`
+      );
+    }
+
+    let last = initial;
+    for (let attempt = 1; attempt <= SUBMIT_BACKLOG_RECHECK_ATTEMPTS; attempt += 1) {
+      await wait(SUBMIT_BACKLOG_RECHECK_DELAY_MS);
+      const probe = await queryBacklog();
+      if (!probe.ok) {
+        return fail('no_unsubmitted_block_backlog', probe.reason, probe.actionableReason);
+      }
+      last = probe;
+      if (probe.backlog <= 0) {
+        return pass(
+          'no_unsubmitted_block_backlog',
+          `Transient submit backlog resolved before run start (initial delta=${initial.backlog}, now commit=${probe.commitValue}, submit=${probe.submitValue}, delta=${probe.backlog}).`
+        );
+      }
+    }
+
+    return fail(
+      'no_unsubmitted_block_backlog',
+      `Preflight detected persistent unsubmitted-block backlog: initial delta=${initial.backlog}, final commit_block_count_total=${last.commitValue}, submit_block_count_total=${last.submitValue}, delta=${last.backlog} after ${SUBMIT_BACKLOG_RECHECK_ATTEMPTS} rechecks.`,
+      'Clear submit backlog (for example, reset submit-block queue) before starting load tiers.'
+    );
+  } catch (err) {
+    return fail(
+      'no_unsubmitted_block_backlog',
+      `Unsubmitted-block backlog check failed: ${err instanceof Error ? err.message : String(err)}`,
+      'Verify Prometheus is reachable and exposes commit_block_count_total / submit_block_count_total.'
+    );
+  }
+}
+
+async function checkNoPreexistingMempoolBacklog(
+  scenario: ScalabilityScenario,
+  dependencies?: PreflightDependencies
+): Promise<PreflightCheckResult> {
+  const client =
+    dependencies?.prometheusClientFactory?.(
+      scenario.prometheusEndpoint,
+      dependencies.prometheusFetcher
+    ) ?? new PrometheusClient(scenario.prometheusEndpoint, dependencies?.prometheusFetcher);
+
+  try {
+    const queryMempoolSize = async (): Promise<
+      | { ok: true; mempoolSize: number }
+      | { ok: false; reason: string; actionableReason: string }
+    > => {
+      const series = await client.queryInstant('mempool_tx_count');
+      if (series.length === 0) {
+        return {
+          ok: false,
+          reason: 'Could not evaluate pre-existing mempool backlog: mempool_tx_count is missing.',
+          actionableReason:
+            'Ensure mempool_tx_count is exposed in Prometheus before running the harness.',
+        };
+      }
+      const mempoolSize = parseFloat(series[0].value[1]);
+      if (isNaN(mempoolSize)) {
+        return {
+          ok: false,
+          reason:
+            'Could not evaluate pre-existing mempool backlog: mempool_tx_count is not numeric.',
+          actionableReason: 'Verify Prometheus returns numeric values for mempool_tx_count.',
+        };
+      }
+      return { ok: true, mempoolSize };
+    };
+
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      });
+
+    const initial = await queryMempoolSize();
+    if (!initial.ok) {
+      return fail(
+        'no_preexisting_mempool_backlog',
+        initial.reason,
+        initial.actionableReason
+      );
+    }
+
+    if (initial.mempoolSize <= MAX_PREFLIGHT_MEMPOOL_TX_COUNT) {
+      return pass(
+        'no_preexisting_mempool_backlog',
+        `No pre-existing mempool backlog detected (mempool_tx_count=${initial.mempoolSize}).`
+      );
+    }
+
+    let last = initial;
+    for (let attempt = 1; attempt <= MEMPOOL_BACKLOG_RECHECK_ATTEMPTS; attempt += 1) {
+      await wait(MEMPOOL_BACKLOG_RECHECK_DELAY_MS);
+      const probe = await queryMempoolSize();
+      if (!probe.ok) {
+        return fail('no_preexisting_mempool_backlog', probe.reason, probe.actionableReason);
+      }
+      last = probe;
+      if (probe.mempoolSize <= MAX_PREFLIGHT_MEMPOOL_TX_COUNT) {
+        return pass(
+          'no_preexisting_mempool_backlog',
+          `Transient pre-existing mempool backlog resolved before run start (initial=${initial.mempoolSize}, final=${probe.mempoolSize}).`
+        );
+      }
+    }
+
+    return fail(
+      'no_preexisting_mempool_backlog',
+      `Preflight detected pre-existing mempool backlog: initial mempool_tx_count=${initial.mempoolSize}, final=${last.mempoolSize} after ${MEMPOOL_BACKLOG_RECHECK_ATTEMPTS} rechecks.`,
+      'Clear or recover mempool backlog before running load tiers (for example, reset node state or allow the submission pipeline to drain).'
+    );
+  } catch (err) {
+    return fail(
+      'no_preexisting_mempool_backlog',
+      `Pre-existing mempool backlog check failed: ${err instanceof Error ? err.message : String(err)}`,
+      'Verify Prometheus is reachable and exposes mempool_tx_count.'
+    );
+  }
 }
 
 async function checkArtifactDirectoryWritable(outputDir: string): Promise<PreflightCheckResult> {
@@ -548,6 +741,8 @@ export async function runExecutionReadinessPreflight(
   checks.push(await checkNodeProbe(scenario, probeTimeoutMs, options.dependencies));
   checks.push(await checkPrometheusScrapeHealth(scenario, options.dependencies));
   checks.push(await checkRequiredMetricsPresence(scenario, options.dependencies));
+  checks.push(await checkNoUnsubmittedBlockBacklog(scenario, options.dependencies));
+  checks.push(await checkNoPreexistingMempoolBacklog(scenario, options.dependencies));
   checks.push(await checkArtifactDirectoryWritable(outputDir));
   checks.push(await checkTxGeneratorInvocable(cwd, options.dependencies));
   checks.push(await checkCommitmentWalletBalance(scenario, options.dependencies));

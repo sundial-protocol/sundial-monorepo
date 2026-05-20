@@ -20,31 +20,51 @@ export const tableName = "mempool";
 export const insertMultiple = (
   processedTxs: ProcessedTx[],
 ): Effect.Effect<
-  void,
+  number,
   SDK.CmlDeserializationError | SDK.DataCoercionError | DatabaseError,
   Database
 > =>
   Effect.gen(function* () {
     if (processedTxs.length === 0) {
-      return;
+      return 0;
     }
 
-    const {
-      allTxEntries,
-      addressHistoryEntries,
-      collectiveProduced,
-      collectiveSpent,
-    } = yield* AddressHistoryDB.aggregateProcessedTxs(
-      MempoolLedgerDB.tableName,
-      processedTxs,
-      AddressHistoryDB.Status.SLATED,
+    const txEntries: Tx.EntryNoTimeStamp[] = processedTxs.map((tx) => ({
+      [Tx.Columns.TX_ID]: tx.txId,
+      [Tx.Columns.TX]: tx.txCbor,
+    }));
+
+    const sql = yield* SqlClient.SqlClient;
+    const insertedTxRows = yield* sql<Pick<Tx.EntryNoTimeStamp, Tx.Columns.TX_ID>>`
+      INSERT INTO ${sql(tableName)} ${sql.insert(txEntries)}
+      ON CONFLICT (${sql(Tx.Columns.TX_ID)}) DO NOTHING
+      RETURNING ${sql(Tx.Columns.TX_ID)}`;
+
+    if (insertedTxRows.length === 0) {
+      return 0;
+    }
+
+    const insertedTxIdsHex = new Set(
+      insertedTxRows.map((row) => row[Tx.Columns.TX_ID].toString("hex")),
     );
+    const newlyInsertedProcessedTxs = processedTxs.filter((processedTx) =>
+      insertedTxIdsHex.has(processedTx.txId.toString("hex")),
+    );
+
+    if (newlyInsertedProcessedTxs.length === 0) {
+      return 0;
+    }
+
+    const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
+      yield* AddressHistoryDB.aggregateProcessedTxs(
+        MempoolLedgerDB.tableName,
+        newlyInsertedProcessedTxs,
+        AddressHistoryDB.Status.SLATED,
+      );
 
     // TODO: Batching might be needed.
     yield* Effect.all(
       [
-        // Insert the transactions themselves in `MempoolDB`.
-        Tx.insertEntries(tableName, allTxEntries),
         // Insert transactions corresponding entries to `AddressHistoryDB`.
         AddressHistoryDB.upsertEntries(addressHistoryEntries),
         // Insertion to `MempoolLedgerDB` followed by removal of spent outrefs in
@@ -56,9 +76,15 @@ export const insertMultiple = (
       ],
       { concurrency: "unbounded" },
     );
+
+    return insertedTxRows.length;
   }).pipe(
     Effect.withLogSpan(`insert ${tableName}`),
+    Effect.tapErrorTag("SqlError", (e) =>
+      Effect.logError(`${tableName} db: insert sql error: ${JSON.stringify(e)}`),
+    ),
     Effect.tapError((e) => Effect.logError(`${tableName} db: insert: ${e}`)),
+    sqlErrorToDatabaseError(tableName, "Failed to insert the given transactions"),
   );
 
 export const retrieveTxCborByHash = (txHash: Buffer) =>
@@ -91,8 +117,31 @@ export const retrieveTimeBoundEntries = (
 ): Effect.Effect<readonly Tx.Entry[], DatabaseError, Database> =>
   Tx.retrieveTimeBoundEntries(tableName, startTime, endTime);
 
+export const retrieveEntriesBeforeTime = (endTime: Date) =>
+  Tx.retrieveEntriesBeforeTime(tableName, endTime);
+
 export const retrieveTxCount: Effect.Effect<bigint, DatabaseError, Database> =
   retrieveNumberOfEntries(tableName);
+
+export const touchTxs = (
+  txHashes: readonly Buffer[],
+  timestamp: Date,
+): Effect.Effect<void, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    if (txHashes.length === 0) {
+      return;
+    }
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`UPDATE ${sql(tableName)}
+      SET ${sql(Tx.Columns.TIMESTAMPTZ)} = ${timestamp}
+      WHERE ${sql.in(Tx.Columns.TX_ID, txHashes)}`;
+  }).pipe(
+    Effect.withLogSpan(`touchTxs ${tableName}`),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to update timestamps for mempool transactions",
+    ),
+  );
 
 export const clearTxs = (
   txHashes: Buffer[],

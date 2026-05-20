@@ -34,6 +34,10 @@ export interface StopConditions {
   stopOnPrometheusDown: boolean;
   stopOnCommitmentFailure: boolean;
   stopOnMergeFailure: boolean;
+  // Commitment-failure budget ratio: commitmentFailuresDelta / mempoolAcceptedDelta.
+  // When provided with stopOnCommitmentFailure=true, collapse only when the observed
+  // ratio exceeds this threshold. Use 0.0001 for a 0.01% budget.
+  maxCommitmentFailureRatio?: number;
   maxRecoveryQueueSize?: number;
   maxRecoveryMempoolSize?: number;
   // Node-health drain check: requires committedTxDelta >= mempoolAcceptedDelta * ratio.
@@ -657,6 +661,19 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     ) {
       throw new ScenarioValidationError(
         `stopConditions.maxRecoveryMempoolSize must be a non-negative number when provided, got: ${sc.maxRecoveryMempoolSize}`
+      );
+    }
+  }
+
+  if (sc.maxCommitmentFailureRatio !== undefined) {
+    if (
+      typeof sc.maxCommitmentFailureRatio !== 'number' ||
+      !isFinite(sc.maxCommitmentFailureRatio) ||
+      sc.maxCommitmentFailureRatio < 0 ||
+      sc.maxCommitmentFailureRatio > 1
+    ) {
+      throw new ScenarioValidationError(
+        `stopConditions.maxCommitmentFailureRatio must be between 0 and 1 when provided, got: ${sc.maxCommitmentFailureRatio}`
       );
     }
   }

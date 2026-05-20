@@ -345,6 +345,44 @@ describe('checkMetricStopConditions', () => {
     ).toBeNull();
   });
 
+  it('returns null when commitment failure ratio is within maxCommitmentFailureRatio budget', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'commit_block_commitment_failures_total', deltaLoad: 1, deltaRecovery: 1 },
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 10000, deltaRecovery: 10000 },
+      ],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, stopOnCommitmentFailure: true, maxCommitmentFailureRatio: 0.0001 },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  it('returns commitment_failure when commitment failure ratio exceeds maxCommitmentFailureRatio', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [
+        { query: 'commit_block_commitment_failures_total', deltaLoad: 2, deltaRecovery: 2 },
+        { query: 'tx_submissions_mempool_accepted_total', deltaLoad: 10000, deltaRecovery: 10000 },
+      ],
+    });
+    const result = checkMetricStopConditions(
+      { ...BASE_SC, stopOnCommitmentFailure: true, maxCommitmentFailureRatio: 0.0001 },
+      emptyWindow,
+      summary,
+      60,
+      100
+    );
+    expect(result?.reason).toBe('commitment_failure');
+    expect(result?.metricValues?.commit_block_commitment_failures_total).toBe(2);
+    expect(result?.metricValues?.mempoolAcceptedDelta).toBe(10000);
+    expect(result?.metricValues?.maxCommitmentFailureRatio).toBe(0.0001);
+  });
+
   // ---- stopOnMergeFailure --------------------------------------------------
 
   it('returns null when stopOnMergeFailure is false even with positive delta', () => {

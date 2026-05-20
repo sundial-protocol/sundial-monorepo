@@ -93,7 +93,7 @@ export interface SubmissionAggregate {
 //   concurrency  = ceil(targetTps * effectiveTaskCostSec * FAIL_FAST_CONCURRENCY_HEADROOM)
 //   interval     = batchSize / effectiveTps
 //   Uses targetTps (not effectiveTps) so concurrency is proportional to what the server
-//   actually needs to handle, not the 2× oversend rate. For 800 TPS, 500ms timeout:
+//   actually needs to handle, not the oversend rate. For 800 TPS, 500ms timeout:
 //   ceil(800 × 0.5 × 1.5) = 600 connections — enough to sustain 800 TPS with headroom
 //   but not so many that the OS accept queue or event loop saturates.
 //
@@ -102,7 +102,7 @@ export interface SubmissionAggregate {
 // concurrency calculation in fast-fail mode.
 const SUBMISSION_PARALLELISM_HEADROOM = 12;
 const FAIL_FAST_CONCURRENCY_HEADROOM = 1.5;
-const CLIENT_OVERSEND_RATIO = 2;
+const CLIENT_OVERSEND_RATIO = 1.3;
 // Keep generation concurrency well below submission concurrency. Lucid's
 // WASM transaction-signing is synchronous-from-Node's-perspective and
 // saturates the event loop when too many workers run in parallel. At high
@@ -187,8 +187,8 @@ export function computeSettings(
     const effectiveTaskCostSec = effectiveTaskCostMs / 1000;
     // Use targetTps (not effectiveTps) so that concurrent connections stay
     // proportional to what the server needs to handle. effectiveTps already
-    // has a 2× oversend ratio built in; applying it to the concurrency formula
-    // would triple the connection count without benefit.
+    // has an oversend ratio built in; applying it to the concurrency formula
+    // would inflate the connection count without benefit.
     concurrency = Math.max(
       1,
       Math.ceil(targetTps * effectiveTaskCostSec * FAIL_FAST_CONCURRENCY_HEADROOM)

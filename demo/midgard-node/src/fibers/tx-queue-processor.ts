@@ -73,11 +73,11 @@ export const txQueueProcessorAction = (
         return yield* breakDownTx(fromHex(tx));
       }),
     );
-    yield* MempoolDB.insertMultiple(processedTxs);
-    if (withMonitoring && processedTxs.length > 0) {
+    const insertedTxCount = yield* MempoolDB.insertMultiple(processedTxs);
+    if (withMonitoring && insertedTxCount > 0) {
       yield* Metric.incrementBy(
         txMempoolAcceptedCounter,
-        BigInt(processedTxs.length),
+        BigInt(insertedTxCount),
       );
     }
   }).pipe(

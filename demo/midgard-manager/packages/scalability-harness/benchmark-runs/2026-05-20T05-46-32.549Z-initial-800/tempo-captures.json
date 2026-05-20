@@ -1,0 +1,23 @@
+[
+  {
+    "tierIndex": 0,
+    "targetTps": 800,
+    "capturedAt": "2026-05-20T06:30:41.736Z",
+    "serviceName": "midgard-node",
+    "startedAt": "2026-05-20T06:16:27.121Z",
+    "recoveryStoppedAt": "2026-05-20T06:30:41.520Z",
+    "result": {
+      "traces": [
+        {
+          "traceId": "d74026d4d2276b2d34fc7c63c839f85d",
+          "rootServiceName": "<root span not yet received>",
+          "startTimeUnixNano": "1779257653542872461",
+          "durationMs": 137259
+        }
+      ],
+      "inspectedTraces": 1,
+      "truncated": false
+    },
+    "error": null
+  }
+]

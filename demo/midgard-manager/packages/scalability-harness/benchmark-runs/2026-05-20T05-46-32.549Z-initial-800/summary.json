@@ -1,0 +1,469 @@
+{
+  "classification": "Failed",
+  "classificationReasons": [
+    "Collapsed tiers are within threshold: 1 (expected <= 0)",
+    "Minimum completed tiers reached: 0 (expected >= 1)",
+    "Final mempool size after recovery: 1147638 (expected <= 15000)"
+  ],
+  "violatedChecks": [
+    {
+      "id": "max_collapsed_tiers",
+      "name": "Collapsed tiers are within threshold",
+      "severity": "failure",
+      "outcome": "violated",
+      "expected": "<= 0",
+      "observed": "1",
+      "details": "Collapsed tier count exceeds threshold by 1."
+    },
+    {
+      "id": "min_completed_tiers",
+      "name": "Minimum completed tiers reached",
+      "severity": "failure",
+      "outcome": "violated",
+      "expected": ">= 1",
+      "observed": "0",
+      "details": "Completed tier count is below required minimum by 1."
+    },
+    {
+      "id": "max_final_mempool_size_after_recovery",
+      "name": "Final mempool size after recovery",
+      "severity": "failure",
+      "outcome": "violated",
+      "expected": "<= 15000",
+      "observed": "1147638",
+      "details": "Observed as the maximum final mempool size across all tiers."
+    }
+  ],
+  "criteriaChecks": [
+    {
+      "id": "max_collapsed_tiers",
+      "name": "Collapsed tiers are within threshold",
+      "severity": "failure",
+      "outcome": "violated",
+      "expected": "<= 0",
+      "observed": "1",
+      "details": "Collapsed tier count exceeds threshold by 1."
+    },
+    {
+      "id": "min_completed_tiers",
+      "name": "Minimum completed tiers reached",
+      "severity": "failure",
+      "outcome": "violated",
+      "expected": ">= 1",
+      "observed": "0",
+      "details": "Completed tier count is below required minimum by 1."
+    },
+    {
+      "id": "max_evidence_incomplete_tiers",
+      "name": "Evidence-incomplete tiers are bounded",
+      "severity": "observation",
+      "outcome": "passed",
+      "expected": "<= 0",
+      "observed": "0",
+      "details": "Evidence completeness is within configured tolerance."
+    },
+    {
+      "id": "min_durable_throughput_ratio",
+      "name": "Durable throughput ratio floor",
+      "severity": "failure",
+      "outcome": "not_evaluable",
+      "expected": ">= 50.00%",
+      "observed": "n/a",
+      "details": "No completed tiers with durable throughput metrics were available."
+    },
+    {
+      "id": "max_rejected_ratio",
+      "name": "Rejected submission ratio",
+      "severity": "observation",
+      "outcome": "passed",
+      "expected": "<= 2.00%",
+      "observed": "0.00%",
+      "details": "Computed from aggregate rejected (0) / enqueued (1176077)."
+    },
+    {
+      "id": "max_processing_failed_ratio",
+      "name": "Processing-failed ratio",
+      "severity": "observation",
+      "outcome": "passed",
+      "expected": "<= 1.00%",
+      "observed": "0.00%",
+      "details": "Computed from aggregate processing_failed (0) / enqueued (1176077)."
+    },
+    {
+      "id": "max_final_queue_size_after_recovery",
+      "name": "Final queue size after recovery",
+      "severity": "failure",
+      "outcome": "passed",
+      "expected": "<= 25000",
+      "observed": "651",
+      "details": "Observed as the maximum final queue size across all tiers."
+    },
+    {
+      "id": "max_final_mempool_size_after_recovery",
+      "name": "Final mempool size after recovery",
+      "severity": "failure",
+      "outcome": "violated",
+      "expected": "<= 15000",
+      "observed": "1147638",
+      "details": "Observed as the maximum final mempool size across all tiers."
+    },
+    {
+      "id": "max_p95_inclusion_latency",
+      "name": "p95 mempool-accepted-to-committed inclusion latency",
+      "severity": "observation",
+      "outcome": "not_evaluable",
+      "expected": "disabled",
+      "observed": "390000 ms",
+      "details": "No p95 inclusion latency threshold configured."
+    },
+    {
+      "id": "max_l1_fee_per_committed_tx",
+      "name": "L1 fee per committed L2 transaction",
+      "severity": "observation",
+      "outcome": "not_evaluable",
+      "expected": "disabled",
+      "observed": "1.98 lovelace",
+      "details": "No L1 fee-per-committed-tx threshold configured. Set runClassificationPolicy.maxL1FeePerCommittedTxLovelace to enable this check."
+    }
+  ],
+  "policy": {
+    "maxCollapsedTiers": 0,
+    "minCompletedTiers": 1,
+    "maxEvidenceIncompleteTiers": 0,
+    "minDurableThroughputRatio": 0.5,
+    "maxRejectedRatio": 0.02,
+    "maxProcessingFailedRatio": 0.01,
+    "maxFinalQueueSizeAfterRecovery": 25000,
+    "maxFinalMempoolSizeAfterRecovery": 15000
+  },
+  "tierSummaries": [
+    {
+      "tierIndex": 0,
+      "targetTps": 800,
+      "startedAt": "2026-05-20T06:16:27.121Z",
+      "stoppedAt": "2026-05-20T06:30:41.520Z",
+      "durationSeconds": 854.399,
+      "loadDurationSeconds": 854.391,
+      "result": "collapsed",
+      "collapseReason": "commitment_failures",
+      "enqueuedDelta": 1176077,
+      "rejectedDelta": 0,
+      "mempoolAcceptedDelta": 1175787,
+      "processingFailedDelta": 0,
+      "committedTxDelta": 339535,
+      "committedBlockDelta": 4,
+      "submittedBlockDelta": 1,
+      "mergeFailureDelta": 0,
+      "commitmentFailureDelta": 1,
+      "l1CommitmentFeesDeltaLovelace": 673209,
+      "l1CommitmentFeeLastLovelace": 224403,
+      "l1FeePerCommittedL2TxLovelace": 1.9827381565965216,
+      "observedEnqueuedTps": 1376.5091158497692,
+      "observedMempoolAcceptedTps": 1376.1696927987305,
+      "observedCommittedTps": 397.40001942904365,
+      "peakQueueSize": 1564,
+      "finalQueueSizeAfterRecovery": 651,
+      "peakMempoolSize": 1147638,
+      "finalMempoolSizeAfterRecovery": 1147638,
+      "clientSubmittedCount": 1158931,
+      "clientRejectedCount": 0,
+      "clientNodeUnavailableCount": 0,
+      "clientErrorCount": 0,
+      "clientTotalRetries": 0,
+      "clientRetriedSubmissionCount": 0,
+      "clientSubmittedLatencyP95Ms": 500,
+      "acceptedToCommittedLatencyMethod": "cohort_counter_alignment_v1",
+      "acceptedToCommittedLatencyConfidence": "low",
+      "acceptedToCommittedLatencyConfidenceNotes": [
+        "Scrape step is approximately 15s; latency resolution is bounded by this interval.",
+        "Only 27.7% of accepted transactions were matched to committed progress before window end."
+      ],
+      "acceptedToCommittedLatencyP50Ms": 285000,
+      "acceptedToCommittedLatencyP95Ms": 390000,
+      "acceptedToCommittedLatencyP99Ms": 390000,
+      "acceptedToCommittedResolvedRatio": 0.2765490144332188,
+      "acceptedToCommittedResolvedTxCount": 318564,
+      "acceptedToCommittedAcceptedTxCount": 1151926,
+      "loadDriverResourceEvidence": {
+        "beforeLoad": {
+          "capturedAt": "2026-05-20T06:16:27.345Z",
+          "capturedAtMs": 1779257787345,
+          "systemCpuTotalMs": 16172300,
+          "systemCpuIdleMs": 12647270,
+          "processCpuUserMicros": 2064428273,
+          "processCpuSystemMicros": 7700078,
+          "processCpuTotalMicros": 2072128351,
+          "processRssBytes": 1732317184,
+          "processHeapUsedBytes": 273122800,
+          "processHeapTotalBytes": 774541312,
+          "systemTotalMemoryBytes": 33311244288,
+          "systemFreeMemoryBytes": 23763648512,
+          "eventLoopLagP95Ms": 53.837823,
+          "eventLoopLagMaxMs": 53.837823,
+          "eventLoopLagMeanMs": 47.333376,
+          "networkRxBytes": 1404158309,
+          "networkTxBytes": 1285234826
+        },
+        "afterLoad": {
+          "capturedAt": "2026-05-20T06:30:41.511Z",
+          "capturedAtMs": 1779258641511,
+          "systemCpuTotalMs": 21155890,
+          "systemCpuIdleMs": 14387880,
+          "processCpuUserMicros": 2069484264,
+          "processCpuSystemMicros": 9389396,
+          "processCpuTotalMicros": 2078873660,
+          "processRssBytes": 850669568,
+          "processHeapUsedBytes": 127334000,
+          "processHeapTotalBytes": 139350016,
+          "systemTotalMemoryBytes": 33311244288,
+          "systemFreeMemoryBytes": 18648649728,
+          "eventLoopLagP95Ms": 20.807679,
+          "eventLoopLagMaxMs": 126.156799,
+          "eventLoopLagMeanMs": 20.22797117044755,
+          "networkRxBytes": 6900739814,
+          "networkTxBytes": 8064341601
+        },
+        "afterRecovery": {
+          "capturedAt": "2026-05-20T06:30:41.520Z",
+          "capturedAtMs": 1779258641520,
+          "systemCpuTotalMs": 21155930,
+          "systemCpuIdleMs": 14387910,
+          "processCpuUserMicros": 2069486648,
+          "processCpuSystemMicros": 9389396,
+          "processCpuTotalMicros": 2078876044,
+          "processRssBytes": 850669568,
+          "processHeapUsedBytes": 127290368,
+          "processHeapTotalBytes": 139350016,
+          "systemTotalMemoryBytes": 33311244288,
+          "systemFreeMemoryBytes": 18797334528,
+          "eventLoopLagP95Ms": null,
+          "eventLoopLagMaxMs": null,
+          "eventLoopLagMeanMs": null,
+          "networkRxBytes": 6900741464,
+          "networkTxBytes": 8064344937
+        },
+        "loadPhase": {
+          "elapsedMs": 854166,
+          "hostCpuUtilizationPercent": 65.07317014441398,
+          "processCpuPercent": 0.7896953285426954,
+          "processRssBytes": 850669568,
+          "processRssDeltaBytes": -881647616,
+          "processRssToSystemMemoryRatio": 0.02553700968493825,
+          "eventLoopLagP95Ms": 20.807679,
+          "eventLoopLagMaxMs": 126.156799,
+          "eventLoopLagMeanMs": 20.22797117044755,
+          "networkRxDeltaBytes": 5496581505,
+          "networkTxDeltaBytes": 6779106775,
+          "networkRxBytesPerSec": 6435027.272216408,
+          "networkTxBytesPerSec": 7936521.443138687,
+          "networkTotalBytesPerSec": 14371548.715355095
+        },
+        "recoveryPhase": {
+          "elapsedMs": 9,
+          "hostCpuUtilizationPercent": 25,
+          "processCpuPercent": 26.48888888888889,
+          "processRssBytes": 850669568,
+          "processRssDeltaBytes": 0,
+          "processRssToSystemMemoryRatio": 0.02553700968493825,
+          "eventLoopLagP95Ms": null,
+          "eventLoopLagMaxMs": null,
+          "eventLoopLagMeanMs": null,
+          "networkRxDeltaBytes": 1650,
+          "networkTxDeltaBytes": 3336,
+          "networkRxBytesPerSec": 183333.33333333334,
+          "networkTxBytesPerSec": 370666.6666666667,
+          "networkTotalBytesPerSec": 554000
+        },
+        "totalPhase": {
+          "elapsedMs": 854175,
+          "hostCpuUtilizationPercent": 65.07284850600867,
+          "processCpuPercent": 0.7899661076477302,
+          "processRssBytes": 850669568,
+          "processRssDeltaBytes": -881647616,
+          "processRssToSystemMemoryRatio": 0.02553700968493825,
+          "eventLoopLagP95Ms": null,
+          "eventLoopLagMaxMs": null,
+          "eventLoopLagMeanMs": null,
+          "networkRxDeltaBytes": 5496583155,
+          "networkTxDeltaBytes": 6779110111,
+          "networkRxBytesPerSec": 6434961.401352182,
+          "networkTxBytesPerSec": 7936441.725641701,
+          "networkTotalBytesPerSec": 14371403.126993883
+        },
+        "saturationFlags": {
+          "cpuSaturated": false,
+          "memorySaturated": false,
+          "eventLoopLagSaturated": false,
+          "networkIoSaturated": false,
+          "anySaturation": false,
+          "reasons": [],
+          "thresholds": {
+            "cpuPercent": 90,
+            "memoryRssToSystemRatio": 0.8,
+            "eventLoopLagP95Ms": 100,
+            "networkTotalBytesPerSec": 100000000
+          }
+        }
+      },
+      "loadDriverSaturationFlags": {
+        "cpuSaturated": false,
+        "memorySaturated": false,
+        "eventLoopLagSaturated": false,
+        "networkIoSaturated": false,
+        "anySaturation": false,
+        "reasons": [],
+        "thresholds": {
+          "cpuPercent": 90,
+          "memoryRssToSystemRatio": 0.8,
+          "eventLoopLagP95Ms": 100,
+          "networkTotalBytesPerSec": 100000000
+        }
+      }
+    }
+  ],
+  "conclusion": {
+    "highestCompletedTier": null,
+    "highestCompletedTargetTps": null,
+    "firstCollapsedTier": 0,
+    "firstCollapsedTargetTps": 800,
+    "primaryBottleneck": "block commitment (commitment failures detected)",
+    "classification": "Failed",
+    "classificationReasons": [
+      "Collapsed tiers are within threshold: 1 (expected <= 0)",
+      "Minimum completed tiers reached: 0 (expected >= 1)",
+      "Final mempool size after recovery: 1147638 (expected <= 15000)"
+    ],
+    "violatedChecks": [
+      {
+        "id": "max_collapsed_tiers",
+        "name": "Collapsed tiers are within threshold",
+        "severity": "failure",
+        "outcome": "violated",
+        "expected": "<= 0",
+        "observed": "1",
+        "details": "Collapsed tier count exceeds threshold by 1."
+      },
+      {
+        "id": "min_completed_tiers",
+        "name": "Minimum completed tiers reached",
+        "severity": "failure",
+        "outcome": "violated",
+        "expected": ">= 1",
+        "observed": "0",
+        "details": "Completed tier count is below required minimum by 1."
+      },
+      {
+        "id": "max_final_mempool_size_after_recovery",
+        "name": "Final mempool size after recovery",
+        "severity": "failure",
+        "outcome": "violated",
+        "expected": "<= 15000",
+        "observed": "1147638",
+        "details": "Observed as the maximum final mempool size across all tiers."
+      }
+    ],
+    "criteriaChecks": [
+      {
+        "id": "max_collapsed_tiers",
+        "name": "Collapsed tiers are within threshold",
+        "severity": "failure",
+        "outcome": "violated",
+        "expected": "<= 0",
+        "observed": "1",
+        "details": "Collapsed tier count exceeds threshold by 1."
+      },
+      {
+        "id": "min_completed_tiers",
+        "name": "Minimum completed tiers reached",
+        "severity": "failure",
+        "outcome": "violated",
+        "expected": ">= 1",
+        "observed": "0",
+        "details": "Completed tier count is below required minimum by 1."
+      },
+      {
+        "id": "max_evidence_incomplete_tiers",
+        "name": "Evidence-incomplete tiers are bounded",
+        "severity": "observation",
+        "outcome": "passed",
+        "expected": "<= 0",
+        "observed": "0",
+        "details": "Evidence completeness is within configured tolerance."
+      },
+      {
+        "id": "min_durable_throughput_ratio",
+        "name": "Durable throughput ratio floor",
+        "severity": "failure",
+        "outcome": "not_evaluable",
+        "expected": ">= 50.00%",
+        "observed": "n/a",
+        "details": "No completed tiers with durable throughput metrics were available."
+      },
+      {
+        "id": "max_rejected_ratio",
+        "name": "Rejected submission ratio",
+        "severity": "observation",
+        "outcome": "passed",
+        "expected": "<= 2.00%",
+        "observed": "0.00%",
+        "details": "Computed from aggregate rejected (0) / enqueued (1176077)."
+      },
+      {
+        "id": "max_processing_failed_ratio",
+        "name": "Processing-failed ratio",
+        "severity": "observation",
+        "outcome": "passed",
+        "expected": "<= 1.00%",
+        "observed": "0.00%",
+        "details": "Computed from aggregate processing_failed (0) / enqueued (1176077)."
+      },
+      {
+        "id": "max_final_queue_size_after_recovery",
+        "name": "Final queue size after recovery",
+        "severity": "failure",
+        "outcome": "passed",
+        "expected": "<= 25000",
+        "observed": "651",
+        "details": "Observed as the maximum final queue size across all tiers."
+      },
+      {
+        "id": "max_final_mempool_size_after_recovery",
+        "name": "Final mempool size after recovery",
+        "severity": "failure",
+        "outcome": "violated",
+        "expected": "<= 15000",
+        "observed": "1147638",
+        "details": "Observed as the maximum final mempool size across all tiers."
+      },
+      {
+        "id": "max_p95_inclusion_latency",
+        "name": "p95 mempool-accepted-to-committed inclusion latency",
+        "severity": "observation",
+        "outcome": "not_evaluable",
+        "expected": "disabled",
+        "observed": "390000 ms",
+        "details": "No p95 inclusion latency threshold configured."
+      },
+      {
+        "id": "max_l1_fee_per_committed_tx",
+        "name": "L1 fee per committed L2 transaction",
+        "severity": "observation",
+        "outcome": "not_evaluable",
+        "expected": "disabled",
+        "observed": "1.98 lovelace",
+        "details": "No L1 fee-per-committed-tx threshold configured. Set runClassificationPolicy.maxL1FeePerCommittedTxLovelace to enable this check."
+      }
+    ],
+    "policy": {
+      "maxCollapsedTiers": 0,
+      "minCompletedTiers": 1,
+      "maxEvidenceIncompleteTiers": 0,
+      "minDurableThroughputRatio": 0.5,
+      "maxRejectedRatio": 0.02,
+      "maxProcessingFailedRatio": 0.01,
+      "maxFinalQueueSizeAfterRecovery": 25000,
+      "maxFinalMempoolSizeAfterRecovery": 15000
+    },
+    "notes": []
+  }
+}
