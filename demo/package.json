@@ -14,7 +14,7 @@
     "build:all": "node ../scripts/readme/refresh-badges.mjs build 1 && node ../scripts/readme/run-badged-command.mjs build \"npm run build && npm run build:manager\"",
     "check:all": "npm run security:check:all && npm run tests:all",
     "tests:all": "npm run build:all && npm run quality:check:all && npm run infra:check:all && npm run test:all",
-    "quality:check:all": "node ../scripts/readme/refresh-badges.mjs quality 1 && node ../scripts/readme/run-badged-command.mjs quality \"npm run quality:format:check:all && npm run quality:lint:check:all && npm run quality:type:all\"",
+    "quality:check:all": "node ../scripts/readme/refresh-badges.mjs quality 1 && node ../scripts/readme/run-badged-command.mjs quality \"npm run quality:format:check:all && npm run quality:lint:check:all && npm run quality:type:all && npm run quality:osv:check\"",
     "quality:format:check:all": "npm run quality:format:check:sdk && npm run quality:format:check:manager && npm run quality:format:check:node && npm run quality:terraform:format:check",
     "quality:format:check:sdk": "npm --prefix midgard-sdk run format-check",
     "quality:format:check:manager": "npm --prefix midgard-manager run format:check",
