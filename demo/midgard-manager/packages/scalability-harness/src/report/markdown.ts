@@ -75,7 +75,7 @@ function appendCharts(base: string, charts: string | null): string {
 
 function renderHeader(): string {
   return [
-    '# Scalability Baseline Report',
+    '# 📊 Scalability Baseline Report',
     '',
     '> **Scope:** This report measures the current behavior of the Midgard node under synthetic',
     '> load. Results reflect a single benchmark run executed without remediation and do not',
@@ -106,7 +106,7 @@ function renderRunMetadata(manifest: RunManifest): string {
     ['Host', hostInfo],
   ];
 
-  return ['## Run Metadata', '', mdTable(['Field', 'Value'], rows)].join('\n');
+  return ['## 📌 Run Metadata', '', mdTable(['Field', 'Value'], rows)].join('\n');
 }
 
 function renderScenario(scenario: ScalabilityScenario): string {
@@ -155,12 +155,12 @@ function renderScenario(scenario: ScalabilityScenario): string {
       : []),
   ];
 
-  return ['## Scenario', '', mdTable(['Parameter', 'Value'], rows)].join('\n');
+  return ['## 🔬 Scenario', '', mdTable(['Parameter', 'Value'], rows)].join('\n');
 }
 
 function renderTierResultsTable(tiers: TierSummary[]): string {
   if (tiers.length === 0) {
-    return '## Tier Results\n\n_No tiers were executed._';
+    return '## 🏃 Tier Results\n\n_No tiers were executed._';
   }
 
   const headers = [
@@ -181,7 +181,7 @@ function renderTierResultsTable(tiers: TierSummary[]): string {
   const rows = tiers.map((t) => [
     String(t.tierIndex),
     String(t.targetTps),
-    t.result,
+    renderTierResult(t.result),
     n(t.enqueuedDelta),
     n(t.mempoolAcceptedDelta),
     n(t.committedTxDelta),
@@ -193,11 +193,11 @@ function renderTierResultsTable(tiers: TierSummary[]): string {
     s(t.collapseReason),
   ]);
 
-  return ['## Tier Results', '', mdTable(headers, rows)].join('\n');
+  return ['## 🏃 Tier Results', '', mdTable(headers, rows)].join('\n');
 }
 
 function renderCollapsePoint(conclusion: BenchmarkConclusion): string {
-  const lines: string[] = ['## Collapse Point', ''];
+  const lines: string[] = ['## 💥 Collapse Point', ''];
 
   if (conclusion.firstCollapsedTier === null) {
     lines.push('No collapse detected. All tiers completed or ran with incomplete evidence.');
@@ -218,16 +218,27 @@ function renderCollapsePoint(conclusion: BenchmarkConclusion): string {
   return lines.join('\n');
 }
 
+function renderTierResult(result: string): string {
+  switch (result) {
+    case 'completed':
+      return 'completed ✅';
+    case 'collapsed':
+      return 'collapsed 🚫';
+    default:
+      return result;
+  }
+}
+
 function renderClassificationLabel(classification: BenchmarkConclusion['classification']): string {
   switch (classification) {
     case 'Passed':
-      return 'Passed';
+      return 'Passed ✅';
     case 'Passed with Observations':
-      return 'Passed with Observations';
+      return 'Passed with Observations ✅';
     case 'Failed':
-      return 'Failed';
+      return 'Failed 🚫';
     case 'Blocked':
-      return 'Blocked';
+      return 'Blocked 🚫';
   }
 }
 
@@ -249,7 +260,7 @@ function renderViolatedChecksTable(violatedChecks: ClassificationCheckEvidence[]
 }
 
 function renderFormalRunClassification(conclusion: BenchmarkConclusion): string {
-  const lines: string[] = ['## Formal Run Classification', ''];
+  const lines: string[] = ['## 🚦 Formal Run Classification', ''];
   lines.push(`**Classification:** ${renderClassificationLabel(conclusion.classification)}`);
   lines.push('');
   lines.push(`- Policy checks evaluated: ${conclusion.criteriaChecks.length}`);
@@ -291,7 +302,7 @@ function renderThroughputStageDeltas(tiers: TierSummary[], chartRecords?: ChartR
   ].join('\n');
 
   if (tiers.length === 0) {
-    return `## Throughput Stage Deltas\n\n${prose}\n\n_No tier data._`;
+    return `## ⚡ Throughput Stage Deltas\n\n${prose}\n\n_No tier data._`;
   }
 
   const headers = ['Tier', 'Target TPS', 'Enqueued TPS', 'Mempool Accepted TPS', 'Committed TPS'];
@@ -303,7 +314,7 @@ function renderThroughputStageDeltas(tiers: TierSummary[], chartRecords?: ChartR
     f2(t.observedCommittedTps),
   ]);
 
-  const base = ['## Throughput Stage Deltas', '', prose, '', mdTable(headers, rows)].join('\n');
+  const base = ['## ⚡ Throughput Stage Deltas', '', prose, '', mdTable(headers, rows)].join('\n');
   return appendCharts(base, chartsForSection('Throughput', chartRecords));
 }
 
@@ -318,7 +329,7 @@ function renderClientSubmissionEvidence(tiers: TierSummary[]): string {
   ].join('\n');
 
   if (tiers.length === 0) {
-    return `## Client Submission Evidence\n\n${prose}\n\n_No tier data._`;
+    return `## 📨 Client Submission Evidence\n\n${prose}\n\n_No tier data._`;
   }
 
   const headers = [
@@ -344,7 +355,7 @@ function renderClientSubmissionEvidence(tiers: TierSummary[]): string {
     n(t.clientSubmittedLatencyP95Ms),
   ]);
 
-  return ['## Client Submission Evidence', '', prose, '', mdTable(headers, rows)].join('\n');
+  return ['## 📨 Client Submission Evidence', '', prose, '', mdTable(headers, rows)].join('\n');
 }
 
 function renderAcceptedToCommittedLatencyEvidence(tiers: TierSummary[]): string {
@@ -363,7 +374,7 @@ function renderAcceptedToCommittedLatencyEvidence(tiers: TierSummary[]): string 
   ].join('\n');
 
   if (tiers.length === 0) {
-    return `## Accepted-to-Committed Latency Evidence\n\n${prose}\n\n_No tier data._`;
+    return `## ⏱️ Accepted-to-Committed Latency Evidence\n\n${prose}\n\n_No tier data._`;
   }
 
   const headers = [
@@ -398,7 +409,7 @@ function renderAcceptedToCommittedLatencyEvidence(tiers: TierSummary[]): string 
   }
 
   return [
-    '## Accepted-to-Committed Latency Evidence',
+    '## ⏱️ Accepted-to-Committed Latency Evidence',
     '',
     prose,
     '',
@@ -412,7 +423,7 @@ function renderAcceptedToCommittedLatencyEvidence(tiers: TierSummary[]): string 
 
 function renderQueueAndMempoolBehavior(tiers: TierSummary[], chartRecords?: ChartRecord[]): string {
   if (tiers.length === 0) {
-    return '## Queue and Mempool Behavior\n\n_No tier data._';
+    return '## 📦 Queue and Mempool Behavior\n\n_No tier data._';
   }
 
   const headers = [
@@ -433,7 +444,7 @@ function renderQueueAndMempoolBehavior(tiers: TierSummary[], chartRecords?: Char
     n(t.finalMempoolSizeAfterRecovery),
   ]);
 
-  const base = ['## Queue and Mempool Behavior', '', mdTable(headers, rows)].join('\n');
+  const base = ['## 📦 Queue and Mempool Behavior', '', mdTable(headers, rows)].join('\n');
   return appendCharts(base, chartsForSection('Queue and Mempool', chartRecords));
 }
 
@@ -442,7 +453,7 @@ function renderCommitSubmitMergeProgress(
   chartRecords?: ChartRecord[]
 ): string {
   if (tiers.length === 0) {
-    return '## Commit/Submit/Merge Progress\n\n_No tier data._';
+    return '## 🔗 Commit/Submit/Merge Progress\n\n_No tier data._';
   }
 
   const prose = [
@@ -478,7 +489,7 @@ function renderCommitSubmitMergeProgress(
     f2(t.l1FeePerCommittedL2TxLovelace),
   ]);
 
-  const base = ['## Commit/Submit/Merge Progress', '', prose, '', mdTable(headers, rows)].join(
+  const base = ['## 🔗 Commit/Submit/Merge Progress', '', prose, '', mdTable(headers, rows)].join(
     '\n'
   );
   return appendCharts(base, chartsForSection('Block Pipeline', chartRecords));
@@ -486,7 +497,7 @@ function renderCommitSubmitMergeProgress(
 
 function renderFailureSignals(tiers: TierSummary[], chartRecords?: ChartRecord[]): string {
   if (tiers.length === 0) {
-    return '## Failure Signals\n\n_No tier data._';
+    return '## 🚨 Failure Signals\n\n_No tier data._';
   }
 
   const headers = [
@@ -507,19 +518,19 @@ function renderFailureSignals(tiers: TierSummary[], chartRecords?: ChartRecord[]
     n(t.processingFailedDelta),
   ]);
 
-  const base = ['## Failure Signals', '', mdTable(headers, rows)].join('\n');
+  const base = ['## 🚨 Failure Signals', '', mdTable(headers, rows)].join('\n');
   return appendCharts(base, chartsForSection('Failure Signals', chartRecords));
 }
 
 function renderInfrastructureCharts(chartRecords?: ChartRecord[]): string | null {
   const charts = chartsForSection('Infrastructure', chartRecords);
   if (charts === null) return null;
-  return ['## Infrastructure', '', charts].join('\n');
+  return ['## 🖥️ Infrastructure', '', charts].join('\n');
 }
 
 function renderPrimaryBottleneckHypothesis(conclusion: BenchmarkConclusion): string {
   const lines: string[] = [
-    '## Primary Bottleneck Hypothesis',
+    '## 🔧 Primary Bottleneck Hypothesis',
     '',
     `**Identified bottleneck:** ${conclusion.primaryBottleneck}`,
   ];
@@ -566,7 +577,7 @@ function renderLokiEvidence(captures: LokiTierCapture[] | undefined): string | n
   ]);
 
   return [
-    '## Log Evidence (Loki)',
+    '## 📋 Log Evidence (Loki)',
     '',
     'Per-tier log capture from Loki over the tier window plus a short post-window tail.',
     'Full log streams are in `loki-captures.json`.',
@@ -606,7 +617,7 @@ function renderTempoEvidence(captures: TempoTierCapture[] | undefined): string |
   ]);
 
   return [
-    '## Trace Evidence (Tempo)',
+    '## 🔍 Trace Evidence (Tempo)',
     '',
     'Per-tier trace capture from Tempo over the full tier window (load phase + recovery).',
     'Full trace summaries are in `tempo-captures.json`.',
@@ -617,16 +628,16 @@ function renderTempoEvidence(captures: TempoTierCapture[] | undefined): string |
 
 function renderArtifactIndex(files: string[]): string {
   if (files.length === 0) {
-    return '## Artifact Index\n\n_No artifact files recorded._';
+    return '## 📂 Artifact Index\n\n_No artifact files recorded._';
   }
 
   const list = files.map((f) => `- \`${f}\``).join('\n');
-  return ['## Artifact Index', '', list].join('\n');
+  return ['## 📂 Artifact Index', '', list].join('\n');
 }
 
 function renderLimitations(): string {
   return [
-    '## Limitations',
+    '## ⚠️ Limitations',
     '',
     '- This run measures current behavior without remediation.',
     '  No performance tuning, protocol changes, or infrastructure adjustments were applied.',
