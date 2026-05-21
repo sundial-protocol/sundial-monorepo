@@ -500,16 +500,24 @@ async function withBackpressureCapacity(
 
 async function processPreparedSubmission(params: {
   prepared: PreparedSubmission;
+  localValidation: TransactionGeneratorConfig['localValidation'];
   nodeClient: MidgardNodeClient;
   outputDir: string | undefined;
   requestEventsMode: RequestEventsMode;
   requestEventRandom: () => number;
   rateLimiter: TokenBucket | null;
 }): Promise<void> {
-  const { prepared, nodeClient, outputDir, requestEventsMode, requestEventRandom, rateLimiter } =
-    params;
+  const {
+    prepared,
+    localValidation,
+    nodeClient,
+    outputDir,
+    requestEventsMode,
+    requestEventRandom,
+    rateLimiter,
+  } = params;
 
-  if (prepared.evidenceEntry.validation.status === 'rejected') {
+  if (prepared.evidenceEntry.validation.status === 'rejected' && localValidation !== 'warn') {
     prepared.evidenceEntry.submission.status = 'VALIDATION_REJECTED';
     state.stats.transactionsFailed += 1;
     recordSubmissionObservation(state.stats.submissionAggregate, 'rejected', null, 0);
@@ -876,6 +884,7 @@ export const startGenerator = async (
       try {
         await processPreparedSubmission({
           prepared,
+          localValidation: fullConfig.localValidation,
           nodeClient,
           outputDir: fullConfig.outputDir,
           requestEventsMode,
@@ -1018,6 +1027,7 @@ export const startGenerator = async (
   console.log(`• Node Endpoint: ${fullConfig.nodeEndpoint}`);
   console.log(`• Generation Seed: ${generationSeed}`);
   console.log(`• Request Events: ${requestEventsMode}`);
+  console.log(`• Local Validation: ${fullConfig.localValidation}`);
   if (requestEventsMode === 'sampled') {
     console.log(`• Request Event Sample Rate: ${REQUEST_EVENTS_SAMPLE_RATE}`);
   }

@@ -1,10 +1,16 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
+import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path, { dirname, isAbsolute, resolve } from 'node:path';
 
 import type { ScalabilityScenario } from '../config/scenario.js';
+import {
+  sanitizePathLikeText,
+  stringifyCompactWithSanitizedPaths,
+  stringifyWithSanitizedPaths,
+} from '../path-sanitization.js';
 import type {
   LoadDriverResourceEvidence,
   LoadDriverSaturationFlags,
@@ -93,8 +99,14 @@ async function hashReplayCorpus(
     return { replayCorpusPath: null, replayCorpusSha256: null };
   }
 
-  const corpusContent = await readFile(resolvedReplayCorpusPath);
-  const replayCorpusSha256 = createHash('sha256').update(corpusContent).digest('hex');
+  const hash = createHash('sha256');
+  await new Promise<void>((resolve, reject) => {
+    const stream = createReadStream(resolvedReplayCorpusPath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', resolve);
+    stream.on('error', reject);
+  });
+  const replayCorpusSha256 = hash.digest('hex');
   return {
     replayCorpusPath: resolvedReplayCorpusPath,
     replayCorpusSha256,
@@ -123,7 +135,7 @@ export class ArtifactWriter {
 
     const writer = new ArtifactWriter(runDir);
 
-    await writeFile(path.join(runDir, 'scenario.json'), JSON.stringify(scenario, null, 2));
+    await writeFile(path.join(runDir, 'scenario.json'), stringifyWithSanitizedPaths(scenario));
 
     const replayCorpus = await hashReplayCorpus(scenario.replayCorpusPath, scenarioPath);
 
@@ -133,9 +145,12 @@ export class ArtifactWriter {
       gitSha: gitSha(),
       nodeEndpoint: scenario.nodeEndpoint,
       prometheusEndpoint: scenario.prometheusEndpoint,
-      scenarioPath,
+      scenarioPath: sanitizePathLikeText(scenarioPath),
       harnessVersion,
-      replayCorpusPath: replayCorpus.replayCorpusPath,
+      replayCorpusPath:
+        replayCorpus.replayCorpusPath === null
+          ? null
+          : sanitizePathLikeText(replayCorpus.replayCorpusPath),
       replayCorpusSha256: replayCorpus.replayCorpusSha256,
       l1ProviderMode: scenario.l1ProviderMode ?? null,
       walletMode: scenario.walletMode ?? null,
@@ -143,7 +158,10 @@ export class ArtifactWriter {
       lokiEndpoint: scenario.lokiEndpoint ?? null,
       tempoEndpoint: scenario.tempoEndpoint ?? null,
       grafanaScreenshotsEnabled: scenario.grafanaScreenshots?.enabled ?? false,
-      grafanaDashboardJsonPath: scenario.grafanaScreenshots?.dashboardJsonPath ?? null,
+      grafanaDashboardJsonPath:
+        scenario.grafanaScreenshots?.dashboardJsonPath === undefined
+          ? null
+          : sanitizePathLikeText(scenario.grafanaScreenshots.dashboardJsonPath),
       host: {
         hostname: os.hostname(),
         platform: os.platform(),
@@ -153,7 +171,7 @@ export class ArtifactWriter {
       },
     };
 
-    await writeFile(path.join(runDir, 'run-manifest.json'), JSON.stringify(manifest, null, 2));
+    await writeFile(path.join(runDir, 'run-manifest.json'), stringifyWithSanitizedPaths(manifest));
 
     return writer;
   }
@@ -171,7 +189,7 @@ export class ArtifactWriter {
 
     const writer = new ArtifactWriter(runDir);
 
-    await writeFile(path.join(runDir, 'scenario.json'), JSON.stringify(scenario, null, 2));
+    await writeFile(path.join(runDir, 'scenario.json'), stringifyWithSanitizedPaths(scenario));
 
     const replayCorpus = await hashReplayCorpus(scenario.replayCorpusPath, scenarioPath);
 
@@ -181,9 +199,12 @@ export class ArtifactWriter {
       gitSha: gitSha(),
       nodeEndpoint: scenario.nodeEndpoint,
       prometheusEndpoint: scenario.prometheusEndpoint,
-      scenarioPath,
+      scenarioPath: sanitizePathLikeText(scenarioPath),
       harnessVersion,
-      replayCorpusPath: replayCorpus.replayCorpusPath,
+      replayCorpusPath:
+        replayCorpus.replayCorpusPath === null
+          ? null
+          : sanitizePathLikeText(replayCorpus.replayCorpusPath),
       replayCorpusSha256: replayCorpus.replayCorpusSha256,
       l1ProviderMode: scenario.l1ProviderMode ?? null,
       walletMode: scenario.walletMode ?? null,
@@ -191,7 +212,10 @@ export class ArtifactWriter {
       lokiEndpoint: scenario.lokiEndpoint ?? null,
       tempoEndpoint: scenario.tempoEndpoint ?? null,
       grafanaScreenshotsEnabled: scenario.grafanaScreenshots?.enabled ?? false,
-      grafanaDashboardJsonPath: scenario.grafanaScreenshots?.dashboardJsonPath ?? null,
+      grafanaDashboardJsonPath:
+        scenario.grafanaScreenshots?.dashboardJsonPath === undefined
+          ? null
+          : sanitizePathLikeText(scenario.grafanaScreenshots.dashboardJsonPath),
       host: {
         hostname: os.hostname(),
         platform: os.platform(),
@@ -201,7 +225,7 @@ export class ArtifactWriter {
       },
     };
 
-    await writeFile(path.join(runDir, 'run-manifest.json'), JSON.stringify(manifest, null, 2));
+    await writeFile(path.join(runDir, 'run-manifest.json'), stringifyWithSanitizedPaths(manifest));
 
     return writer;
   }
@@ -211,19 +235,25 @@ export class ArtifactWriter {
   }
 
   async appendLoadEvent(event: LoadEvent): Promise<void> {
-    await appendFile(this.filePath('load-events.jsonl'), JSON.stringify(event) + '\n');
+    await appendFile(
+      this.filePath('load-events.jsonl'),
+      stringifyCompactWithSanitizedPaths(event) + '\n'
+    );
   }
 
   async appendTierSummary(summary: TierSummary): Promise<void> {
-    await appendFile(this.filePath('tier-summaries.jsonl'), JSON.stringify(summary) + '\n');
+    await appendFile(
+      this.filePath('tier-summaries.jsonl'),
+      stringifyCompactWithSanitizedPaths(summary) + '\n'
+    );
   }
 
   async writePrometheusSamples(samples: unknown): Promise<void> {
-    await writeFile(this.filePath('prometheus-samples.json'), JSON.stringify(samples, null, 2));
+    await writeFile(this.filePath('prometheus-samples.json'), stringifyWithSanitizedPaths(samples));
   }
 
   async writeSummary(summary: unknown): Promise<void> {
-    await writeFile(this.filePath('summary.json'), JSON.stringify(summary, null, 2));
+    await writeFile(this.filePath('summary.json'), stringifyWithSanitizedPaths(summary));
   }
 
   async writeReport(markdown: string): Promise<void> {
@@ -231,18 +261,18 @@ export class ArtifactWriter {
   }
 
   async writeLokiCaptures(captures: LokiTierCapture[]): Promise<void> {
-    await writeFile(this.filePath('loki-captures.json'), JSON.stringify(captures, null, 2));
+    await writeFile(this.filePath('loki-captures.json'), stringifyWithSanitizedPaths(captures));
   }
 
   async writeTempoCaptures(captures: TempoTierCapture[]): Promise<void> {
-    await writeFile(this.filePath('tempo-captures.json'), JSON.stringify(captures, null, 2));
+    await writeFile(this.filePath('tempo-captures.json'), stringifyWithSanitizedPaths(captures));
   }
 
   async logStdout(line: string): Promise<void> {
-    await appendFile(this.filePath('stdout.log'), line + '\n');
+    await appendFile(this.filePath('stdout.log'), sanitizePathLikeText(line) + '\n');
   }
 
   async logStderr(line: string): Promise<void> {
-    await appendFile(this.filePath('stderr.log'), line + '\n');
+    await appendFile(this.filePath('stderr.log'), sanitizePathLikeText(line) + '\n');
   }
 }

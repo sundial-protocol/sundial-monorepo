@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { PlanConfig } from '../config/plan.js';
+import { sanitizePathLikeText, stringifyWithSanitizedPaths } from '../path-sanitization.js';
 
 export interface PlanManifest {
   planId: string;
@@ -58,16 +59,16 @@ export class PlanArtifactWriter {
 
     const writer = new PlanArtifactWriter(planDir);
 
-    await writeFile(path.join(planDir, 'plan.json'), JSON.stringify(plan, null, 2));
+    await writeFile(path.join(planDir, 'plan.json'), stringifyWithSanitizedPaths(plan));
 
     const manifest: PlanManifest = {
       planId: plan.planId,
       description: plan.description ?? null,
       startedAt: startedAt.toISOString(),
       gitSha: gitSha(),
-      planPath,
+      planPath: sanitizePathLikeText(planPath),
       harnessVersion,
-      scenarioPaths: resolvedScenarioPaths,
+      scenarioPaths: resolvedScenarioPaths.map((scenarioPath) => sanitizePathLikeText(scenarioPath)),
       host: {
         hostname: os.hostname(),
         platform: os.platform(),
@@ -77,7 +78,10 @@ export class PlanArtifactWriter {
       },
     };
 
-    await writeFile(path.join(planDir, 'plan-manifest.json'), JSON.stringify(manifest, null, 2));
+    await writeFile(
+      path.join(planDir, 'plan-manifest.json'),
+      stringifyWithSanitizedPaths(manifest)
+    );
 
     return writer;
   }
@@ -90,7 +94,7 @@ export class PlanArtifactWriter {
   }
 
   async writePlanSummary(summary: unknown): Promise<void> {
-    await writeFile(path.join(this.planDir, 'plan-summary.json'), JSON.stringify(summary, null, 2));
+    await writeFile(path.join(this.planDir, 'plan-summary.json'), stringifyWithSanitizedPaths(summary));
   }
 
   async writePlanReport(markdown: string): Promise<void> {

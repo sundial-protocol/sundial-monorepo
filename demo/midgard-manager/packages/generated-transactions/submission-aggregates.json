@@ -1,9 +1,9 @@
 {
   "counters": {
-    "generated": 1056,
+    "generated": 1032,
     "attempted": 0,
     "submitted": 0,
-    "rejected": 1056,
+    "rejected": 1032,
     "node_unavailable": 0,
     "timed_out": 0,
     "error": 0
@@ -205,7 +205,7 @@
         60000
       ],
       "counts": [
-        1056,
+        1032,
         0,
         0,
         0,
@@ -218,8 +218,8 @@
         0
       ],
       "overflowCount": 0,
-      "count": 1056,
-      "sumMs": 1056,
+      "count": 1032,
+      "sumMs": 1032,
       "minMs": 1,
       "maxMs": 1
     },
@@ -271,7 +271,7 @@
         60000
       ],
       "counts": [
-        1056,
+        1032,
         0,
         0,
         0,
@@ -284,8 +284,8 @@
         0
       ],
       "overflowCount": 0,
-      "count": 1056,
-      "sumMs": 1,
+      "count": 1032,
+      "sumMs": 3,
       "minMs": 0,
       "maxMs": 1
     },
@@ -337,7 +337,7 @@
         60000
       ],
       "counts": [
-        528,
+        516,
         0,
         0,
         0,
@@ -350,8 +350,8 @@
         0
       ],
       "overflowCount": 0,
-      "count": 528,
-      "sumMs": 4,
+      "count": 516,
+      "sumMs": 5,
       "minMs": 0,
       "maxMs": 1
     }

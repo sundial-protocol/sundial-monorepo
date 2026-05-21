@@ -21,7 +21,7 @@
     "clean": "pnpm --filter @midgard-manager/* clean",
     "start": "pnpm --filter @midgard-manager/cli start",
     "tx-generator": "pnpm --filter @midgard-manager/tx-generator start",
-    "tx:corpus:generate:benchmark-runs": "mkdir -p packages/scalability-harness/benchmark-runs/data && pnpm --filter @midgard-manager/tx-generator run build && pnpm --filter @midgard-manager/tx-generator exec node dist/bin/index.js generate-corpus --test-wallet --network ${TX_CORPUS_NETWORK:-Preview} --type ${TX_CORPUS_TYPE:-one-to-one} --count ${TX_CORPUS_COUNT:-1500000} --seed ${TX_CORPUS_SEED:-benchmark-runs-corpus} --output ${TX_CORPUS_OUTPUT:-packages/scalability-harness/benchmark-runs/data/corpus-v1-net-preview-t-one-to-one-r-na-n-1500000.jsonl}",
+    "tx:corpus:generate:benchmark-runs": "mkdir -p packages/scalability-harness/corpora && pnpm --filter @midgard-manager/tx-generator run build && pnpm --filter @midgard-manager/tx-generator exec node dist/bin/index.js generate-corpus --test-wallet --network ${TX_CORPUS_NETWORK:-Preview} --type ${TX_CORPUS_TYPE:-one-to-one} --count ${TX_CORPUS_COUNT:-1500000} --seed ${TX_CORPUS_SEED:-benchmark-runs-corpus} --output ${TX_CORPUS_OUTPUT:-$PWD/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-1500000.jsonl} --progress-interval ${TX_CORPUS_PROGRESS_INTERVAL:-10000} --progress-interval-ms ${TX_CORPUS_PROGRESS_INTERVAL_MS:-1000}",
     "scalability-harness": "pnpm --filter @midgard-manager/scalability-harness start",
     "wallet:block-commitment:topup": "node scripts/fund-bc-wallet.mjs",
     "wallet:block-commitment:check": "node scripts/fund-bc-wallet.mjs --check",

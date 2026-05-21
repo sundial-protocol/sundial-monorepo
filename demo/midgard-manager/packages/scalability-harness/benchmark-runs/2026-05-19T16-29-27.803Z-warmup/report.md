@@ -10,7 +10,7 @@
 | ------------------------ | -------------------------------------------------------------------------------------------- |
 | Run ID                   | warmup                                                                                       |
 | Started At               | 2026-05-19T16:29:27.803Z                                                                     |
-| Git SHA                  | d15f2bfceca3f25ea0a353d67f058529718b2ac1                                                     |
+| Git SHA                  | e0b938c463b081b4cb7e3a7ab2a0634dc8efe689                                                     |
 | Node Endpoint            | http://localhost:3000                                                                        |
 | Prometheus Endpoint      | http://localhost:9090                                                                        |
 | L1 Provider Mode         | emulator                                                                                     |

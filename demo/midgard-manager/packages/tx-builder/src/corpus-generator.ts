@@ -144,6 +144,7 @@ export async function generateCorpus(config: CorpusGenerateConfig): Promise<void
         }
 
         for (const tx of txs) {
+          if (generated >= count) break;
           await writeLine(tx);
           generated += 1;
           onProgress?.(generated, count);

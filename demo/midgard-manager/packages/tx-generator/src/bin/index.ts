@@ -30,6 +30,7 @@ interface GeneratorOptions {
   replayCorpusPath?: string;
   replayStartIndex?: string;
   replayCount?: string;
+  localValidation?: 'strict' | 'warn';
   retryAttempts?: string;
   retryDelayMs?: string;
   submitTimeoutMs?: string;
@@ -75,6 +76,11 @@ program
     '5000'
   )
   .option('--request-events <mode>', 'Per-request submission event mode (off|sampled|all)', 'off')
+  .option(
+    '--local-validation <mode>',
+    'Local Midgard inspection handling before submission (strict|warn)',
+    'strict'
+  )
   .option(
     '--replay-corpus-path <path>',
     'Replay transactions from a JSON corpus (array or { transactions: [] })'
@@ -141,6 +147,7 @@ program
         chalk.gray(`Submit Timeout: ${options.submitTimeoutMs ?? '5000'}ms (per attempt)`)
       );
       console.log(chalk.gray(`Request Events: ${options.requestEvents}`));
+      console.log(chalk.gray(`Local Validation: ${options.localValidation}`));
       if (options.seed) {
         console.log(chalk.gray(`Generation Seed: ${options.seed}`));
       }
@@ -181,6 +188,7 @@ program
         nodeSubmitTimeoutMs: parseInt(options.submitTimeoutMs ?? '5000'),
         outputDir: options.outputDir,
         requestEvents: options.requestEvents ?? 'off',
+        localValidation: options.localValidation ?? 'strict',
         generationSeed: options.seed,
         replayCorpusPath: options.replayCorpusPath,
         replayStartIndex:
@@ -228,6 +236,16 @@ program
   .option('--network <network>', 'Network (Preview/Mainnet)', 'Preview')
   .option('--test-wallet', 'Generate a fresh test wallet private key', false)
   .option('-k, --private-key <key>', 'Wallet private key')
+  .option(
+    '--progress-interval <number>',
+    'Generated transaction interval between progress updates',
+    '10000'
+  )
+  .option(
+    '--progress-interval-ms <number>',
+    'Elapsed millisecond interval between progress updates',
+    '1000'
+  )
   .action(
     async (opts: {
       output: string;
@@ -238,10 +256,24 @@ program
       network?: string;
       testWallet: boolean;
       privateKey?: string;
+      progressInterval: string;
+      progressIntervalMs: string;
     }) => {
       const count = parseInt(opts.count, 10);
       if (!Number.isFinite(count) || count < 1) {
         console.error(chalk.red('--count must be a positive integer'));
+        process.exit(1);
+      }
+
+      const progressInterval = parseInt(opts.progressInterval, 10);
+      if (!Number.isFinite(progressInterval) || progressInterval < 1) {
+        console.error(chalk.red('--progress-interval must be a positive integer'));
+        process.exit(1);
+      }
+
+      const progressIntervalMs = parseInt(opts.progressIntervalMs, 10);
+      if (!Number.isFinite(progressIntervalMs) || progressIntervalMs < 1) {
+        console.error(chalk.red('--progress-interval-ms must be a positive integer'));
         process.exit(1);
       }
 
@@ -279,7 +311,9 @@ program
       console.log(chalk.blue(`Generating ${count} transactions...`));
       console.log(chalk.gray(`Type: ${opts.type} | Seed: ${seed} | Output: ${opts.output}`));
 
-      let lastPct = -1;
+      const progressStartedAt = Date.now();
+      let lastProgressAt = 0;
+      let lastProgressGenerated = 0;
       await generateCorpus({
         count,
         walletSeedOrPrivateKey,
@@ -290,13 +324,26 @@ program
         seed,
         outputPath: opts.output,
         onProgress(generated: number, total: number) {
-          const pct = Math.floor((generated / total) * 100);
-          if (pct !== lastPct && pct % 5 === 0) {
-            lastPct = pct;
-            const filled = Math.floor(pct / 5);
-            const bar = '='.repeat(filled) + '-'.repeat(20 - filled);
-            process.stdout.write(`\r  [${bar}] ${pct}% (${generated}/${total})`);
+          const now = Date.now();
+          const shouldReport =
+            generated === total ||
+            generated - lastProgressGenerated >= progressInterval ||
+            now - lastProgressAt >= progressIntervalMs;
+          if (!shouldReport) {
+            return;
           }
+
+          lastProgressAt = now;
+          lastProgressGenerated = generated;
+
+          const pct = Math.min(100, Math.floor((generated / total) * 100));
+          const elapsedSeconds = Math.max((now - progressStartedAt) / 1000, 0.001);
+          const txPerSecond = generated / elapsedSeconds;
+          const filled = Math.floor(pct / 5);
+          const bar = '='.repeat(filled) + '-'.repeat(20 - filled);
+          process.stdout.write(
+            `\r  [${bar}] ${pct}% (${generated}/${total}) ${txPerSecond.toFixed(0)} tx/s`
+          );
         },
       });
 

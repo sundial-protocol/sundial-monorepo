@@ -10,7 +10,7 @@
 | ------------------------ | -------------------------------------------------------------------------------------------- |
 | Run ID                   | baseline-100-800                                                                             |
 | Started At               | 2026-05-20T15:07:15.936Z                                                                     |
-| Git SHA                  | 69387ee1db747be2d9f8ca0afb2422c0449810a9                                                     |
+| Git SHA                  | e0b938c463b081b4cb7e3a7ab2a0634dc8efe689                                                     |
 | Node Endpoint            | http://localhost:3000                                                                        |
 | Prometheus Endpoint      | http://localhost:9090                                                                        |
 | L1 Provider Mode         | emulator                                                                                     |
