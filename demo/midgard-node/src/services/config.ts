@@ -1,5 +1,5 @@
 import { Network, UTxO, walletFromSeed } from "@lucid-evolution/lucid";
-import { Config, Context, Data, Effect, Layer, Schedule } from "effect";
+import { Config, Context, Data, Effect, Layer, Option } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 
 type Provider = "Kupmios" | "Blockfrost";
@@ -33,6 +33,41 @@ type NodeConfigDep = {
 };
 
 const makeConfig = Effect.gen(function* () {
+  const nodeEnv = yield* Config.string("NODE_ENV").pipe(
+    Config.withDefault("development"),
+  );
+  const isProduction = nodeEnv === "production";
+  const readDeploymentString = (name: string, localDefault: string) =>
+    Effect.gen(function* () {
+      const value = isProduction
+        ? yield* Config.option(Config.string(name)).pipe(
+            Effect.flatMap((maybeValue) =>
+              Option.match(maybeValue, {
+                onNone: () =>
+                  Effect.fail(
+                    new ConfigError({
+                      message: `Missing required production config: ${name}`,
+                      cause: undefined,
+                      fieldsAndValues: [[name, "<missing>"]],
+                    }),
+                  ),
+                onSome: Effect.succeed,
+              }),
+            ),
+          )
+        : yield* Config.string(name).pipe(Config.withDefault(localDefault));
+      if (isProduction && value.trim() === "") {
+        return yield* Effect.fail(
+          new ConfigError({
+            message: `Missing required production config: ${name}`,
+            cause: undefined,
+            fieldsAndValues: [[name, "<empty>"]],
+          }),
+        );
+      }
+      return value;
+    });
+
   const provider = yield* Config.literal(
     "Kupmios",
     "Blockfrost",
@@ -76,23 +111,20 @@ const makeConfig = Effect.gen(function* () {
   const oltpExporterUrl = yield* Config.string("OLTP_EXPORTER_URL").pipe(
     Config.withDefault("http://0.0.0.0:4318/v1/traces"),
   );
-  const postgresHost = yield* Config.string("POSTGRES_HOST").pipe(
-    Config.withDefault("postgres"),
-  ); // service name
-  const postgresPassword = yield* Config.string("POSTGRES_PASSWORD").pipe(
-    Config.withDefault("postgres"),
+  const postgresHost = yield* readDeploymentString("POSTGRES_HOST", "postgres"); // service name
+  const postgresPassword = yield* readDeploymentString(
+    "POSTGRES_PASSWORD",
+    "postgres",
   );
-  const postgresDb = yield* Config.string("POSTGRES_DB").pipe(
-    Config.withDefault("midgard"),
+  const postgresDb = yield* readDeploymentString("POSTGRES_DB", "midgard");
+  const postgresUser = yield* readDeploymentString("POSTGRES_USER", "postgres");
+  const ledgerMptDbPath = yield* readDeploymentString(
+    "LEDGER_MPT_DB_PATH",
+    "midgard-ledger-mpt-db",
   );
-  const postgresUser = yield* Config.string("POSTGRES_USER").pipe(
-    Config.withDefault("postgres"),
-  );
-  const ledgerMptDbPath = yield* Config.string("LEDGER_MPT_DB_PATH").pipe(
-    Config.withDefault("midgard-ledger-mpt-db"),
-  );
-  const mempoolMptDbPath = yield* Config.string("MEMPOOL_MPT_DB_PATH").pipe(
-    Config.withDefault("midgard-mempool-mpt-db"),
+  const mempoolMptDbPath = yield* readDeploymentString(
+    "MEMPOOL_MPT_DB_PATH",
+    "midgard-mempool-mpt-db",
   );
   const seedA = yield* Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_A");
   const seedB = yield* Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_B");
@@ -190,14 +222,14 @@ const makeConfig = Effect.gen(function* () {
     GENESIS_UTXOS: network === "Mainnet" ? [] : genesisUtxos,
   };
 }).pipe(
-  Effect.retry(Schedule.fixed("5000 millis")),
-  Effect.mapError(
-    (e) =>
-      new ConfigError({
-        message: "Error instantiating the config service.",
-        cause: e,
-        fieldsAndValues: [["<n/a>", "<n/a>"]],
-      }),
+  Effect.mapError((e) =>
+    e instanceof ConfigError
+      ? e
+      : new ConfigError({
+          message: "Error instantiating the config service.",
+          cause: e,
+          fieldsAndValues: [["<n/a>", "<n/a>"]],
+        }),
   ),
 );
 

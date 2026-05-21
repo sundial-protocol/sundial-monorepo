@@ -59,6 +59,48 @@ describe("NodeConfig", () => {
   );
 
   it.effect(
+    "fails closed when production deployment config is absent",
+    () => {
+      const productionProvider = ConfigProvider.fromMap(
+        new Map([
+          ["NODE_ENV", "production"],
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+        ]),
+      );
+      const productionLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(productionProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(productionLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain("POSTGRES_HOST");
+        }
+      });
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
     "returns empty genesis UTxOs for Mainnet",
     () => {
       const mainnetProvider = ConfigProvider.fromMap(

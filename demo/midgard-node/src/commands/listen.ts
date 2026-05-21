@@ -31,6 +31,7 @@ import {
 import {
   AddressHistoryDB,
   BlocksTxsDB,
+  HealthDB,
   ImmutableDB,
   DBInitialization,
   MempoolDB,
@@ -45,6 +46,7 @@ import {
 } from "@effect/platform";
 import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
+import { constants as Http2Constants } from "node:http2";
 import { NodeHttpServer } from "@effect/platform-node";
 import { HttpBodyError } from "@effect/platform/HttpBody";
 import * as Genesis from "@/genesis.js";
@@ -74,6 +76,8 @@ const RESET_ENDPOINT: string = "reset";
 const SUBMIT_ENDPOINT: string = "submit";
 const STATE_QUEUE_ENDPOINT: string = "stateQueue";
 const COMMITMENT_WALLET_BALANCE_ENDPOINT: string = "commitment-wallet/balance";
+const HEALTH_LIVE_ENDPOINT: string = "health/live";
+const HEALTH_READY_ENDPOINT: string = "health/ready";
 
 const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
@@ -120,6 +124,23 @@ const handleTxGetFailure = (
 
 const handleGenericGetFailure = (endpoint: string, e: SDK.GenericErrorFields) =>
   failWith500("GET", endpoint, e.cause, e.message);
+
+const getHealthLiveHandler = HttpServerResponse.json({ status: "ok" });
+
+const getHealthReadyHandler = HealthDB.checkReady.pipe(
+  Effect.flatMap(() => HttpServerResponse.json({ status: "ready" })),
+  Effect.catchTag("DatabaseError", (e) =>
+    Effect.gen(function* () {
+      yield* Effect.logError(
+        `GET /${HEALTH_READY_ENDPOINT} - database readiness failure: ${e.message}`,
+      );
+      return yield* HttpServerResponse.json(
+        { status: "not_ready" },
+        { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
+      );
+    }),
+  ),
+);
 
 const lookupTxCbor = (txHashBytes: Buffer, txHashParam: string) =>
   MempoolDB.retrieveTxCborByHash(txHashBytes).pipe(
@@ -613,6 +634,8 @@ const router = (
 > =>
   HttpRouter.empty
     .pipe(
+      HttpRouter.get(`/${HEALTH_LIVE_ENDPOINT}`, getHealthLiveHandler),
+      HttpRouter.get(`/${HEALTH_READY_ENDPOINT}`, getHealthReadyHandler),
       HttpRouter.get(`/${TX_ENDPOINT}`, getTxHandler),
       HttpRouter.get(`/${ADDRESS_HISTORY_ENDPOINT}`, getTxsOfAddressHandler),
       HttpRouter.get(`/${UTXOS_ENDPOINT}`, getUtxosHandler),
