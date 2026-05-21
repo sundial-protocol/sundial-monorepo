@@ -4,10 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - demo/**
-      - .github/actions/setup-l2/**
-      - .github/workflows/quality.yml
   workflow_dispatch:
 
 permissions:
@@ -21,8 +17,24 @@ env:
   OSV_SCANNER_VERSION: 2.3.8
 
 jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-slim
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          paths: '^(demo/|\.github/actions/|\.github/workflows/quality\.yml)'
+
   checks:
     name: ${{ matrix.name }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-slim
     timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
@@ -61,6 +73,8 @@ jobs:
 
   osv-check:
     name: OSV Check
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-slim
     timeout-minutes: 20
     steps:

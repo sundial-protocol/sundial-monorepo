@@ -4,10 +4,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - demo/**
-      - .github/actions/setup-l2/**
-      - .github/workflows/tests-long.yml
   workflow_dispatch:
 
 permissions:
@@ -18,8 +14,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-slim
+    outputs:
+      run: ${{ steps.detect.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          paths: '^(demo/|\.github/actions/|\.github/workflows/tests-long\.yml)'
+
   long-tests:
     name: ${{ matrix.name }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
