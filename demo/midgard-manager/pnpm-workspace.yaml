@@ -3,6 +3,7 @@ packages:
 
 overrides:
   ip-address: '10.2.0'
+  ws: '8.20.1'
 
 allowedDeprecatedVersions:
   '@effect/schema': '*'
