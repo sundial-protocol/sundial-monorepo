@@ -1,10 +1,10 @@
-# Scalability Baseline Report
+# 📊 Scalability Baseline Report
 
 > **Scope:** This report measures the current behavior of the Midgard node under synthetic
 > load. Results reflect a single benchmark run executed without remediation and do not
 > claim or imply production scalability.
 
-## Run Metadata
+## 📌 Run Metadata
 
 | Field                    | Value                                                                                                              |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
@@ -21,7 +21,7 @@
 | Replay Corpus SHA256     | 4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80                                                   |
 | Host                     | dev3 (linux/x64, 6 CPUs, 31.0 GB)                                                                                  |
 
-## Scenario
+## 🔬 Scenario
 
 | Parameter                      | Value                                                                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
@@ -47,15 +47,15 @@
 | Max Recovery Queue Size        | 25000                                                                                                              |
 | Max Recovery Mempool Size      | 15000                                                                                                              |
 
-## Tier Results
+## 🏃 Tier Results
 
-| Tier | Target TPS | Result    | Enqueued Δ | Mempool Accepted Δ | Committed Tx Δ | Submitted Blocks Δ | Peak Queue | Peak Mempool | Commit Failures Δ | Merge Failures Δ | Collapse Reason       |
-| ---- | ---------- | --------- | ---------- | ------------------ | -------------- | ------------------ | ---------- | ------------ | ----------------- | ---------------- | --------------------- |
-| 0    | 800        | collapsed | 1867040    | 1858055            | 787733         | 11                 | 2443       | 1664382      | 2                 | 0                | mempool_not_recovered |
+| Tier | Target TPS | Result       | Enqueued Δ | Mempool Accepted Δ | Committed Tx Δ | Submitted Blocks Δ | Peak Queue | Peak Mempool | Commit Failures Δ | Merge Failures Δ | Collapse Reason       |
+| ---- | ---------- | ------------ | ---------- | ------------------ | -------------- | ------------------ | ---------- | ------------ | ----------------- | ---------------- | --------------------- |
+| 0    | 800        | collapsed 🚫 | 1867040    | 1858055            | 787733         | 11                 | 2443       | 1664382      | 2                 | 0                | mempool_not_recovered |
 
-## Formal Run Classification
+## 🚦 Formal Run Classification
 
-**Classification:** Failed
+**Classification:** Failed 🚫
 
 - Policy checks evaluated: 10
 - Violated checks: 3
@@ -76,12 +76,12 @@
 | Minimum completed tiers reached      | failure  | >= 1     | 0        | Completed tier count is below required minimum by 1.                             |
 | Final mempool growth after recovery  | failure  | <= 15000 | 1664382  | Observed as the maximum (afterRecovery - before) mempool delta across all tiers. |
 
-## Collapse Point
+## 💥 Collapse Point
 
 **First collapsed tier:** 0 at 800 TPS
 **Highest completed tier:** none
 
-## Throughput Stage Deltas
+## ⚡ Throughput Stage Deltas
 
 The columns below reflect three distinct pipeline stages:
 
@@ -110,7 +110,7 @@ Gaps between adjacent columns identify where the pipeline loses throughput.
 
 ![Committed Transactions](charts/committed-cumulative.svg)
 
-## Client Submission Evidence
+## 📨 Client Submission Evidence
 
 Client-side submission evidence is aggregated per tier/window and does not
 require per-request JSONL.
@@ -123,7 +123,7 @@ require per-request JSONL.
 | ---- | ---------- | --------- | -------- | ---------------- | ----- | ------------- | ------------------- | -------------------------- |
 | 0    | 800        | 1862381   | 0        | 0                | 0     | 8873          | 8552                | 2000                       |
 
-## Accepted-to-Committed Latency Evidence
+## ⏱️ Accepted-to-Committed Latency Evidence
 
 Accepted-to-committed latency is estimated from Prometheus counters using
 cohort alignment (`cohort_counter_alignment_v1`):
@@ -145,7 +145,7 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 
 - Tier 0: Scrape step is approximately 15s; latency resolution is bounded by this interval. Only 41.3% of accepted transactions were matched to committed progress before window end.
 
-## Queue and Mempool Behavior
+## 📦 Queue and Mempool Behavior
 
 | Tier | Target TPS | Peak Queue | Final Queue (after recovery) | Peak Mempool | Final Mempool (after recovery) |
 | ---- | ---------- | ---------- | ---------------------------- | ------------ | ------------------------------ |
@@ -155,7 +155,7 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 
 ![Mempool Transactions](charts/mempool-count.svg)
 
-## Commit/Submit/Merge Progress
+## 🔗 Commit/Submit/Merge Progress
 
 L1 commitment fee fields are derived as follows:
 
@@ -183,7 +183,7 @@ L1 commitment fee fields are derived as follows:
 
 ![Block Size](charts/block-size.svg)
 
-## Failure Signals
+## 🚨 Failure Signals
 
 | Tier | Target TPS | Commit Failures Δ | Merge Failures Δ | Rejected Δ | Processing Failed Δ |
 | ---- | ---------- | ----------------- | ---------------- | ---------- | ------------------- |
@@ -195,11 +195,11 @@ L1 commitment fee fields are derived as follows:
 
 ![Rejected Submissions](charts/rejected-submissions.svg)
 
-## Primary Bottleneck Hypothesis
+## 🔧 Primary Bottleneck Hypothesis
 
 **Identified bottleneck:** block commitment (mempool did not recover after load)
 
-## Infrastructure
+## 🖥️ Infrastructure
 
 ![CPU Usage](charts/cpu-usage.svg)
 
@@ -209,7 +209,7 @@ L1 commitment fee fields are derived as follows:
 
 ![Network Tx](charts/network-tx.svg)
 
-## Log Evidence (Loki)
+## 📋 Log Evidence (Loki)
 
 Per-tier log capture from Loki over the tier window plus a short post-window tail.
 Full log streams are in `loki-captures.json`.
@@ -218,7 +218,7 @@ Full log streams are in `loki-captures.json`.
 | ---- | ---------- | ------------------------------------------- | ------------------------------------------- | ----------------------- | ------- | ------- | --------- | ----- |
 | 0    | 800        | 2026-05-21T13:16:28Z → 2026-05-21T13:51:28Z | 2026-05-21T13:16:28Z → 2026-05-21T13:52:28Z | `{job="containerlogs"}` | 2       | 5000    | true      |       |
 
-## Trace Evidence (Tempo)
+## 🔍 Trace Evidence (Tempo)
 
 Per-tier trace capture from Tempo over the full tier window (load phase + recovery).
 Full trace summaries are in `tempo-captures.json`.
@@ -227,7 +227,7 @@ Full trace summaries are in `tempo-captures.json`.
 | ---- | ---------- | ------------------------------------------- | ------------ | ------ | --------- | --------- | ----- |
 | 0    | 800        | 2026-05-21T13:16:28Z → 2026-05-21T13:51:28Z | midgard-node | 0      | n/a       | false     |       |
 
-## Artifact Index
+## 📂 Artifact Index
 
 - `load-events.jsonl`
 - `loki-captures.json`
@@ -240,7 +240,7 @@ Full trace summaries are in `tempo-captures.json`.
 - `tempo-captures.json`
 - `tier-summaries.jsonl`
 
-## Limitations
+## ⚠️ Limitations
 
 - This run measures current behavior without remediation.
   No performance tuning, protocol changes, or infrastructure adjustments were applied.

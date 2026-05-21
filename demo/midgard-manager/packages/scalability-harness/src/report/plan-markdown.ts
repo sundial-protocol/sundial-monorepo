@@ -95,20 +95,29 @@ function s(value: string | null | undefined): string {
 function resultLabel(c: FormalRunClassification | 'skipped'): string {
   switch (c) {
     case 'Passed':
-      return 'Passed';
+      return 'Passed ✅';
     case 'Passed with Observations':
-      return 'Passed w/ Observations';
+      return 'Passed w/ Observations ✅';
     case 'Failed':
-      return 'Failed';
+      return 'Failed 🚫';
     case 'Blocked':
-      return 'Blocked';
+      return 'Blocked 🚫';
     case 'skipped':
       return 'Skipped';
   }
 }
 
 function planLabel(c: PlanClassification): string {
-  return c;
+  switch (c) {
+    case 'Passed':
+      return 'Passed ✅';
+    case 'Passed with Observations':
+      return 'Passed with Observations ✅';
+    case 'Failed':
+      return 'Failed 🚫';
+    case 'Blocked':
+      return 'Blocked 🚫';
+  }
 }
 
 function mdTable(headers: string[], rows: string[][]): string {
@@ -147,7 +156,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   const sections: string[] = [];
 
   // --- Header ---
-  sections.push('# Scalability Plan Run Report');
+  sections.push('# 📊 Scalability Plan Run Report');
   sections.push('');
   sections.push(
     '> **Scope:** This report covers a multi-scenario scalability plan executed by the\n' +
@@ -157,7 +166,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Plan metadata ---
-  sections.push('## Plan Metadata');
+  sections.push('## 📌 Plan Metadata');
   sections.push('');
   sections.push(
     mdTable(
@@ -178,7 +187,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Execution overview ---
-  sections.push('## Execution Overview');
+  sections.push('## 🏃 Execution Overview');
   sections.push('');
   sections.push(
     mdTable(
@@ -215,7 +224,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Throughput progression ---
-  sections.push('## Throughput Progression');
+  sections.push('## ⚡ Throughput Progression');
   sections.push('');
   sections.push(
     'Average observed transaction rates across completed tiers per scenario.\n' +
@@ -252,7 +261,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Transaction totals ---
-  sections.push('## Transaction Totals');
+  sections.push('## 📈 Transaction Totals');
   sections.push('');
   sections.push(
     'Aggregate counts across all executed scenarios.\n' +
@@ -279,7 +288,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Peak metrics per scenario ---
-  sections.push('## Peak Metrics per Scenario');
+  sections.push('## 📦 Peak Metrics per Scenario');
   sections.push('');
   if (executed.length === 0) {
     sections.push('_No scenarios executed._');
@@ -306,7 +315,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Inclusion latency ---
-  sections.push('## Inclusion Latency (p95) per Scenario');
+  sections.push('## ⏱️ Inclusion Latency (p95) per Scenario');
   sections.push('');
   sections.push(
     'Estimated p95 mempool-accepted-to-committed inclusion latency per §7 of the test plan.\n' +
@@ -334,7 +343,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Collapse analysis ---
-  sections.push('## Collapse Analysis');
+  sections.push('## 💥 Collapse Analysis');
   sections.push('');
   const collapsedRecords = executed.filter((r) => r.conclusion.firstCollapsedTier !== null);
   if (collapsedRecords.length === 0) {
@@ -354,7 +363,7 @@ export function renderPlanReport(input: PlanReportInput): string {
   }
 
   // --- Final disposition ---
-  sections.push('## Final Disposition');
+  sections.push('## 🏁 Final Disposition');
   sections.push('');
   sections.push(`**Overall plan result: ${planLabel(conclusion.classification)}**`);
   sections.push('');
@@ -395,13 +404,17 @@ export function renderPlanReport(input: PlanReportInput): string {
   sections.push('');
 
   // --- Artifact index ---
-  sections.push('## Artifact Index');
+  sections.push('## 📂 Artifact Index');
   sections.push('');
   sections.push('Per-scenario evidence:');
   sections.push('');
   for (const r of records) {
-    const status = r.skipped ? 'skipped' : r.conclusion.classification;
-    sections.push(`- \`${r.runDir}\` — **${r.runId}** (${r.targetTps} TPS) — ${status}`);
+    const status: FormalRunClassification | 'skipped' = r.skipped
+      ? 'skipped'
+      : r.conclusion.classification;
+    sections.push(
+      `- \`${r.runDir}\` — **${r.runId}** (${r.targetTps} TPS) — ${resultLabel(status)}`
+    );
   }
   sections.push('');
   sections.push('Plan-level artifacts (this directory):');
