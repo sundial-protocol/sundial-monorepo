@@ -6,46 +6,46 @@
 
 ## Run Metadata
 
-| Field                    | Value                                                                                                                                                      |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Run ID                   | initial-800-replay                                                                                                                                         |
-| Started At               | 2026-05-21T13:16:18.076Z                                                                                                                                   |
-| Git SHA                  | e0b938c463b081b4cb7e3a7ab2a0634dc8efe689                                                                                                                   |
-| Node Endpoint            | http://localhost:3000                                                                                                                                      |
-| Prometheus Endpoint      | http://localhost:9090                                                                                                                                      |
-| L1 Provider Mode         | emulator                                                                                                                                                   |
-| Wallet Mode              | test-wallet                                                                                                                                                |
-| Wallet Provisioning Note | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key                                                               |
-| Harness Version          | 0.1.0                                                                                                                                                      |
+| Field                    | Value                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Run ID                   | initial-800-replay                                                                                                 |
+| Started At               | 2026-05-21T13:16:18.076Z                                                                                           |
+| Git SHA                  | e0b938c463b081b4cb7e3a7ab2a0634dc8efe689                                                                           |
+| Node Endpoint            | http://localhost:3000                                                                                              |
+| Prometheus Endpoint      | http://localhost:9090                                                                                              |
+| L1 Provider Mode         | emulator                                                                                                           |
+| Wallet Mode              | test-wallet                                                                                                        |
+| Wallet Provisioning Note | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key                       |
+| Harness Version          | 0.1.0                                                                                                              |
 | Replay Corpus Path       | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
-| Replay Corpus SHA256     | 4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80                                                                                           |
-| Host                     | dev3 (linux/x64, 6 CPUs, 31.0 GB)                                                                                                                          |
+| Replay Corpus SHA256     | 4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80                                                   |
+| Host                     | dev3 (linux/x64, 6 CPUs, 31.0 GB)                                                                                  |
 
 ## Scenario
 
-| Parameter                      | Value                                                                                                                                                      |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Transaction Type               | one-to-one                                                                                                                                                 |
-| L1 Provider Mode               | emulator                                                                                                                                                   |
-| Wallet Mode                    | test-wallet                                                                                                                                                |
-| Wallet Provisioning Note       | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key                                                               |
-| Start TPS                      | 800                                                                                                                                                        |
-| Max TPS                        | 800                                                                                                                                                        |
-| Step Multiplier                | 2                                                                                                                                                          |
-| Tier Duration                  | 1800 s                                                                                                                                                     |
-| Recovery Duration              | 300 s                                                                                                                                                      |
-| Tx Cost (s)                    | 0.2                                                                                                                                                        |
-| Retry Attempts                 | 3                                                                                                                                                          |
-| Retry Delay                    | 500 ms                                                                                                                                                     |
-| Request Events Mode            | off                                                                                                                                                        |
-| Seed                           | initial-800-2026-05-20                                                                                                                                     |
+| Parameter                      | Value                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Transaction Type               | one-to-one                                                                                                         |
+| L1 Provider Mode               | emulator                                                                                                           |
+| Wallet Mode                    | test-wallet                                                                                                        |
+| Wallet Provisioning Note       | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key                       |
+| Start TPS                      | 800                                                                                                                |
+| Max TPS                        | 800                                                                                                                |
+| Step Multiplier                | 2                                                                                                                  |
+| Tier Duration                  | 1800 s                                                                                                             |
+| Recovery Duration              | 300 s                                                                                                              |
+| Tx Cost (s)                    | 0.2                                                                                                                |
+| Retry Attempts                 | 3                                                                                                                  |
+| Retry Delay                    | 500 ms                                                                                                             |
+| Request Events Mode            | off                                                                                                                |
+| Seed                           | initial-800-2026-05-20                                                                                             |
 | Replay Corpus Path             | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
-| Max Consecutive Probe Failures | 5                                                                                                                                                          |
-| Stop On Prometheus Down        | false                                                                                                                                                      |
-| Stop On Commitment Failure     | true                                                                                                                                                       |
-| Stop On Merge Failure          | false                                                                                                                                                      |
-| Max Recovery Queue Size        | 25000                                                                                                                                                      |
-| Max Recovery Mempool Size      | 15000                                                                                                                                                      |
+| Max Consecutive Probe Failures | 5                                                                                                                  |
+| Stop On Prometheus Down        | false                                                                                                              |
+| Stop On Commitment Failure     | true                                                                                                               |
+| Stop On Merge Failure          | false                                                                                                              |
+| Max Recovery Queue Size        | 25000                                                                                                              |
+| Max Recovery Mempool Size      | 15000                                                                                                              |
 
 ## Tier Results
 

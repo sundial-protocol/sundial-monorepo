@@ -68,7 +68,9 @@ export class PlanArtifactWriter {
       gitSha: gitSha(),
       planPath: sanitizePathLikeText(planPath),
       harnessVersion,
-      scenarioPaths: resolvedScenarioPaths.map((scenarioPath) => sanitizePathLikeText(scenarioPath)),
+      scenarioPaths: resolvedScenarioPaths.map((scenarioPath) =>
+        sanitizePathLikeText(scenarioPath)
+      ),
       host: {
         hostname: os.hostname(),
         platform: os.platform(),
@@ -94,7 +96,10 @@ export class PlanArtifactWriter {
   }
 
   async writePlanSummary(summary: unknown): Promise<void> {
-    await writeFile(path.join(this.planDir, 'plan-summary.json'), stringifyWithSanitizedPaths(summary));
+    await writeFile(
+      path.join(this.planDir, 'plan-summary.json'),
+      stringifyWithSanitizedPaths(summary)
+    );
   }
 
   async writePlanReport(markdown: string): Promise<void> {

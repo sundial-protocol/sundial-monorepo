@@ -80,7 +80,9 @@ async function loadPlan(planPath: string): Promise<PlanConfig> {
   try {
     text = await readFile(planPath, 'utf8');
   } catch (err) {
-    throw new CliInputError(`Failed to read plan file: ${redactPathLike(planPath)}\n${String(err)}`);
+    throw new CliInputError(
+      `Failed to read plan file: ${redactPathLike(planPath)}\n${String(err)}`
+    );
   }
 
   let raw: unknown;
@@ -362,14 +364,16 @@ async function executePlan(opts: {
         : classLabel === 'Passed with Observations'
           ? chalk.yellow
           : chalk.red;
-    console.log(chalk.gray(`  Report:    ${redactPathLike(path.join(writer.runDir, 'report.md'))}`));
+    console.log(
+      chalk.gray(`  Report:    ${redactPathLike(path.join(writer.runDir, 'report.md'))}`)
+    );
     console.log(`  Result:    ${classColor(classLabel)}`);
 
     records.push({
       scenarioIndex: i,
-        scenarioPath: redactPathLike(scenPath),
-        runId: scenario.runId,
-        runDir: redactPathLike(writer.runDir),
+      scenarioPath: redactPathLike(scenPath),
+      runId: scenario.runId,
+      runDir: redactPathLike(writer.runDir),
       targetTps: scenario.maxTps,
       scenario,
       tierSummaries: result.tierSummaries,

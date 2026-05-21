@@ -23,71 +23,71 @@ The plan explicitly distinguishes enqueued submissions, durable mempool acceptan
 
 ## Test Scope
 
-| Field | Value |
-| :---- | :---- |
-| System under test | Sundial/Midgard node through the scalability harness |
-| Commit under test | `e0b938c463b081b4cb7e3a7ab2a0634dc8efe689` |
-| Transaction profile | `one-to-one` |
-| L1 provider mode | `emulator` |
-| Wallet mode | `test-wallet` |
-| Node endpoint | `http://localhost:3000` |
-| Prometheus endpoint | `http://localhost:9090` |
-| Host | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM |
-| Harness version | `0.1.0` |
-| Evidence directory | `demo/midgard-manager/packages/scalability-harness/benchmark-runs/e0b938c463b081b4cb7e3a7ab2a0634dc8efe689` |
+| Field               | Value                                                                                                       |
+| :------------------ | :---------------------------------------------------------------------------------------------------------- |
+| System under test   | Sundial/Midgard node through the scalability harness                                                        |
+| Commit under test   | `e0b938c463b081b4cb7e3a7ab2a0634dc8efe689`                                                                  |
+| Transaction profile | `one-to-one`                                                                                                |
+| L1 provider mode    | `emulator`                                                                                                  |
+| Wallet mode         | `test-wallet`                                                                                               |
+| Node endpoint       | `http://localhost:3000`                                                                                     |
+| Prometheus endpoint | `http://localhost:9090`                                                                                     |
+| Host                | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM                                                                       |
+| Harness version     | `0.1.0`                                                                                                     |
+| Evidence directory  | `demo/midgard-manager/packages/scalability-harness/benchmark-runs/e0b938c463b081b4cb7e3a7ab2a0634dc8efe689` |
 
 ## Executed Runs
 
-| Run | Started | Target Profile | Duration | Result | Evidence |
-| :-- | :------ | :------------- | :------- | :----- | :------- |
-| `warmup` | 2026-05-19T16:29:27.803Z | `100 TPS` warm-up | 600s load + 120s recovery | Passed | [`2026-05-19T16-29-27.803Z-warmup/report.md`](2026-05-19T16-29-27.803Z-warmup/report.md) |
-| `baseline-100-800` | 2026-05-20T15:07:15.936Z | Step ramp: `100`, `200`, `400`, `800 TPS` | 180s load + 90s recovery per tier | Passed | [`2026-05-20T15-07-15.936Z-baseline-100-800/report.md`](2026-05-20T15-07-15.936Z-baseline-100-800/report.md) |
-| `initial-800-replay` | 2026-05-21T13:16:18.076Z | Replay at `800 TPS` | 1800s load + 300s recovery | Failed | [`2026-05-21T13-16-18.076Z-initial-800-replay/report.md`](2026-05-21T13-16-18.076Z-initial-800-replay/report.md) |
+| Run                  | Started                  | Target Profile                            | Duration                          | Result | Evidence                                                                                                         |
+| :------------------- | :----------------------- | :---------------------------------------- | :-------------------------------- | :----- | :--------------------------------------------------------------------------------------------------------------- |
+| `warmup`             | 2026-05-19T16:29:27.803Z | `100 TPS` warm-up                         | 600s load + 120s recovery         | Passed | [`2026-05-19T16-29-27.803Z-warmup/report.md`](2026-05-19T16-29-27.803Z-warmup/report.md)                         |
+| `baseline-100-800`   | 2026-05-20T15:07:15.936Z | Step ramp: `100`, `200`, `400`, `800 TPS` | 180s load + 90s recovery per tier | Passed | [`2026-05-20T15-07-15.936Z-baseline-100-800/report.md`](2026-05-20T15-07-15.936Z-baseline-100-800/report.md)     |
+| `initial-800-replay` | 2026-05-21T13:16:18.076Z | Replay at `800 TPS`                       | 1800s load + 300s recovery        | Failed | [`2026-05-21T13-16-18.076Z-initial-800-replay/report.md`](2026-05-21T13-16-18.076Z-initial-800-replay/report.md) |
 
 The replay run used corpus `corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl` with SHA256 `4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80`.
 
 ## Aggregate Results
 
-| Metric | Total Across Runs |
-| :----- | ----------------: |
-| Client submitted transactions | 2,268,770 |
-| Prometheus enqueued transactions | 2,261,696 |
-| Prometheus durable mempool accepted transactions | 2,251,978 |
-| Committed L2 transactions | 1,125,020 |
-| Committed blocks | 168 |
-| Submitted blocks | 163 |
-| Merged blocks | At least 9; warm-up merge count was not reported in the rendered table |
-| Rejected submissions | 0 |
-| Processing failures | 0 |
-| Commitment failures | 2 |
-| Merge failures | 0 |
-| Peak queue size | 2,443 |
-| Peak mempool size | 1,664,382 |
+| Metric                                           |                                                      Total Across Runs |
+| :----------------------------------------------- | ---------------------------------------------------------------------: |
+| Client submitted transactions                    |                                                              2,268,770 |
+| Prometheus enqueued transactions                 |                                                              2,261,696 |
+| Prometheus durable mempool accepted transactions |                                                              2,251,978 |
+| Committed L2 transactions                        |                                                              1,125,020 |
+| Committed blocks                                 |                                                                    168 |
+| Submitted blocks                                 |                                                                    163 |
+| Merged blocks                                    | At least 9; warm-up merge count was not reported in the rendered table |
+| Rejected submissions                             |                                                                      0 |
+| Processing failures                              |                                                                      0 |
+| Commitment failures                              |                                                                      2 |
+| Merge failures                                   |                                                                      0 |
+| Peak queue size                                  |                                                                  2,443 |
+| Peak mempool size                                |                                                              1,664,382 |
 
 ## Per-Run Throughput Summary
 
-| Run / Tier | Target TPS | Result | Enqueued Tx | Durable Accepted Tx | Committed Tx | Durable Accepted Tx/s | Committed Tx/s | Peak Queue | Peak Mempool | Final Mempool |
-| :--------- | ---------: | :----- | ----------: | ------------------: | -----------: | --------------------: | -------------: | ---------: | -----------: | ------------: |
-| `warmup` / tier 0 | 100 | completed | 59,520 | 59,497 | 57,400 | 82.63 | 79.72 | 80 | 4,447 | 0 |
-| `baseline-100-800` / tier 0 | 100 | completed | 22,381 | 22,327 | 21,989 | 124.03 | 122.15 | 69 | 344 | 0 |
-| `baseline-100-800` / tier 1 | 200 | completed | 44,722 | 44,581 | 44,032 | 247.66 | 244.61 | 140 | 1,374 | 0 |
-| `baseline-100-800` / tier 2 | 400 | completed | 89,399 | 89,167 | 87,193 | 495.34 | 484.38 | 291 | 4,810 | 0 |
-| `baseline-100-800` / tier 3 | 800 | completed | 178,634 | 178,351 | 126,673 | 990.78 | 703.70 | 2,094 | 62,230 | 0 |
-| `initial-800-replay` / tier 0 | 800 | collapsed | 1,867,040 | 1,858,055 | 787,733 | 1,032.17 | 437.60 | 2,443 | 1,664,382 | 1,664,382 |
+| Run / Tier                    | Target TPS | Result    | Enqueued Tx | Durable Accepted Tx | Committed Tx | Durable Accepted Tx/s | Committed Tx/s | Peak Queue | Peak Mempool | Final Mempool |
+| :---------------------------- | ---------: | :-------- | ----------: | ------------------: | -----------: | --------------------: | -------------: | ---------: | -----------: | ------------: |
+| `warmup` / tier 0             |        100 | completed |      59,520 |              59,497 |       57,400 |                 82.63 |          79.72 |         80 |        4,447 |             0 |
+| `baseline-100-800` / tier 0   |        100 | completed |      22,381 |              22,327 |       21,989 |                124.03 |         122.15 |         69 |          344 |             0 |
+| `baseline-100-800` / tier 1   |        200 | completed |      44,722 |              44,581 |       44,032 |                247.66 |         244.61 |        140 |        1,374 |             0 |
+| `baseline-100-800` / tier 2   |        400 | completed |      89,399 |              89,167 |       87,193 |                495.34 |         484.38 |        291 |        4,810 |             0 |
+| `baseline-100-800` / tier 3   |        800 | completed |     178,634 |             178,351 |      126,673 |                990.78 |         703.70 |      2,094 |       62,230 |             0 |
+| `initial-800-replay` / tier 0 |        800 | collapsed |   1,867,040 |           1,858,055 |      787,733 |              1,032.17 |         437.60 |      2,443 |    1,664,382 |     1,664,382 |
 
 ## Formal Criteria Assessment
 
-| Criterion Area | Evidence | Assessment |
-| :------------- | :------- | :--------- |
-| API submission acceptance | No rejected, unavailable, or errored client submissions were reported in the rendered run reports. | Passed for valid generated load. |
-| Durable acceptance | All runs durably accepted large transaction volume into `MempoolDB`. | Passed as an ingress signal. |
-| Commitment progress | Blocks continued to be committed in all runs. | Passed as progress, failed as sustained drain at long `800 TPS`. |
-| Commitment failures | The long `800 TPS` replay recorded `2` commitment failures. | Failed. |
-| Merge failures | All runs reported `0` merge failures. | Passed. |
-| Queue recovery | Final in-memory queue was `0` after recovery in all rendered reports. | Passed. |
-| Mempool recovery | The long `800 TPS` replay ended with `1,664,382` transactions still in mempool. | Failed. |
-| Inclusion latency | Baseline tiers up to `400 TPS` reported p95 `15s`; baseline `800 TPS` reported p95 `75s`; replay `800 TPS` reported p95 `360s` with low confidence and only `41.3%` resolved. | Failed for sustained `800 TPS` target. |
-| Resource saturation | Harness-side resource flags did not mark CPU, memory, event-loop, or network saturation. Replay load phase host CPU was `70.49%`, below the configured `90%` saturation threshold. | No load-driver saturation indicated. |
+| Criterion Area            | Evidence                                                                                                                                                                           | Assessment                                                       |
+| :------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------- |
+| API submission acceptance | No rejected, unavailable, or errored client submissions were reported in the rendered run reports.                                                                                 | Passed for valid generated load.                                 |
+| Durable acceptance        | All runs durably accepted large transaction volume into `MempoolDB`.                                                                                                               | Passed as an ingress signal.                                     |
+| Commitment progress       | Blocks continued to be committed in all runs.                                                                                                                                      | Passed as progress, failed as sustained drain at long `800 TPS`. |
+| Commitment failures       | The long `800 TPS` replay recorded `2` commitment failures.                                                                                                                        | Failed.                                                          |
+| Merge failures            | All runs reported `0` merge failures.                                                                                                                                              | Passed.                                                          |
+| Queue recovery            | Final in-memory queue was `0` after recovery in all rendered reports.                                                                                                              | Passed.                                                          |
+| Mempool recovery          | The long `800 TPS` replay ended with `1,664,382` transactions still in mempool.                                                                                                    | Failed.                                                          |
+| Inclusion latency         | Baseline tiers up to `400 TPS` reported p95 `15s`; baseline `800 TPS` reported p95 `75s`; replay `800 TPS` reported p95 `360s` with low confidence and only `41.3%` resolved.      | Failed for sustained `800 TPS` target.                           |
+| Resource saturation       | Harness-side resource flags did not mark CPU, memory, event-loop, or network saturation. Replay load phase host CPU was `70.49%`, below the configured `90%` saturation threshold. | No load-driver saturation indicated.                             |
 
 ## Key Findings
 
@@ -127,10 +127,10 @@ This indicates that the next optimization pass should focus on:
 
 Each run directory contains the rendered report and chart exports. The zipped evidence packages also contain Prometheus samples, scenario metadata, run manifest, log captures, trace captures, tier summaries, load events, and summary JSON.
 
-| Run | Key Artifacts |
-| :-- | :------------ |
-| `warmup` | [`report.md`](2026-05-19T16-29-27.803Z-warmup/report.md), [`2026-05-19T16-29-27.803Z-warmup.zip`](2026-05-19T16-29-27.803Z-warmup/2026-05-19T16-29-27.803Z-warmup.zip) |
-| `baseline-100-800` | [`report.md`](2026-05-20T15-07-15.936Z-baseline-100-800/report.md), [`2026-05-20T15-07-15.936Z-baseline-100-800.zip`](2026-05-20T15-07-15.936Z-baseline-100-800/2026-05-20T15-07-15.936Z-baseline-100-800.zip) |
+| Run                  | Key Artifacts                                                                                                                                                                                                          |
+| :------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `warmup`             | [`report.md`](2026-05-19T16-29-27.803Z-warmup/report.md), [`2026-05-19T16-29-27.803Z-warmup.zip`](2026-05-19T16-29-27.803Z-warmup/2026-05-19T16-29-27.803Z-warmup.zip)                                                 |
+| `baseline-100-800`   | [`report.md`](2026-05-20T15-07-15.936Z-baseline-100-800/report.md), [`2026-05-20T15-07-15.936Z-baseline-100-800.zip`](2026-05-20T15-07-15.936Z-baseline-100-800/2026-05-20T15-07-15.936Z-baseline-100-800.zip)         |
 | `initial-800-replay` | [`report.md`](2026-05-21T13-16-18.076Z-initial-800-replay/report.md), [`2026-05-21T13-16-18.076Z-initial-800-replay.zip`](2026-05-21T13-16-18.076Z-initial-800-replay/2026-05-21T13-16-18.076Z-initial-800-replay.zip) |
 
 ## Limitations

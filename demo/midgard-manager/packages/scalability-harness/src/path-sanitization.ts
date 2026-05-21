@@ -39,9 +39,7 @@ export function stringifyWithSanitizedPaths(value: unknown): string {
 }
 
 export function stringifyCompactWithSanitizedPaths(value: unknown): string {
-  return JSON.stringify(
-    value,
-    (_key, nestedValue) =>
-      typeof nestedValue === 'string' ? sanitizePathLikeText(nestedValue) : nestedValue,
+  return JSON.stringify(value, (_key, nestedValue) =>
+    typeof nestedValue === 'string' ? sanitizePathLikeText(nestedValue) : nestedValue
   );
 }
