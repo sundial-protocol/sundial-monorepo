@@ -45,6 +45,7 @@ gitleaks-report.json
 node_modules/
 dist/
 corpora
+generated-transactions
 data
 out/
 .turbo/
