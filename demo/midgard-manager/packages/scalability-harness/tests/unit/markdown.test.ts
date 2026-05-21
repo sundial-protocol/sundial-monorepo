@@ -209,63 +209,63 @@ function makeInput(overrides: Partial<ReportInput> = {}): ReportInput {
 describe('renderReport — section headers', () => {
   it('includes the top-level title', () => {
     const out = renderReport(makeInput());
-    expect(out).toContain('# Scalability Baseline Report');
+    expect(out).toContain('# 📊 Scalability Baseline Report');
   });
 
   it('includes ## Run Metadata', () => {
-    expect(renderReport(makeInput())).toContain('## Run Metadata');
+    expect(renderReport(makeInput())).toContain('## 📌 Run Metadata');
   });
 
   it('includes ## Scenario', () => {
-    expect(renderReport(makeInput())).toContain('## Scenario');
+    expect(renderReport(makeInput())).toContain('## 🔬 Scenario');
   });
 
   it('includes ## Tier Results', () => {
-    expect(renderReport(makeInput())).toContain('## Tier Results');
+    expect(renderReport(makeInput())).toContain('## 🏃 Tier Results');
   });
 
   it('includes ## Formal Run Classification', () => {
-    expect(renderReport(makeInput())).toContain('## Formal Run Classification');
+    expect(renderReport(makeInput())).toContain('## 🚦 Formal Run Classification');
   });
 
   it('includes ## Collapse Point', () => {
-    expect(renderReport(makeInput())).toContain('## Collapse Point');
+    expect(renderReport(makeInput())).toContain('## 💥 Collapse Point');
   });
 
   it('includes ## Throughput Stage Deltas', () => {
-    expect(renderReport(makeInput())).toContain('## Throughput Stage Deltas');
+    expect(renderReport(makeInput())).toContain('## ⚡ Throughput Stage Deltas');
   });
 
   it('includes ## Queue and Mempool Behavior', () => {
-    expect(renderReport(makeInput())).toContain('## Queue and Mempool Behavior');
+    expect(renderReport(makeInput())).toContain('## 📦 Queue and Mempool Behavior');
   });
 
   it('includes ## Client Submission Evidence', () => {
-    expect(renderReport(makeInput())).toContain('## Client Submission Evidence');
+    expect(renderReport(makeInput())).toContain('## 📨 Client Submission Evidence');
   });
 
   it('includes ## Accepted-to-Committed Latency Evidence', () => {
-    expect(renderReport(makeInput())).toContain('## Accepted-to-Committed Latency Evidence');
+    expect(renderReport(makeInput())).toContain('## ⏱️ Accepted-to-Committed Latency Evidence');
   });
 
   it('includes ## Commit/Submit/Merge Progress', () => {
-    expect(renderReport(makeInput())).toContain('## Commit/Submit/Merge Progress');
+    expect(renderReport(makeInput())).toContain('## 🔗 Commit/Submit/Merge Progress');
   });
 
   it('includes ## Failure Signals', () => {
-    expect(renderReport(makeInput())).toContain('## Failure Signals');
+    expect(renderReport(makeInput())).toContain('## 🚨 Failure Signals');
   });
 
   it('includes ## Primary Bottleneck Hypothesis', () => {
-    expect(renderReport(makeInput())).toContain('## Primary Bottleneck Hypothesis');
+    expect(renderReport(makeInput())).toContain('## 🔧 Primary Bottleneck Hypothesis');
   });
 
   it('includes ## Artifact Index', () => {
-    expect(renderReport(makeInput())).toContain('## Artifact Index');
+    expect(renderReport(makeInput())).toContain('## 📂 Artifact Index');
   });
 
   it('includes ## Limitations', () => {
-    expect(renderReport(makeInput())).toContain('## Limitations');
+    expect(renderReport(makeInput())).toContain('## ⚠️ Limitations');
   });
 });
 
@@ -673,11 +673,11 @@ describe('renderReport — Scenario', () => {
 describe('renderReport — empty tier list', () => {
   it('still renders all sections when tierSummaries is empty', () => {
     const out = renderReport(makeInput({ tierSummaries: [] }));
-    expect(out).toContain('## Tier Results');
-    expect(out).toContain('## Throughput Stage Deltas');
-    expect(out).toContain('## Queue and Mempool Behavior');
-    expect(out).toContain('## Commit/Submit/Merge Progress');
-    expect(out).toContain('## Failure Signals');
+    expect(out).toContain('## 🏃 Tier Results');
+    expect(out).toContain('## ⚡ Throughput Stage Deltas');
+    expect(out).toContain('## 📦 Queue and Mempool Behavior');
+    expect(out).toContain('## 🔗 Commit/Submit/Merge Progress');
+    expect(out).toContain('## 🚨 Failure Signals');
   });
 
   it('shows a no-tiers placeholder in the Tier Results section', () => {
@@ -782,31 +782,31 @@ function makeSampleChartRecords(): ChartRecord[] {
 // ---------------------------------------------------------------------------
 
 describe('renderReport — chart embedding: Infrastructure section', () => {
-  it('omits ## Infrastructure when chartRecords is undefined', () => {
+  it('omits ## 🖥️ Infrastructure when chartRecords is undefined', () => {
     const out = renderReport(makeInput());
-    expect(out).not.toContain('## Infrastructure');
+    expect(out).not.toContain('## 🖥️ Infrastructure');
   });
 
-  it('omits ## Infrastructure when chartRecords is an empty array', () => {
+  it('omits ## 🖥️ Infrastructure when chartRecords is an empty array', () => {
     const out = renderReport(makeInput({ chartRecords: [] }));
-    expect(out).not.toContain('## Infrastructure');
+    expect(out).not.toContain('## 🖥️ Infrastructure');
   });
 
-  it('omits ## Infrastructure when all infrastructure records have hasData: false', () => {
+  it('omits ## 🖥️ Infrastructure when all infrastructure records have hasData: false', () => {
     const records: ChartRecord[] = [
       makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', false),
       makeChartRecord('memory-usage', 'Memory Usage', 'Infrastructure', false),
     ];
     const out = renderReport(makeInput({ chartRecords: records }));
-    expect(out).not.toContain('## Infrastructure');
+    expect(out).not.toContain('## 🖥️ Infrastructure');
   });
 
-  it('includes ## Infrastructure when at least one infrastructure record has hasData: true', () => {
+  it('includes ## 🖥️ Infrastructure when at least one infrastructure record has hasData: true', () => {
     const records: ChartRecord[] = [
       makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
     ];
     const out = renderReport(makeInput({ chartRecords: records }));
-    expect(out).toContain('## Infrastructure');
+    expect(out).toContain('## 🖥️ Infrastructure');
   });
 
   it('embeds image markdown for infrastructure charts with hasData: true', () => {
@@ -829,25 +829,25 @@ describe('renderReport — chart embedding: Infrastructure section', () => {
     expect(out).not.toContain('![Memory Usage](charts/memory-usage.svg)');
   });
 
-  it('places ## Infrastructure after ## Primary Bottleneck Hypothesis', () => {
+  it('places ## 🖥️ Infrastructure after ## 🔧 Primary Bottleneck Hypothesis', () => {
     const records: ChartRecord[] = [
       makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
     ];
     const out = renderReport(makeInput({ chartRecords: records }));
-    const idxBottleneck = out.indexOf('## Primary Bottleneck Hypothesis');
-    const idxInfra = out.indexOf('## Infrastructure');
+    const idxBottleneck = out.indexOf('## 🔧 Primary Bottleneck Hypothesis');
+    const idxInfra = out.indexOf('## 🖥️ Infrastructure');
     expect(idxBottleneck).toBeGreaterThan(-1);
     expect(idxInfra).toBeGreaterThan(-1);
     expect(idxInfra).toBeGreaterThan(idxBottleneck);
   });
 
-  it('places ## Infrastructure before ## Artifact Index', () => {
+  it('places ## 🖥️ Infrastructure before ## 📂 Artifact Index', () => {
     const records: ChartRecord[] = [
       makeChartRecord('cpu-usage', 'CPU Usage', 'Infrastructure', true),
     ];
     const out = renderReport(makeInput({ chartRecords: records }));
-    const idxInfra = out.indexOf('## Infrastructure');
-    const idxArtifact = out.indexOf('## Artifact Index');
+    const idxInfra = out.indexOf('## 🖥️ Infrastructure');
+    const idxArtifact = out.indexOf('## 📂 Artifact Index');
     expect(idxInfra).toBeGreaterThan(-1);
     expect(idxArtifact).toBeGreaterThan(-1);
     expect(idxArtifact).toBeGreaterThan(idxInfra);
@@ -855,40 +855,40 @@ describe('renderReport — chart embedding: Infrastructure section', () => {
 });
 
 describe('renderReport — chart embedding: per-section charts', () => {
-  it('embeds Throughput charts after ## Throughput Stage Deltas', () => {
+  it('embeds Throughput charts after ## ⚡ Throughput Stage Deltas', () => {
     const records = makeSampleChartRecords();
     const out = renderReport(makeInput({ chartRecords: records }));
-    const idxSection = out.indexOf('## Throughput Stage Deltas');
+    const idxSection = out.indexOf('## ⚡ Throughput Stage Deltas');
     const idxChart = out.indexOf('![Received TPS](charts/received-tps.svg)');
     expect(idxSection).toBeGreaterThan(-1);
     expect(idxChart).toBeGreaterThan(-1);
     expect(idxChart).toBeGreaterThan(idxSection);
   });
 
-  it('embeds Queue and Mempool charts after ## Queue and Mempool Behavior', () => {
+  it('embeds Queue and Mempool charts after ## 📦 Queue and Mempool Behavior', () => {
     const records = makeSampleChartRecords();
     const out = renderReport(makeInput({ chartRecords: records }));
-    const idxSection = out.indexOf('## Queue and Mempool Behavior');
+    const idxSection = out.indexOf('## 📦 Queue and Mempool Behavior');
     const idxChart = out.indexOf('![TX Queue Size](charts/tx-queue.svg)');
     expect(idxSection).toBeGreaterThan(-1);
     expect(idxChart).toBeGreaterThan(-1);
     expect(idxChart).toBeGreaterThan(idxSection);
   });
 
-  it('embeds Block Pipeline charts after ## Commit/Submit/Merge Progress', () => {
+  it('embeds Block Pipeline charts after ## 🔗 Commit/Submit/Merge Progress', () => {
     const records = makeSampleChartRecords();
     const out = renderReport(makeInput({ chartRecords: records }));
-    const idxSection = out.indexOf('## Commit/Submit/Merge Progress');
+    const idxSection = out.indexOf('## 🔗 Commit/Submit/Merge Progress');
     const idxChart = out.indexOf('![Blocks Built](charts/built-blocks.svg)');
     expect(idxSection).toBeGreaterThan(-1);
     expect(idxChart).toBeGreaterThan(-1);
     expect(idxChart).toBeGreaterThan(idxSection);
   });
 
-  it('embeds Failure Signals charts after ## Failure Signals', () => {
+  it('embeds Failure Signals charts after ## 🚨 Failure Signals', () => {
     const records = makeSampleChartRecords();
     const out = renderReport(makeInput({ chartRecords: records }));
-    const idxSection = out.indexOf('## Failure Signals');
+    const idxSection = out.indexOf('## 🚨 Failure Signals');
     const idxChart = out.indexOf('![Commitment Failures](charts/commit-failures.svg)');
     expect(idxSection).toBeGreaterThan(-1);
     expect(idxChart).toBeGreaterThan(-1);
@@ -901,7 +901,7 @@ describe('renderReport — chart embedding: per-section charts', () => {
     ];
     const out = renderReport(makeInput({ chartRecords: records }));
     // No throughput charts → section has no embedded images
-    const idxSection = out.indexOf('## Throughput Stage Deltas');
+    const idxSection = out.indexOf('## ⚡ Throughput Stage Deltas');
     const nextSection = out.indexOf('\n## ', idxSection + 1);
     const throughputBlock = out.slice(idxSection, nextSection > -1 ? nextSection : undefined);
     expect(throughputBlock).not.toContain('![CPU Usage]');
