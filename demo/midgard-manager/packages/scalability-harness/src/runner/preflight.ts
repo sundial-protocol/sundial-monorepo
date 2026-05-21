@@ -13,6 +13,7 @@ import {
   COUNTER_NODE_METRICS,
   PrometheusClient,
 } from '../metrics/prometheus.js';
+import { sanitizePathLikeText } from '../path-sanitization.js';
 import type { Fetcher as NodeProbeFetcher, ProbeResult } from './node-probe.js';
 import { PROBE_TIMEOUT_MS, probeNode } from './node-probe.js';
 
@@ -570,6 +571,7 @@ async function checkCommitPipelineReady(
 }
 
 async function checkArtifactDirectoryWritable(outputDir: string): Promise<PreflightCheckResult> {
+  const redactedOutputDir = sanitizePathLikeText(outputDir);
   try {
     await mkdir(outputDir, { recursive: true });
     const tempDir = await mkdtemp(path.join(outputDir, '.preflight-'));
@@ -579,12 +581,14 @@ async function checkArtifactDirectoryWritable(outputDir: string): Promise<Prefli
 
     return pass(
       'artifact_directory_writable',
-      `Artifact output directory is writable (${outputDir}).`
+      `Artifact output directory is writable (${redactedOutputDir}).`
     );
   } catch (err) {
     return fail(
       'artifact_directory_writable',
-      `Artifact directory write probe failed for ${outputDir}: ${err instanceof Error ? err.message : String(err)}`,
+      `Artifact directory write probe failed for ${redactedOutputDir}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
       'Fix outputDir permissions or choose a writable --output-dir before formal runs.'
     );
   }

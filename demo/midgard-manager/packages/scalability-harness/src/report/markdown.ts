@@ -4,6 +4,7 @@ import type { ScalabilityScenario } from '../config/scenario.js';
 import type { RunManifest } from '../evidence/artifacts.js';
 import type { LokiTierCapture } from '../evidence/loki.js';
 import type { TempoTierCapture } from '../evidence/tempo.js';
+import { sanitizePathLikeText } from '../path-sanitization.js';
 import type { ChartRecord, ChartSection } from './charts.js';
 
 export interface ReportInput {
@@ -97,7 +98,10 @@ function renderRunMetadata(manifest: RunManifest): string {
       ? [['Wallet Provisioning Note', manifest.walletProvisioningNote]]
       : []),
     ['Harness Version', manifest.harnessVersion],
-    ['Replay Corpus Path', manifest.replayCorpusPath ?? 'n/a'],
+    [
+      'Replay Corpus Path',
+      manifest.replayCorpusPath === null ? 'n/a' : sanitizePathLikeText(manifest.replayCorpusPath),
+    ],
     ['Replay Corpus SHA256', manifest.replayCorpusSha256 ?? 'n/a'],
     ['Host', hostInfo],
   ];
@@ -130,7 +134,12 @@ function renderScenario(scenario: ScalabilityScenario): string {
     ['Retry Delay', `${scenario.retryDelayMs} ms`],
     ['Request Events Mode', scenario.requestEvents ?? 'off'],
     ['Seed', scenario.seed],
-    ['Replay Corpus Path', scenario.replayCorpusPath ?? 'n/a'],
+    [
+      'Replay Corpus Path',
+      scenario.replayCorpusPath === undefined
+        ? 'n/a'
+        : sanitizePathLikeText(scenario.replayCorpusPath),
+    ],
     ['Max Consecutive Probe Failures', String(sc.maxConsecutiveNodeProbeFailures)],
     ['Stop On Prometheus Down', String(sc.stopOnPrometheusDown)],
     ['Stop On Commitment Failure', String(sc.stopOnCommitmentFailure)],

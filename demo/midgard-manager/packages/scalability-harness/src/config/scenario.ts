@@ -4,6 +4,8 @@ const URL_PREFIX = /^https?:\/\//;
 const RAMP_STRATEGIES = ['multiply', 'percent_increment'] as const;
 export const REQUEST_EVENT_MODES = ['off', 'sampled', 'all'] as const;
 export type RequestEventsMode = (typeof REQUEST_EVENT_MODES)[number];
+export const LOCAL_VALIDATION_MODES = ['strict', 'warn'] as const;
+export type LocalValidationMode = (typeof LOCAL_VALIDATION_MODES)[number];
 
 export const L1_PROVIDER_MODES = ['kupmios', 'blockfrost', 'emulator', 'unknown'] as const;
 export type L1ProviderMode = (typeof L1_PROVIDER_MODES)[number];
@@ -146,6 +148,9 @@ export interface ScalabilityScenario {
   // Defaults to the tx-generator default (5000 ms) when omitted.
   submitTimeoutMs?: number;
   requestEvents?: RequestEventsMode;
+  // Passed to tx-generator. "strict" blocks locally rejected Midgard inspection
+  // results; "warn" records the rejection but still submits raw CBOR.
+  localValidation?: LocalValidationMode;
   grafanaScreenshots?: GrafanaScreenshotsConfig;
   runClassificationPolicy?: RunClassificationPolicyConfig;
   stopConditions: StopConditions;
@@ -515,6 +520,16 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
     ) {
       throw new ScenarioValidationError(
         `requestEvents must be one of: ${REQUEST_EVENT_MODES.join(', ')}, got: ${s.requestEvents}`
+      );
+    }
+  }
+  if (s.localValidation !== undefined) {
+    if (
+      typeof s.localValidation !== 'string' ||
+      !(LOCAL_VALIDATION_MODES as readonly string[]).includes(s.localValidation)
+    ) {
+      throw new ScenarioValidationError(
+        `localValidation must be one of: ${LOCAL_VALIDATION_MODES.join(', ')}, got: ${s.localValidation}`
       );
     }
   }

@@ -49,6 +49,11 @@ describe('validateScenario', () => {
       expect(() => validateScenario(s)).not.toThrow();
     });
 
+    it('accepts localValidation warn when provided', () => {
+      const s = { ...VALID_SCENARIO, localValidation: 'warn' };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
     it('accepts https URLs', () => {
       const s = {
         ...VALID_SCENARIO,
@@ -162,6 +167,11 @@ describe('validateScenario', () => {
 
     it('accepts requestEvents mode when set to sampled', () => {
       const s = { ...VALID_SCENARIO, requestEvents: 'sampled' };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
+    it('accepts localValidation mode when set to strict', () => {
+      const s = { ...VALID_SCENARIO, localValidation: 'strict' };
       expect(() => validateScenario(s)).not.toThrow();
     });
 
@@ -468,6 +478,15 @@ describe('validateScenario', () => {
         validateScenario({
           ...VALID_SCENARIO,
           requestEvents: 'sometimes',
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects invalid localValidation mode', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          localValidation: 'ignore',
         })
       ).toThrow(ScenarioValidationError);
     });

@@ -23,6 +23,7 @@ import type { TempoTierCapture } from '../evidence/tempo.js';
 import { TempoClient } from '../evidence/tempo.js';
 import { PrometheusClient } from '../metrics/prometheus.js';
 import type { TierMetricWindow, TierWindowSummary } from '../metrics/window.js';
+import { sanitizePathLikeText } from '../path-sanitization.js';
 import { generateCharts } from '../report/charts.js';
 import { renderReport } from '../report/markdown.js';
 import type { TierRunResult } from './load-runner.js';
@@ -118,7 +119,9 @@ export async function runScenario(
     const text = await readFile(path.join(writer.runDir, 'run-manifest.json'), 'utf8');
     manifest = JSON.parse(text) as RunManifest;
   } catch (err) {
-    throw new Error(`Failed to read run manifest from ${writer.runDir}: ${String(err)}`);
+    throw new Error(
+      `Failed to read run manifest from ${sanitizePathLikeText(writer.runDir)}: ${String(err)}`
+    );
   }
 
   const prometheusClient = new PrometheusClient(scenario.prometheusEndpoint);

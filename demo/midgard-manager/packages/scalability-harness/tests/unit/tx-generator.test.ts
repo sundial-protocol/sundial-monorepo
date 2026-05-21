@@ -331,6 +331,24 @@ describe('startTxGenerator', () => {
     expect(args).toContain('70');
   });
 
+  it('passes --local-validation when configured by the scenario', async () => {
+    const { spawnFn, ...spawner } = makeMockSpawner(proc);
+    proc.simulateExit(0);
+
+    await startTxGenerator(
+      { ...BASE_SCENARIO, localValidation: 'warn' },
+      BASE_TIER,
+      writer,
+      '/tmp/tier-0',
+      { spawner }
+    );
+
+    const [, args] = spawnFn.mock.calls[0];
+    const flagIndex = args.indexOf('--local-validation');
+    expect(flagIndex).toBeGreaterThan(-1);
+    expect(args[flagIndex + 1]).toBe('warn');
+  });
+
   it('passes --replay-corpus-path when replayCorpusPath is configured', async () => {
     const { spawnFn, ...spawner } = makeMockSpawner(proc);
     proc.simulateExit(0);

@@ -3,6 +3,7 @@ import { Network, UTxO } from '@lucid-evolution/lucid';
 // Transaction Types
 export type TransactionType = 'one-to-one' | 'multi-output' | 'mixed';
 export type RequestEventsMode = 'off' | 'sampled' | 'all';
+export type LocalValidationMode = 'strict' | 'warn';
 
 // Node Client Configuration
 export interface MidgardNodeConfig {
@@ -43,6 +44,9 @@ export interface TransactionGeneratorConfig {
   replayStartIndex?: number;
   // Maximum number of replay transactions to consume from replayStartIndex.
   replayCount?: number;
+  // strict: local Midgard inspection rejection blocks submission.
+  // warn: local rejection is recorded in evidence, but raw CBOR is still submitted.
+  localValidation?: LocalValidationMode;
 
   // Batch settings
   batchSize: number;
@@ -97,6 +101,7 @@ export const DEFAULT_CONFIG: TransactionGeneratorConfig = {
   replayCorpusPath: undefined,
   replayStartIndex: undefined,
   replayCount: undefined,
+  localValidation: 'strict',
 
   // Batch defaults
   batchSize: 10,
@@ -166,6 +171,13 @@ export const validateGeneratorConfig = (config: TransactionGeneratorConfig): voi
   }
   if (config.replayCorpusPath !== undefined && config.replayCorpusPath.trim().length === 0) {
     throw new Error('Replay corpus path must not be empty when provided');
+  }
+  if (
+    config.localValidation !== undefined &&
+    config.localValidation !== 'strict' &&
+    config.localValidation !== 'warn'
+  ) {
+    throw new Error('localValidation must be one of: strict, warn');
   }
   if (
     config.replayStartIndex !== undefined &&

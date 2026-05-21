@@ -10,7 +10,7 @@
   "l1ProviderMode": "emulator",
   "walletMode": "test-wallet",
   "walletProvisioningNote": "test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key",
-  "replayCorpusPath": "corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-1500000.jsonl",
+  "replayCorpusPath": "../corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl",
   "transactionType": "one-to-one",
   "tierDurationSeconds": 1800,
   "recoverySeconds": 300,

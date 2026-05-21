@@ -230,4 +230,47 @@ describe('Scheduler submission outcome counting (H-31)', () => {
     expect(status.transactionsSubmitted).toBe(1);
     expect(status.transactionsFailed).toBe(1);
   });
+
+  it('submits transactions rejected by shared inspection when local validation is warn', async () => {
+    mockInspectGeneratedTransaction
+      .mockImplementationOnce((tx) => ({
+        transaction: tx,
+        inspection: {
+          computedTxIdHex: tx.txId,
+          cborByteSize: 1,
+          midgardByteSize: null,
+          validation: {
+            status: 'rejected',
+            rejectCode: 'E_UNSUPPORTED_FIELD_NONEMPTY',
+            detail: 'local inspection rejected transaction',
+          },
+          shape: null,
+        },
+      }))
+      .mockImplementationOnce((tx) => ({
+        transaction: tx,
+        inspection: {
+          computedTxIdHex: tx.txId,
+          cborByteSize: 1,
+          midgardByteSize: null,
+          validation: {
+            status: 'rejected',
+            rejectCode: 'E_UNSUPPORTED_FIELD_NONEMPTY',
+            detail: 'local inspection rejected transaction',
+          },
+          shape: null,
+        },
+      }));
+
+    await startGenerator({ ...baseConfig, localValidation: 'warn' });
+    await waitForGeneratorStop();
+
+    const status = getGeneratorStatus();
+    expect(mockSubmitTransaction).toHaveBeenCalledTimes(2);
+    expect(mockSubmitTransaction).toHaveBeenNthCalledWith(1, 'cbor_1');
+    expect(mockSubmitTransaction).toHaveBeenNthCalledWith(2, 'cbor_2');
+    expect(status.transactionsGenerated).toBe(2);
+    expect(status.transactionsSubmitted).toBe(2);
+    expect(status.transactionsFailed).toBe(0);
+  });
 });

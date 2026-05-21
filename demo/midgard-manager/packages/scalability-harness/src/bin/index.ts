@@ -19,6 +19,7 @@ import { generateTiers } from '../config/tiers.js';
 import { ArtifactWriter } from '../evidence/artifacts.js';
 import { GrafanaScreenshotService } from '../evidence/grafana-screenshots.js';
 import { PlanArtifactWriter } from '../evidence/plan-artifacts.js';
+import { sanitizePathLikeText } from '../path-sanitization.js';
 import type { ScenarioRunRecord } from '../report/plan-markdown.js';
 import { buildPlanConclusion, renderPlanReport } from '../report/plan-markdown.js';
 import { runExecutionReadinessPreflight } from '../runner/preflight.js';
@@ -44,19 +45,27 @@ class CliInputError extends Error {
   }
 }
 
+function redactPathLike(value: string): string {
+  return sanitizePathLikeText(value);
+}
+
 async function loadScenario(scenarioPath: string): Promise<ScalabilityScenario> {
   let text: string;
   try {
     text = await readFile(scenarioPath, 'utf8');
   } catch (err) {
-    throw new CliInputError(`Failed to read scenario file: ${scenarioPath}\n${String(err)}`);
+    throw new CliInputError(
+      `Failed to read scenario file: ${redactPathLike(scenarioPath)}\n${String(err)}`
+    );
   }
 
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (err) {
-    throw new CliInputError(`Failed to parse scenario JSON: ${scenarioPath}\n${String(err)}`);
+    throw new CliInputError(
+      `Failed to parse scenario JSON: ${redactPathLike(scenarioPath)}\n${String(err)}`
+    );
   }
 
   try {
@@ -71,14 +80,16 @@ async function loadPlan(planPath: string): Promise<PlanConfig> {
   try {
     text = await readFile(planPath, 'utf8');
   } catch (err) {
-    throw new CliInputError(`Failed to read plan file: ${planPath}\n${String(err)}`);
+    throw new CliInputError(`Failed to read plan file: ${redactPathLike(planPath)}\n${String(err)}`);
   }
 
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (err) {
-    throw new CliInputError(`Failed to parse plan JSON: ${planPath}\n${String(err)}`);
+    throw new CliInputError(
+      `Failed to parse plan JSON: ${redactPathLike(planPath)}\n${String(err)}`
+    );
   }
 
   try {
@@ -137,9 +148,9 @@ function printPreflightResult(
 ): void {
   for (const check of result.checks) {
     const prefix = check.passed ? chalk.green('  [PASS]') : chalk.red('  [FAIL]');
-    console.log(`${prefix} ${check.name} — ${check.summary}`);
+    console.log(`${prefix} ${check.name} — ${redactPathLike(check.summary)}`);
     if (!check.passed && check.actionableReason) {
-      console.log(chalk.yellow(`        Action: ${check.actionableReason}`));
+      console.log(chalk.yellow(`        Action: ${redactPathLike(check.actionableReason)}`));
     }
   }
 }
@@ -190,7 +201,7 @@ async function executePlan(opts: {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(chalk.red(`\nExecution Readiness: Blocked`));
-      console.error(chalk.red(`  - scenarios[${i}] (${scenPath}): ${message}`));
+      console.error(chalk.red(`  - scenarios[${i}] (${redactPathLike(scenPath)}): ${message}`));
       process.exit(1);
     }
     if (opts.requestEvents !== undefined || opts.grafanaScreenshots === true) {
@@ -214,14 +225,16 @@ async function executePlan(opts: {
     console.log(chalk.blue(`\nScalability Harness — Plan Dry Run`));
     console.log(chalk.gray(`Plan:   ${plan.planId}`));
     if (plan.description) console.log(chalk.gray(`        ${plan.description}`));
-    console.log(chalk.gray(`Output: ${plan.outputDir}`));
+    console.log(chalk.gray(`Output: ${redactPathLike(plan.outputDir)}`));
     console.log(chalk.gray(`Stop on failure: ${plan.stopOnFailure ?? true}`));
     console.log('');
     for (const [i, scenario] of loadedScenarios.entries()) {
       const tiers = generateTiers(scenario);
       console.log(
         chalk.gray(
-          `Scenario ${i + 1}/${loadedScenarios.length} — ${scenario.runId} (${resolvedScenarioPaths[i]})`
+          `Scenario ${i + 1}/${loadedScenarios.length} — ${scenario.runId} (${redactPathLike(
+            resolvedScenarioPaths[i]
+          )})`
         )
       );
       for (const tier of tiers) {
@@ -264,7 +277,7 @@ async function executePlan(opts: {
   console.log(chalk.blue(`\nScalability Harness — Plan Run`));
   console.log(chalk.gray(`Plan:      ${plan.planId}`));
   console.log(chalk.gray(`Scenarios: ${loadedScenarios.length}`));
-  console.log(chalk.gray(`Output:    ${planWriter.planDir}`));
+  console.log(chalk.gray(`Output:    ${redactPathLike(planWriter.planDir)}`));
 
   const records: ScenarioRunRecord[] = [];
   let stopRemaining = false;
@@ -276,9 +289,9 @@ async function executePlan(opts: {
     if (stopRemaining) {
       records.push({
         scenarioIndex: i,
-        scenarioPath: scenPath,
+        scenarioPath: redactPathLike(scenPath),
         runId: scenario.runId,
-        runDir: planWriter.scenarioRunDir(i, scenario.runId),
+        runDir: redactPathLike(planWriter.scenarioRunDir(i, scenario.runId)),
         targetTps: scenario.maxTps,
         scenario,
         tierSummaries: [],
@@ -326,7 +339,7 @@ async function executePlan(opts: {
       continue;
     }
 
-    console.log(chalk.gray(`  Artifacts: ${writer.runDir}`));
+    console.log(chalk.gray(`  Artifacts: ${redactPathLike(writer.runDir)}`));
 
     let result: Awaited<ReturnType<typeof runScenario>>;
     try {
@@ -349,14 +362,14 @@ async function executePlan(opts: {
         : classLabel === 'Passed with Observations'
           ? chalk.yellow
           : chalk.red;
-    console.log(chalk.gray(`  Report:    ${path.join(writer.runDir, 'report.md')}`));
+    console.log(chalk.gray(`  Report:    ${redactPathLike(path.join(writer.runDir, 'report.md'))}`));
     console.log(`  Result:    ${classColor(classLabel)}`);
 
     records.push({
       scenarioIndex: i,
-      scenarioPath: scenPath,
-      runId: scenario.runId,
-      runDir: writer.runDir,
+        scenarioPath: redactPathLike(scenPath),
+        runId: scenario.runId,
+        runDir: redactPathLike(writer.runDir),
       targetTps: scenario.maxTps,
       scenario,
       tierSummaries: result.tierSummaries,
@@ -438,7 +451,7 @@ async function executePlan(opts: {
   }
 
   const planReportPath = path.join(planWriter.planDir, 'plan-report.md');
-  console.log(chalk.green(`\nPlan Report: ${planReportPath}`));
+  console.log(chalk.green(`\nPlan Report: ${redactPathLike(planReportPath)}`));
 
   const planLabel =
     planConclusion.classification === 'Passed'
@@ -567,7 +580,7 @@ program
         console.log(chalk.gray(`Scenario: ${scenario.runId}`));
         console.log(chalk.gray(`Node:     ${scenario.nodeEndpoint}`));
         console.log(chalk.gray(`Metrics:  ${scenario.prometheusEndpoint}`));
-        console.log(chalk.gray(`Output:   ${scenario.outputDir}`));
+        console.log(chalk.gray(`Output:   ${redactPathLike(scenario.outputDir)}`));
         console.log(chalk.gray(`Request Events: ${scenario.requestEvents ?? 'off'}`));
         if (tiers.length === 0) {
           console.log(chalk.yellow('\nNo tiers match the current filters.'));
@@ -612,7 +625,7 @@ program
       console.log(
         chalk.gray(`Tiers:    ${tiers.length} (${tiers.map((t) => t.targetTps).join(' → ')} TPS)`)
       );
-      console.log(chalk.gray(`Output:   ${scenario.outputDir}`));
+      console.log(chalk.gray(`Output:   ${redactPathLike(scenario.outputDir)}`));
       console.log(chalk.gray(`Request Events: ${scenario.requestEvents ?? 'off'}`));
 
       const harnessVersion = await readHarnessVersion();
@@ -625,14 +638,14 @@ program
         process.exit(1);
       }
 
-      console.log(chalk.green(`\nArtifacts: ${writer.runDir}`));
+      console.log(chalk.green(`\nArtifacts: ${redactPathLike(writer.runDir)}`));
 
       const result = await runScenario(scenario, scenarioPath, tiers, writer, {
         requestEvents: scenario.requestEvents,
       });
 
       const reportPath = path.join(writer.runDir, 'report.md');
-      console.log(chalk.green(`\nReport:    ${reportPath}`));
+      console.log(chalk.green(`\nReport:    ${redactPathLike(reportPath)}`));
 
       if (result.conclusion.firstCollapsedTier !== null) {
         console.log(

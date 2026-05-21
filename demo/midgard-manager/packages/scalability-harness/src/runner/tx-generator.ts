@@ -285,6 +285,10 @@ function buildArgs(
     args.push('--ratio', String(scenario.oneToOneRatio));
   }
 
+  if (scenario.localValidation !== undefined) {
+    args.push('--local-validation', scenario.localValidation);
+  }
+
   const replayCorpusPath = resolveReplayCorpusPath(scenario.replayCorpusPath, cwd);
   if (replayCorpusPath !== undefined) {
     args.push('--replay-corpus-path', replayCorpusPath);
