@@ -48,6 +48,13 @@ jobs:
       - name: Setup l2 workspace
         uses: ./.github/actions/setup-l2
 
+      - name: Setup OpenTofu
+        if: matrix.name == 'Format Check'
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.11.6
+          tofu_wrapper: false
+
       - name: Run check
         run: ${{ matrix.command }}
         working-directory: demo
