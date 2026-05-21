@@ -63,6 +63,10 @@ node dist/bin/index.js tiers --scenario scenarios/saturation-ramp-25pct.json --m
 If block commitments fail with collateral errors (for example "required 5000000 Lovelace collateral"),
 top up the block-commitment operator wallet before running formal scalability scenarios.
 
+The top-up script reads credentials/seeds from `demo/midgard-manager/scripts/.env`.
+Copy `demo/midgard-manager/scripts/.env.example` to `.env` and set:
+`BLOCKFROST_URL`, `BLOCKFROST_KEY`, `MAIN_SEED`, `BC_SEED`.
+
 ```bash
 # From demo/ (workspace shortcut)
 npm run wallet:block-commitment:topup
@@ -230,6 +234,7 @@ Scenario subdirectories are named `<NN>-<runId>` so they sort in execution order
 | `walletProvisioningNote`    | string? | Free-text provisioning note; recorded in manifest                                                   |
 | `transactionType`           | string  | `one-to-one` \| `multi-output` \| `mixed`                                                           |
 | `oneToOneRatio`             | number? | Percentage of one-to-one txs when `mixed` (0–100)                                                   |
+| `localValidation`           | string? | `strict` \| `warn`; `warn` records local tx inspection rejection but still submits raw CBOR         |
 | `startTps`                  | number  | First tier target TPS                                                                               |
 | `maxTps`                    | number  | Maximum tier target TPS                                                                             |
 | `stepMultiplier`            | number? | TPS multiplier between tiers (legacy; prefer `ramp`)                                                |
