@@ -1,8 +1,0 @@
-[
-  {
-    "txId": "multi-838AC823157EBC9344BC73CC132C650FB375DDAD4CAA3C4A95BBED1E15EC49B6",
-    "cborHex": "multi-838AC823157EBC9344BC73CC132C650FB375DDAD4CAA3C4A95BBED1E15EC49B6",
-    "type": "Midgard L2 User Transaction",
-    "description": "deterministic multi-output"
-  }
-]
