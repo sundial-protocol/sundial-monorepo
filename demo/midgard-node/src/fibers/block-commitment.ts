@@ -73,7 +73,12 @@ export const blockCommitmentMetrics = {
 export const buildAndSubmitCommitmentBlockAction = () =>
   Effect.gen(function* () {
     const globals = yield* Globals;
-    const { COMMITMENT_WORKER_TIMEOUT_MS } = yield* NodeConfig;
+    const {
+      COMMITMENT_WORKER_TIMEOUT_MS,
+      COMMITMENT_WINDOW_WARN_TX_REQUESTS,
+      COMMITMENT_WINDOW_WARN_TOTAL_EVENTS,
+      COMMITMENT_WINDOW_WARN_TOTAL_BYTES,
+    } = yield* NodeConfig;
 
     const worker = Effect.async<WorkerOutput, WorkerError, never>((resume) => {
       let isDone = false;
@@ -172,26 +177,39 @@ export const buildAndSubmitCommitmentBlockAction = () =>
     switch (workerOutput.type) {
       case "SuccessfulCommitmentOutput": {
         yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n + 1);
+        const stats = workerOutput.stats;
+        const totalEventsCount = BlocksDB.getTotalEventsCount(stats);
+        const thresholdBreaches =
+          BlocksDB.getCommitmentWindowWarningThresholdBreaches(stats, {
+            txRequestsCount: COMMITMENT_WINDOW_WARN_TX_REQUESTS,
+            totalEventsCount: COMMITMENT_WINDOW_WARN_TOTAL_EVENTS,
+            totalEventsSizeBytes: COMMITMENT_WINDOW_WARN_TOTAL_BYTES,
+          });
 
         yield* Metric.set(
           commitBlockL1UserEventsGauge,
-          workerOutput.stats[BlocksDB.Columns.DEPOSITS_COUNT] +
-            workerOutput.stats[BlocksDB.Columns.WITHDRAWALS_COUNT] +
-            workerOutput.stats[BlocksDB.Columns.TX_ORDERS_COUNT],
+          stats[BlocksDB.Columns.DEPOSITS_COUNT] +
+            stats[BlocksDB.Columns.WITHDRAWALS_COUNT] +
+            stats[BlocksDB.Columns.TX_ORDERS_COUNT],
         );
         yield* Metric.set(
           commitBlockNumTxGauge,
-          BigInt(workerOutput.stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
+          BigInt(stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
         );
         yield* Metric.set(
           commitBlockEventsSizeGauge,
-          workerOutput.stats[BlocksDB.Columns.TOTAL_EVENTS_SIZE],
+          stats[BlocksDB.Columns.TOTAL_EVENTS_SIZE],
         );
         yield* Metric.increment(commitBlockCounter);
         yield* Metric.incrementBy(
           commitBlockTxCounter,
-          BigInt(workerOutput.stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
+          BigInt(stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
         );
+        if (thresholdBreaches.length > 0) {
+          yield* Effect.logWarning(
+            `Committed block exceeded commitment window warning thresholds: breaches=${thresholdBreaches.join(",")} tx_requests=${stats[BlocksDB.Columns.TX_REQUESTS_COUNT]}/${COMMITMENT_WINDOW_WARN_TX_REQUESTS} total_events=${totalEventsCount}/${COMMITMENT_WINDOW_WARN_TOTAL_EVENTS} total_events_size_bytes=${stats[BlocksDB.Columns.TOTAL_EVENTS_SIZE]}/${COMMITMENT_WINDOW_WARN_TOTAL_BYTES}`,
+          );
+        }
         yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
         break;
       }

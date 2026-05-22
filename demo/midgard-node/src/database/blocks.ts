@@ -47,6 +47,35 @@ export type Stats = {
   [Columns.TOTAL_EVENTS_SIZE]: number;
 };
 
+export type CommitmentWindowWarningThresholds = {
+  txRequestsCount: number;
+  totalEventsCount: number;
+  totalEventsSizeBytes: number;
+};
+
+export const getTotalEventsCount = (stats: Stats): number =>
+  stats[Columns.DEPOSITS_COUNT] +
+  stats[Columns.TX_REQUESTS_COUNT] +
+  stats[Columns.TX_ORDERS_COUNT] +
+  stats[Columns.WITHDRAWALS_COUNT];
+
+export const getCommitmentWindowWarningThresholdBreaches = (
+  stats: Stats,
+  thresholds: CommitmentWindowWarningThresholds,
+): readonly string[] => {
+  const breaches: string[] = [];
+  if (stats[Columns.TX_REQUESTS_COUNT] >= thresholds.txRequestsCount) {
+    breaches.push("tx_requests_count");
+  }
+  if (getTotalEventsCount(stats) >= thresholds.totalEventsCount) {
+    breaches.push("total_events_count");
+  }
+  if (stats[Columns.TOTAL_EVENTS_SIZE] >= thresholds.totalEventsSizeBytes) {
+    breaches.push("total_events_size_bytes");
+  }
+  return breaches;
+};
+
 export type EntryNoMeta = Stats & {
   [Columns.HEADER_HASH]: Buffer;
   [Columns.EVENT_START_TIME]: Date;
@@ -65,6 +94,10 @@ export enum Status {
   SUBMITTED = 1,
   CONFIRMED = 2,
   MERGED = 3,
+}
+
+enum IndexNames {
+  UNSUBMITTED_HEIGHT = "idx_unsubmitted_blocks_unsubmitted_height",
 }
 
 export type Entry = EntryNoMeta & {
@@ -97,22 +130,30 @@ type LatestUnsubmittedBlockJoinRow = Entry & {
 export const createTable: Effect.Effect<void, DatabaseError, Database> =
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      ${sql(Columns.HEIGHT)} BIGSERIAL PRIMARY KEY,
-      ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL UNIQUE,
-      ${sql(Columns.EVENT_START_TIME)} TIMESTAMPTZ NOT NULL,
-      ${sql(Columns.EVENT_END_TIME)} TIMESTAMPTZ NOT NULL,
-      ${sql(Columns.NEW_WALLET_UTXOS)} BYTEA NOT NULL,
-      ${sql(Columns.L1_CBOR)} BYTEA NOT NULL,
-      ${sql(Columns.PRODUCED_UTXOS)} BYTEA NOT NULL,
-      ${sql(Columns.DEPOSITS_COUNT)} INTEGER NOT NULL,
-      ${sql(Columns.TX_REQUESTS_COUNT)} INTEGER NOT NULL,
-      ${sql(Columns.TX_ORDERS_COUNT)} INTEGER NOT NULL,
-      ${sql(Columns.WITHDRAWALS_COUNT)} INTEGER NOT NULL,
-      ${sql(Columns.TOTAL_EVENTS_SIZE)} INTEGER NOT NULL,
-      ${sql(Columns.STATUS)} INTEGER NOT NULL DEFAULT(${sql.literal(String(Status.UNSUBMITTED))}),
-      ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
-    );`;
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+        ${sql(Columns.HEIGHT)} BIGSERIAL PRIMARY KEY,
+        ${sql(Columns.HEADER_HASH)} BYTEA NOT NULL UNIQUE,
+        ${sql(Columns.EVENT_START_TIME)} TIMESTAMPTZ NOT NULL,
+        ${sql(Columns.EVENT_END_TIME)} TIMESTAMPTZ NOT NULL,
+        ${sql(Columns.NEW_WALLET_UTXOS)} BYTEA NOT NULL,
+        ${sql(Columns.L1_CBOR)} BYTEA NOT NULL,
+        ${sql(Columns.PRODUCED_UTXOS)} BYTEA NOT NULL,
+        ${sql(Columns.DEPOSITS_COUNT)} INTEGER NOT NULL,
+        ${sql(Columns.TX_REQUESTS_COUNT)} INTEGER NOT NULL,
+        ${sql(Columns.TX_ORDERS_COUNT)} INTEGER NOT NULL,
+        ${sql(Columns.WITHDRAWALS_COUNT)} INTEGER NOT NULL,
+        ${sql(Columns.TOTAL_EVENTS_SIZE)} INTEGER NOT NULL,
+        ${sql(Columns.STATUS)} INTEGER NOT NULL DEFAULT(${sql.literal(String(Status.UNSUBMITTED))}),
+        ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW())
+      );`;
+        yield* sql`CREATE INDEX IF NOT EXISTS ${sql(
+          IndexNames.UNSUBMITTED_HEIGHT,
+        )} ON ${sql(tableName)} (${sql(Columns.HEIGHT)})
+        WHERE ${sql(Columns.STATUS)} = ${sql.literal(String(Status.UNSUBMITTED))};`;
+      }),
+    );
   }).pipe(
     Effect.withLogSpan(`creating table ${tableName}`),
     sqlErrorToDatabaseError(tableName, "Failed to create the table"),
@@ -238,7 +279,8 @@ export const retrieveEarliestUnsubmittedEntry: Effect.Effect<
   const rows = yield* sql<Entry>`
     SELECT * FROM ${sql(tableName)}
     WHERE ${sql(Columns.STATUS)} = ${Status.UNSUBMITTED}
-    ORDER BY ${sql(Columns.HEIGHT)} ASC`;
+    ORDER BY ${sql(Columns.HEIGHT)} ASC
+    LIMIT 1`;
   if (rows.length <= 0) {
     return Option.none();
   } else {
@@ -253,7 +295,9 @@ export const retrieveLatestEntry: Effect.Effect<
 > = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const rows = yield* sql<LatestUnsubmittedBlockJoinRow>`
-    SELECT * FROM ${sql(tableName)} ORDER BY ${sql(Columns.HEIGHT)} DESC`;
+    SELECT * FROM ${sql(tableName)}
+    ORDER BY ${sql(Columns.HEIGHT)} DESC
+    LIMIT 1`;
   if (rows.length <= 0) {
     return Option.none();
   } else {

@@ -13,6 +13,9 @@ export enum Columns {
   TIMESTAMPTZ = "time_stamp_tz",
 }
 
+const getTimestampIndexName = (tableName: string): string =>
+  `idx_${tableName}_${Columns.TIMESTAMPTZ}`;
+
 export type EntryNoTimeStamp = {
   [Columns.TX_ID]: Buffer;
   [Columns.TX]: Buffer;
@@ -29,12 +32,19 @@ export const createTable = (
 ): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
-      ${sql(Columns.TX_ID)} BYTEA NOT NULL,
-      ${sql(Columns.TX)} BYTEA NOT NULL,
-      ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
-      PRIMARY KEY (${sql(Columns.TX_ID)})
-    );`;
+    yield* sql.withTransaction(
+      Effect.gen(function* () {
+        yield* sql`CREATE TABLE IF NOT EXISTS ${sql(tableName)} (
+        ${sql(Columns.TX_ID)} BYTEA NOT NULL,
+        ${sql(Columns.TX)} BYTEA NOT NULL,
+        ${sql(Columns.TIMESTAMPTZ)} TIMESTAMPTZ NOT NULL DEFAULT(NOW()),
+        PRIMARY KEY (${sql(Columns.TX_ID)})
+      );`;
+        yield* sql`CREATE INDEX IF NOT EXISTS ${sql(
+          getTimestampIndexName(tableName),
+        )} ON ${sql(tableName)} (${sql(Columns.TIMESTAMPTZ)});`;
+      }),
+    );
   }).pipe(
     Effect.withLogSpan(`creating table ${tableName}`),
     sqlErrorToDatabaseError(tableName, "Failed to create the table"),
