@@ -186,11 +186,12 @@ export class MidgardNodeClient {
         const timeoutId = setTimeout(() => controller.abort(), this.submitTimeoutMs);
         let response: Response;
         try {
-          response = await fetch(`${this.baseUrl}/submit?tx_cbor=${cborHex}`, {
+          response = await fetch(`${this.baseUrl}/submit`, {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain',
             },
+            body: cborHex,
             signal: controller.signal,
           });
         } finally {

@@ -84,12 +84,13 @@ describe('MidgardNodeClient', () => {
     // Verify fetch was called with the correct arguments (second call)
     expect(mockFetch).toHaveBeenNthCalledWith(
       2,
-      'http://localhost:3000/submit?tx_cbor=test_cbor_hex',
+      'http://localhost:3000/submit',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
           'Content-Type': 'text/plain',
         }),
+        body: 'test_cbor_hex',
       })
     );
   });

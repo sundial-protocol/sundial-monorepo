@@ -236,6 +236,7 @@ const mainProgram: Effect.Effect<
                 "Updating MempoolLedgerDB and BlocksDB after updating ledger MPT for block commitment failed",
               ),
             );
+          yield* ledgerTrie.commit();
           return stats;
         }).pipe(Effect.tapError((_) => ledgerTrie.revert()));
       }),
