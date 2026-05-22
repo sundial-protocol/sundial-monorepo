@@ -144,27 +144,30 @@ it.effect("insertMultiple aggregates address history as slated", () =>
   ),
 );
 
-it.effect(
-  "retrieveTimeBoundEntries delegates to tx table with correct args",
-  () => {
-    const start = new Date("2024-01-01T00:00:00Z");
-    const end = new Date("2024-01-02T00:00:00Z");
-    vi.mocked(Tx.retrieveTimeBoundEntries).mockReturnValue(
-      Effect.succeed([{ tx_id: txIdA, tx: txCborA }]),
-    );
-    return MempoolDB.retrieveTimeBoundEntries(start, end).pipe(
-      Effect.map((entries) => {
-        expect(entries.length).toBe(1);
-        expect(vi.mocked(Tx.retrieveTimeBoundEntries)).toHaveBeenCalledWith(
-          "mempool",
-          start,
-          end,
-        );
-      }),
-      Effect.provide(sqlHarness.layer),
-    );
-  },
-);
+it.effect("retrieveTimeBoundEntries queries mempool rows with effects", () => {
+  const start = new Date("2024-01-01T00:00:00Z");
+  const end = new Date("2024-01-02T00:00:00Z");
+  sqlHarness.setRows([
+    {
+      tx_id: txIdA,
+      tx: txCborA,
+      time_stamp_tz: start,
+      tx_size_bytes: txCborA.length,
+      spent_outrefs: [outrefA],
+      produced_outrefs: [outrefA],
+      produced_outputs: [txCborA],
+      produced_addresses: [testAddress],
+    },
+  ]);
+  return MempoolDB.retrieveTimeBoundEntries(start, end).pipe(
+    Effect.map((entries) => {
+      expect(entries.length).toBe(1);
+      expect(vi.mocked(Tx.retrieveTimeBoundEntries)).not.toHaveBeenCalled();
+      expect(sqlHarness.getCallCount()).toBeGreaterThan(0);
+    }),
+    Effect.provide(sqlHarness.layer),
+  );
+});
 
 it.effect("insertMultiple no-ops on duplicate mempool insert", () => {
   sqlHarness.setRows([]);

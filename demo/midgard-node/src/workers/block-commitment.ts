@@ -18,7 +18,13 @@ import {
   AlwaysSucceedsContract,
   NodeConfig,
 } from "@/services/index.js";
-import { MempoolLedgerDB, BlocksDB, Tx, UserEvents } from "@/database/index.js";
+import {
+  MempoolLedgerDB,
+  BlocksDB,
+  MempoolDB,
+  Tx,
+  UserEvents,
+} from "@/database/index.js";
 import { TxSignError } from "@/transactions/utils.js";
 import { MidgardMpt, MptError } from "@/workers/utils/mpt.js";
 import {
@@ -139,6 +145,10 @@ const mainProgram: Effect.Effect<
           currentDate,
         );
         const { withdrawals, txOrders, txRequests, deposits } = events;
+        const processedTxRequests = yield* Effect.forEach(
+          txRequests,
+          (entry) => MempoolDB.toProcessedTx(entry),
+        );
         const preflightStats = buildPreflightWindowStats(events);
         const thresholdBreaches =
           BlocksDB.getCommitmentWindowWarningThresholdBreaches(preflightStats, {
@@ -165,14 +175,18 @@ const mainProgram: Effect.Effect<
           const { withdrawnOutRefs, withdrawalsRoot, sizeOfWithdrawals } =
             yield* applyWithdrawalsToLedger(ledgerTrie, withdrawals);
           const {
-            txOrdersHashes,
+            txOrdersCount,
             spentByTxOrders,
             producedByTxOrders,
             txsTrie,
             sizeOfTxOrders,
           } = yield* applyTxOrdersToLedger(ledgerTrie, txOrders);
-          const { txRequestsHashes, txsRoot, sizeOfTxRequests } =
-            yield* applyTxRequestsToLedger(ledgerTrie, txsTrie, txRequests);
+          const { txRequestsCount, txsRoot, sizeOfTxRequests } =
+            yield* applyTxRequestsToLedger(
+              ledgerTrie,
+              txsTrie,
+              processedTxRequests,
+            );
           const { depositLedgerEntries, depositsRoot, sizeOfDeposits } =
             yield* applyDepositsToLedger(ledgerTrie, deposits);
 
@@ -180,8 +194,8 @@ const mainProgram: Effect.Effect<
 
           const stats: BlocksDB.Stats = {
             [BlocksDB.Columns.DEPOSITS_COUNT]: depositLedgerEntries.length,
-            [BlocksDB.Columns.TX_REQUESTS_COUNT]: txRequestsHashes.length,
-            [BlocksDB.Columns.TX_ORDERS_COUNT]: txOrdersHashes.length,
+            [BlocksDB.Columns.TX_REQUESTS_COUNT]: txRequestsCount,
+            [BlocksDB.Columns.TX_ORDERS_COUNT]: txOrdersCount,
             [BlocksDB.Columns.WITHDRAWALS_COUNT]: withdrawnOutRefs.length,
             [BlocksDB.Columns.TOTAL_EVENTS_SIZE]:
               sizeOfWithdrawals +

@@ -108,7 +108,7 @@ export type Entry = EntryNoMeta & {
 export type Events = {
   withdrawals: readonly UserEvents.Entry[];
   txOrders: readonly UserEvents.Entry[];
-  txRequests: readonly Tx.Entry[];
+  txRequests: readonly MempoolDB.EntryWithEffects[];
   deposits: readonly UserEvents.Entry[];
 };
 

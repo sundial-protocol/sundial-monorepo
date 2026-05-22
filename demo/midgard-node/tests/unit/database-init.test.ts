@@ -85,6 +85,7 @@ vi.mock("@/database/mempool.js", async () => {
   const { Effect: E } = await import("effect");
   return {
     tableName: "mempool",
+    ensureNormalizedColumns: E.succeed(undefined),
     insertMultiple: vi.fn(() => E.succeed(undefined)),
     retrieveTxCborByHash: vi.fn(() => E.succeed(undefined)),
     retrieveTxCborsByHashes: vi.fn(() => E.succeed([])),

@@ -92,6 +92,8 @@ it.effect("Repository clear helpers produce a clean business state", () => {
       { concurrency: "unbounded" },
     );
 
+    // Re-seed the spent outref expected by txCborA before re-inserting it.
+    yield* MempoolLedgerDB.insert([makeSeedLedgerEntry()]);
     yield* MempoolDB.insertMultiple([processedTx]);
 
     const count = yield* MempoolDB.retrieveTxCount;

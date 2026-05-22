@@ -269,7 +269,7 @@ it.effect("Applying tx requests updates ledger and txs roots", () => {
       mempoolEntry,
     ]);
 
-    expect(result.txRequestsHashes.length).toBe(1);
+    expect(result.txRequestsCount).toBe(1);
     expect(result.txsRoot).not.toBe(EMPTY_ROOT);
     expect(yield* ledgerTrie.getRootHex()).not.toBe(initialLedgerRoot);
   }).pipe(Effect.provide(layers));
@@ -321,7 +321,7 @@ it.effect("Empty event roots are stable for an empty block", () => {
     expect(depResult.depositsRoot).toBe(EMPTY_ROOT);
     expect(wthResult.withdrawnOutRefs.length).toBe(0);
     expect(wthResult.withdrawalsRoot).toBe(EMPTY_ROOT);
-    expect(txrResult.txRequestsHashes.length).toBe(0);
+    expect(txrResult.txRequestsCount).toBe(0);
     expect(txrResult.txsRoot).toBe(EMPTY_ROOT);
   });
 });
