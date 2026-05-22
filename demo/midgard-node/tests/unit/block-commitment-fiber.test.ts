@@ -9,7 +9,9 @@ import { Lucid } from "@/services/lucid.js";
 import {
   blockCommitmentMetrics,
   buildAndSubmitCommitmentBlockAction,
+  unsafeResetCommitmentWorkerForTesting,
 } from "@/fibers/block-commitment.js";
+import { CommitmentWorkerMessageType } from "@/workers/utils/block-commitment.js";
 import { metricDelta } from "./harness/metric-snapshot.js";
 import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
@@ -135,20 +137,38 @@ function runUntilCommitmentWorkerTimeout() {
   });
 }
 
-// Helper: build a fake worker that emits one event asynchronously after listener registration.
+// Helper: build a fake worker that emits one event asynchronously on postMessage.
 function makeEventWorker(event: string, ...args: unknown[]) {
+  const listeners = new Map<string, Set<(...a: unknown[]) => void>>();
   const terminate = vi.fn();
   const on = vi.fn((ev: string, cb: (...a: unknown[]) => void) => {
-    if (ev === event) {
-      queueMicrotask(() => cb(...args));
+    const existing = listeners.get(ev) ?? new Set<(...a: unknown[]) => void>();
+    existing.add(cb);
+    listeners.set(ev, existing);
+  });
+  const off = vi.fn((ev: string, cb: (...a: unknown[]) => void) => {
+    const existing = listeners.get(ev);
+    if (existing) {
+      existing.delete(cb);
     }
   });
-  return { on, terminate };
+  const postMessage = vi.fn(() => {
+    queueMicrotask(() => {
+      const matchingListeners = listeners.get(event);
+      if (matchingListeners) {
+        for (const listener of matchingListeners) {
+          listener(...args);
+        }
+      }
+    });
+  });
+  return { on, off, postMessage, terminate };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   sqlHarness.reset();
+  unsafeResetCommitmentWorkerForTesting();
   ensureBlocksSeededFn.mockReturnValue(Effect.succeed("already-seeded"));
 });
 
@@ -163,8 +183,11 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
       setup: () =>
         makeWorkerInstance.mockReturnValue(
           makeEventWorker("message", {
-            type: "FailureOutput",
-            error: "sdk error",
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: {
+              type: "FailureOutput",
+              error: "sdk error",
+            },
           }),
         ),
       expectedDelta: 1n,
@@ -187,7 +210,10 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
       name: "does not increment on SuccessfulCommitmentOutput",
       setup: () =>
         makeWorkerInstance.mockReturnValue(
-          makeEventWorker("message", successfulCommitmentOutput),
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: successfulCommitmentOutput,
+          }),
         ),
       expectedDelta: 0n,
     },
@@ -195,7 +221,10 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
       name: "does not increment on SeededOutput",
       setup: () =>
         makeWorkerInstance.mockReturnValue(
-          makeEventWorker("message", { type: "SeededOutput" }),
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: { type: "SeededOutput" },
+          }),
         ),
       expectedDelta: 0n,
     },
@@ -215,6 +244,8 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
     Effect.gen(function* () {
       makeWorkerInstance.mockReturnValue({
         on: vi.fn(),
+        off: vi.fn(),
+        postMessage: vi.fn(),
         terminate: vi.fn(),
       });
 
@@ -230,6 +261,8 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
     Effect.gen(function* () {
       const neverRespondingWorker = {
         on: vi.fn(),
+        off: vi.fn(),
+        postMessage: vi.fn(),
         terminate: vi.fn(),
       };
       makeWorkerInstance.mockReturnValue(neverRespondingWorker);
@@ -265,14 +298,20 @@ describe("buildAndSubmitCommitmentBlockAction — duration histogram", () => {
       name: "records observation on SuccessfulCommitmentOutput",
       setup: () =>
         makeWorkerInstance.mockReturnValue(
-          makeEventWorker("message", successfulCommitmentOutput),
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: successfulCommitmentOutput,
+          }),
         ),
     },
     {
       name: "records observation on SeededOutput",
       setup: () =>
         makeWorkerInstance.mockReturnValue(
-          makeEventWorker("message", { type: "SeededOutput" }),
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: { type: "SeededOutput" },
+          }),
         ),
     },
     {
@@ -280,8 +319,11 @@ describe("buildAndSubmitCommitmentBlockAction — duration histogram", () => {
       setup: () =>
         makeWorkerInstance.mockReturnValue(
           makeEventWorker("message", {
-            type: "FailureOutput",
-            error: "sdk error",
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: {
+              type: "FailureOutput",
+              error: "sdk error",
+            },
           }),
         ),
     },

@@ -266,3 +266,24 @@ export function readVarBytesDynamic(r: Reader, len: number): Uint8Array {
   r.skip(alignmentBytes(len));
   return bytes;
 }
+
+// ---------------------------------------------------------------------------
+// Bounds guard for variable-length collection reads
+// Call immediately after reading a length field and before entering the loop.
+// Rejects a claimed count when it exceeds remaining bytes / minimum element
+// size, catching crafted frames that claim huge counts to force CPU/memory DoS
+// before Reader.read() can throw on the first missing byte.
+// ---------------------------------------------------------------------------
+
+export function assertBoundedLength(
+  len: number,
+  r: Reader,
+  minBytesPerElement: number,
+  label: string,
+): void {
+  if (len > Math.floor(r.remaining() / minBytesPerElement)) {
+    throw new Error(
+      `UnboundedLength: ${label} claims ${len} elements but only ${r.remaining()} bytes remain (min ${minBytesPerElement} bytes/element)`,
+    );
+  }
+}

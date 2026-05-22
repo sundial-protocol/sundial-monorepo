@@ -26,8 +26,13 @@ import {
 import { TxSignError } from "@/transactions/utils.js";
 import { breakDownTx, ProcessedTx } from "@/utils.js";
 
+export const CommitmentWorkerMessageType = {
+  RunCommitment: "RunCommitment",
+  RunCommitmentResult: "RunCommitmentResult",
+} as const;
+
 export type WorkerInput = {
-  data: {};
+  type: typeof CommitmentWorkerMessageType.RunCommitment;
 };
 
 export type SuccessfulCommitmentOutput = {
@@ -48,6 +53,11 @@ export type WorkerOutput =
   | SuccessfulCommitmentOutput
   | FailureOutput
   | SeededOutput;
+
+export type WorkerMessage = {
+  type: typeof CommitmentWorkerMessageType.RunCommitmentResult;
+  output: WorkerOutput;
+};
 
 const COMMITMENT_MPT_CHUNK_SIZE = 1000;
 

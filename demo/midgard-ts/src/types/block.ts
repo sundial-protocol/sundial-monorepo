@@ -8,6 +8,7 @@ import {
   writeU64,
   readU64,
   readVarBytesDynamic,
+  assertBoundedLength,
 } from "../codec";
 
 import {
@@ -207,6 +208,8 @@ function writeUtxosDynamic(w: Writer, map: UtxoMap): void {
 }
 function readUtxosStatic(r: Reader): UtxoPartial[] {
   const len = readU64(r);
+  // Min per utxo: 40 (OutputReference) + 40 (min TransactionOutput static) = 80, use 40 conservatively
+  assertBoundedLength(len, r, 40, "BlockBody.utxos");
   const ps: UtxoPartial[] = [];
   for (let i = 0; i < len; i++) {
     const k = readOutputReferenceStatic(r);
@@ -238,6 +241,8 @@ function writeTransactionsDynamic(w: Writer, map: TransactionMap): void {
 }
 function readTransactionsStatic(r: Reader): TxPartial[] {
   const len = readU64(r);
+  // Min per tx: 32 (txId) + min Transaction static (≥ 48 bytes), use 32 conservatively
+  assertBoundedLength(len, r, 32, "BlockBody.transactions");
   const ps: TxPartial[] = [];
   for (let i = 0; i < len; i++) {
     const k = readHash32Static(r);
@@ -279,6 +284,8 @@ function writeDepositsDynamic(w: Writer, map: DepositMap): void {
 }
 function readDepositsStatic(r: Reader): DepositPartial[] {
   const len = readU64(r);
+  // Min per deposit: 40 (OutputReference) + 8 (addrLen) + 8 (datumPresent) = 56, use 40 conservatively
+  assertBoundedLength(len, r, 40, "BlockBody.deposits");
   const ps: DepositPartial[] = [];
   for (let i = 0; i < len; i++) {
     const outerKey = readOutputReferenceStatic(r);
@@ -332,6 +339,8 @@ function writeWithdrawalsDynamic(w: Writer, map: WithdrawalMap): void {
 }
 function readWithdrawalsStatic(r: Reader): WithdrawalPartial[] {
   const len = readU64(r);
+  // Min per withdrawal: 40 (outerKey) + 40 (l2_outref) + 8 (addrLen) + 8 (datumPresent) = 96, use 40 conservatively
+  assertBoundedLength(len, r, 40, "BlockBody.withdrawals");
   const ps: WithdrawalPartial[] = [];
   for (let i = 0; i < len; i++) {
     const outerKey = readOutputReferenceStatic(r);

@@ -7,7 +7,12 @@ import {
 } from "@/services/index.js";
 import { Effect, Metric, MetricBoundaries, Ref, Schedule } from "effect";
 import { WorkerError } from "@/workers/utils/common.js";
-import { WorkerInput, WorkerOutput } from "@/workers/utils/block-commitment.js";
+import {
+  CommitmentWorkerMessageType,
+  WorkerInput,
+  WorkerMessage,
+  WorkerOutput,
+} from "@/workers/utils/block-commitment.js";
 import { Worker } from "worker_threads";
 import { BlocksDB } from "@/database/index.js";
 import { performance } from "node:perf_hooks";
@@ -15,6 +20,168 @@ import {
   blocksDbSeedingMetrics,
   ensureBlocksDBSeededFromChain,
 } from "@/fibers/seed-blocks-db-from-chain.js";
+
+const COMMITMENT_WORKER_NAME = "commit-block-header";
+const COMMITMENT_WORKER_URL = new URL("./block-commitment.js", import.meta.url);
+
+type PendingCommitmentWorkerRequest = {
+  readonly complete: (effect: Effect.Effect<WorkerOutput, WorkerError>) => void;
+  readonly clearTimeout: () => void;
+  readonly onMessage: (message: WorkerMessage) => void;
+};
+
+type CommitmentWorkerState = {
+  readonly worker: Worker;
+  pendingRequest: PendingCommitmentWorkerRequest | null;
+};
+
+let commitmentWorkerState: CommitmentWorkerState | null = null;
+const commitmentWorkerSemaphore = Effect.unsafeMakeSemaphore(1);
+
+const resetCommitmentWorkerState = (state?: CommitmentWorkerState | null) => {
+  const activeState = state ?? commitmentWorkerState;
+  if (activeState === null) {
+    return;
+  }
+  commitmentWorkerState = null;
+  if (activeState.pendingRequest !== null) {
+    activeState.worker.off("message", activeState.pendingRequest.onMessage);
+  }
+  activeState.pendingRequest?.clearTimeout();
+  activeState.pendingRequest = null;
+};
+
+const spawnCommitmentWorker = (): CommitmentWorkerState => {
+  Effect.runSync(Effect.logInfo("👷 Starting persistent block commitment worker..."));
+  const worker = new Worker(COMMITMENT_WORKER_URL);
+  const state: CommitmentWorkerState = {
+    worker,
+    pendingRequest: null,
+  };
+  worker.on("error", (error: Error) => {
+    const pendingRequest = state.pendingRequest;
+    resetCommitmentWorkerState(state);
+    pendingRequest?.complete(
+      Effect.fail(
+        new WorkerError({
+          worker: COMMITMENT_WORKER_NAME,
+          message: `Error in commitment worker: ${error}`,
+          cause: error,
+        }),
+      ),
+    );
+  });
+  worker.on("exit", (code: number) => {
+    const pendingRequest = state.pendingRequest;
+    resetCommitmentWorkerState(state);
+    pendingRequest?.complete(
+      Effect.fail(
+        new WorkerError({
+          worker: COMMITMENT_WORKER_NAME,
+          message:
+            code === 0
+              ? "Commitment worker exited while request was in-flight"
+              : `Commitment worker exited with code: ${code}`,
+          cause: `exit code ${code}`,
+        }),
+      ),
+    );
+  });
+  commitmentWorkerState = state;
+  return state;
+};
+
+const getOrSpawnCommitmentWorker = (): CommitmentWorkerState =>
+  commitmentWorkerState ?? spawnCommitmentWorker();
+
+const terminateCommitmentWorker = () => {
+  const state = commitmentWorkerState;
+  if (state === null) {
+    return;
+  }
+  resetCommitmentWorkerState(state);
+  void state.worker.terminate();
+};
+
+const runCommitmentWorkerCycle = (
+  timeoutMs: number,
+): Effect.Effect<WorkerOutput, WorkerError> =>
+  commitmentWorkerSemaphore.withPermits(1)(
+    Effect.async<WorkerOutput, WorkerError, never>((resume) => {
+      const state = getOrSpawnCommitmentWorker();
+
+      let isDone = false;
+      let onMessage: (message: WorkerMessage) => void = () => {};
+      const complete = (effect: Effect.Effect<WorkerOutput, WorkerError>) => {
+        if (isDone) {
+          return;
+        }
+        isDone = true;
+        state.worker.off("message", onMessage);
+        state.pendingRequest = null;
+        resume(effect);
+      };
+
+      const workerInputData: WorkerInput = {
+        type: CommitmentWorkerMessageType.RunCommitment,
+      };
+      const timeoutId = setTimeout(() => {
+        complete(
+          Effect.fail(
+            new WorkerError({
+              worker: COMMITMENT_WORKER_NAME,
+              message: `Commitment worker timed out after ${timeoutMs}ms`,
+              cause: "Timed out waiting for worker output",
+            }),
+          ),
+        );
+        terminateCommitmentWorker();
+      }, timeoutMs);
+      const clearTimeoutFn = () => clearTimeout(timeoutId);
+
+      onMessage = (message: WorkerMessage) => {
+        if (message.type !== CommitmentWorkerMessageType.RunCommitmentResult) {
+          return;
+        }
+        clearTimeoutFn();
+        if (message.output.type === "FailureOutput") {
+          complete(
+            Effect.fail(
+              new WorkerError({
+                worker: COMMITMENT_WORKER_NAME,
+                message: "Commitment worker failed",
+                cause: message.output.error,
+              }),
+            ),
+          );
+          return;
+        }
+        complete(Effect.succeed(message.output));
+      };
+
+      state.pendingRequest = {
+        complete,
+        clearTimeout: clearTimeoutFn,
+        onMessage,
+      };
+      state.worker.on("message", onMessage);
+      state.worker.postMessage(workerInputData);
+
+      return Effect.sync(() => {
+        const pendingRequest = state.pendingRequest;
+        if (pendingRequest?.onMessage === onMessage) {
+          pendingRequest.clearTimeout();
+          state.pendingRequest = null;
+          terminateCommitmentWorker();
+        }
+        state.worker.off("message", onMessage);
+      });
+    }),
+  );
+
+export const unsafeResetCommitmentWorkerForTesting = () => {
+  terminateCommitmentWorker();
+};
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_txs_per_block", {
   description:
@@ -102,83 +269,10 @@ export const buildAndSubmitCommitmentBlockAction = () =>
       COMMITMENT_WINDOW_WARN_TOTAL_BYTES,
     } = yield* NodeConfig;
 
-    const worker = Effect.async<WorkerOutput, WorkerError, never>((resume) => {
-      let isDone = false;
-      const complete = (effect: Effect.Effect<WorkerOutput, WorkerError>) => {
-        if (!isDone) {
-          isDone = true;
-          clearTimeout(timeoutId);
-          resume(effect);
-        }
-      };
-
-      Effect.runSync(Effect.logInfo(`👷 Starting block commitment worker...`));
-      const workerInputData: WorkerInput = { data: {} };
-      const worker = new Worker(
-        new URL("./block-commitment.js", import.meta.url),
-        { workerData: workerInputData },
-      );
-      const timeoutId = setTimeout(() => {
-        complete(
-          Effect.fail(
-            new WorkerError({
-              worker: "commit-block-header",
-              message: `Commitment worker timed out after ${COMMITMENT_WORKER_TIMEOUT_MS}ms`,
-              cause: "Timed out waiting for worker output",
-            }),
-          ),
-        );
-        worker.terminate();
-      }, COMMITMENT_WORKER_TIMEOUT_MS);
-      worker.on("message", (output: WorkerOutput) => {
-        if (output.type === "FailureOutput") {
-          complete(
-            Effect.fail(
-              new WorkerError({
-                worker: "commit-block-header",
-                message: `Commitment worker failed`,
-                cause: output.error,
-              }),
-            ),
-          );
-        } else {
-          complete(Effect.succeed(output));
-        }
-        worker.terminate();
-      });
-      worker.on("error", (e: Error) => {
-        complete(
-          Effect.fail(
-            new WorkerError({
-              worker: "commit-block-header",
-              message: `Error in commitment worker: ${e}`,
-              cause: e,
-            }),
-          ),
-        );
-        worker.terminate();
-      });
-      worker.on("exit", (code: number) => {
-        if (code !== 0) {
-          complete(
-            Effect.fail(
-              new WorkerError({
-                worker: "commit-block-header",
-                message: `Commitment worker exited with code: ${code}`,
-                cause: `exit code ${code}`,
-              }),
-            ),
-          );
-        }
-      });
-      return Effect.sync(() => {
-        clearTimeout(timeoutId);
-        worker.terminate();
-      });
-    });
-
     const workerStartMs = performance.now();
-    const workerOutput: WorkerOutput = yield* worker.pipe(
+    const workerOutput: WorkerOutput = yield* runCommitmentWorkerCycle(
+      COMMITMENT_WORKER_TIMEOUT_MS,
+    ).pipe(
       Effect.tapBoth({
         onFailure: (_) =>
           Effect.all([

@@ -1,3 +1,5 @@
+import { Writer, writeU64 } from "../../src/codec";
+
 import {
   encodeHeader,
   decodeHeader,
@@ -187,4 +189,42 @@ it("round trips a full block", () => {
   expect(decoded.header.utxos_root).toEqual(hash32B);
   expect(decoded.block_body.utxos.length).toBe(1);
   expect(decoded.block_body.transactions.length).toBe(0);
+});
+
+// ---------------------------------------------------------------------------
+// H-12: Bounds checking — BlockBody length fields must not exceed remaining bytes
+// ---------------------------------------------------------------------------
+
+it("decodeBlockBody rejects utxos count exceeding remaining bytes", () => {
+    // First 8 bytes of a BlockBody are utxosLen; claim 1,000,000 with no data
+    const w = new Writer();
+    writeU64(w, 1_000_000); // utxosLen = huge
+    expect(() => decodeBlockBody(w.toBytes())).toThrow(/UnboundedLength/);
+});
+
+it("decodeBlockBody rejects transactions count exceeding remaining bytes", () => {
+    // utxosLen=0, then txsLen=1,000,000 with no data
+    const w = new Writer();
+    writeU64(w, 0); // utxosLen = 0
+    writeU64(w, 1_000_000); // txsLen = huge
+    expect(() => decodeBlockBody(w.toBytes())).toThrow(/UnboundedLength/);
+});
+
+it("decodeBlockBody rejects deposits count exceeding remaining bytes", () => {
+    // utxosLen=0, txsLen=0, depositsLen=1,000,000 with no data
+    const w = new Writer();
+    writeU64(w, 0); // utxosLen = 0
+    writeU64(w, 0); // txsLen = 0
+    writeU64(w, 1_000_000); // depositsLen = huge
+    expect(() => decodeBlockBody(w.toBytes())).toThrow(/UnboundedLength/);
+});
+
+it("decodeBlockBody rejects withdrawals count exceeding remaining bytes", () => {
+    // utxosLen=0, txsLen=0, depositsLen=0, withdrawalsLen=1,000,000
+    const w = new Writer();
+    writeU64(w, 0); // utxosLen = 0
+    writeU64(w, 0); // txsLen = 0
+    writeU64(w, 0); // depositsLen = 0
+    writeU64(w, 1_000_000); // withdrawalsLen = huge
+    expect(() => decodeBlockBody(w.toBytes())).toThrow(/UnboundedLength/);
 });

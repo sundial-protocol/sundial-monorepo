@@ -1,9 +1,8 @@
 import { fromHex } from "@lucid-evolution/lucid";
 import { Chunk, Effect, Metric, pipe, Queue, Ref, Schedule } from "effect";
 import { MempoolDB } from "@/database/index.js";
-import { ProcessedTx, breakDownTx } from "@/utils.js";
+import { breakDownTx } from "@/utils.js";
 import { DatabaseError } from "@/database/utils/common.js";
-import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "@/services/database.js";
 
 const TX_QUEUE_PERSIST_CHUNK_SIZE = 100;
@@ -33,7 +32,7 @@ const txProcessingFailedCounter = Metric.counter(
   "tx_submissions_processing_failed",
   {
     description:
-      "A counter for tracking L2 transaction processing batch failures (CBOR deserialization or mempool insertion errors)",
+      "A counter for tracking L2 transaction processing failures: incremented once per malformed-CBOR tx rejected during deserialization, and once per batch on mempool insertion errors",
     bigint: true,
     incremental: true,
   },
@@ -51,11 +50,7 @@ export const txQueueProcessorAction = (
   txQueueDrainBatchSize: number,
   withMonitoring?: boolean,
   peakRef?: Ref.Ref<bigint>,
-): Effect.Effect<
-  void,
-  DatabaseError | SDK.CmlDeserializationError | SDK.DataCoercionError,
-  Database
-> =>
+): Effect.Effect<void, DatabaseError, Database> =>
   Effect.gen(function* () {
     const queueSize = yield* txQueue.size;
 
@@ -84,14 +79,24 @@ export const txQueueProcessorAction = (
         startIndex,
         startIndex + TX_QUEUE_PERSIST_CHUNK_SIZE,
       );
-      const processedTxs: ProcessedTx[] = yield* Effect.forEach(
+      const [malformedErrors, processedTxs] = yield* Effect.partition(
         txStringsPersistChunk,
-        (tx) =>
-          Effect.gen(function* () {
-            return yield* breakDownTx(fromHex(tx));
-          }),
+        (tx) => breakDownTx(fromHex(tx)),
       );
-      insertedTxCount += yield* MempoolDB.insertMultiple(processedTxs);
+      for (const error of malformedErrors) {
+        yield* Effect.logWarning(
+          `Dropping malformed tx; CBOR deserialization failed: ${error.message}`,
+        );
+      }
+      if (withMonitoring && malformedErrors.length > 0) {
+        yield* Metric.incrementBy(
+          txProcessingFailedCounter,
+          BigInt(malformedErrors.length),
+        );
+      }
+      if (processedTxs.length > 0) {
+        insertedTxCount += yield* MempoolDB.insertMultiple(processedTxs);
+      }
     }
 
     if (withMonitoring && insertedTxCount > 0) {

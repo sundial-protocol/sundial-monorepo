@@ -25,6 +25,7 @@ import {
   writeFixedBytes,
   readFixedBytes,
   alignmentBytes,
+  assertBoundedLength,
 } from "../codec";
 
 import {
@@ -149,11 +150,15 @@ function readTransactionWitnessSetDynamic(
 
   if (mask & (1 << 0)) {
     const len = readU64(r);
+    // Min per VKeyWitness: 32 (vkey aligned) + 64 (signature) = 96 bytes
+    assertBoundedLength(len, r, 96, "TransactionWitnessSet.vkey_witnesses");
     vkey_witnesses = [];
     for (let i = 0; i < len; i++) vkey_witnesses.push(readVKeyWitness(r));
   }
   if (mask & (1 << 1)) {
     const len = readU64(r);
+    // Min per native_script: 8 (blen field)
+    assertBoundedLength(len, r, 8, "TransactionWitnessSet.native_scripts");
     native_scripts = [];
     for (let i = 0; i < len; i++) {
       const blen = readU64(r);
@@ -166,6 +171,8 @@ function readTransactionWitnessSetDynamic(
   }
   if (mask & (1 << 3)) {
     const len = readU64(r);
+    // Min per plutus_v3_script: 8 (blen field)
+    assertBoundedLength(len, r, 8, "TransactionWitnessSet.plutus_v3_scripts");
     plutus_v3_scripts = [];
     for (let i = 0; i < len; i++) {
       const blen = readU64(r);
@@ -369,10 +376,14 @@ function writeTransactionBodyDynamic(w: Writer, b: TransactionBody): void {
 // fuel: fuel-types/src/canonical.rs:332 — Vec<T>::decode_static (reads lens, stores partials)
 function readTransactionBodyStatic(r: Reader): TransactionBodyPartial {
   const inputsLen = readU64(r);
+  // Min per input (OutputReference): 32 (txId aligned) + 8 (u16 padded) = 40 bytes
+  assertBoundedLength(inputsLen, r, 40, "TransactionBody.inputs");
   const inputs: OutputReference[] = [];
   for (let i = 0; i < inputsLen; i++) inputs.push(readOutputReferenceStatic(r));
 
   const outputsLen = readU64(r);
+  // Min per output static: 8 (addrLen) + 16 (value disc+coin) + 8 (datumPresent) + 8 (scriptRefPresent) = 40 bytes
+  assertBoundedLength(outputsLen, r, 40, "TransactionBody.outputs");
   const outPartials: TransactionOutputPartial[] = [];
   for (let i = 0; i < outputsLen; i++)
     outPartials.push(readTransactionOutputStatic(r));
@@ -406,6 +417,8 @@ function readTransactionBodyDynamic(
   let required_signers: Uint8Array[] | undefined;
   if (mask & (1 << 5)) {
     const len = readU64(r);
+    // Min per signer (Hash28 aligned): 32 bytes
+    assertBoundedLength(len, r, 32, "TransactionBody.required_signers");
     required_signers = [];
     for (let i = 0; i < len; i++) required_signers.push(readHash28Static(r));
   }
@@ -413,6 +426,8 @@ function readTransactionBodyDynamic(
   let reference_inputs: OutputReference[] | undefined;
   if (mask & (1 << 7)) {
     const len = readU64(r);
+    // Min per reference input (OutputReference): 40 bytes
+    assertBoundedLength(len, r, 40, "TransactionBody.reference_inputs");
     reference_inputs = [];
     for (let i = 0; i < len; i++)
       reference_inputs.push(readOutputReferenceStatic(r));
@@ -420,6 +435,8 @@ function readTransactionBodyDynamic(
   let required_observers: Uint8Array[] | undefined;
   if (mask & (1 << 8)) {
     const len = readU64(r);
+    // Min per observer (Hash28 aligned): 32 bytes
+    assertBoundedLength(len, r, 32, "TransactionBody.required_observers");
     required_observers = [];
     for (let i = 0; i < len; i++) required_observers.push(readHash28Static(r));
   }

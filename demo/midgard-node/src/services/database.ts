@@ -8,34 +8,55 @@ export class DatabaseInitializationError extends Data.TaggedError(
   "DatabaseInitializationError",
 )<SDK.GenericErrorFields> {}
 
-const createPgLayerEffect = Effect.gen(function* () {
-  const nodeConfig = yield* NodeConfig;
-  yield* Effect.logInfo("📚 Opening connection to db...");
-  const pgClientLayer = PgClient.layer({
-    host: nodeConfig.POSTGRES_HOST,
-    username: nodeConfig.POSTGRES_USER,
-    password: Redacted.make(nodeConfig.POSTGRES_PASSWORD),
-    database: nodeConfig.POSTGRES_DB,
-    maxConnections: 20,
-    idleTimeout: Duration.minutes(5),
-    connectTimeout: Duration.seconds(2),
-  });
-  return Layer.mapError(pgClientLayer, (e) => {
-    return new DatabaseInitializationError({
-      message: "Failed to initialize the database",
-      cause: e,
-    });
-  });
-}).pipe(Effect.orDie);
+const RPC_POOL_MAX_CONNECTIONS = 20;
+const SEQUENCER_POOL_MAX_CONNECTIONS = 5;
 
-const SqlClientLive: Layer.Layer<
+const createPgLayer = (
+  poolName: "rpc" | "sequencer",
+  maxConnections: number,
+): Layer.Layer<
   SqlClient.SqlClient,
   DatabaseInitializationError | ConfigError,
   NodeConfig
-> = Layer.unwrapEffect(createPgLayerEffect);
+> =>
+  Layer.unwrapEffect(
+    Effect.gen(function* () {
+      const nodeConfig = yield* NodeConfig;
+      yield* Effect.logInfo(
+        `📚 Opening PostgreSQL ${poolName} pool (maxConnections=${maxConnections})...`,
+      );
+      const pgClientLayer = PgClient.layer({
+        host: nodeConfig.POSTGRES_HOST,
+        username: nodeConfig.POSTGRES_USER,
+        password: Redacted.make(nodeConfig.POSTGRES_PASSWORD),
+        database: nodeConfig.POSTGRES_DB,
+        maxConnections,
+        idleTimeout: Duration.minutes(5),
+        connectTimeout: Duration.seconds(2),
+      });
+      return Layer.mapError(pgClientLayer, (e) => {
+        return new DatabaseInitializationError({
+          message: `Failed to initialize PostgreSQL ${poolName} pool`,
+          cause: e,
+        });
+      });
+    }).pipe(Effect.orDie),
+  );
+
+const RpcSqlClientLive = createPgLayer("rpc", RPC_POOL_MAX_CONNECTIONS);
+const SequencerSqlClientLive = createPgLayer(
+  "sequencer",
+  SEQUENCER_POOL_MAX_CONNECTIONS,
+);
 
 export const Database = {
-  layer: Layer.provide(SqlClientLive, NodeConfig.layer),
+  Rpc: {
+    layer: Layer.provide(RpcSqlClientLive, NodeConfig.layer),
+  },
+  Sequencer: {
+    layer: Layer.provide(SequencerSqlClientLive, NodeConfig.layer),
+  },
+  layer: Layer.provide(RpcSqlClientLive, NodeConfig.layer),
 };
 
 export type Database = SqlClient.SqlClient;
