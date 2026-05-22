@@ -54,6 +54,9 @@ describe("NodeConfig", () => {
         expect(config.PROM_METRICS_PORT).toBe(9464);
         expect(config.POSTGRES_USER).toBe("postgres");
         expect(config.POSTGRES_DB).toBe("midgard");
+        expect(config.TX_QUEUE_CAPACITY).toBe(10_000);
+        expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(250);
+        expect(config.TX_QUEUE_OFFER_TIMEOUT_MS).toBe(100);
       }).pipe(Effect.provide(configLayer)),
     { timeout: 10000 },
   );
@@ -130,6 +133,48 @@ describe("NodeConfig", () => {
         expect(config.GENESIS_UTXOS).toEqual([]);
         expect(config.L1_PROVIDER).toBe("Blockfrost");
       }).pipe(Effect.provide(mainnetLayer));
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "fails when TX_QUEUE_DRAIN_BATCH_SIZE is not positive",
+    () => {
+      const invalidProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["TX_QUEUE_DRAIN_BATCH_SIZE", "0"],
+        ]),
+      );
+      const invalidLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(invalidProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(invalidLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain("TX_QUEUE_DRAIN_BATCH_SIZE");
+        }
+      });
     },
     { timeout: 10000 },
   );

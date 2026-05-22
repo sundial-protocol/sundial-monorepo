@@ -56,6 +56,8 @@ const PASSING_TX_INVOKER: TxGeneratorInvoker = {
   invoke: async () => ({ passed: true, summary: 'ok' }),
 };
 
+const NOOP_PREFLIGHT_DELAY = async (): Promise<void> => undefined;
+
 // Returns null so the balance check observes (non-blocking) without making real network calls.
 const NULL_BALANCE_FETCHER: NodeBalanceFetcher = async () => null;
 
@@ -64,6 +66,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-pass-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory(),
         txGeneratorInvoker: PASSING_TX_INVOKER,
@@ -80,6 +83,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-prom-down-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           'up{job="midgard_nodes"}': [{ value: [1, '0'] }],
@@ -98,6 +102,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-gauge-missing-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           // tx_queue_size is always-present — its absence means the node is not running fibers
@@ -116,6 +121,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-mempool-backlog-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           mempool_tx_count: [{ value: [1, '42'] }],
@@ -136,6 +142,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-cold-start-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           // Counter metrics are absent on a fresh node — should not block
@@ -170,6 +177,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-submit-delta-one-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           commit_block_count_total: [{ value: [1, '319'] }],
@@ -197,6 +205,7 @@ describe('runExecutionReadinessPreflight', () => {
     let submitCalls = 0;
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: () => ({
           queryInstant: async (query: string) => {
@@ -237,6 +246,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-commit-cold-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           commit_block_count_total: [{ value: [1, '0'] }],
@@ -260,6 +270,7 @@ describe('runExecutionReadinessPreflight', () => {
 
     const result = await runExecutionReadinessPreflight(makeScenario(filePath), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory(),
         txGeneratorInvoker: PASSING_TX_INVOKER,
@@ -275,6 +286,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-txgen-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory(),
         txGeneratorInvoker: {
@@ -297,6 +309,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-wallet-unavailable-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory(),
         txGeneratorInvoker: PASSING_TX_INVOKER,
@@ -316,6 +329,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-wallet-sufficient-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           l1_commitment_fee_lovelace_last: [{ value: [1, '300000'] }],
@@ -337,6 +351,7 @@ describe('runExecutionReadinessPreflight', () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-wallet-insufficient-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
           l1_commitment_fee_lovelace_last: [{ value: [1, '300000'] }],

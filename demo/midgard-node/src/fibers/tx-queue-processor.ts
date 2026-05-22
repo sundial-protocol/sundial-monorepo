@@ -6,6 +6,8 @@ import { DatabaseError } from "@/database/utils/common.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { Database } from "@/services/database.js";
 
+const TX_QUEUE_PERSIST_CHUNK_SIZE = 100;
+
 const txQueueSizeGauge = Metric.gauge("tx_queue_size", {
   description: "Tx queue size sampled before each drain cycle",
   bigint: true,
@@ -46,6 +48,7 @@ export const txQueueProcessorMetrics = {
 
 export const txQueueProcessorAction = (
   txQueue: Queue.Dequeue<string>,
+  txQueueDrainBatchSize: number,
   withMonitoring?: boolean,
   peakRef?: Ref.Ref<bigint>,
 ): Effect.Effect<
@@ -66,14 +69,31 @@ export const txQueueProcessorAction = (
       }
     }
 
-    const txStringsChunk: Chunk.Chunk<string> = yield* Queue.takeAll(txQueue);
-    const txStrings = Chunk.toReadonlyArray(txStringsChunk);
-    const processedTxs: ProcessedTx[] = yield* Effect.forEach(txStrings, (tx) =>
-      Effect.gen(function* () {
-        return yield* breakDownTx(fromHex(tx));
-      }),
+    const txStringsChunk: Chunk.Chunk<string> = yield* txQueue.takeUpTo(
+      txQueueDrainBatchSize,
     );
-    const insertedTxCount = yield* MempoolDB.insertMultiple(processedTxs);
+    const txStrings = Chunk.toReadonlyArray(txStringsChunk);
+    let insertedTxCount = 0;
+
+    for (
+      let startIndex = 0;
+      startIndex < txStrings.length;
+      startIndex += TX_QUEUE_PERSIST_CHUNK_SIZE
+    ) {
+      const txStringsPersistChunk = txStrings.slice(
+        startIndex,
+        startIndex + TX_QUEUE_PERSIST_CHUNK_SIZE,
+      );
+      const processedTxs: ProcessedTx[] = yield* Effect.forEach(
+        txStringsPersistChunk,
+        (tx) =>
+          Effect.gen(function* () {
+            return yield* breakDownTx(fromHex(tx));
+          }),
+      );
+      insertedTxCount += yield* MempoolDB.insertMultiple(processedTxs);
+    }
+
     if (withMonitoring && insertedTxCount > 0) {
       yield* Metric.incrementBy(
         txMempoolAcceptedCounter,
@@ -91,6 +111,7 @@ export const txQueueProcessorAction = (
 export const txQueueProcessorFiber = (
   schedule: Schedule.Schedule<number>,
   txQueue: Queue.Dequeue<string>,
+  txQueueDrainBatchSize: number,
   withMonitoring?: boolean,
 ): Effect.Effect<void, never, Database> =>
   pipe(
@@ -107,6 +128,7 @@ export const txQueueProcessorFiber = (
       yield* Effect.repeat(
         txQueueProcessorAction(
           txQueue,
+          txQueueDrainBatchSize,
           withMonitoring,
           withMonitoring ? peakRef : undefined,
         ).pipe(Effect.catchAllCause(Effect.logWarning)),

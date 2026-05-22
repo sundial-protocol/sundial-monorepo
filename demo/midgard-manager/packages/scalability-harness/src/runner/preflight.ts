@@ -82,6 +82,7 @@ export interface TxGeneratorInvoker {
 }
 
 export type NodeBalanceFetcher = (nodeEndpoint: string) => Promise<bigint | null>;
+export type PreflightDelay = (ms: number) => Promise<void>;
 
 export interface PreflightDependencies {
   nodeProbeFetcher?: NodeProbeFetcher;
@@ -94,6 +95,7 @@ export interface PreflightDependencies {
   prometheusClientFactory?: (endpoint: string, fetcher?: PrometheusFetcher) => PrometheusClientLike;
   txGeneratorInvoker?: TxGeneratorInvoker;
   nodeBalanceFetcher?: NodeBalanceFetcher;
+  delay?: PreflightDelay;
 }
 
 export interface RunExecutionReadinessPreflightOptions {
@@ -112,6 +114,15 @@ function fail(
   actionableReason: string
 ): PreflightCheckResult {
   return { name, passed: false, summary, actionableReason };
+}
+
+const defaultDelay: PreflightDelay = (ms) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+function getPreflightDelay(dependencies?: PreflightDependencies): PreflightDelay {
+  return dependencies?.delay ?? defaultDelay;
 }
 
 // Non-blocking observation: recorded in check results but does not block the run.
@@ -320,11 +331,6 @@ async function checkNoUnsubmittedBlockBacklog(
       };
     };
 
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, ms);
-      });
-
     const initial = await queryBacklog();
     if (!initial.ok) {
       return fail('no_unsubmitted_block_backlog', initial.reason, initial.actionableReason);
@@ -338,8 +344,9 @@ async function checkNoUnsubmittedBlockBacklog(
     }
 
     let last = initial;
+    const delay = getPreflightDelay(dependencies);
     for (let attempt = 1; attempt <= SUBMIT_BACKLOG_RECHECK_ATTEMPTS; attempt += 1) {
-      await wait(SUBMIT_BACKLOG_RECHECK_DELAY_MS);
+      await delay(SUBMIT_BACKLOG_RECHECK_DELAY_MS);
       const probe = await queryBacklog();
       if (!probe.ok) {
         return fail('no_unsubmitted_block_backlog', probe.reason, probe.actionableReason);
@@ -432,11 +439,6 @@ async function checkNoPreexistingMempoolBacklog(
       return { ok: true, mempoolSize };
     };
 
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, ms);
-      });
-
     const initial = await queryMempoolSize();
     if (!initial.ok) {
       return fail('no_preexisting_mempool_backlog', initial.reason, initial.actionableReason);
@@ -450,8 +452,9 @@ async function checkNoPreexistingMempoolBacklog(
     }
 
     let last = initial;
+    const delay = getPreflightDelay(dependencies);
     for (let attempt = 1; attempt <= MEMPOOL_BACKLOG_RECHECK_ATTEMPTS; attempt += 1) {
-      await wait(MEMPOOL_BACKLOG_RECHECK_DELAY_MS);
+      await delay(MEMPOOL_BACKLOG_RECHECK_DELAY_MS);
       const probe = await queryMempoolSize();
       if (!probe.ok) {
         return fail('no_preexisting_mempool_backlog', probe.reason, probe.actionableReason);
@@ -523,11 +526,6 @@ async function checkCommitPipelineReady(
       return { ok: true, commitValue, submitValue };
     };
 
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => {
-        setTimeout(resolve, ms);
-      });
-
     const initial = await queryPipelineCounters();
     if (!initial.ok) {
       return fail('commit_pipeline_ready', initial.reason, initial.actionableReason);
@@ -541,8 +539,9 @@ async function checkCommitPipelineReady(
     }
 
     let last = initial;
+    const delay = getPreflightDelay(dependencies);
     for (let attempt = 1; attempt <= COMMIT_PIPELINE_RECHECK_ATTEMPTS; attempt += 1) {
-      await wait(COMMIT_PIPELINE_RECHECK_DELAY_MS);
+      await delay(COMMIT_PIPELINE_RECHECK_DELAY_MS);
       const probe = await queryPipelineCounters();
       if (!probe.ok) {
         return fail('commit_pipeline_ready', probe.reason, probe.actionableReason);
