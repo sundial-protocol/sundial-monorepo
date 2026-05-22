@@ -27,12 +27,8 @@ export enum Columns {
 export type EntryWithEffects = Tx.EntryWithTimeStamp & {
   [Columns.TX_SIZE_BYTES]: number | null;
   [Columns.SPENT_OUTREFS]: readonly (Buffer | Uint8Array | string)[] | null;
-  [Columns.PRODUCED_OUTREFS]:
-    | readonly (Buffer | Uint8Array | string)[]
-    | null;
-  [Columns.PRODUCED_OUTPUTS]:
-    | readonly (Buffer | Uint8Array | string)[]
-    | null;
+  [Columns.PRODUCED_OUTREFS]: readonly (Buffer | Uint8Array | string)[] | null;
+  [Columns.PRODUCED_OUTPUTS]: readonly (Buffer | Uint8Array | string)[] | null;
   [Columns.PRODUCED_ADDRESSES]: readonly string[] | null;
 };
 
@@ -96,15 +92,11 @@ const hasPersistedEffects = (
 
 const decodeBytea = (value: Buffer | Uint8Array | string): Buffer =>
   typeof value === "string"
-    ? Buffer.from(
-        value.startsWith("\\x") ? value.slice(2) : value,
-        "hex",
-      )
+    ? Buffer.from(value.startsWith("\\x") ? value.slice(2) : value, "hex")
     : Buffer.from(value);
 
-const normalizeTxIdToBuffer = (
-  txId: Buffer | Uint8Array | string,
-): Buffer => decodeBytea(txId);
+const normalizeTxIdToBuffer = (txId: Buffer | Uint8Array | string): Buffer =>
+  decodeBytea(txId);
 
 const toProcessedTxFromPersistedEffects = (
   entry: EntryWithEffects & {
@@ -118,7 +110,9 @@ const toProcessedTxFromPersistedEffects = (
     (outRef, index) => ({
       [Ledger.Columns.TX_ID]: normalizeTxIdToBuffer(entry[Tx.Columns.TX_ID]),
       [Ledger.Columns.OUTREF]: decodeBytea(outRef),
-      [Ledger.Columns.OUTPUT]: decodeBytea(entry[Columns.PRODUCED_OUTPUTS][index]),
+      [Ledger.Columns.OUTPUT]: decodeBytea(
+        entry[Columns.PRODUCED_OUTPUTS][index],
+      ),
       [Ledger.Columns.ADDRESS]: entry[Columns.PRODUCED_ADDRESSES][index],
     }),
   );

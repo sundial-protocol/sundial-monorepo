@@ -269,7 +269,9 @@ const getWorkerContextPromise = (): Promise<CommitmentWorkerContext> => {
 
 const executeCommitment = () =>
   Effect.gen(function* () {
-    const workerContext = yield* Effect.promise(() => getWorkerContextPromise());
+    const workerContext = yield* Effect.promise(() =>
+      getWorkerContextPromise(),
+    );
     return yield* wrapper(workerContext.ledgerTrie).pipe(
       Effect.catchAllCause((cause) =>
         Effect.succeed({

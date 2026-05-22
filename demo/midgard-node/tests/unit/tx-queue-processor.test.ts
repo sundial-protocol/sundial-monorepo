@@ -147,7 +147,12 @@ describe("txQueueProcessorAction — tx_submissions_processing_failed counter", 
             4,
             withMonitoring,
           ).pipe(Effect.catchAllCause(() => Effect.void))
-        : txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, withMonitoring);
+        : txQueueProcessorAction(
+            queue,
+            TEST_DRAIN_BATCH_SIZE,
+            4,
+            withMonitoring,
+          );
 
       const delta = yield* metricDelta(
         readProcessingFailedCounter,
@@ -343,17 +348,19 @@ describe("txQueueProcessorAction — per-tx isolation (H-07)", () => {
       }).pipe(Effect.provide(sqlHarness.layer)),
   );
 
-  it.effect("does not call insertMultiple when all txs in a batch are malformed", () =>
-    Effect.gen(function* () {
-      breakDownTxFn.mockReturnValue(Effect.fail(new Error("bad cbor")));
+  it.effect(
+    "does not call insertMultiple when all txs in a batch are malformed",
+    () =>
+      Effect.gen(function* () {
+        breakDownTxFn.mockReturnValue(Effect.fail(new Error("bad cbor")));
 
-      const queue = yield* Queue.bounded<string>(10);
-      yield* enqueue(queue, ["badtx1", "badtx2"]);
+        const queue = yield* Queue.bounded<string>(10);
+        yield* enqueue(queue, ["badtx1", "badtx2"]);
 
-      yield* txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, true);
+        yield* txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, true);
 
-      expect(mempoolInsertFn).not.toHaveBeenCalled();
-    }).pipe(Effect.provide(sqlHarness.layer)),
+        expect(mempoolInsertFn).not.toHaveBeenCalled();
+      }).pipe(Effect.provide(sqlHarness.layer)),
   );
 });
 

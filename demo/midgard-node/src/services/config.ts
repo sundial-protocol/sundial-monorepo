@@ -127,9 +127,9 @@ const makeConfig = Effect.gen(function* () {
   const txQueueOfferTimeoutMs = yield* Config.integer(
     "TX_QUEUE_OFFER_TIMEOUT_MS",
   ).pipe(Config.withDefault(100));
-  const txParseConcurrency = yield* Config.integer(
-    "TX_PARSE_CONCURRENCY",
-  ).pipe(Config.withDefault(4));
+  const txParseConcurrency = yield* Config.integer("TX_PARSE_CONCURRENCY").pipe(
+    Config.withDefault(4),
+  );
   const waitBetweenUserEventFetches = yield* Config.integer(
     "WAIT_BETWEEN_USER_EVENT_FETCHES",
   ).pipe(Config.withDefault(10000));

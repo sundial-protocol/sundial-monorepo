@@ -436,7 +436,8 @@ export const applyDepositsToLedger = (
 
       yield* Effect.forEach(depositsChunk, (depositEntry) =>
         Effect.gen(function* () {
-          const ledgerEntry = yield* DepositsDB.entryToLedgerEntry(depositEntry);
+          const ledgerEntry =
+            yield* DepositsDB.entryToLedgerEntry(depositEntry);
           depositLedgerEntries.push(ledgerEntry);
           sizeOfDeposits += depositEntry[UserEvents.Columns.INFO].length;
           ledgerBatchOps.push({
@@ -453,7 +454,10 @@ export const applyDepositsToLedger = (
       );
 
       yield* Effect.all(
-        [ledgerTrie.batch(ledgerBatchOps), depositsTrie.batch(depositsBatchOps)],
+        [
+          ledgerTrie.batch(ledgerBatchOps),
+          depositsTrie.batch(depositsBatchOps),
+        ],
         { concurrency: "unbounded" },
       );
 
