@@ -1,4 +1,4 @@
-import { Writer, Reader } from "../../src/codec";
+import { Writer, Reader, writeU64 } from "../../src/codec";
 import {
   writeVKeyWitness,
   readVKeyWitness,
@@ -152,4 +152,29 @@ it("Compact multiasset output with hashes round trips", () => {
     }
     expect(decoded.datum_hash).toEqual(hash32B);
     expect(decoded.script_ref_hash).toEqual(hash32C);
+});
+
+// ---------------------------------------------------------------------------
+// H-12: Bounds checking — length fields must not exceed remaining bytes
+// ---------------------------------------------------------------------------
+
+it("readMintStatic rejects outer count exceeding remaining bytes", () => {
+    // 8 bytes claiming 1,000,000 outer policy entries — no actual entry data
+    const w = new Writer();
+    writeU64(w, 1_000_000);
+    const r = new Reader(w.toBytes());
+    expect(() => readMintStatic(r)).toThrow(/UnboundedLength/);
+});
+
+it("readMintStatic rejects inner asset count exceeding remaining bytes", () => {
+    // outerLen=1 passes the outer check (40 bytes available for 1 entry),
+    // but innerLen=1,000,000 fires the inner check with 0 bytes remaining
+    const w = new Writer();
+    writeU64(w, 1); // outerLen = 1
+    w.write(new Uint8Array(28)); // pid raw bytes
+    w.writeZeros(4); // alignment padding → 32 bytes total for pid
+    writeU64(w, 1_000_000); // innerLen = huge
+    // Total: 8 + 32 + 8 = 48 bytes; after reading outerLen+pid+innerLen, 0 remain
+    const r = new Reader(w.toBytes());
+    expect(() => readMintStatic(r)).toThrow(/UnboundedLength/);
 });

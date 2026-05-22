@@ -96,13 +96,15 @@ describe("txQueueProcessorAction — tx_submissions_mempool_accepted counter", (
 describe("txQueueProcessorAction — tx_submissions_processing_failed counter", () => {
   it.effect.each([
     {
+      // breakDownTx typed failure is caught by Effect.partition; action
+      // succeeds, counter incremented once per malformed tx.
       name: "increments when breakDownTx fails",
       configure: () =>
         breakDownTxFn.mockReturnValue(
-          Effect.die(new Error("deserialization error")),
+          Effect.fail(new Error("deserialization error")),
         ),
       withMonitoring: true,
-      catchFailure: true,
+      catchFailure: false,
       expectedDelta: 1n,
     },
     {
@@ -119,10 +121,10 @@ describe("txQueueProcessorAction — tx_submissions_processing_failed counter", 
       name: "does not increment when monitoring is disabled",
       configure: () =>
         breakDownTxFn.mockReturnValue(
-          Effect.die(new Error("deserialization error")),
+          Effect.fail(new Error("deserialization error")),
         ),
       withMonitoring: false,
-      catchFailure: true,
+      catchFailure: false,
       expectedDelta: 0n,
     },
     {
@@ -281,6 +283,69 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
         expect(sizeAfterSecond.value).toBe(0n);
         expect(peakAfterSecond.value).toBe(2n);
       }).pipe(Effect.provide(sqlHarness.layer)),
+  );
+});
+
+describe("txQueueProcessorAction — per-tx isolation (H-07)", () => {
+  it.effect(
+    "inserts valid txs and skips only the malformed one in the same batch",
+    () =>
+      Effect.gen(function* () {
+        breakDownTxFn
+          .mockReturnValueOnce(Effect.fail(new Error("bad cbor")))
+          .mockReturnValueOnce(Effect.succeed(fakeProcessedTx))
+          .mockReturnValueOnce(Effect.succeed(fakeProcessedTx));
+
+        const queue = yield* Queue.bounded<string>(10);
+        yield* enqueue(queue, ["badtx", "goodtx1", "goodtx2"]);
+
+        const acceptedDelta = yield* metricDelta(
+          readMempoolAcceptedCounter,
+          txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, true),
+          (state) => state.count,
+        );
+
+        expect(mempoolInsertFn).toHaveBeenCalledOnce();
+        expect(mempoolInsertFn).toHaveBeenCalledWith([
+          fakeProcessedTx,
+          fakeProcessedTx,
+        ]);
+        expect(acceptedDelta).toBe(2n);
+      }).pipe(Effect.provide(sqlHarness.layer)),
+  );
+
+  it.effect(
+    "increments processing-failed counter only for the malformed tx, not the valid ones",
+    () =>
+      Effect.gen(function* () {
+        breakDownTxFn
+          .mockReturnValueOnce(Effect.fail(new Error("bad cbor")))
+          .mockReturnValueOnce(Effect.succeed(fakeProcessedTx));
+
+        const queue = yield* Queue.bounded<string>(10);
+        yield* enqueue(queue, ["badtx", "goodtx"]);
+
+        const failedDelta = yield* metricDelta(
+          readProcessingFailedCounter,
+          txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, true),
+          (state) => state.count,
+        );
+
+        expect(failedDelta).toBe(1n);
+      }).pipe(Effect.provide(sqlHarness.layer)),
+  );
+
+  it.effect("does not call insertMultiple when all txs in a batch are malformed", () =>
+    Effect.gen(function* () {
+      breakDownTxFn.mockReturnValue(Effect.fail(new Error("bad cbor")));
+
+      const queue = yield* Queue.bounded<string>(10);
+      yield* enqueue(queue, ["badtx1", "badtx2"]);
+
+      yield* txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, true);
+
+      expect(mempoolInsertFn).not.toHaveBeenCalled();
+    }).pipe(Effect.provide(sqlHarness.layer)),
   );
 });
 

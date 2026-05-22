@@ -701,9 +701,11 @@ export const runNode = (withMonitoring?: boolean) =>
 
     const txQueue = yield* Queue.bounded<string>(nodeConfig.TX_QUEUE_CAPACITY);
 
-    yield* DBInitialization.program.pipe(Effect.provide(Database.layer));
+    yield* DBInitialization.program.pipe(
+      Effect.provide(Database.Sequencer.layer),
+    );
 
-    yield* Genesis.program;
+    yield* Genesis.program.pipe(Effect.provide(Database.Sequencer.layer));
 
     const appThread = Layer.launch(
       Layer.provide(
@@ -715,9 +717,8 @@ export const runNode = (withMonitoring?: boolean) =>
     const mkSchedule = (millisBetweenRuns: number) =>
       Schedule.spaced(Duration.millis(millisBetweenRuns));
 
-    const program = Effect.all(
+    const sequencerProgram = Effect.all(
       [
-        appThread,
         blockCommitmentFiber(
           mkSchedule(nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENTS),
         ),
@@ -728,6 +729,15 @@ export const runNode = (withMonitoring?: boolean) =>
           mkSchedule(nodeConfig.WAIT_BETWEEN_USER_EVENT_FETCHES),
         ),
         mergeFiber(mkSchedule(nodeConfig.WAIT_BETWEEN_MERGE_TXS)),
+      ],
+      {
+        concurrency: "unbounded",
+      },
+    ).pipe(Effect.provide(Database.Sequencer.layer));
+
+    const rpcProgram = Effect.all(
+      [
+        appThread,
         withMonitoring ? monitorMempoolFiber(mkSchedule(1000)) : Effect.void,
         txQueueProcessorFiber(
           mkSchedule(500),
@@ -739,7 +749,11 @@ export const runNode = (withMonitoring?: boolean) =>
       {
         concurrency: "unbounded",
       },
-    );
+    ).pipe(Effect.provide(Database.Rpc.layer));
+
+    const program = Effect.all([sequencerProgram, rpcProgram], {
+      concurrency: "unbounded",
+    });
 
     if (withMonitoring) {
       const prometheusExporter = new PrometheusExporter(

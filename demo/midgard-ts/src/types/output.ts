@@ -19,6 +19,7 @@ import {
   readVarBytesLen,
   readVarBytesDynamic,
   alignmentBytes,
+  assertBoundedLength,
 } from "../codec";
 
 import {
@@ -123,10 +124,14 @@ function writeMultiassetDynamic(w: Writer, ma: Multiasset): void {
 // fuel: fuel-types/src/canonical.rs:332 — Vec<T>::decode_static (reads len, allocates capacity)
 function readMultiassetStatic(r: Reader): MultiassetPartialEntry[] {
   const outerLen = readU64(r);
+  // Min per outer entry: 32 (pid aligned) + 8 (innerLen) = 40 bytes
+  assertBoundedLength(outerLen, r, 40, "Multiasset.policies");
   const partial: MultiassetPartialEntry[] = [];
   for (let i = 0; i < outerLen; i++) {
     const pid = readHash28Static(r);
     const innerLen = readU64(r);
+    // Min per inner entry: 8 (assetName len) + 8 (amount) = 16 bytes
+    assertBoundedLength(innerLen, r, 16, "Multiasset.assets");
     const assets: Array<{ nameLen: number; amount: bigint }> = [];
     for (let j = 0; j < innerLen; j++) {
       const nameLen = readAssetNameLen(r);
@@ -203,10 +208,14 @@ export function writeMintDynamic(w: Writer, mint: Mint): void {
 // fuel: fuel-types/src/canonical.rs:332 — Vec<T>::decode_static (reads len, allocates capacity)
 export function readMintStatic(r: Reader): MintPartialEntry[] {
   const outerLen = readU64(r);
+  // Min per outer entry: 32 (pid aligned) + 8 (innerLen) = 40 bytes
+  assertBoundedLength(outerLen, r, 40, "Mint.policies");
   const partial: MintPartialEntry[] = [];
   for (let i = 0; i < outerLen; i++) {
     const pid = readHash28Static(r);
     const innerLen = readU64(r);
+    // Min per inner entry: 8 (assetName len) + 8 (amount) = 16 bytes
+    assertBoundedLength(innerLen, r, 16, "Mint.assets");
     const assets: Array<{ nameLen: number; amount: bigint }> = [];
     for (let j = 0; j < innerLen; j++) {
       const nameLen = readAssetNameLen(r);
@@ -254,6 +263,8 @@ function writeMultiassetCompactStatic(w: Writer, mac: MultiassetCompact): void {
 // fuel: fuel-types/src/canonical.rs:332 — Vec<T>::decode_static
 function readMultiassetCompactStatic(r: Reader): MultiassetCompact {
   const len = readU64(r);
+  // Min per entry: 32 (pid aligned) + 32 (hash32) = 64 bytes
+  assertBoundedLength(len, r, 64, "MultiassetCompact");
   const result: MultiassetCompact = [];
   for (let i = 0; i < len; i++) {
     const pid = readHash28Static(r);

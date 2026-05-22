@@ -1,3 +1,5 @@
+import { Writer, writeU64 } from "../../src/codec";
+
 import {
   encodeTransactionWitnessSetCompact,
   decodeTransactionWitnessSetCompact,
@@ -210,4 +212,59 @@ it("Compact transaction round trips valid flag", () => {
     expect(
       decodeTransactionCompact(encodeTransactionCompact(compactFalse)).is_valid,
     ).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// H-12: Bounds checking — length fields must not exceed remaining bytes
+// ---------------------------------------------------------------------------
+
+it("decodeTransactionBody rejects inputs count exceeding remaining bytes", () => {
+    // First 8 bytes claim 1,000,000 inputs — no actual input data follows
+    const w = new Writer();
+    writeU64(w, 1_000_000);
+    expect(() => decodeTransactionBody(w.toBytes())).toThrow(/UnboundedLength/);
+});
+
+it("decodeTransactionBody rejects outputs count exceeding remaining bytes", () => {
+    // inputsLen=0 is valid, then outputsLen=1,000,000 with no output data
+    const w = new Writer();
+    writeU64(w, 0); // inputsLen = 0
+    writeU64(w, 1_000_000); // outputsLen = huge
+    expect(() => decodeTransactionBody(w.toBytes())).toThrow(/UnboundedLength/);
+});
+
+it("decodeTransactionBody rejects required_signers count exceeding remaining bytes", () => {
+    // Encode a minimal valid static body with bit 5 (required_signers) set in mask,
+    // then in the dynamic section claim 1,000,000 signers with no actual data
+    const body: TransactionBody = {
+      ...minimalTransactionBody,
+      required_signers: [hash28A], // forces bit 5 in opts_mask
+    };
+    const encoded = encodeTransactionBody(body);
+    // Tamper: locate the required_signers length in the dynamic section.
+    // The static section ends just before the dynamic data.  The dynamic section
+    // starts with the output dynamic bytes, then optional fields in bit order.
+    // For a body with only required_signers set (bit 5), the dynamic section is:
+    //   output dynamics (addrLen-aligned address bytes for the one output)
+    //   required_signers count (8 bytes) followed by signers
+    // We build a truncated buffer: valid static + output dynamic + huge count (8 bytes).
+    const validBody = encodeTransactionBody(minimalTransactionBody);
+    // Build static section with bit 5 set but no signers data in dynamic
+    const w = new Writer();
+    writeU64(w, 1); // inputsLen
+    w.write(encoded.slice(8, 48)); // copy the one input's bytes (40 bytes)
+    writeU64(w, 1); // outputsLen
+    // We can't easily tamper inline without reimplementing the encoder.
+    // Instead, use a simpler approach: valid static section + 0 inputs/outputs + huge signers
+    const w2 = new Writer();
+    writeU64(w2, 0); // inputsLen = 0
+    writeU64(w2, 0); // outputsLen = 0
+    // fee as BigU64
+    const feeBuf = new Uint8Array(8);
+    new DataView(feeBuf.buffer).setUint32(4, 170_000, false);
+    w2.write(feeBuf);
+    writeU64(w2, 1 << 5); // opts_mask: bit 5 = required_signers
+    // Dynamic section: required_signers count = 1,000,000
+    writeU64(w2, 1_000_000);
+    expect(() => decodeTransactionBody(w2.toBytes())).toThrow(/UnboundedLength/);
 });
