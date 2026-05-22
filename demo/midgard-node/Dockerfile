@@ -11,8 +11,8 @@ ENV CI=true
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
   pnpm install --frozen-lockfile
 RUN pnpm --filter @al-ft/midgard-sdk run build
-RUN pnpm --filter midgard-node run build
-RUN pnpm --filter midgard-node deploy --prod --legacy /deploy
+RUN pnpm --filter sundial-node run build
+RUN pnpm --filter sundial-node deploy --prod --legacy /deploy
 
 FROM base AS final
 RUN mkdir -p /app && chown node:node /app

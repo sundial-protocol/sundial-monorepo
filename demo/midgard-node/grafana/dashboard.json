@@ -109,7 +109,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "tx_queue_size{instance=\"midgard-node:9464\"}",
+          "expr": "tx_queue_size{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -212,7 +212,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "tx_submissions_enqueued_total{instance=\"midgard-node:9464\"}",
+          "expr": "tx_submissions_enqueued_total{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -311,7 +311,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by(instance) (rate(tx_submissions_enqueued_total{instance=\"midgard-node:9464\"}[$__rate_interval]))",
+          "expr": "sum by(instance) (rate(tx_submissions_enqueued_total{instance=\"node:9464\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -411,7 +411,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "mempool_tx_count{instance=\"midgard-node:9464\"}",
+          "expr": "mempool_tx_count{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -515,7 +515,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(commit_block_tx_count_total{instance=\"midgard-node:9464\"}[$__rate_interval])",
+          "expr": "rate(commit_block_tx_count_total{instance=\"node:9464\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "committed tx/s",
@@ -613,7 +613,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(commit_block_count_total{instance=\"midgard-node:9464\"}[$__rate_interval]))",
+          "expr": "sum by (instance) (rate(commit_block_count_total{instance=\"node:9464\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -713,7 +713,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_tx_count_total{instance=\"midgard-node:9464\"}",
+          "expr": "commit_block_tx_count_total{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -813,7 +813,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_count_total{instance=\"midgard-node:9464\"}",
+          "expr": "commit_block_count_total{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -912,7 +912,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_txs_per_block{instance=\"midgard-node:9464\"}",
+          "expr": "commit_block_txs_per_block{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1015,7 +1015,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "merge_block_count_total{instance=\"midgard-node:9464\"} ",
+          "expr": "merge_block_count_total{instance=\"node:9464\"} ",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -1114,7 +1114,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(merge_block_count_total{instance=\"midgard-node:9464\"}[$__rate_interval]))",
+          "expr": "sum by (instance) (rate(merge_block_count_total{instance=\"node:9464\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1209,7 +1209,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(submit_block_count_total{instance=\"midgard-node:9464\"}[$__rate_interval]))",
+          "expr": "sum by (instance) (rate(submit_block_count_total{instance=\"node:9464\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1305,7 +1305,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "submit_block_count_total{instance=\"midgard-node:9464\"}",
+          "expr": "submit_block_count_total{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1404,7 +1404,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_events_size_bytes{instance=\"midgard-node:9464\"}",
+          "expr": "commit_block_events_size_bytes{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1503,7 +1503,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_l1_user_events{instance=\"midgard-node:9464\"}",
+          "expr": "commit_block_l1_user_events{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1606,7 +1606,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(commit_block_duration_seconds_sum{instance=\"midgard-node:9464\"}[$__rate_interval]) / rate(commit_block_duration_seconds_count{instance=\"midgard-node:9464\"}[$__rate_interval])",
+          "expr": "rate(commit_block_duration_seconds_sum{instance=\"node:9464\"}[$__rate_interval]) / rate(commit_block_duration_seconds_count{instance=\"node:9464\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "avg duration",
@@ -1710,7 +1710,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_commitment_failures_total{instance=\"midgard-node:9464\"}",
+          "expr": "commit_block_commitment_failures_total{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1814,7 +1814,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "tx_submissions_rejected_total{instance=\"midgard-node:9464\"}",
+          "expr": "tx_submissions_rejected_total{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1918,7 +1918,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "merge_block_failures_total{instance=\"midgard-node:9464\"}",
+          "expr": "merge_block_failures_total{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
