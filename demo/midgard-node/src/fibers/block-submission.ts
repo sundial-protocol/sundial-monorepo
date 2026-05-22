@@ -212,19 +212,16 @@ const processTxOrdersProgram = (txOrders: readonly UserEvents.Entry[]) =>
     return processedTxOrders;
   });
 
-const processTxRequestsProgram = (txRequests: readonly Tx.Entry[]) =>
+const processTxRequestsProgram = (
+  txRequests: readonly MempoolDB.EntryWithEffects[],
+) =>
   Effect.gen(function* () {
-    const mempoolTxHashes: Buffer[] = [];
-    const processedTxRequests: ProcessedTx[] = [];
-    yield* Effect.forEach(txRequests, (txRequest) =>
-      breakDownTx(txRequest[Tx.Columns.TX]).pipe(
-        Effect.andThen((processedTx) =>
-          Effect.sync(() => {
-            mempoolTxHashes.push(txRequest[Tx.Columns.TX_ID]);
-            processedTxRequests.push(processedTx);
-          }),
-        ),
-      ),
+    const processedTxRequests = yield* Effect.forEach(
+      txRequests,
+      (entry) => MempoolDB.toProcessedTx(entry),
+    );
+    const mempoolTxHashes = processedTxRequests.map(
+      (processedTx) => processedTx.txId,
     );
     return {
       mempoolTxHashes,
@@ -272,7 +269,7 @@ const processEventsForLedgerApplication = (
   endDate: Date,
 ): Effect.Effect<
   {
-    txRequests: readonly Tx.Entry[];
+    txRequests: readonly MempoolDB.EntryWithEffects[];
     allProducedLedgerEntries: Ledger.Entry[];
     allSpentOutRefs: Buffer[];
     mempoolTxHashes: Buffer[];
@@ -417,7 +414,9 @@ export const submitEarliestBlock = Effect.gen(function* () {
           txRequests.length,
           "Transfer of MempoolDB entries to ImmutableDB and BlocksTxsDB",
           (startIndex, endIndex) => {
-            const txsBatch = txRequests.slice(startIndex, endIndex);
+            const txsBatch = txRequests
+              .slice(startIndex, endIndex)
+              .map((entry) => MempoolDB.toTxEntry(entry));
             const txHashesBatch = mempoolTxHashes.slice(startIndex, endIndex);
             return Effect.gen(function* () {
               yield* ImmutableDB.insertTxsOrIgnore(txsBatch);

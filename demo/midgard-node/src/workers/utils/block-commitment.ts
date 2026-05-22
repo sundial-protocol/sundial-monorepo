@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Metric } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { LucidEvolution, fromHex } from "@lucid-evolution/lucid";
 import * as ETH_UTILS from "@ethereumjs/util";
@@ -24,7 +24,7 @@ import {
   NodeConfig,
 } from "@/services/index.js";
 import { TxSignError } from "@/transactions/utils.js";
-import { breakDownTx } from "@/utils.js";
+import { breakDownTx, ProcessedTx } from "@/utils.js";
 
 export type WorkerInput = {
   data: {};
@@ -48,6 +48,65 @@ export type WorkerOutput =
   | SuccessfulCommitmentOutput
   | FailureOutput
   | SeededOutput;
+
+const COMMITMENT_MPT_CHUNK_SIZE = 1000;
+
+const commitmentMptChunksAppliedCounter = Metric.counter(
+  "commitment_mpt_chunks_applied_total",
+  {
+    description:
+      "Total number of bounded MPT operation chunks applied during block commitment",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const commitmentMptChunkEntriesCounter = Metric.counter(
+  "commitment_mpt_chunk_entries_total",
+  {
+    description:
+      "Total number of entries processed across bounded MPT chunks during block commitment",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const commitmentMptChunkOpsCounter = Metric.counter(
+  "commitment_mpt_chunk_ops_total",
+  {
+    description:
+      "Total number of trie batch operations applied across bounded MPT chunks during block commitment",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const getTotalChunks = (totalEntries: number): number =>
+  Math.ceil(totalEntries / COMMITMENT_MPT_CHUNK_SIZE);
+
+const logMptChunkProgress = (
+  stage: string,
+  chunkIndex: number,
+  chunkCount: number,
+  chunkEntriesCount: number,
+  processedEntriesCount: number,
+  totalEntriesCount: number,
+  chunkOpsCount: number,
+) =>
+  Effect.gen(function* () {
+    yield* Metric.increment(commitmentMptChunksAppliedCounter);
+    yield* Metric.incrementBy(
+      commitmentMptChunkEntriesCounter,
+      BigInt(chunkEntriesCount),
+    );
+    yield* Metric.incrementBy(
+      commitmentMptChunkOpsCounter,
+      BigInt(chunkOpsCount),
+    );
+    yield* Effect.logInfo(
+      `commitment-mpt chunk stage=${stage} chunk=${chunkIndex + 1}/${chunkCount} entries=${chunkEntriesCount} processed=${processedEntriesCount}/${totalEntriesCount} ops=${chunkOpsCount}`,
+    );
+  });
 
 const txEntryToBatchDBOps = (
   txCbor: Buffer,
@@ -99,13 +158,22 @@ export const applyWithdrawalsToLedger = (
 
     const withdrawalsTrie: MidgardMpt = yield* MidgardMpt.create("withdrawals");
     const withdrawnOutRefs: Buffer[] = [];
-    const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
-    const withdrawalsBatchOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfWithdrawals = 0;
+    const chunkCount = getTotalChunks(withdrawalEntries.length);
+    let processedEntriesCount = 0;
 
-    yield* Effect.forEach(
-      withdrawalEntries,
-      (withdrawalEntry: UserEvents.Entry) =>
+    for (
+      let startIndex = 0;
+      startIndex < withdrawalEntries.length;
+      startIndex += COMMITMENT_MPT_CHUNK_SIZE
+    ) {
+      const endIndex = startIndex + COMMITMENT_MPT_CHUNK_SIZE;
+      const chunkIndex = Math.floor(startIndex / COMMITMENT_MPT_CHUNK_SIZE);
+      const withdrawalsChunk = withdrawalEntries.slice(startIndex, endIndex);
+      const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
+      const withdrawalsBatchOps: ETH_UTILS.BatchDBOp[] = [];
+
+      yield* Effect.forEach(withdrawalsChunk, (withdrawalEntry) =>
         Effect.gen(function* () {
           const withdrawalInfo = withdrawalEntry[UserEvents.Columns.INFO];
           const spentOutRef =
@@ -122,21 +190,31 @@ export const applyWithdrawalsToLedger = (
           sizeOfWithdrawals += withdrawalInfo.length;
           withdrawnOutRefs.push(spentOutRef);
         }),
-    );
+      );
 
-    yield* Effect.all(
-      [
-        ledgerTrie.batch(ledgerBatchOps),
-        withdrawalsTrie.batch(withdrawalsBatchOps),
-      ],
-      { concurrency: "unbounded" },
-    );
+      yield* Effect.all(
+        [
+          ledgerTrie.batch(ledgerBatchOps),
+          withdrawalsTrie.batch(withdrawalsBatchOps),
+        ],
+        { concurrency: "unbounded" },
+      );
+      processedEntriesCount += withdrawalsChunk.length;
+      yield* logMptChunkProgress(
+        "withdrawals",
+        chunkIndex,
+        chunkCount,
+        withdrawalsChunk.length,
+        processedEntriesCount,
+        withdrawalEntries.length,
+        ledgerBatchOps.length + withdrawalsBatchOps.length,
+      );
+    }
 
     const withdrawalsRoot = yield* withdrawalsTrie.getRootHex();
 
     return {
       withdrawnOutRefs,
-      ledgerBatchOps,
       withdrawalsRoot,
       sizeOfWithdrawals,
     };
@@ -147,7 +225,7 @@ export const applyTxOrdersToLedger = (
   txOrders: readonly UserEvents.Entry[],
 ): Effect.Effect<
   {
-    txOrdersHashes: Buffer[];
+    txOrdersCount: number;
     spentByTxOrders: Buffer[];
     producedByTxOrders: Ledger.Entry[];
     txsTrie: MidgardMpt;
@@ -162,37 +240,50 @@ export const applyTxOrdersToLedger = (
     );
 
     let sizeOfTxOrders = 0;
-    const txOrdersHashes: Buffer[] = [];
-    const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
     const spentByTxOrders: Buffer[] = [];
     const producedByTxOrders: Ledger.Entry[] = [];
-    const txOrdersLedgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
     const txsTrie: MidgardMpt = yield* MidgardMpt.create("txs");
+    const chunkCount = getTotalChunks(txOrders.length);
+    let processedEntriesCount = 0;
 
-    yield* Effect.forEach(txOrders, (txOrder: UserEvents.Entry) =>
-      Effect.gen(function* () {
-        const txHash = txOrder[UserEvents.Columns.ID];
-        const txCbor = txOrder[UserEvents.Columns.INFO];
-        const { delOps, putOps, spent, produced } =
-          yield* txEntryToBatchDBOps(txCbor);
-        sizeOfTxOrders += txCbor.length;
-        txOrdersHashes.push(txHash);
-        ledgerBatchOps.push(...delOps);
-        ledgerBatchOps.push(...putOps);
-        spentByTxOrders.push(...spent);
-        producedByTxOrders.push(...produced);
-        txOrdersLedgerBatchOps.push({
-          type: "put",
-          key: txHash,
-          value: txCbor,
-        });
-      }),
-    );
+    for (
+      let startIndex = 0;
+      startIndex < txOrders.length;
+      startIndex += COMMITMENT_MPT_CHUNK_SIZE
+    ) {
+      const endIndex = startIndex + COMMITMENT_MPT_CHUNK_SIZE;
+      const chunkIndex = Math.floor(startIndex / COMMITMENT_MPT_CHUNK_SIZE);
+      const txOrdersChunk = txOrders.slice(startIndex, endIndex);
+      const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
 
-    yield* ledgerTrie.batch(ledgerBatchOps);
+      yield* Effect.forEach(txOrdersChunk, (txOrder) =>
+        Effect.gen(function* () {
+          const txCbor = txOrder[UserEvents.Columns.INFO];
+          const { delOps, putOps, spent, produced } =
+            yield* txEntryToBatchDBOps(txCbor);
+          sizeOfTxOrders += txCbor.length;
+          ledgerBatchOps.push(...delOps);
+          ledgerBatchOps.push(...putOps);
+          spentByTxOrders.push(...spent);
+          producedByTxOrders.push(...produced);
+        }),
+      );
+
+      yield* ledgerTrie.batch(ledgerBatchOps);
+      processedEntriesCount += txOrdersChunk.length;
+      yield* logMptChunkProgress(
+        "tx_orders",
+        chunkIndex,
+        chunkCount,
+        txOrdersChunk.length,
+        processedEntriesCount,
+        txOrders.length,
+        ledgerBatchOps.length,
+      );
+    }
 
     return {
-      txOrdersHashes,
+      txOrdersCount: txOrders.length,
       spentByTxOrders,
       producedByTxOrders,
       txsTrie,
@@ -203,49 +294,90 @@ export const applyTxOrdersToLedger = (
 export const applyTxRequestsToLedger = (
   ledgerTrie: MidgardMpt,
   txsTrie: MidgardMpt,
-  mempoolTxs: readonly Tx.Entry[],
+  mempoolTxs: readonly (ProcessedTx | Tx.Entry)[],
 ): Effect.Effect<
   {
-    txRequestsHashes: Buffer[];
+    txRequestsCount: number;
     txsRoot: string;
     sizeOfTxRequests: number;
   },
   SDK.CmlDeserializationError | MptError
 > =>
   Effect.gen(function* () {
-    const mempoolTxHashes: Buffer[] = [];
-    const mempoolBatchOps: ETH_UTILS.BatchDBOp[] = [];
-    const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
+    let txRequestsCount = 0;
     let sizeOfTxRequests = 0;
+    const chunkCount = getTotalChunks(mempoolTxs.length);
+    let processedEntriesCount = 0;
+
     yield* Effect.logInfo(
       `🔹 Going through mempool and processing (${mempoolTxs.length}) transactions...`,
     );
-    yield* Effect.forEach(mempoolTxs, (entry: Tx.Entry) =>
-      Effect.gen(function* () {
-        const txHash = entry[Tx.Columns.TX_ID];
-        const txCbor = entry[Tx.Columns.TX];
-        const { delOps, putOps } = yield* txEntryToBatchDBOps(txCbor);
-        mempoolTxHashes.push(txHash);
-        sizeOfTxRequests += txCbor.length;
-        mempoolBatchOps.push({
-          type: "put",
-          key: txHash,
-          value: txCbor,
-        });
-        ledgerBatchOps.push(...delOps);
-        ledgerBatchOps.push(...putOps);
-      }),
-    );
 
-    yield* Effect.all(
-      [txsTrie.batch(mempoolBatchOps), ledgerTrie.batch(ledgerBatchOps)],
-      { concurrency: "unbounded" },
-    );
+    for (
+      let startIndex = 0;
+      startIndex < mempoolTxs.length;
+      startIndex += COMMITMENT_MPT_CHUNK_SIZE
+    ) {
+      const endIndex = startIndex + COMMITMENT_MPT_CHUNK_SIZE;
+      const chunkIndex = Math.floor(startIndex / COMMITMENT_MPT_CHUNK_SIZE);
+      const mempoolTxChunk = mempoolTxs.slice(startIndex, endIndex);
+      const mempoolBatchOps: ETH_UTILS.BatchDBOp[] = [];
+      const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
+
+      yield* Effect.forEach(mempoolTxChunk, (entry) =>
+        Effect.gen(function* () {
+          const processedTx =
+            "spent" in entry && "produced" in entry
+              ? entry
+              : yield* breakDownTx(entry[Tx.Columns.TX]);
+          const txHash = processedTx.txId;
+          const txCbor = processedTx.txCbor;
+          const delOps: ETH_UTILS.BatchDBOp[] = processedTx.spent.map(
+            (outRef) => ({
+              type: "del",
+              key: outRef,
+            }),
+          );
+          const putOps: ETH_UTILS.BatchDBOp[] = processedTx.produced.map(
+            (ledgerEntry) => ({
+              type: "put",
+              key: ledgerEntry[Ledger.Columns.OUTREF],
+              value: ledgerEntry[Ledger.Columns.OUTPUT],
+            }),
+          );
+          txRequestsCount += 1;
+          sizeOfTxRequests += txCbor.length;
+          mempoolBatchOps.push({
+            type: "put",
+            key: txHash,
+            value: txCbor,
+          });
+          ledgerBatchOps.push(...delOps);
+          ledgerBatchOps.push(...putOps);
+        }),
+      );
+
+      yield* Effect.all(
+        [txsTrie.batch(mempoolBatchOps), ledgerTrie.batch(ledgerBatchOps)],
+        { concurrency: "unbounded" },
+      );
+
+      processedEntriesCount += mempoolTxChunk.length;
+      yield* logMptChunkProgress(
+        "tx_requests",
+        chunkIndex,
+        chunkCount,
+        mempoolTxChunk.length,
+        processedEntriesCount,
+        mempoolTxs.length,
+        mempoolBatchOps.length + ledgerBatchOps.length,
+      );
+    }
 
     const txsRoot = yield* txsTrie.getRootHex();
 
     return {
-      txRequestsHashes: mempoolTxHashes,
+      txRequestsCount,
       txsRoot,
       sizeOfTxRequests,
     };
@@ -269,31 +401,55 @@ export const applyDepositsToLedger = (
     );
     const depositLedgerEntries: Ledger.Entry[] = [];
     const depositsTrie: MidgardMpt = yield* MidgardMpt.create("deposits");
-    const depositsBatchOps: ETH_UTILS.BatchDBOp[] = [];
-    const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
     let sizeOfDeposits = 0;
-    yield* Effect.forEach(deposits, (depositEntry) =>
-      Effect.gen(function* () {
-        const ledgerEntry = yield* DepositsDB.entryToLedgerEntry(depositEntry);
-        depositLedgerEntries.push(ledgerEntry);
-        sizeOfDeposits += depositEntry[UserEvents.Columns.INFO].length;
-        ledgerBatchOps.push({
-          type: "put",
-          key: ledgerEntry[Ledger.Columns.OUTREF],
-          value: ledgerEntry[Ledger.Columns.OUTPUT],
-        });
-        depositsBatchOps.push({
-          type: "put",
-          key: depositEntry[UserEvents.Columns.ID],
-          value: depositEntry[UserEvents.Columns.INFO],
-        });
-      }),
-    );
+    const chunkCount = getTotalChunks(deposits.length);
+    let processedEntriesCount = 0;
 
-    yield* Effect.all(
-      [ledgerTrie.batch(ledgerBatchOps), depositsTrie.batch(depositsBatchOps)],
-      { concurrency: "unbounded" },
-    );
+    for (
+      let startIndex = 0;
+      startIndex < deposits.length;
+      startIndex += COMMITMENT_MPT_CHUNK_SIZE
+    ) {
+      const endIndex = startIndex + COMMITMENT_MPT_CHUNK_SIZE;
+      const chunkIndex = Math.floor(startIndex / COMMITMENT_MPT_CHUNK_SIZE);
+      const depositsChunk = deposits.slice(startIndex, endIndex);
+      const depositsBatchOps: ETH_UTILS.BatchDBOp[] = [];
+      const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
+
+      yield* Effect.forEach(depositsChunk, (depositEntry) =>
+        Effect.gen(function* () {
+          const ledgerEntry = yield* DepositsDB.entryToLedgerEntry(depositEntry);
+          depositLedgerEntries.push(ledgerEntry);
+          sizeOfDeposits += depositEntry[UserEvents.Columns.INFO].length;
+          ledgerBatchOps.push({
+            type: "put",
+            key: ledgerEntry[Ledger.Columns.OUTREF],
+            value: ledgerEntry[Ledger.Columns.OUTPUT],
+          });
+          depositsBatchOps.push({
+            type: "put",
+            key: depositEntry[UserEvents.Columns.ID],
+            value: depositEntry[UserEvents.Columns.INFO],
+          });
+        }),
+      );
+
+      yield* Effect.all(
+        [ledgerTrie.batch(ledgerBatchOps), depositsTrie.batch(depositsBatchOps)],
+        { concurrency: "unbounded" },
+      );
+
+      processedEntriesCount += depositsChunk.length;
+      yield* logMptChunkProgress(
+        "deposits",
+        chunkIndex,
+        chunkCount,
+        depositsChunk.length,
+        processedEntriesCount,
+        deposits.length,
+        ledgerBatchOps.length + depositsBatchOps.length,
+      );
+    }
 
     const depositsRoot = yield* depositsTrie.getRootHex();
 

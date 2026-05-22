@@ -163,10 +163,7 @@ it.effect("applyTxOrdersToLedger applies tx orders to the ledger trie", () =>
       txOrders,
     );
 
-    expect(result.txOrdersHashes).toEqual([
-      txOrders[0][UserEvents.Columns.ID],
-      txOrders[1][UserEvents.Columns.ID],
-    ]);
+    expect(result.txOrdersCount).toBe(2);
     expect(result.spentByTxOrders).toEqual([spentA, spentB]);
     expect(result.producedByTxOrders).toEqual([producedA, producedB]);
     expect(result.sizeOfTxOrders).toBe(5);
@@ -180,39 +177,38 @@ it.effect("applyTxRequestsToLedger applies mempool tx requests", () =>
     const ledgerTrie = makeFakeTrie("ledger-root");
     const txsTrie = makeFakeTrie("txs-root");
 
-    breakDownTxMock
-      .mockReturnValueOnce(
-        Effect.succeed({
-          spent: [Buffer.from([0xc1])],
-          produced: [
-            {
-              ...makeLedgerEntry(0xc2, {
-                outref: Buffer.from([0xc3]),
-                output: Buffer.from([0xc4]),
-                address: COMMON_ADDRESSES.produced,
-              }),
-            },
-          ],
-        }),
-      )
-      .mockReturnValueOnce(
-        Effect.succeed({
-          spent: [Buffer.from([0xd1])],
-          produced: [
-            {
-              ...makeLedgerEntry(0xd2, {
-                outref: Buffer.from([0xd3]),
-                output: Buffer.from([0xd4]),
-                address: COMMON_ADDRESSES.produced,
-              }),
-            },
-          ],
-        }),
-      );
+    const txA = makeTxEntryNoTimeStamp(0x31, { tx: Buffer.from([0x41, 0x42]) });
+    const txB = makeTxEntryNoTimeStamp(0x32, {
+      tx: Buffer.from([0x43, 0x44, 0x45]),
+    });
 
-    const mempoolTxs: Tx.Entry[] = [
-      makeTxEntryNoTimeStamp(0x31, { tx: Buffer.from([0x41, 0x42]) }),
-      makeTxEntryNoTimeStamp(0x32, { tx: Buffer.from([0x43, 0x44, 0x45]) }),
+    const mempoolTxs = [
+      {
+        txId: txA[Tx.Columns.TX_ID],
+        txCbor: txA[Tx.Columns.TX],
+        spent: [Buffer.from([0xc1])],
+        produced: [
+          makeLedgerEntry(0xc2, {
+            tx_id: txA[Tx.Columns.TX_ID],
+            outref: Buffer.from([0xc3]),
+            output: Buffer.from([0xc4]),
+            address: COMMON_ADDRESSES.produced,
+          }),
+        ],
+      },
+      {
+        txId: txB[Tx.Columns.TX_ID],
+        txCbor: txB[Tx.Columns.TX],
+        spent: [Buffer.from([0xd1])],
+        produced: [
+          makeLedgerEntry(0xd2, {
+            tx_id: txB[Tx.Columns.TX_ID],
+            outref: Buffer.from([0xd3]),
+            output: Buffer.from([0xd4]),
+            address: COMMON_ADDRESSES.produced,
+          }),
+        ],
+      },
     ];
 
     const result = yield* applyTxRequestsToLedger(
@@ -221,10 +217,7 @@ it.effect("applyTxRequestsToLedger applies mempool tx requests", () =>
       mempoolTxs,
     );
 
-    expect(result.txRequestsHashes).toEqual([
-      mempoolTxs[0][Tx.Columns.TX_ID],
-      mempoolTxs[1][Tx.Columns.TX_ID],
-    ]);
+    expect(result.txRequestsCount).toBe(2);
     expect(result.txsRoot).toBe("txs-root");
     expect(result.sizeOfTxRequests).toBe(5);
     expect(txsTrie.batch).toHaveBeenCalledOnce();

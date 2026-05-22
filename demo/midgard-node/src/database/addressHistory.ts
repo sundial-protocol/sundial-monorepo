@@ -24,6 +24,12 @@ import { NodeConfig } from "@/services/config.js";
 
 const tableName = "address_history";
 const MAX_SPENT_OUTREFS_LOOKUP_BATCH_SIZE = 1000;
+type ByteaValue = Buffer | Uint8Array | string;
+
+const byteaValueToHex = (value: ByteaValue): string =>
+  typeof value === "string"
+    ? (value.startsWith("\\x") ? value.slice(2) : value).toLowerCase()
+    : Buffer.from(value).toString("hex");
 
 export enum Columns {
   EVENT_ID = "event_id",
@@ -161,7 +167,7 @@ export const aggregateProcessedTxs = (
     );
     const inputLedgerEntriesByOutRef = new Map<string, Ledger.Entry>(
       inputLedgerEntries.map((entry) => [
-        entry[Ledger.Columns.OUTREF].toString("hex"),
+        byteaValueToHex(entry[Ledger.Columns.OUTREF] as ByteaValue),
         entry,
       ]),
     );
@@ -174,7 +180,7 @@ export const aggregateProcessedTxs = (
       });
 
       for (const spentOutRef of processedTx.spent) {
-        const spentOutRefHex = spentOutRef.toString("hex");
+        const spentOutRefHex = byteaValueToHex(spentOutRef);
         const ledgerEntry = inputLedgerEntriesByOutRef.get(spentOutRefHex);
 
         if (ledgerEntry === undefined) {
