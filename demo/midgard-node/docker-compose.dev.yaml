@@ -1,5 +1,8 @@
+name: sundial
+
 services:
-  midgard-node:
+  node:
+    image: sundial-node
     build:
       context: .
       additional_contexts:

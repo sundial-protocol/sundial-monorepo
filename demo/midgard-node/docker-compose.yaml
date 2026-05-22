@@ -1,3 +1,5 @@
+name: sundial
+
 x-logging:
   &default-logging
   driver: "json-file"
@@ -7,7 +9,8 @@ x-logging:
     tag: "{{.Name}}"
 
 services:
-  midgard-node:
+  node:
+    image: sundial-node
     build:
       context: ..
       dockerfile: ./midgard-node/Dockerfile
@@ -73,7 +76,6 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.5.1
-    container_name: prometheus
     ports:
       - "9090:9090"
     user: root
@@ -91,7 +93,6 @@ services:
       midgard_net:
 
   loki:
-    container_name: loki
     image: grafana/loki:3.6.4
     ports:
       - "3100:3100"
@@ -105,7 +106,6 @@ services:
 
   promtail:
     image: grafana/promtail:3.6.4
-    container_name: promtail
     volumes:
       - /var/log:/var/log
       - ./promtail-config.yaml:/etc/promtail/config.yaml
@@ -133,7 +133,6 @@ services:
       midgard_net:
 
   grafana:
-    container_name: grafana
     image: grafana/grafana:12.3.2
     ports:
       - "3001:3000"
@@ -184,8 +183,7 @@ services:
     logging: *default-logging
     networks:
       midgard_net:
-
-  midgard-node-tests:
+  node-tests:
     build:
       context: .
       additional_contexts:

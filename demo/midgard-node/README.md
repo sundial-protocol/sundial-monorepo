@@ -59,11 +59,10 @@ quite easily.
 
 Midgard node should be running on port `PORT` (from your `.env`).
 
-You can view logs of `midgard-node` with `docker`:
+You can view logs of the `node` service with `docker`:
 
 ```sh
-# Change container's name as needed:
-docker logs -f midgard-node-midgard-node-1
+docker compose logs -f node
 ```
 
 If you made any changes to `midgard-node` and had an image running, restart it
@@ -120,7 +119,7 @@ pnpm listen
 ### With Docker
 
 ```sh
-docker compose run --rm midgard-node-tests
+docker compose run --rm node-tests
 ```
 
 ### Without Docker

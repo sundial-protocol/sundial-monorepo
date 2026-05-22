@@ -28,14 +28,14 @@ scrape_configs:
     static_configs:
       - targets: ["0.0.0.0:9090"]
 
-  - job_name: "midgard_nodes"
+  - job_name: "sundial_nodes"
 
     # metrics_path defaults to '/metrics'
     # scheme defaults to 'http'.
 
     static_configs:
       - targets: 
-          - "midgard-node:9464"
+          - "node:9464"
 
   - job_name: "cadvisor"
     static_configs:

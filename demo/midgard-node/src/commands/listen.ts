@@ -44,7 +44,6 @@ import {
   HttpServerRequest,
   HttpServerResponse,
 } from "@effect/platform";
-import { ParsedSearchParams } from "@effect/platform/HttpServerRequest";
 import { createServer } from "node:http";
 import { constants as Http2Constants } from "node:http2";
 import { NodeHttpServer } from "@effect/platform-node";
@@ -171,7 +170,7 @@ const lookupTxCbor = (txHashBytes: Buffer, txHashParam: string) =>
   );
 
 const getTxHandler = Effect.gen(function* () {
-  const params = yield* ParsedSearchParams;
+  const params = yield* HttpServerRequest.ParsedSearchParams;
   const txHashParam = params["tx_hash"];
   if (
     typeof txHashParam !== "string" ||
@@ -208,7 +207,7 @@ const getTxHandler = Effect.gen(function* () {
 );
 
 const getUtxosHandler = Effect.gen(function* () {
-  const params = yield* ParsedSearchParams;
+  const params = yield* HttpServerRequest.ParsedSearchParams;
   const addr = params["address"];
 
   if (typeof addr !== "string") {
@@ -260,7 +259,7 @@ const getUtxosHandler = Effect.gen(function* () {
 );
 
 const getBlockHandler = Effect.gen(function* () {
-  const params = yield* ParsedSearchParams;
+  const params = yield* HttpServerRequest.ParsedSearchParams;
   const hdrHash = params["header_hash"];
   yield* Effect.logInfo(
     `GET /block - Request received for header_hash: ${hdrHash}`,
@@ -402,7 +401,7 @@ const getResetHandler = Effect.gen(function* () {
 );
 
 const getTxsOfAddressHandler = Effect.gen(function* () {
-  const params = yield* ParsedSearchParams;
+  const params = yield* HttpServerRequest.ParsedSearchParams;
   const addr = params["address"];
 
   if (typeof addr !== "string") {
@@ -598,6 +597,8 @@ const postSubmitHandler = (
       failWith500("POST", "submit", e, "▫️ L2 transaction failed"),
     ),
   );
+
+export const postSubmitHandlerForTesting = postSubmitHandler;
 
 const getCommitmentWalletBalanceHandler = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
