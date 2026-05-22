@@ -561,9 +561,9 @@ const postSubmitHandler = (
 ) =>
   Effect.gen(function* () {
     // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
-    const params = yield* ParsedSearchParams;
-    const txStringParam = params["tx_cbor"];
-    if (typeof txStringParam !== "string" || !isHexString(txStringParam)) {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const txString = yield* request.text;
+    if (!isHexString(txString)) {
       yield* Effect.logInfo(`▫️ Invalid CBOR provided`);
       yield* Metric.increment(txRejectedCounter);
       return yield* HttpServerResponse.json(
@@ -571,7 +571,6 @@ const postSubmitHandler = (
         { status: 400 },
       );
     } else {
-      const txString = txStringParam;
       const offered = yield* Effect.raceFirst(
         txQueue.offer(txString),
         Effect.sleep(Duration.millis(txQueueOfferTimeoutMs)).pipe(

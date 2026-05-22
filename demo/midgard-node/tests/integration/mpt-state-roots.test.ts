@@ -4,6 +4,7 @@ import { Effect, Layer } from "effect";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
+import { SqlClient } from "@effect/sql";
 
 import { makeTestSqlLayer } from "./harness/pglite-sql-layer.js";
 import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
@@ -213,6 +214,51 @@ it.effect("withTrieTransaction commits SQL and trie changes together", () => {
     expect(dbRecord).not.toBeUndefined();
   }).pipe(Effect.provide(layers));
 });
+
+it.effect(
+  "persists committed checkpointed ledger trie writes across reopen after SQL success",
+  () => {
+    const tmpLedgerPath = path.join(os.tmpdir(), `nit045-ledger-${randomUUID()}`);
+    const layers = Layer.mergeAll(
+      makeTestSqlLayer(),
+      makeTestNodeConfigLayer({ ledgerMptPath: tmpLedgerPath }),
+    );
+
+    return Effect.gen(function* () {
+      yield* DBInitialization.program;
+
+      const ledgerTrie = yield* MidgardMpt.create("nit045-ledger", tmpLedgerPath);
+      const initialRoot = yield* ledgerTrie.getRootHex();
+
+      yield* ledgerTrie.checkpoint();
+      const sql = yield* SqlClient.SqlClient;
+      yield* sql.withTransaction(
+        Effect.gen(function* () {
+          yield* ImmutableDB.insertTx({ tx_id: txIdA, tx: txCborA });
+          yield* ledgerTrie.batch([{ type: "put", key: keyBuf, value: valueBuf }]);
+        }),
+      );
+      yield* ledgerTrie.commit();
+
+      const committedRoot = yield* ledgerTrie.getRootHex();
+      expect(committedRoot).not.toBe(initialRoot);
+      const dbRecord = yield* ImmutableDB.retrieveTxCborByHash(txIdA);
+      expect(dbRecord).not.toBeUndefined();
+
+      yield* ledgerTrie.close();
+
+      const reopenedLedgerTrie = yield* MidgardMpt.create(
+        "nit045-ledger",
+        tmpLedgerPath,
+      );
+      const reopenedRoot = yield* reopenedLedgerTrie.getRootHex();
+      expect(reopenedRoot).toBe(committedRoot);
+
+      yield* reopenedLedgerTrie.close();
+      yield* deleteMpt(tmpLedgerPath, "nit045-ledger");
+    }).pipe(Effect.provide(layers));
+  },
+);
 
 it.effect("Applying deposits updates ledger and deposit roots", () => {
   const stubAlwaysSucceeds = Layer.succeed(AlwaysSucceedsContract, null as any);
