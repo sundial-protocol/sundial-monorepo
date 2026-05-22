@@ -193,6 +193,7 @@ export const aggregateProcessedTxs = (
             table: referenceLedgerTableName,
             txIdHex: processedTx.txId.toString("hex"),
           });
+          continue;
         }
 
         addressHistoryEntries.push({

@@ -27,6 +27,7 @@ type NodeConfigDep = {
   TX_QUEUE_CAPACITY: number;
   TX_QUEUE_DRAIN_BATCH_SIZE: number;
   TX_QUEUE_OFFER_TIMEOUT_MS: number;
+  TX_PARSE_CONCURRENCY: number;
   PROM_METRICS_PORT: number;
   OLTP_EXPORTER_URL: string;
   POSTGRES_USER: string;
@@ -126,6 +127,9 @@ const makeConfig = Effect.gen(function* () {
   const txQueueOfferTimeoutMs = yield* Config.integer(
     "TX_QUEUE_OFFER_TIMEOUT_MS",
   ).pipe(Config.withDefault(100));
+  const txParseConcurrency = yield* Config.integer(
+    "TX_PARSE_CONCURRENCY",
+  ).pipe(Config.withDefault(4));
   const waitBetweenUserEventFetches = yield* Config.integer(
     "WAIT_BETWEEN_USER_EVENT_FETCHES",
   ).pipe(Config.withDefault(10000));
@@ -237,6 +241,7 @@ const makeConfig = Effect.gen(function* () {
     "TX_QUEUE_OFFER_TIMEOUT_MS",
     txQueueOfferTimeoutMs,
   );
+  yield* assertPositiveInteger("TX_PARSE_CONCURRENCY", txParseConcurrency);
   yield* assertPositiveInteger(
     "COMMITMENT_WINDOW_WARN_TX_REQUESTS",
     commitmentWindowWarnTxRequests,
@@ -274,6 +279,7 @@ const makeConfig = Effect.gen(function* () {
     TX_QUEUE_CAPACITY: txQueueCapacity,
     TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,
     TX_QUEUE_OFFER_TIMEOUT_MS: txQueueOfferTimeoutMs,
+    TX_PARSE_CONCURRENCY: txParseConcurrency,
     PROM_METRICS_PORT: promMetricsPort,
     OLTP_EXPORTER_URL: oltpExporterUrl,
     POSTGRES_HOST: postgresHost,

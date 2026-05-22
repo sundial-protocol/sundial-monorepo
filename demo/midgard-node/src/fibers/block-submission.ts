@@ -197,28 +197,25 @@ const processWithdrawalsProgram = (withdrawals: readonly UserEvents.Entry[]) =>
     };
   });
 
-const processTxOrdersProgram = (txOrders: readonly UserEvents.Entry[]) =>
-  Effect.gen(function* () {
-    const processedTxOrders: ProcessedTx[] = [];
-    yield* Effect.forEach(txOrders, (txOrder) =>
-      breakDownTx(txOrder[UserEvents.Columns.INFO]).pipe(
-        Effect.andThen((processedTx) =>
-          Effect.sync(() => {
-            processedTxOrders.push(processedTx);
-          }),
-        ),
-      ),
-    );
-    return processedTxOrders;
-  });
+const processTxOrdersProgram = (
+  txOrders: readonly UserEvents.Entry[],
+  concurrency: number,
+) =>
+  Effect.forEach(
+    txOrders,
+    (txOrder) => breakDownTx(txOrder[UserEvents.Columns.INFO]),
+    { concurrency },
+  );
 
 const processTxRequestsProgram = (
   txRequests: readonly MempoolDB.EntryWithEffects[],
+  concurrency: number,
 ) =>
   Effect.gen(function* () {
     const processedTxRequests = yield* Effect.forEach(
       txRequests,
       (entry) => MempoolDB.toProcessedTx(entry),
+      { concurrency },
     );
     const mempoolTxHashes = processedTxRequests.map(
       (processedTx) => processedTx.txId,
@@ -282,6 +279,8 @@ const processEventsForLedgerApplication = (
   NodeConfig | Database | AlwaysSucceedsContract
 > =>
   Effect.gen(function* () {
+    const nodeConfig = yield* NodeConfig;
+    const txParseConcurrency = nodeConfig.TX_PARSE_CONCURRENCY;
     const blockEvents = yield* BlocksDB.retrieveEvents(startDate, endDate);
 
     const { withdrawnOutRefs, withdrawalAddressHistoryEntries } =
@@ -289,10 +288,14 @@ const processEventsForLedgerApplication = (
 
     const processedTxOrders = yield* processTxOrdersProgram(
       blockEvents.txOrders,
+      txParseConcurrency,
     );
 
     const { mempoolTxHashes, processedTxRequests } =
-      yield* processTxRequestsProgram(blockEvents.txRequests);
+      yield* processTxRequestsProgram(
+        blockEvents.txRequests,
+        txParseConcurrency,
+      );
 
     const { depositLedgerEntries, depositAddressHistoryEntries } =
       yield* processDepositsProgram(blockEvents.deposits);

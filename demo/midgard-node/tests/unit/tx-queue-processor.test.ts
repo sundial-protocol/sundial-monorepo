@@ -85,7 +85,7 @@ describe("txQueueProcessorAction — tx_submissions_mempool_accepted counter", (
       yield* enqueue(queue, txs);
       const delta = yield* metricDelta(
         readMempoolAcceptedCounter,
-        txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, withMonitoring),
+        txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, withMonitoring),
         (state) => state.count,
       );
       expect(delta).toBe(expectedDelta);
@@ -144,9 +144,10 @@ describe("txQueueProcessorAction — tx_submissions_processing_failed counter", 
         ? txQueueProcessorAction(
             queue,
             TEST_DRAIN_BATCH_SIZE,
+            4,
             withMonitoring,
           ).pipe(Effect.catchAllCause(() => Effect.void))
-        : txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, withMonitoring);
+        : txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, withMonitoring);
 
       const delta = yield* metricDelta(
         readProcessingFailedCounter,
@@ -169,6 +170,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
       yield* txQueueProcessorAction(
         queue,
         TEST_DRAIN_BATCH_SIZE,
+        4,
         true,
         peakRef,
       );
@@ -190,6 +192,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
         yield* txQueueProcessorAction(
           queue,
           TEST_DRAIN_BATCH_SIZE,
+          4,
           true,
           peakRef,
         );
@@ -199,6 +202,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
         yield* txQueueProcessorAction(
           queue,
           TEST_DRAIN_BATCH_SIZE,
+          4,
           true,
           peakRef,
         );
@@ -217,6 +221,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
       yield* txQueueProcessorAction(
         queue,
         TEST_DRAIN_BATCH_SIZE,
+        4,
         true,
         peakRef,
       );
@@ -228,6 +233,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
       yield* txQueueProcessorAction(
         queue,
         TEST_DRAIN_BATCH_SIZE,
+        4,
         true,
         peakRef,
       );
@@ -244,7 +250,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
       const peakRef = yield* Ref.make(0n);
       const delta = yield* metricDelta(
         readQueuePeakSizeGauge,
-        txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, false, peakRef),
+        txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, false, peakRef),
         (state) => state.value,
       );
 
@@ -264,6 +270,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
         yield* txQueueProcessorAction(
           queue,
           TEST_DRAIN_BATCH_SIZE,
+          4,
           true,
           peakRef,
         );
@@ -275,6 +282,7 @@ describe("txQueueProcessorAction — tx_queue_peak_size gauge", () => {
         yield* txQueueProcessorAction(
           queue,
           TEST_DRAIN_BATCH_SIZE,
+          4,
           true,
           peakRef,
         );
@@ -301,7 +309,7 @@ describe("txQueueProcessorAction — per-tx isolation (H-07)", () => {
 
         const acceptedDelta = yield* metricDelta(
           readMempoolAcceptedCounter,
-          txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, true),
+          txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, true),
           (state) => state.count,
         );
 
@@ -327,7 +335,7 @@ describe("txQueueProcessorAction — per-tx isolation (H-07)", () => {
 
         const failedDelta = yield* metricDelta(
           readProcessingFailedCounter,
-          txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, true),
+          txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, true),
           (state) => state.count,
         );
 
@@ -342,7 +350,7 @@ describe("txQueueProcessorAction — per-tx isolation (H-07)", () => {
       const queue = yield* Queue.bounded<string>(10);
       yield* enqueue(queue, ["badtx1", "badtx2"]);
 
-      yield* txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, true);
+      yield* txQueueProcessorAction(queue, TEST_DRAIN_BATCH_SIZE, 4, true);
 
       expect(mempoolInsertFn).not.toHaveBeenCalled();
     }).pipe(Effect.provide(sqlHarness.layer)),
@@ -357,7 +365,7 @@ describe("txQueueProcessorAction — bounded per-tick draining", () => {
 
       const firstDelta = yield* metricDelta(
         readMempoolAcceptedCounter,
-        txQueueProcessorAction(queue, 2, true),
+        txQueueProcessorAction(queue, 2, 4, true),
         (state) => state.count,
       );
       expect(firstDelta).toBe(2n);
@@ -366,7 +374,7 @@ describe("txQueueProcessorAction — bounded per-tick draining", () => {
 
       const secondDelta = yield* metricDelta(
         readMempoolAcceptedCounter,
-        txQueueProcessorAction(queue, 2, true),
+        txQueueProcessorAction(queue, 2, 4, true),
         (state) => state.count,
       );
       expect(secondDelta).toBe(1n);

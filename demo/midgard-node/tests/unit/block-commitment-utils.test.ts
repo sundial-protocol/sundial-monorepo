@@ -161,6 +161,7 @@ it.effect("applyTxOrdersToLedger applies tx orders to the ledger trie", () =>
     const result = yield* applyTxOrdersToLedger(
       ledgerTrie as unknown as MidgardMpt,
       txOrders,
+      4,
     );
 
     expect(result.txOrdersCount).toBe(2);
@@ -215,6 +216,7 @@ it.effect("applyTxRequestsToLedger applies mempool tx requests", () =>
       ledgerTrie as unknown as MidgardMpt,
       txsTrie as unknown as MidgardMpt,
       mempoolTxs,
+      4,
     );
 
     expect(result.txRequestsCount).toBe(2);

@@ -37,6 +37,7 @@ export const makeTestNodeConfigLayer = () =>
       TX_QUEUE_CAPACITY: 10_000,
       TX_QUEUE_DRAIN_BATCH_SIZE: 250,
       TX_QUEUE_OFFER_TIMEOUT_MS: 100,
+      TX_PARSE_CONCURRENCY: 4,
       PROM_METRICS_PORT: 9464,
       OLTP_EXPORTER_URL: "http://127.0.0.1:4318/v1/traces",
       POSTGRES_USER: "postgres",

@@ -108,9 +108,9 @@ const normalizeTxIdToBuffer = (
 
 const toProcessedTxFromPersistedEffects = (
   entry: EntryWithEffects & {
-    [Columns.SPENT_OUTREFS]: readonly Buffer[];
-    [Columns.PRODUCED_OUTREFS]: readonly Buffer[];
-    [Columns.PRODUCED_OUTPUTS]: readonly Buffer[];
+    [Columns.SPENT_OUTREFS]: readonly (Buffer | Uint8Array | string)[];
+    [Columns.PRODUCED_OUTREFS]: readonly (Buffer | Uint8Array | string)[];
+    [Columns.PRODUCED_OUTPUTS]: readonly (Buffer | Uint8Array | string)[];
     [Columns.PRODUCED_ADDRESSES]: readonly string[];
   },
 ): ProcessedTx => {

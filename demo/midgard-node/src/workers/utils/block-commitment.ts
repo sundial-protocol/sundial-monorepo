@@ -233,6 +233,7 @@ export const applyWithdrawalsToLedger = (
 export const applyTxOrdersToLedger = (
   ledgerTrie: MidgardMpt,
   txOrders: readonly UserEvents.Entry[],
+  concurrency: number,
 ): Effect.Effect<
   {
     txOrdersCount: number;
@@ -266,17 +267,20 @@ export const applyTxOrdersToLedger = (
       const txOrdersChunk = txOrders.slice(startIndex, endIndex);
       const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
 
-      yield* Effect.forEach(txOrdersChunk, (txOrder) =>
-        Effect.gen(function* () {
-          const txCbor = txOrder[UserEvents.Columns.INFO];
-          const { delOps, putOps, spent, produced } =
-            yield* txEntryToBatchDBOps(txCbor);
-          sizeOfTxOrders += txCbor.length;
-          ledgerBatchOps.push(...delOps);
-          ledgerBatchOps.push(...putOps);
-          spentByTxOrders.push(...spent);
-          producedByTxOrders.push(...produced);
-        }),
+      yield* Effect.forEach(
+        txOrdersChunk,
+        (txOrder) =>
+          Effect.gen(function* () {
+            const txCbor = txOrder[UserEvents.Columns.INFO];
+            const { delOps, putOps, spent, produced } =
+              yield* txEntryToBatchDBOps(txCbor);
+            sizeOfTxOrders += txCbor.length;
+            ledgerBatchOps.push(...delOps);
+            ledgerBatchOps.push(...putOps);
+            spentByTxOrders.push(...spent);
+            producedByTxOrders.push(...produced);
+          }),
+        { concurrency },
       );
 
       yield* ledgerTrie.batch(ledgerBatchOps);
@@ -305,6 +309,7 @@ export const applyTxRequestsToLedger = (
   ledgerTrie: MidgardMpt,
   txsTrie: MidgardMpt,
   mempoolTxs: readonly (ProcessedTx | Tx.Entry)[],
+  concurrency: number,
 ): Effect.Effect<
   {
     txRequestsCount: number;
@@ -334,37 +339,40 @@ export const applyTxRequestsToLedger = (
       const mempoolBatchOps: ETH_UTILS.BatchDBOp[] = [];
       const ledgerBatchOps: ETH_UTILS.BatchDBOp[] = [];
 
-      yield* Effect.forEach(mempoolTxChunk, (entry) =>
-        Effect.gen(function* () {
-          const processedTx =
-            "spent" in entry && "produced" in entry
-              ? entry
-              : yield* breakDownTx(entry[Tx.Columns.TX]);
-          const txHash = processedTx.txId;
-          const txCbor = processedTx.txCbor;
-          const delOps: ETH_UTILS.BatchDBOp[] = processedTx.spent.map(
-            (outRef) => ({
-              type: "del",
-              key: outRef,
-            }),
-          );
-          const putOps: ETH_UTILS.BatchDBOp[] = processedTx.produced.map(
-            (ledgerEntry) => ({
+      yield* Effect.forEach(
+        mempoolTxChunk,
+        (entry) =>
+          Effect.gen(function* () {
+            const processedTx =
+              "spent" in entry && "produced" in entry
+                ? entry
+                : yield* breakDownTx(entry[Tx.Columns.TX]);
+            const txHash = processedTx.txId;
+            const txCbor = processedTx.txCbor;
+            const delOps: ETH_UTILS.BatchDBOp[] = processedTx.spent.map(
+              (outRef) => ({
+                type: "del",
+                key: outRef,
+              }),
+            );
+            const putOps: ETH_UTILS.BatchDBOp[] = processedTx.produced.map(
+              (ledgerEntry) => ({
+                type: "put",
+                key: ledgerEntry[Ledger.Columns.OUTREF],
+                value: ledgerEntry[Ledger.Columns.OUTPUT],
+              }),
+            );
+            txRequestsCount += 1;
+            sizeOfTxRequests += txCbor.length;
+            mempoolBatchOps.push({
               type: "put",
-              key: ledgerEntry[Ledger.Columns.OUTREF],
-              value: ledgerEntry[Ledger.Columns.OUTPUT],
-            }),
-          );
-          txRequestsCount += 1;
-          sizeOfTxRequests += txCbor.length;
-          mempoolBatchOps.push({
-            type: "put",
-            key: txHash,
-            value: txCbor,
-          });
-          ledgerBatchOps.push(...delOps);
-          ledgerBatchOps.push(...putOps);
-        }),
+              key: txHash,
+              value: txCbor,
+            });
+            ledgerBatchOps.push(...delOps);
+            ledgerBatchOps.push(...putOps);
+          }),
+        { concurrency },
       );
 
       yield* Effect.all(
