@@ -277,11 +277,11 @@ export const removeSpentOutRef = (
             cause: e,
           }),
       });
-      return (
-        spentOutRef.transaction_id().to_hex() !==
-          ledgerEntryOutRef.transaction_id().to_hex() &&
-        spentOutRef.index() !== ledgerEntryOutRef.index()
-      );
+      const txIdEqual =
+        spentOutRef.transaction_id().to_hex() ===
+        ledgerEntryOutRef.transaction_id().to_hex();
+      const indexEqual = spentOutRef.index() === ledgerEntryOutRef.index();
+      return !(txIdEqual && indexEqual);
     }),
   );
 

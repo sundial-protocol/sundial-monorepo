@@ -64,6 +64,25 @@ describe("Ledger transition helpers", () => {
     );
   });
 
+  it.effect("removeSpentOutRef keeps non-matching outrefs sharing txId or index", () => {
+    const exactSpent = makeLedgerEntry(0x10, { outref: outrefA });
+    const sameTxIdDifferentIndex = makeLedgerEntry(0x20, {
+      outref: Buffer.from([0xaa, 0x01]),
+    });
+    const differentTxIdSameIndex = makeLedgerEntry(0x30, {
+      outref: Buffer.from([0xbb, 0x00]),
+    });
+
+    return Ledger.removeSpentOutRef(
+      [exactSpent, sameTxIdDifferentIndex, differentTxIdSameIndex],
+      outrefA,
+    ).pipe(
+      Effect.map((remaining) => {
+        expect(remaining).toEqual([sameTxIdDifferentIndex, differentTxIdSameIndex]);
+      }),
+    );
+  });
+
   it.effect("applyTx adds produced outputs and removes spent outputs", () => {
     const entryA = makeLedgerEntry(0x10, { outref: outrefA });
     const entryB = makeLedgerEntry(0x20, { outref: outrefB });
