@@ -52,7 +52,9 @@ const resetCommitmentWorkerState = (state?: CommitmentWorkerState | null) => {
 };
 
 const spawnCommitmentWorker = (): CommitmentWorkerState => {
-  Effect.runSync(Effect.logInfo("👷 Starting persistent block commitment worker..."));
+  Effect.runSync(
+    Effect.logInfo("👷 Starting persistent block commitment worker..."),
+  );
   const worker = new Worker(COMMITMENT_WORKER_URL);
   const state: CommitmentWorkerState = {
     worker,

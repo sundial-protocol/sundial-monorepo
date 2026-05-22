@@ -51,14 +51,17 @@ const fetchUserEventUTxOs = (
       inclusionTimeLowerBound,
       inclusionTimeUpperBound,
     };
-    return {
-      deposits: yield* SDK.fetchDepositUTxOsProgram(lucid, depositFetchConfig),
-      txOrders: yield* SDK.fetchTxOrderUTxOsProgram(lucid, txOrderFetchConfig),
-      withdrawals: yield* SDK.fetchWithdrawalUTxOsProgram(
-        lucid,
-        withdrawalFetchConfig,
-      ),
-    };
+    return yield* Effect.all(
+      {
+        deposits: SDK.fetchDepositUTxOsProgram(lucid, depositFetchConfig),
+        txOrders: SDK.fetchTxOrderUTxOsProgram(lucid, txOrderFetchConfig),
+        withdrawals: SDK.fetchWithdrawalUTxOsProgram(
+          lucid,
+          withdrawalFetchConfig,
+        ),
+      },
+      { concurrency: "unbounded" },
+    );
   });
 
 const userEventUTxOsToEntry = (

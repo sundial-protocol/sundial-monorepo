@@ -218,7 +218,10 @@ it.effect("withTrieTransaction commits SQL and trie changes together", () => {
 it.effect(
   "persists committed checkpointed ledger trie writes across reopen after SQL success",
   () => {
-    const tmpLedgerPath = path.join(os.tmpdir(), `nit045-ledger-${randomUUID()}`);
+    const tmpLedgerPath = path.join(
+      os.tmpdir(),
+      `nit045-ledger-${randomUUID()}`,
+    );
     const layers = Layer.mergeAll(
       makeTestSqlLayer(),
       makeTestNodeConfigLayer({ ledgerMptPath: tmpLedgerPath }),
@@ -227,7 +230,10 @@ it.effect(
     return Effect.gen(function* () {
       yield* DBInitialization.program;
 
-      const ledgerTrie = yield* MidgardMpt.create("nit045-ledger", tmpLedgerPath);
+      const ledgerTrie = yield* MidgardMpt.create(
+        "nit045-ledger",
+        tmpLedgerPath,
+      );
       const initialRoot = yield* ledgerTrie.getRootHex();
 
       yield* ledgerTrie.checkpoint();
@@ -235,7 +241,9 @@ it.effect(
       yield* sql.withTransaction(
         Effect.gen(function* () {
           yield* ImmutableDB.insertTx({ tx_id: txIdA, tx: txCborA });
-          yield* ledgerTrie.batch([{ type: "put", key: keyBuf, value: valueBuf }]);
+          yield* ledgerTrie.batch([
+            { type: "put", key: keyBuf, value: valueBuf },
+          ]);
         }),
       );
       yield* ledgerTrie.commit();
@@ -311,9 +319,12 @@ it.effect("Applying tx requests updates ledger and txs roots", () => {
       [Tx.Columns.TX]: processedTx.txCbor,
     };
 
-    const result = yield* applyTxRequestsToLedger(ledgerTrie, txsTrie, [
-      mempoolEntry,
-    ], 4);
+    const result = yield* applyTxRequestsToLedger(
+      ledgerTrie,
+      txsTrie,
+      [mempoolEntry],
+      4,
+    );
 
     expect(result.txRequestsCount).toBe(1);
     expect(result.txsRoot).not.toBe(EMPTY_ROOT);
@@ -361,7 +372,12 @@ it.effect("Empty event roots are stable for an empty block", () => {
       Effect.provide(layers),
     );
     const wthResult = yield* applyWithdrawalsToLedger(ledgerTrie, []);
-    const txrResult = yield* applyTxRequestsToLedger(ledgerTrie, txsTrie, [], 4);
+    const txrResult = yield* applyTxRequestsToLedger(
+      ledgerTrie,
+      txsTrie,
+      [],
+      4,
+    );
 
     expect(depResult.depositLedgerEntries.length).toBe(0);
     expect(depResult.depositsRoot).toBe(EMPTY_ROOT);
