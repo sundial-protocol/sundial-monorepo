@@ -14,6 +14,7 @@ export type MockSqlHarness = {
   reset: () => void;
   getCalls: () => readonly SqlInvocation[];
   getCallCount: () => number;
+  getTransactionCallCount: () => number;
 };
 
 const isTaggedTemplateInput = (
@@ -29,6 +30,7 @@ export const createMockSqlHarness = (
 ): MockSqlHarness => {
   let rows: MockSqlRow[] = [...initialRows];
   const calls: SqlInvocation[] = [];
+  let transactionCallCount = 0;
 
   const sql = Object.assign(
     (stringsOrStr: unknown, ...values: readonly unknown[]) => {
@@ -42,7 +44,10 @@ export const createMockSqlHarness = (
       return stringsOrStr;
     },
     {
-      withTransaction: <A, E, R>(eff: Effect.Effect<A, E, R>) => eff,
+      withTransaction: <A, E, R>(eff: Effect.Effect<A, E, R>) => {
+        transactionCallCount += 1;
+        return eff;
+      },
       insert: (obj: unknown) => obj,
       in: (_col: string, vals: readonly unknown[]) => vals,
       literal: (s: string) => s,
@@ -62,8 +67,10 @@ export const createMockSqlHarness = (
     reset: () => {
       rows = [];
       calls.length = 0;
+      transactionCallCount = 0;
     },
     getCalls: () => calls,
     getCallCount: () => calls.length,
+    getTransactionCallCount: () => transactionCallCount,
   };
 };

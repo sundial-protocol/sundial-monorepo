@@ -93,6 +93,16 @@ const txRejectedCounter = Metric.counter("tx_submissions_rejected", {
   incremental: true,
 }).register();
 
+const txQueueBackpressureRejectedCounter = Metric.counter(
+  "tx_submissions_rejected_queue_backpressure",
+  {
+    description:
+      "A counter for tracking L2 transaction submissions rejected because the in-memory queue stayed saturated beyond the configured offer timeout",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
 const failWith500Helper = (
   logLabel: string,
   logMsg: string,
@@ -545,7 +555,10 @@ const getLogGlobalsHandler = Effect.gen(function* () {
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "logGlobals", e)),
 );
 
-const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
+const postSubmitHandler = (
+  txQueue: Queue.Enqueue<string>,
+  txQueueOfferTimeoutMs: number,
+) =>
   Effect.gen(function* () {
     // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
     const params = yield* ParsedSearchParams;
@@ -559,7 +572,23 @@ const postSubmitHandler = (txQueue: Queue.Enqueue<string>) =>
       );
     } else {
       const txString = txStringParam;
-      yield* txQueue.offer(txString);
+      const offered = yield* Effect.raceFirst(
+        txQueue.offer(txString),
+        Effect.sleep(Duration.millis(txQueueOfferTimeoutMs)).pipe(
+          Effect.as(false),
+        ),
+      );
+      if (!offered) {
+        const queueSize = yield* txQueue.size;
+        yield* Effect.logInfo(
+          `POST /${SUBMIT_ENDPOINT} - queue backpressure rejection: size=${queueSize} timeout_ms=${txQueueOfferTimeoutMs}`,
+        );
+        yield* Metric.increment(txQueueBackpressureRejectedCounter);
+        return yield* HttpServerResponse.json(
+          { error: `Transaction queue is saturated; retry later` },
+          { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
+        );
+      }
       yield* Metric.increment(txAcceptedCounter);
       return yield* HttpServerResponse.json({
         message: `Successfully added the transaction to the queue`,
@@ -622,6 +651,7 @@ const getCommitmentWalletBalanceHandler = Effect.gen(function* () {
 
 const router = (
   txQueue: Queue.Queue<string>,
+  txQueueOfferTimeoutMs: number,
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   HttpBodyError,
@@ -651,7 +681,10 @@ const router = (
       ),
       HttpRouter.get(`/logBlocksTxsDB`, getLogBlocksTxsDBHandler),
       HttpRouter.get(`/logGlobals`, getLogGlobalsHandler),
-      HttpRouter.post(`/${SUBMIT_ENDPOINT}`, postSubmitHandler(txQueue)),
+      HttpRouter.post(
+        `/${SUBMIT_ENDPOINT}`,
+        postSubmitHandler(txQueue, txQueueOfferTimeoutMs),
+      ),
     )
     .pipe(
       Effect.catchAllCause((cause) =>
@@ -667,7 +700,7 @@ export const runNode = (withMonitoring?: boolean) =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
 
-    const txQueue = yield* Queue.unbounded<string>();
+    const txQueue = yield* Queue.bounded<string>(nodeConfig.TX_QUEUE_CAPACITY);
 
     yield* DBInitialization.program.pipe(Effect.provide(Database.layer));
 
@@ -675,7 +708,7 @@ export const runNode = (withMonitoring?: boolean) =>
 
     const appThread = Layer.launch(
       Layer.provide(
-        HttpServer.serve(router(txQueue)),
+        HttpServer.serve(router(txQueue, nodeConfig.TX_QUEUE_OFFER_TIMEOUT_MS)),
         NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
       ),
     );
@@ -697,7 +730,12 @@ export const runNode = (withMonitoring?: boolean) =>
         ),
         mergeFiber(mkSchedule(nodeConfig.WAIT_BETWEEN_MERGE_TXS)),
         withMonitoring ? monitorMempoolFiber(mkSchedule(1000)) : Effect.void,
-        txQueueProcessorFiber(mkSchedule(500), txQueue, withMonitoring),
+        txQueueProcessorFiber(
+          mkSchedule(500),
+          txQueue,
+          nodeConfig.TX_QUEUE_DRAIN_BATCH_SIZE,
+          withMonitoring,
+        ),
       ],
       {
         concurrency: "unbounded",

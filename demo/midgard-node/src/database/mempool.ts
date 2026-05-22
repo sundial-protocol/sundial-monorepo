@@ -12,6 +12,7 @@ import { ProcessedTx } from "@/utils.js";
 import { AddressHistoryDB, MempoolLedgerDB, Tx } from "./index.js";
 
 export const tableName = "mempool";
+const INSERT_MULTIPLE_CHUNK_SIZE = 100;
 
 const normalizeTxIdToHex = (txId: Buffer | Uint8Array | string): string =>
   typeof txId === "string"
@@ -19,6 +20,20 @@ const normalizeTxIdToHex = (txId: Buffer | Uint8Array | string): string =>
       ? txId.slice(2)
       : txId
     : Buffer.from(txId).toString("hex");
+
+const chunkProcessedTxs = (processedTxs: ProcessedTx[]): ProcessedTx[][] => {
+  const chunks: ProcessedTx[][] = [];
+  for (
+    let startIndex = 0;
+    startIndex < processedTxs.length;
+    startIndex += INSERT_MULTIPLE_CHUNK_SIZE
+  ) {
+    chunks.push(
+      processedTxs.slice(startIndex, startIndex + INSERT_MULTIPLE_CHUNK_SIZE),
+    );
+  }
+  return chunks;
+};
 
 /**
  * Along with insertions to MempoolDB, applies transactions to MempoolLedgerDB,
@@ -36,57 +51,64 @@ export const insertMultiple = (
       return 0;
     }
 
-    const txEntries: Tx.EntryNoTimeStamp[] = processedTxs.map((tx) => ({
-      [Tx.Columns.TX_ID]: tx.txId,
-      [Tx.Columns.TX]: tx.txCbor,
-    }));
-
     const sql = yield* SqlClient.SqlClient;
-    const insertedTxRows = yield* sql<{
-      [Tx.Columns.TX_ID]: Buffer | Uint8Array | string;
-    }>`
-      INSERT INTO ${sql(tableName)} ${sql.insert(txEntries)}
-      ON CONFLICT (${sql(Tx.Columns.TX_ID)}) DO NOTHING
-      RETURNING ${sql(Tx.Columns.TX_ID)}`;
+    let totalInsertedRows = 0;
+    const txChunks = chunkProcessedTxs(processedTxs);
 
-    if (insertedTxRows.length === 0) {
-      return 0;
-    }
+    for (const [chunkIndex, txChunk] of txChunks.entries()) {
+      const insertedChunkRows = yield* sql.withTransaction(
+        Effect.gen(function* () {
+          const txEntries: Tx.EntryNoTimeStamp[] = txChunk.map((tx) => ({
+            [Tx.Columns.TX_ID]: tx.txId,
+            [Tx.Columns.TX]: tx.txCbor,
+          }));
+          const insertedTxRows = yield* sql<{
+            [Tx.Columns.TX_ID]: Buffer | Uint8Array | string;
+          }>`
+            INSERT INTO ${sql(tableName)} ${sql.insert(txEntries)}
+            ON CONFLICT (${sql(Tx.Columns.TX_ID)}) DO NOTHING
+            RETURNING ${sql(Tx.Columns.TX_ID)}`;
 
-    const insertedTxIdsHex = new Set(
-      insertedTxRows.map((row) => normalizeTxIdToHex(row[Tx.Columns.TX_ID])),
-    );
-    const newlyInsertedProcessedTxs = processedTxs.filter((processedTx) =>
-      insertedTxIdsHex.has(processedTx.txId.toString("hex")),
-    );
+          if (insertedTxRows.length === 0) {
+            return 0;
+          }
 
-    if (newlyInsertedProcessedTxs.length === 0) {
-      return 0;
-    }
+          const insertedTxIdsHex = new Set(
+            insertedTxRows.map((row) =>
+              normalizeTxIdToHex(row[Tx.Columns.TX_ID]),
+            ),
+          );
+          const newlyInsertedProcessedTxs = txChunk.filter((processedTx) =>
+            insertedTxIdsHex.has(processedTx.txId.toString("hex")),
+          );
 
-    const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
-      yield* AddressHistoryDB.aggregateProcessedTxs(
-        MempoolLedgerDB.tableName,
-        newlyInsertedProcessedTxs,
-        AddressHistoryDB.Status.SLATED,
+          if (newlyInsertedProcessedTxs.length === 0) {
+            return 0;
+          }
+
+          const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
+            yield* AddressHistoryDB.aggregateProcessedTxs(
+              MempoolLedgerDB.tableName,
+              newlyInsertedProcessedTxs,
+              AddressHistoryDB.Status.SLATED,
+            );
+
+          // Apply projection changes in the same transaction as row insertion.
+          yield* AddressHistoryDB.upsertEntries(addressHistoryEntries);
+          yield* MempoolLedgerDB.insert(collectiveProduced);
+          yield* MempoolLedgerDB.clearUTxOs(collectiveSpent);
+
+          return insertedTxRows.length;
+        }),
       );
 
-    // TODO: Batching might be needed.
-    yield* Effect.all(
-      [
-        // Insert transactions corresponding entries to `AddressHistoryDB`.
-        AddressHistoryDB.upsertEntries(addressHistoryEntries),
-        // Insertion to `MempoolLedgerDB` followed by removal of spent outrefs in
-        // sequence.
-        Effect.all([
-          MempoolLedgerDB.insert(collectiveProduced),
-          MempoolLedgerDB.clearUTxOs(collectiveSpent),
-        ]),
-      ],
-      { concurrency: "unbounded" },
-    );
+      totalInsertedRows += insertedChunkRows;
+      yield* Effect.logInfo(
+        `${tableName} db: insertMultiple chunk ${chunkIndex + 1}/${txChunks.length} inserted_rows=${insertedChunkRows}`,
+      );
+    }
 
-    return insertedTxRows.length;
+    return totalInsertedRows;
   }).pipe(
     Effect.withLogSpan(`insert ${tableName}`),
     Effect.tapErrorTag("SqlError", (e) =>

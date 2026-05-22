@@ -21,6 +21,9 @@ type NodeConfigDep = {
   WAIT_BETWEEN_USER_EVENT_FETCHES: number;
   WAIT_BETWEEN_MERGE_TXS: number;
   COMMITMENT_WORKER_TIMEOUT_MS: number;
+  TX_QUEUE_CAPACITY: number;
+  TX_QUEUE_DRAIN_BATCH_SIZE: number;
+  TX_QUEUE_OFFER_TIMEOUT_MS: number;
   PROM_METRICS_PORT: number;
   OLTP_EXPORTER_URL: string;
   POSTGRES_USER: string;
@@ -102,6 +105,15 @@ const makeConfig = Effect.gen(function* () {
   const commitmentWorkerTimeoutMs = yield* Config.integer(
     "COMMITMENT_WORKER_TIMEOUT_MS",
   ).pipe(Config.withDefault(30_000));
+  const txQueueCapacity = yield* Config.integer("TX_QUEUE_CAPACITY").pipe(
+    Config.withDefault(10_000),
+  );
+  const txQueueDrainBatchSize = yield* Config.integer(
+    "TX_QUEUE_DRAIN_BATCH_SIZE",
+  ).pipe(Config.withDefault(250));
+  const txQueueOfferTimeoutMs = yield* Config.integer(
+    "TX_QUEUE_OFFER_TIMEOUT_MS",
+  ).pipe(Config.withDefault(100));
   const waitBetweenUserEventFetches = yield* Config.integer(
     "WAIT_BETWEEN_USER_EVENT_FETCHES",
   ).pipe(Config.withDefault(10000));
@@ -193,6 +205,27 @@ const makeConfig = Effect.gen(function* () {
     },
   ];
 
+  const assertPositiveInteger = (fieldName: string, value: number) =>
+    value > 0
+      ? Effect.void
+      : Effect.fail(
+          new ConfigError({
+            message: `Config field must be a positive integer: ${fieldName}`,
+            cause: undefined,
+            fieldsAndValues: [[fieldName, String(value)]],
+          }),
+        );
+
+  yield* assertPositiveInteger("TX_QUEUE_CAPACITY", txQueueCapacity);
+  yield* assertPositiveInteger(
+    "TX_QUEUE_DRAIN_BATCH_SIZE",
+    txQueueDrainBatchSize,
+  );
+  yield* assertPositiveInteger(
+    "TX_QUEUE_OFFER_TIMEOUT_MS",
+    txQueueOfferTimeoutMs,
+  );
+
   return {
     L1_PROVIDER: provider,
     L1_BLOCKFROST_API_URL: blockfrostApiUrl,
@@ -211,6 +244,9 @@ const makeConfig = Effect.gen(function* () {
     WAIT_BETWEEN_MERGE_TXS: waitBetweenMergeTxs,
     WAIT_BETWEEN_USER_EVENT_FETCHES: waitBetweenUserEventFetches,
     COMMITMENT_WORKER_TIMEOUT_MS: commitmentWorkerTimeoutMs,
+    TX_QUEUE_CAPACITY: txQueueCapacity,
+    TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,
+    TX_QUEUE_OFFER_TIMEOUT_MS: txQueueOfferTimeoutMs,
     PROM_METRICS_PORT: promMetricsPort,
     OLTP_EXPORTER_URL: oltpExporterUrl,
     POSTGRES_HOST: postgresHost,

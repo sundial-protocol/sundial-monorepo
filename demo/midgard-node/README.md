@@ -86,6 +86,9 @@ POSTGRES_DB=midgard
 POSTGRES_HOST=localhost
 LEDGER_MPT_DB_PATH=midgard-ledger-mpt-db
 MEMPOOL_MPT_DB_PATH=midgard-mempool-mpt-db
+TX_QUEUE_CAPACITY=10000
+TX_QUEUE_DRAIN_BATCH_SIZE=250
+TX_QUEUE_OFFER_TIMEOUT_MS=100
 ```
 
 With a properly setup database, the following set of commands should start the
