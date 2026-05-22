@@ -26,7 +26,7 @@ vi.mock("@/database/utils/ledger.js", async () => {
   };
 });
 
-import * as Ledger from "@/database/utils/ledger.js";
+import * as DatabaseIndex from "@/database/index.js";
 import * as AddressHistoryDB from "@/database/addressHistory.js";
 import { COMMON_ADDRESSES, makeLedgerEntry } from "./harness/fixtures.js";
 import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
@@ -109,6 +109,170 @@ describe("AddressHistoryDB", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
+
+  it.effect("aggregateProcessedTxs batches spent outref lookup", () => {
+    const spentOutRefCount = 2505;
+    const spentOutRefs = Array.from(
+      { length: spentOutRefCount },
+      (_, index) => {
+        const outRef = Buffer.alloc(32);
+        outRef.writeUInt32BE(index, 0);
+        return outRef;
+      },
+    );
+    const processedTxs = spentOutRefs.map((spentOutRef, index) => {
+      const txId = Buffer.alloc(32);
+      txId.writeUInt32BE(index + 1, 0);
+      const producedEntry = makeLedgerEntry((index % 250) + 1, {
+        tx_id: txId,
+        outref: Buffer.from(txId),
+        address: testAddress,
+      });
+      return {
+        txId,
+        txCbor: Buffer.alloc(64, (index % 251) + 1),
+        spent: [spentOutRef],
+        produced: [producedEntry],
+      };
+    });
+
+    const retrieveByOutRefsSpy = vi
+      .spyOn(DatabaseIndex.Ledger, "retrieveByOutRefs")
+      .mockImplementation((_tableName, outRefs) =>
+        Effect.succeed(
+          outRefs.map((outRef, index) =>
+            makeLedgerEntry((index % 250) + 1, {
+              outref: outRef,
+              tx_id: Buffer.alloc(32, 0xdd),
+              address: COMMON_ADDRESSES.spent,
+            }),
+          ),
+        ),
+      );
+
+    return AddressHistoryDB.aggregateProcessedTxs(
+      "mempool_ledger",
+      processedTxs,
+      AddressHistoryDB.Status.SLATED,
+    ).pipe(
+      Effect.map((result) => {
+        expect(result.collectiveSpent).toHaveLength(spentOutRefCount);
+        expect(result.allTxEntries).toHaveLength(spentOutRefCount);
+        expect(result.addressHistoryEntries.length).toBeGreaterThanOrEqual(
+          spentOutRefCount,
+        );
+
+        const retrieveByOutRefsCalls = retrieveByOutRefsSpy.mock.calls;
+        expect(retrieveByOutRefsCalls).toHaveLength(3);
+        expect(
+          retrieveByOutRefsCalls.every(
+            ([tableName, outRefs]) =>
+              tableName === "mempool_ledger" && outRefs.length <= 1000,
+          ),
+        ).toBe(true);
+      }),
+      Effect.provide(sqlHarness.layer),
+    );
+  });
+
+  it.effect(
+    "aggregateProcessedTxs resolves spent addresses by outref, not SQL row order",
+    () => {
+      const txIdFirst = Buffer.alloc(32, 0x11);
+      const txIdSecond = Buffer.alloc(32, 0x22);
+      const spentOutRefFirst = Buffer.alloc(32, 0xa1);
+      const spentOutRefSecond = Buffer.alloc(32, 0xb2);
+      const firstSpentAddress = COMMON_ADDRESSES.spent;
+      const secondSpentAddress = testAddress;
+
+      const firstLedgerEntry = makeLedgerEntry(0x30, {
+        outref: spentOutRefFirst,
+        address: firstSpentAddress,
+      });
+      const secondLedgerEntry = makeLedgerEntry(0x40, {
+        outref: spentOutRefSecond,
+        address: secondSpentAddress,
+      });
+
+      // Intentionally reverse row order to validate deterministic by-outref
+      // attribution.
+      const retrieveByOutRefsSpy = vi
+        .spyOn(DatabaseIndex.Ledger, "retrieveByOutRefs")
+        .mockReturnValue(Effect.succeed([secondLedgerEntry, firstLedgerEntry]));
+
+      const processedTxs = [
+        {
+          txId: txIdFirst,
+          txCbor: Buffer.alloc(64, 0x11),
+          spent: [spentOutRefFirst],
+          produced: [],
+        },
+        {
+          txId: txIdSecond,
+          txCbor: Buffer.alloc(64, 0x22),
+          spent: [spentOutRefSecond],
+          produced: [],
+        },
+      ];
+
+      return AddressHistoryDB.aggregateProcessedTxs(
+        "mempool_ledger",
+        processedTxs,
+        AddressHistoryDB.Status.SLATED,
+      ).pipe(
+        Effect.map((result) => {
+          expect(retrieveByOutRefsSpy).toHaveBeenCalledTimes(1);
+          expect(result.addressHistoryEntries).toEqual([
+            {
+              event_id: txIdFirst,
+              address: firstSpentAddress,
+              event_type: AddressHistoryDB.EventType.TX,
+              status: AddressHistoryDB.Status.SLATED,
+            },
+            {
+              event_id: txIdSecond,
+              address: secondSpentAddress,
+              event_type: AddressHistoryDB.EventType.TX,
+              status: AddressHistoryDB.Status.SLATED,
+            },
+          ]);
+        }),
+        Effect.provide(sqlHarness.layer),
+      );
+    },
+  );
+
+  it.effect(
+    "aggregateProcessedTxs fails when a spent outref is missing",
+    () => {
+      const missingOutRef = Buffer.alloc(32, 0xee);
+      const txId = Buffer.alloc(32, 0x77);
+
+      vi.spyOn(DatabaseIndex.Ledger, "retrieveByOutRefs").mockReturnValue(
+        Effect.succeed([]),
+      );
+
+      return AddressHistoryDB.aggregateProcessedTxs(
+        "mempool_ledger",
+        [
+          {
+            txId,
+            txCbor: Buffer.alloc(64, 0x33),
+            spent: [missingOutRef],
+            produced: [],
+          },
+        ],
+        AddressHistoryDB.Status.SLATED,
+      ).pipe(
+        Effect.flip,
+        Effect.map((error) => {
+          expect(error._tag).toBe("DatabaseError");
+          expect(error.message).toBe("processedTxsToAddressHistoryEntries");
+        }),
+        Effect.provide(sqlHarness.layer),
+      );
+    },
+  );
 
   it.effect("upsertEntries skips SQL for an empty entry list", () => {
     return AddressHistoryDB.upsertEntries([]).pipe(
