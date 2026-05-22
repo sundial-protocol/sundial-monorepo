@@ -5,6 +5,7 @@ import { Address } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import {
   DatabaseError,
+  NotFoundError,
   clearTable,
   sqlErrorToDatabaseError,
 } from "@/database/utils/common.js";
@@ -22,6 +23,7 @@ import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { NodeConfig } from "@/services/config.js";
 
 const tableName = "address_history";
+const MAX_SPENT_OUTREFS_LOOKUP_BATCH_SIZE = 1000;
 
 export enum Columns {
   EVENT_ID = "event_id",
@@ -48,6 +50,37 @@ export enum EventType {
   WITHDRAWAL = 1,
   DEPOSIT = 2,
 }
+
+const retrieveLedgerEntriesByOutRefsBatched = (
+  referenceLedgerTableName: string,
+  outRefs: Buffer[] | readonly Buffer[],
+): Effect.Effect<readonly Ledger.Entry[], DatabaseError, Database> =>
+  Effect.gen(function* () {
+    if (outRefs.length === 0) return [];
+
+    if (outRefs.length > MAX_SPENT_OUTREFS_LOOKUP_BATCH_SIZE) {
+      yield* Effect.logInfo(
+        `${tableName} db: batching spent outref lookup for ${outRefs.length} outrefs`,
+      );
+    }
+
+    const entries: Ledger.Entry[] = [];
+    for (
+      let startIndex = 0;
+      startIndex < outRefs.length;
+      startIndex += MAX_SPENT_OUTREFS_LOOKUP_BATCH_SIZE
+    ) {
+      const endIndex = startIndex + MAX_SPENT_OUTREFS_LOOKUP_BATCH_SIZE;
+      const outRefsBatch = outRefs.slice(startIndex, endIndex);
+      const batchEntries = yield* Ledger.retrieveByOutRefs(
+        referenceLedgerTableName,
+        outRefsBatch,
+      );
+      entries.push(...batchEntries);
+    }
+
+    return entries;
+  });
 
 export const createTable: Effect.Effect<void, DatabaseError, Database> =
   Effect.gen(function* () {
@@ -114,51 +147,66 @@ export const aggregateProcessedTxs = (
   Effect.gen(function* () {
     // To reduce traversals, we'll also collect `Tx.Entry` equivalents.
     const allTxEntries: Tx.Entry[] = [];
-    // Collect all spent UTxOs so that we can make a single SQL query to
-    // retrieve their addresses.
+    // Collect all spent UTxOs so that we can retrieve their addresses in
+    // bounded batches.
     const collectiveSpent: Buffer[] = processedTxs.flatMap(
       (processedTxs) => processedTxs.spent,
     );
     const collectiveProduced: Ledger.Entry[] = [];
-    // Retrieve addresses of spent UTxOs from the given ledger table.
-    const inputLedgerEntries = yield* Ledger.retrieveByOutRefs(
+    // Retrieve addresses of spent UTxOs from the given ledger table and index
+    // by outref hex for deterministic lookups regardless of SQL row order.
+    const inputLedgerEntries = yield* retrieveLedgerEntriesByOutRefsBatched(
       referenceLedgerTableName,
       collectiveSpent,
     );
-    const addressHistoryEntries: Entry[] = [];
-    // Goes through each ProcessedTx value while also exhausting the retrieved
-    // ledger entries from MempoolLedgerDB. Therefore the final acc is an empty
-    // list, which we are dicarding here.
-    yield* Effect.reduce(
-      processedTxs,
-      inputLedgerEntries,
-      (acc, processedTx, _i) =>
-        Effect.gen(function* () {
-          allTxEntries.push({
-            [Tx.Columns.TX_ID]: processedTx.txId,
-            [Tx.Columns.TX]: processedTx.txCbor,
-          });
-          const relevantLedgerEntries = acc.slice(0, processedTx.spent.length);
-          const inputEntries: Entry[] = relevantLedgerEntries.map(
-            (ledgerEntry) => ({
-              [Columns.ADDRESS]: ledgerEntry[Ledger.Columns.ADDRESS],
-              [Columns.EVENT_ID]: processedTx.txId,
-              [Columns.EVENT_TYPE]: EventType.TX,
-              [Columns.STATUS]: status,
-            }),
-          );
-          const outputEntries: Entry[] = processedTx.produced.map((e) => ({
-            [Columns.EVENT_ID]: processedTx.txId,
-            [Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
-            [Columns.EVENT_TYPE]: EventType.TX,
-            [Columns.STATUS]: status,
-          }));
-          collectiveProduced.push(...processedTx.produced);
-          addressHistoryEntries.push(...inputEntries);
-          addressHistoryEntries.push(...outputEntries);
-          return acc.slice(processedTx.spent.length);
-        }),
+    const inputLedgerEntriesByOutRef = new Map<string, Ledger.Entry>(
+      inputLedgerEntries.map((entry) => [
+        entry[Ledger.Columns.OUTREF].toString("hex"),
+        entry,
+      ]),
     );
+    const addressHistoryEntries: Entry[] = [];
+
+    for (const processedTx of processedTxs) {
+      allTxEntries.push({
+        [Tx.Columns.TX_ID]: processedTx.txId,
+        [Tx.Columns.TX]: processedTx.txCbor,
+      });
+
+      for (const spentOutRef of processedTx.spent) {
+        const spentOutRefHex = spentOutRef.toString("hex");
+        const ledgerEntry = inputLedgerEntriesByOutRef.get(spentOutRefHex);
+
+        if (ledgerEntry === undefined) {
+          yield* new NotFoundError({
+            message: `Missing spent outref ledger entry during address history aggregation`,
+            cause: {
+              referenceLedgerTableName,
+              spentOutRefHex,
+            },
+            table: referenceLedgerTableName,
+            txIdHex: processedTx.txId.toString("hex"),
+          });
+        }
+
+        addressHistoryEntries.push({
+          [Columns.ADDRESS]: ledgerEntry[Ledger.Columns.ADDRESS],
+          [Columns.EVENT_ID]: processedTx.txId,
+          [Columns.EVENT_TYPE]: EventType.TX,
+          [Columns.STATUS]: status,
+        });
+      }
+
+      const outputEntries: Entry[] = processedTx.produced.map((e) => ({
+        [Columns.EVENT_ID]: processedTx.txId,
+        [Columns.ADDRESS]: e[Ledger.Columns.ADDRESS],
+        [Columns.EVENT_TYPE]: EventType.TX,
+        [Columns.STATUS]: status,
+      }));
+      collectiveProduced.push(...processedTx.produced);
+      addressHistoryEntries.push(...outputEntries);
+    }
+
     return {
       allTxEntries,
       addressHistoryEntries,
