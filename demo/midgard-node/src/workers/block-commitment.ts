@@ -91,6 +91,7 @@ const mainProgram = (
           const processedTxRequests = yield* Effect.forEach(
             txRequests,
             (entry) => MempoolDB.toProcessedTx(entry),
+            { concurrency: nodeConfig.TX_PARSE_CONCURRENCY },
           );
           const preflightStats = buildPreflightWindowStats(events);
           const thresholdBreaches =
@@ -124,12 +125,17 @@ const mainProgram = (
               producedByTxOrders,
               txsTrie,
               sizeOfTxOrders,
-            } = yield* applyTxOrdersToLedger(ledgerTrie, txOrders);
+            } = yield* applyTxOrdersToLedger(
+              ledgerTrie,
+              txOrders,
+              nodeConfig.TX_PARSE_CONCURRENCY,
+            );
             const { txRequestsCount, txsRoot, sizeOfTxRequests } =
               yield* applyTxRequestsToLedger(
                 ledgerTrie,
                 txsTrie,
                 processedTxRequests,
+                nodeConfig.TX_PARSE_CONCURRENCY,
               );
             const { depositLedgerEntries, depositsRoot, sizeOfDeposits } =
               yield* applyDepositsToLedger(ledgerTrie, deposits);

@@ -313,7 +313,7 @@ it.effect("Applying tx requests updates ledger and txs roots", () => {
 
     const result = yield* applyTxRequestsToLedger(ledgerTrie, txsTrie, [
       mempoolEntry,
-    ]);
+    ], 4);
 
     expect(result.txRequestsCount).toBe(1);
     expect(result.txsRoot).not.toBe(EMPTY_ROOT);
@@ -342,7 +342,7 @@ it.effect("Applying tx orders updates ledger root", () => {
       [UserEvents.Columns.INCLUSION_TIME]: new Date(),
     };
 
-    const result = yield* applyTxOrdersToLedger(ledgerTrie, [txOrderEntry]);
+    const result = yield* applyTxOrdersToLedger(ledgerTrie, [txOrderEntry], 4);
 
     expect(result.producedByTxOrders.length).toBeGreaterThan(0);
     expect(result.spentByTxOrders.length).toBeGreaterThan(0);
@@ -361,7 +361,7 @@ it.effect("Empty event roots are stable for an empty block", () => {
       Effect.provide(layers),
     );
     const wthResult = yield* applyWithdrawalsToLedger(ledgerTrie, []);
-    const txrResult = yield* applyTxRequestsToLedger(ledgerTrie, txsTrie, []);
+    const txrResult = yield* applyTxRequestsToLedger(ledgerTrie, txsTrie, [], 4);
 
     expect(depResult.depositLedgerEntries.length).toBe(0);
     expect(depResult.depositsRoot).toBe(EMPTY_ROOT);

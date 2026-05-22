@@ -1,5 +1,6 @@
 import { fromHex } from "@lucid-evolution/lucid";
 import { Chunk, Effect, Metric, pipe, Queue, Ref, Schedule } from "effect";
+import * as SDK from "@al-ft/midgard-sdk";
 import { MempoolDB } from "@/database/index.js";
 import { breakDownTx } from "@/utils.js";
 import { DatabaseError } from "@/database/utils/common.js";
@@ -48,9 +49,14 @@ export const txQueueProcessorMetrics = {
 export const txQueueProcessorAction = (
   txQueue: Queue.Dequeue<string>,
   txQueueDrainBatchSize: number,
+  txParseConcurrency: number,
   withMonitoring?: boolean,
   peakRef?: Ref.Ref<bigint>,
-): Effect.Effect<void, DatabaseError, Database> =>
+): Effect.Effect<
+  void,
+  DatabaseError | SDK.CmlDeserializationError | SDK.DataCoercionError,
+  Database
+> =>
   Effect.gen(function* () {
     const queueSize = yield* txQueue.size;
 
@@ -82,6 +88,7 @@ export const txQueueProcessorAction = (
       const [malformedErrors, processedTxs] = yield* Effect.partition(
         txStringsPersistChunk,
         (tx) => breakDownTx(fromHex(tx)),
+        { concurrency: txParseConcurrency },
       );
       for (const error of malformedErrors) {
         yield* Effect.logWarning(
@@ -117,6 +124,7 @@ export const txQueueProcessorFiber = (
   schedule: Schedule.Schedule<number>,
   txQueue: Queue.Dequeue<string>,
   txQueueDrainBatchSize: number,
+  txParseConcurrency: number,
   withMonitoring?: boolean,
 ): Effect.Effect<void, never, Database> =>
   pipe(
@@ -134,6 +142,7 @@ export const txQueueProcessorFiber = (
         txQueueProcessorAction(
           txQueue,
           txQueueDrainBatchSize,
+          txParseConcurrency,
           withMonitoring,
           withMonitoring ? peakRef : undefined,
         ).pipe(Effect.catchAllCause(Effect.logWarning)),

@@ -743,6 +743,7 @@ export const runNode = (withMonitoring?: boolean) =>
           mkSchedule(500),
           txQueue,
           nodeConfig.TX_QUEUE_DRAIN_BATCH_SIZE,
+          nodeConfig.TX_PARSE_CONCURRENCY,
           withMonitoring,
         ),
       ],
