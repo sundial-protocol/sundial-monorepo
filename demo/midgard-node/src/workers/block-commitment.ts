@@ -18,7 +18,7 @@ import {
   AlwaysSucceedsContract,
   NodeConfig,
 } from "@/services/index.js";
-import { MempoolLedgerDB, BlocksDB } from "@/database/index.js";
+import { MempoolLedgerDB, BlocksDB, Tx, UserEvents } from "@/database/index.js";
 import { TxSignError } from "@/transactions/utils.js";
 import { MidgardMpt, MptError } from "@/workers/utils/mpt.js";
 import {
@@ -28,6 +28,28 @@ import {
 } from "@/database/utils/common.js";
 import { SqlClient } from "@effect/sql";
 import { fromHex } from "@lucid-evolution/lucid";
+
+const sumBufferBytes = (buffers: readonly Buffer[]): number =>
+  buffers.reduce((acc, next) => acc + next.length, 0);
+
+const buildPreflightWindowStats = (
+  events: BlocksDB.Events,
+): BlocksDB.Stats => {
+  const { withdrawals, txOrders, txRequests, deposits } = events;
+  return {
+    [BlocksDB.Columns.DEPOSITS_COUNT]: deposits.length,
+    [BlocksDB.Columns.TX_REQUESTS_COUNT]: txRequests.length,
+    [BlocksDB.Columns.TX_ORDERS_COUNT]: txOrders.length,
+    [BlocksDB.Columns.WITHDRAWALS_COUNT]: withdrawals.length,
+    [BlocksDB.Columns.TOTAL_EVENTS_SIZE]:
+      sumBufferBytes(
+        withdrawals.map((entry) => entry[UserEvents.Columns.INFO]),
+      ) +
+      sumBufferBytes(txOrders.map((entry) => entry[UserEvents.Columns.INFO])) +
+      sumBufferBytes(txRequests.map((entry) => entry[Tx.Columns.TX])) +
+      sumBufferBytes(deposits.map((entry) => entry[UserEvents.Columns.INFO])),
+  };
+};
 
 const seedBlocksDBFromChain: Effect.Effect<
   SeededOutput | string,
@@ -111,8 +133,28 @@ const mainProgram: Effect.Effect<
       Effect.gen(function* () {
         const nodeConfig = yield* NodeConfig;
         const currentDate = new Date();
-        const { withdrawals, txOrders, txRequests, deposits } =
-          yield* BlocksDB.retrieveEventsForCommitment(latestBlock, currentDate);
+        const startDate = latestBlock[BlocksDB.Columns.EVENT_END_TIME];
+        const events = yield* BlocksDB.retrieveEventsForCommitment(
+          latestBlock,
+          currentDate,
+        );
+        const { withdrawals, txOrders, txRequests, deposits } = events;
+        const preflightStats = buildPreflightWindowStats(events);
+        const thresholdBreaches =
+          BlocksDB.getCommitmentWindowWarningThresholdBreaches(preflightStats, {
+            txRequestsCount: nodeConfig.COMMITMENT_WINDOW_WARN_TX_REQUESTS,
+            totalEventsCount: nodeConfig.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS,
+            totalEventsSizeBytes: nodeConfig.COMMITMENT_WINDOW_WARN_TOTAL_BYTES,
+          });
+        const totalEventsCount = BlocksDB.getTotalEventsCount(preflightStats);
+        yield* Effect.logInfo(
+          `Commitment preflight window: start=${startDate.toISOString()} end=${currentDate.toISOString()} duration_ms=${currentDate.getTime() - startDate.getTime()} tx_requests=${preflightStats[BlocksDB.Columns.TX_REQUESTS_COUNT]} tx_orders=${preflightStats[BlocksDB.Columns.TX_ORDERS_COUNT]} deposits=${preflightStats[BlocksDB.Columns.DEPOSITS_COUNT]} withdrawals=${preflightStats[BlocksDB.Columns.WITHDRAWALS_COUNT]} total_events=${totalEventsCount} total_events_size_bytes=${preflightStats[BlocksDB.Columns.TOTAL_EVENTS_SIZE]}`,
+        );
+        if (thresholdBreaches.length > 0) {
+          yield* Effect.logWarning(
+            `Commitment preflight threshold breach: header_hash=${latestBlock[BlocksDB.Columns.HEADER_HASH].toString("hex")} breaches=${thresholdBreaches.join(",")} tx_requests=${preflightStats[BlocksDB.Columns.TX_REQUESTS_COUNT]}/${nodeConfig.COMMITMENT_WINDOW_WARN_TX_REQUESTS} total_events=${totalEventsCount}/${nodeConfig.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS} total_events_size_bytes=${preflightStats[BlocksDB.Columns.TOTAL_EVENTS_SIZE]}/${nodeConfig.COMMITMENT_WINDOW_WARN_TOTAL_BYTES}`,
+          );
+        }
         const ledgerTrie = yield* MidgardMpt.create(
           "ledger",
           nodeConfig.LEDGER_MPT_DB_PATH,

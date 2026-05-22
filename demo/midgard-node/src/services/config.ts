@@ -21,6 +21,9 @@ type NodeConfigDep = {
   WAIT_BETWEEN_USER_EVENT_FETCHES: number;
   WAIT_BETWEEN_MERGE_TXS: number;
   COMMITMENT_WORKER_TIMEOUT_MS: number;
+  COMMITMENT_WINDOW_WARN_TX_REQUESTS: number;
+  COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: number;
+  COMMITMENT_WINDOW_WARN_TOTAL_BYTES: number;
   TX_QUEUE_CAPACITY: number;
   TX_QUEUE_DRAIN_BATCH_SIZE: number;
   TX_QUEUE_OFFER_TIMEOUT_MS: number;
@@ -105,6 +108,15 @@ const makeConfig = Effect.gen(function* () {
   const commitmentWorkerTimeoutMs = yield* Config.integer(
     "COMMITMENT_WORKER_TIMEOUT_MS",
   ).pipe(Config.withDefault(30_000));
+  const commitmentWindowWarnTxRequests = yield* Config.integer(
+    "COMMITMENT_WINDOW_WARN_TX_REQUESTS",
+  ).pipe(Config.withDefault(50_000));
+  const commitmentWindowWarnTotalEvents = yield* Config.integer(
+    "COMMITMENT_WINDOW_WARN_TOTAL_EVENTS",
+  ).pipe(Config.withDefault(60_000));
+  const commitmentWindowWarnTotalBytes = yield* Config.integer(
+    "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
+  ).pipe(Config.withDefault(20_000_000));
   const txQueueCapacity = yield* Config.integer("TX_QUEUE_CAPACITY").pipe(
     Config.withDefault(10_000),
   );
@@ -225,6 +237,18 @@ const makeConfig = Effect.gen(function* () {
     "TX_QUEUE_OFFER_TIMEOUT_MS",
     txQueueOfferTimeoutMs,
   );
+  yield* assertPositiveInteger(
+    "COMMITMENT_WINDOW_WARN_TX_REQUESTS",
+    commitmentWindowWarnTxRequests,
+  );
+  yield* assertPositiveInteger(
+    "COMMITMENT_WINDOW_WARN_TOTAL_EVENTS",
+    commitmentWindowWarnTotalEvents,
+  );
+  yield* assertPositiveInteger(
+    "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
+    commitmentWindowWarnTotalBytes,
+  );
 
   return {
     L1_PROVIDER: provider,
@@ -244,6 +268,9 @@ const makeConfig = Effect.gen(function* () {
     WAIT_BETWEEN_MERGE_TXS: waitBetweenMergeTxs,
     WAIT_BETWEEN_USER_EVENT_FETCHES: waitBetweenUserEventFetches,
     COMMITMENT_WORKER_TIMEOUT_MS: commitmentWorkerTimeoutMs,
+    COMMITMENT_WINDOW_WARN_TX_REQUESTS: commitmentWindowWarnTxRequests,
+    COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: commitmentWindowWarnTotalEvents,
+    COMMITMENT_WINDOW_WARN_TOTAL_BYTES: commitmentWindowWarnTotalBytes,
     TX_QUEUE_CAPACITY: txQueueCapacity,
     TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,
     TX_QUEUE_OFFER_TIMEOUT_MS: txQueueOfferTimeoutMs,

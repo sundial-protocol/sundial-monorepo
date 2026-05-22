@@ -14,6 +14,9 @@ export enum Columns {
   INCLUSION_TIME = "inclusion_time",
 }
 
+const getInclusionTimeIndexName = (tableName: string): string =>
+  `idx_${tableName}_${Columns.INCLUSION_TIME}`;
+
 export type Entry = {
   [Columns.ID]: Buffer;
   [Columns.INFO]: Buffer;
@@ -37,6 +40,9 @@ export const createTable = (
         ${sql(Columns.INCLUSION_TIME)} TIMESTAMPTZ NOT NULL,
         PRIMARY KEY (${sql(Columns.ID)})
       );`;
+        yield* sql`CREATE INDEX IF NOT EXISTS ${sql(
+          getInclusionTimeIndexName(tableName),
+        )} ON ${sql(tableName)} (${sql(Columns.INCLUSION_TIME)});`;
       }),
     );
   }).pipe(
