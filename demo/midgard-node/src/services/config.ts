@@ -107,7 +107,7 @@ const makeConfig = Effect.gen(function* () {
   ).pipe(Config.withDefault(10000));
   const commitmentWorkerTimeoutMs = yield* Config.integer(
     "COMMITMENT_WORKER_TIMEOUT_MS",
-  ).pipe(Config.withDefault(30_000));
+  ).pipe(Config.withDefault(300_000));
   const commitmentWindowWarnTxRequests = yield* Config.integer(
     "COMMITMENT_WINDOW_WARN_TX_REQUESTS",
   ).pipe(Config.withDefault(50_000));

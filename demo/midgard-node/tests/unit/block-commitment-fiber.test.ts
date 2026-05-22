@@ -1,17 +1,21 @@
 import { describe, expect, vi, afterEach, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Fiber, Layer, Metric } from "effect";
+import { Effect, Fiber, Layer, Metric, MetricBoundaries } from "effect";
 import { Globals } from "@/services/globals.js";
 import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
 import { NodeConfig } from "@/services/config.js";
+import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { Lucid } from "@/services/lucid.js";
 import {
   blockCommitmentMetrics,
   buildAndSubmitCommitmentBlockAction,
 } from "@/fibers/block-commitment.js";
 import { metricDelta } from "./harness/metric-snapshot.js";
+import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 
 // Hoisted so the mock factory can be swapped per test.
 const makeWorkerInstance = vi.hoisted(() => vi.fn());
+const ensureBlocksSeededFn = vi.hoisted(() => vi.fn());
 
 vi.mock("worker_threads", () => ({
   parentPort: null,
@@ -23,7 +27,53 @@ vi.mock("worker_threads", () => ({
   },
 }));
 
-const baseLayer = Layer.mergeAll(Globals.Default, makeTestNodeConfigLayer());
+vi.mock("@/fibers/seed-blocks-db-from-chain.js", () => ({
+  get ensureBlocksDBSeededFromChain() {
+    return ensureBlocksSeededFn();
+  },
+  blocksDbSeedingMetrics: {
+    seedBlocksDbAttemptsCounter: Metric.counter(
+      "test_blocks_db_seed_attempts_total",
+      { bigint: true, incremental: true },
+    ).register(),
+    seedBlocksDbSuccessCounter: Metric.counter(
+      "test_blocks_db_seed_success_total",
+      { bigint: true, incremental: true },
+    ).register(),
+    seedBlocksDbFailuresCounter: Metric.counter(
+      "test_blocks_db_seed_failures_total",
+      { bigint: true, incremental: true },
+    ).register(),
+    seedBlocksDbTraversalHopsGauge: Metric.gauge(
+      "test_blocks_db_seed_traversal_hops_last",
+    ).register(),
+    seedBlocksDbDurationHistogram: Metric.histogram(
+      "test_blocks_db_seed_duration_seconds",
+      MetricBoundaries.exponential({ start: 0.1, factor: 2, count: 6 }),
+    ).register(),
+  },
+}));
+
+const sqlHarness = createMockSqlHarness();
+
+const fakeLucidLayer = Layer.succeed(
+  Lucid,
+  Lucid.of({
+    _tag: "Lucid",
+    api: {} as never,
+    switchToOperatorsMainWallet: Effect.void,
+    switchToOperatorsBlockCommitmentWallet: Effect.void,
+    switchToOperatorsMergingWallet: Effect.void,
+  }),
+);
+
+const baseLayer = Layer.mergeAll(
+  Globals.Default,
+  makeTestNodeConfigLayer(),
+  sqlHarness.layer,
+  fakeLucidLayer,
+  Layer.succeed(AlwaysSucceedsContract, null as never),
+);
 const TEST_WORKER_TIMEOUT_MS = 10;
 
 const successfulCommitmentOutput = {
@@ -59,6 +109,9 @@ function makeShortTimeoutLayer() {
     );
     return Layer.mergeAll(
       Globals.Default,
+      sqlHarness.layer,
+      fakeLucidLayer,
+      Layer.succeed(AlwaysSucceedsContract, null as never),
       Layer.succeed(
         NodeConfig,
         NodeConfig.of({
@@ -95,6 +148,8 @@ function makeEventWorker(event: string, ...args: unknown[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  sqlHarness.reset();
+  ensureBlocksSeededFn.mockReturnValue(Effect.succeed("already-seeded"));
 });
 
 afterEach(() => {
@@ -182,6 +237,24 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
       yield* runUntilCommitmentWorkerTimeout();
 
       expect(neverRespondingWorker.terminate).toHaveBeenCalled();
+    }),
+  );
+
+  it.effect(
+    "does not spawn worker while cold-start seeding is in progress",
+    () =>
+      Effect.gen(function* () {
+        ensureBlocksSeededFn.mockReturnValue(Effect.succeed("retry-later"));
+        yield* runAction();
+        expect(makeWorkerInstance).not.toHaveBeenCalled();
+      }),
+  );
+
+  it.effect("does not spawn worker immediately after successful seeding", () =>
+    Effect.gen(function* () {
+      ensureBlocksSeededFn.mockReturnValue(Effect.succeed("seeded"));
+      yield* runAction();
+      expect(makeWorkerInstance).not.toHaveBeenCalled();
     }),
   );
 });

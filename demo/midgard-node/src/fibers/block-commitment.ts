@@ -1,10 +1,20 @@
-import { Globals, NodeConfig } from "@/services/index.js";
+import {
+  AlwaysSucceedsContract,
+  Database,
+  Globals,
+  Lucid,
+  NodeConfig,
+} from "@/services/index.js";
 import { Effect, Metric, MetricBoundaries, Ref, Schedule } from "effect";
 import { WorkerError } from "@/workers/utils/common.js";
 import { WorkerInput, WorkerOutput } from "@/workers/utils/block-commitment.js";
 import { Worker } from "worker_threads";
 import { BlocksDB } from "@/database/index.js";
 import { performance } from "node:perf_hooks";
+import {
+  blocksDbSeedingMetrics,
+  ensureBlocksDBSeededFromChain,
+} from "@/fibers/seed-blocks-db-from-chain.js";
 
 const commitBlockNumTxGauge = Metric.gauge("commit_block_txs_per_block", {
   description:
@@ -68,10 +78,22 @@ export const blockCommitmentMetrics = {
   commitBlockL1UserEventsGauge,
   commitBlockCommitmentFailuresCounter,
   commitBlockDurationHistogram,
+  ...blocksDbSeedingMetrics,
 } as const;
 
 export const buildAndSubmitCommitmentBlockAction = () =>
   Effect.gen(function* () {
+    const seedResult = yield* ensureBlocksDBSeededFromChain;
+    if (seedResult === "retry-later") {
+      return;
+    }
+    if (seedResult === "seeded") {
+      yield* Effect.logInfo(
+        "🔹 ✅ BlocksDB seeded from chain. Will commit on next cycle.",
+      );
+      return;
+    }
+
     const globals = yield* Globals;
     const {
       COMMITMENT_WORKER_TIMEOUT_MS,
@@ -225,7 +247,7 @@ export const buildAndSubmitCommitmentBlockAction = () =>
 export const blockCommitmentAction: Effect.Effect<
   void,
   WorkerError,
-  Globals | NodeConfig
+  AlwaysSucceedsContract | Database | Globals | Lucid | NodeConfig
 > = Effect.gen(function* () {
   const globals = yield* Globals;
   const RESET_IN_PROGRESS = yield* Ref.get(globals.RESET_IN_PROGRESS);
@@ -239,7 +261,11 @@ export const blockCommitmentAction: Effect.Effect<
 
 export const blockCommitmentFiber = (
   schedule: Schedule.Schedule<number>,
-): Effect.Effect<void, never, Globals | NodeConfig> =>
+): Effect.Effect<
+  void,
+  never,
+  AlwaysSucceedsContract | Database | Globals | Lucid | NodeConfig
+> =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔵 Block commitment fiber started.");
     // Initialize metrics so panels have a visible baseline before first commit.
@@ -250,6 +276,23 @@ export const blockCommitmentFiber = (
     yield* Metric.incrementBy(commitBlockCounter, 0n);
     yield* Metric.incrementBy(commitBlockTxCounter, 0n);
     yield* Metric.incrementBy(commitBlockCommitmentFailuresCounter, 0n);
+    yield* Metric.incrementBy(
+      blocksDbSeedingMetrics.seedBlocksDbAttemptsCounter,
+      0n,
+    );
+    yield* Metric.incrementBy(
+      blocksDbSeedingMetrics.seedBlocksDbSuccessCounter,
+      0n,
+    );
+    yield* Metric.incrementBy(
+      blocksDbSeedingMetrics.seedBlocksDbFailuresCounter,
+      0n,
+    );
+    yield* Metric.set(blocksDbSeedingMetrics.seedBlocksDbTraversalHopsGauge, 0);
+    yield* Metric.update(
+      blocksDbSeedingMetrics.seedBlocksDbDurationHistogram,
+      0,
+    );
     const action = blockCommitmentAction.pipe(
       Effect.withSpan("block-commitment-fiber"),
       Effect.catchAllCause(Effect.logWarning),

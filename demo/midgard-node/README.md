@@ -89,6 +89,7 @@ MEMPOOL_MPT_DB_PATH=midgard-mempool-mpt-db
 TX_QUEUE_CAPACITY=10000
 TX_QUEUE_DRAIN_BATCH_SIZE=250
 TX_QUEUE_OFFER_TIMEOUT_MS=100
+COMMITMENT_WORKER_TIMEOUT_MS=300000
 COMMITMENT_WINDOW_WARN_TX_REQUESTS=50000
 COMMITMENT_WINDOW_WARN_TOTAL_EVENTS=60000
 COMMITMENT_WINDOW_WARN_TOTAL_BYTES=20000000
@@ -128,3 +129,16 @@ docker compose run --rm midgard-node-tests
 cd midgard-node
 pnpm test
 ```
+
+## Operational Metrics
+
+When the node runs with monitoring enabled, Prometheus metrics include block
+commitment and cold-start seeding signals.
+
+Important commitment seeding metrics:
+
+- `blocks_db_seed_attempts_total`
+- `blocks_db_seed_success_total`
+- `blocks_db_seed_failures_total`
+- `blocks_db_seed_duration_seconds`
+- `blocks_db_seed_traversal_hops_last`
