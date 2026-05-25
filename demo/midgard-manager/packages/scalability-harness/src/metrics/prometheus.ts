@@ -59,7 +59,7 @@ export const NODE_METRICS = [
   'tx_submissions_enqueued_total',
   'tx_submissions_rejected_total',
   'tx_submissions_mempool_accepted_total',
-  'tx_submissions_processing_failed_total',
+  'tx_stream_fail_total',
   'tx_stream_depth',
   'tx_stream_depth_peak',
   'mempool_tx_count',

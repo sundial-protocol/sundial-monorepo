@@ -127,7 +127,13 @@ const fakeCompleteProgram = vi.fn<
     never
   >
 >(() => Effect.succeed({ submitProgram: fakeSubmitProgram }));
-const fakeFromTx = vi.fn(() => ({ completeProgram: fakeCompleteProgram }));
+const fakeFromTx = vi.fn(() => ({
+  sign: {
+    withWallet: () => ({
+      completeProgram: fakeCompleteProgram,
+    }),
+  },
+}));
 
 const fakeLucidLayer = Layer.succeed(
   Lucid,

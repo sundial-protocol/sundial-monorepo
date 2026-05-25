@@ -10,6 +10,7 @@ import { Effect, Metric, MetricBoundaries, Option } from "effect";
 import { performance } from "node:perf_hooks";
 
 const MAX_STATE_QUEUE_TRAVERSAL_HOPS = 100_000;
+const BLOCKS_DB_SEED_TIMEOUT_MS = 120_000;
 
 const seedBlocksDbAttemptsCounter = Metric.counter(
   "blocks_db_seed_attempts_total",
@@ -194,7 +195,18 @@ export const ensureBlocksDBSeededFromChain: Effect.Effect<
 
   yield* Metric.increment(seedBlocksDbAttemptsCounter);
   const seedStartMs = performance.now();
-  const seedResult = yield* Effect.either(seedBlocksDBFromChain);
+  const seedResult = yield* Effect.either(
+    seedBlocksDBFromChain.pipe(
+      Effect.timeoutFail({
+        duration: `${BLOCKS_DB_SEED_TIMEOUT_MS} millis`,
+        onTimeout: () =>
+          new SDK.LucidError({
+            message: `Timed out after ${BLOCKS_DB_SEED_TIMEOUT_MS}ms while seeding BlocksDB from chain`,
+            cause: "Timed out waiting for provider/state-queue data",
+          }),
+      }),
+    ),
+  );
   yield* Metric.update(
     seedBlocksDbDurationHistogram,
     (performance.now() - seedStartMs) / 1000,

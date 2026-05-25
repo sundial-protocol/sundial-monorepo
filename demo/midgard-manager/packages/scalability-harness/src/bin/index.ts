@@ -149,7 +149,11 @@ function printPreflightResult(
   result: Awaited<ReturnType<typeof runExecutionReadinessPreflight>>
 ): void {
   for (const check of result.checks) {
-    const prefix = check.passed ? chalk.green('  [PASS]') : chalk.red('  [FAIL]');
+    const prefix = check.passed
+      ? chalk.green('  [PASS]')
+      : check.blocking === false
+        ? chalk.yellow('  [WARN]')
+        : chalk.red('  [FAIL]');
     console.log(`${prefix} ${check.name} — ${redactPathLike(check.summary)}`);
     if (!check.passed && check.actionableReason) {
       console.log(chalk.yellow(`        Action: ${redactPathLike(check.actionableReason)}`));

@@ -243,7 +243,7 @@ describe("AddressHistoryDB", () => {
   );
 
   it.effect(
-    "aggregateProcessedTxs fails when a spent outref is missing",
+    "aggregateProcessedTxs skips address history entry when a spent outref is missing",
     () => {
       const missingOutRef = Buffer.alloc(32, 0xee);
       const txId = Buffer.alloc(32, 0x77);
@@ -264,10 +264,9 @@ describe("AddressHistoryDB", () => {
         ],
         AddressHistoryDB.Status.SLATED,
       ).pipe(
-        Effect.flip,
-        Effect.map((error) => {
-          expect(error._tag).toBe("DatabaseError");
-          expect(error.message).toBe("processedTxsToAddressHistoryEntries");
+        Effect.map((result) => {
+          expect(result.addressHistoryEntries).toHaveLength(0);
+          expect(result.collectiveSpent).toHaveLength(1);
         }),
         Effect.provide(sqlHarness.layer),
       );

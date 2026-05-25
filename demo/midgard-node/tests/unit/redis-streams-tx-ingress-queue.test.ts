@@ -14,9 +14,11 @@ const redisState = vi.hoisted(() => ({
   xackImpl: (_args: unknown[]) => Promise.resolve(1),
   xlenImpl: (_args: unknown[]) => Promise.resolve(0),
   xpendingImpl: (_args: unknown[]) => Promise.resolve([] as unknown[]),
+  callImpl: (_args: unknown[]) => Promise.resolve([] as unknown[]),
   xautoclaimImpl: (_args: unknown[]) =>
     Promise.resolve(["0-0", []] as unknown[]),
   xreadgroupImpl: (_args: unknown[]) => Promise.resolve(null),
+  delImpl: (_args: unknown[]) => Promise.resolve(1),
 }));
 
 vi.mock("ioredis", () => {
@@ -56,6 +58,11 @@ vi.mock("ioredis", () => {
       return redisState.xpendingImpl(args);
     }
 
+    call(...args: unknown[]) {
+      redisState.calls.push({ method: "call", args });
+      return redisState.callImpl(args);
+    }
+
     xautoclaim(...args: unknown[]) {
       redisState.calls.push({ method: "xautoclaim", args });
       return redisState.xautoclaimImpl(args);
@@ -64,6 +71,11 @@ vi.mock("ioredis", () => {
     xreadgroup(...args: unknown[]) {
       redisState.calls.push({ method: "xreadgroup", args });
       return redisState.xreadgroupImpl(args);
+    }
+
+    del(...args: unknown[]) {
+      redisState.calls.push({ method: "del", args });
+      return redisState.delImpl(args);
     }
   }
 
@@ -86,8 +98,10 @@ beforeEach(() => {
   redisState.xackImpl = () => Promise.resolve(1);
   redisState.xlenImpl = () => Promise.resolve(0);
   redisState.xpendingImpl = () => Promise.resolve([] as unknown[]);
+  redisState.callImpl = () => Promise.resolve([] as unknown[]);
   redisState.xautoclaimImpl = () => Promise.resolve(["0-0", []] as unknown[]);
   redisState.xreadgroupImpl = () => Promise.resolve(null);
+  redisState.delImpl = () => Promise.resolve(1);
 });
 
 describe("RedisStreamsTxIngressQueue", () => {
@@ -147,5 +161,82 @@ describe("RedisStreamsTxIngressQueue", () => {
         deliveryCount: 2,
       });
     }).pipe(runWithQueue),
+  );
+
+  it.effect("uses XINFO GROUPS lag as stream depth snapshot", () =>
+    Effect.gen(function* () {
+      redisState.xlenImpl = () => Promise.resolve(10_000);
+      redisState.xpendingImpl = () => Promise.resolve([0, "0-0", "0-0", []]);
+      redisState.callImpl = () =>
+        Promise.resolve([
+          [
+            "name",
+            "midgard-tx-processors",
+            "consumers",
+            1,
+            "pending",
+            0,
+            "last-delivered-id",
+            "1779703559252-0",
+            "entries-read",
+            10_000,
+            "lag",
+            0,
+          ],
+        ]);
+
+      const queue = yield* TxIngressQueue;
+      const snapshot = yield* queue.snapshotMetrics;
+
+      expect(snapshot).toEqual({
+        streamDepth: 0,
+        pendingCount: 0,
+        lagCount: 0,
+      });
+    }).pipe(runWithQueue),
+  );
+
+  it.effect(
+    "clear deletes both streams and recreates the consumer group",
+    () =>
+      Effect.gen(function* () {
+        const queue = yield* TxIngressQueue;
+        yield* queue.clear;
+
+        const delCalls = redisState.calls.filter((c) => c.method === "del");
+        const xgroupCalls = redisState.calls.filter(
+          (c) => c.method === "xgroup",
+        );
+        expect(delCalls.length).toBe(2);
+        expect(xgroupCalls.length).toBe(1);
+        expect(xgroupCalls[0].args).toEqual([
+          "CREATE",
+          "midgard:tx-submissions",
+          "midgard-tx-processors",
+          "0",
+          "MKSTREAM",
+        ]);
+      }).pipe(runWithQueue),
+  );
+
+  it.effect(
+    "snapshotMetrics returns zero pending/lag when consumer group does not exist",
+    () =>
+      Effect.gen(function* () {
+        redisState.xlenImpl = () => Promise.resolve(10_000);
+        redisState.xpendingImpl = () =>
+          Promise.reject(
+            new Error(
+              "NOGROUP No such consumer group 'midgard-tx-processors' for key name 'midgard:tx-submissions'",
+            ),
+          );
+        redisState.callImpl = () => Promise.resolve([]);
+
+        const queue = yield* TxIngressQueue;
+        const snapshot = yield* queue.snapshotMetrics;
+
+        expect(snapshot.pendingCount).toBe(0);
+        expect(snapshot.lagCount).toBe(10_000);
+      }).pipe(runWithQueue),
   );
 });

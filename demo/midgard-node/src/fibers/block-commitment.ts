@@ -328,7 +328,16 @@ export const buildAndSubmitCommitmentBlockAction = () =>
             `Committed block exceeded commitment window warning thresholds: breaches=${thresholdBreaches.join(",")} tx_requests=${stats[BlocksDB.Columns.TX_REQUESTS_COUNT]}/${COMMITMENT_WINDOW_WARN_TX_REQUESTS} total_events=${totalEventsCount}/${COMMITMENT_WINDOW_WARN_TOTAL_EVENTS} total_events_size_bytes=${stats[BlocksDB.Columns.TOTAL_EVENTS_SIZE]}/${COMMITMENT_WINDOW_WARN_TOTAL_BYTES}`,
           );
         }
-        yield* Effect.logInfo("🔹 ☑️  Block submission completed.");
+        yield* Effect.logInfo("🔹 ☑️  Block commitment completed.");
+        break;
+      }
+      case "NoopCommitmentOutput": {
+        yield* Metric.set(commitBlockL1UserEventsGauge, 0);
+        yield* Metric.set(commitBlockNumTxGauge, 0n);
+        yield* Metric.set(commitBlockEventsSizeGauge, 0);
+        yield* Effect.logInfo(
+          "🔹 No-op commitment cycle: skipped empty window (no events).",
+        );
         break;
       }
       case "SeededOutput": {

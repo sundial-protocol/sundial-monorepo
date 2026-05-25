@@ -26,6 +26,7 @@
     "wallet:block-commitment:topup": "node scripts/fund-bc-wallet.mjs",
     "wallet:block-commitment:check": "node scripts/fund-bc-wallet.mjs --check",
     "wallet:topup:block-commitment": "npm run wallet:block-commitment:topup",
+    "node:clear:all": "npm run node:clear:mempool && npm run node:clear:submit-blocks && npm run node:reset:postgres && npm run node:reset:auto",
     "node:clear:mempool": "node scripts/reset-node-state.mjs --mode mempool",
     "node:clear:submit-blocks": "node scripts/reset-node-state.mjs --mode submit-blocks",
     "node:reset:postgres": "node scripts/reset-node-state.mjs --mode postgres",

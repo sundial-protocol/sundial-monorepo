@@ -71,6 +71,7 @@ const makeQueueStub = (
     ack: ackSpy,
     handleFailedMessage: handleFailedSpy,
     snapshotMetrics: Effect.succeed(snapshot),
+    clear: Effect.void,
     ackSpy,
     handleFailedSpy,
   };

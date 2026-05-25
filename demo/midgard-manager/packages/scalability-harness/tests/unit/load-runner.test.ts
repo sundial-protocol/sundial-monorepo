@@ -953,7 +953,7 @@ describe('runTier', () => {
   it('passes an absolute --output-dir to tx-generator even when runDir is relative', async () => {
     const relativeWriter = {
       ...writer,
-      runDir: 'benchmark-runs/relative-test',
+      runDir: 'benchmark-runs/tmp/relative-test',
     } as ArtifactWriter;
     const { spawner, ...rest } = makeOptions();
 
@@ -968,7 +968,7 @@ describe('runTier', () => {
     expect(outputDirIndex).toBeGreaterThan(-1);
     const outputDir = args[outputDirIndex + 1];
     expect(path.isAbsolute(outputDir)).toBe(true);
-    expect(outputDir).toBe(path.resolve('benchmark-runs/relative-test/tier-0'));
+    expect(outputDir).toBe(path.resolve('benchmark-runs/tmp/relative-test/tier-0'));
   });
 
   it('runs probe loop during load phase', async () => {

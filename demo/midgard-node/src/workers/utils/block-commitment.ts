@@ -49,10 +49,16 @@ export type SeededOutput = {
   type: "SeededOutput";
 };
 
+export type NoopCommitmentOutput = {
+  type: "NoopCommitmentOutput";
+  reason: "no_events_in_window";
+};
+
 export type WorkerOutput =
   | SuccessfulCommitmentOutput
   | FailureOutput
-  | SeededOutput;
+  | SeededOutput
+  | NoopCommitmentOutput;
 
 export type WorkerMessage = {
   type: typeof CommitmentWorkerMessageType.RunCommitmentResult;

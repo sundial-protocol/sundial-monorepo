@@ -37,6 +37,7 @@ export type TxIngressQueueService = {
     TxIngressMetricsSnapshot,
     TxIngressQueueError
   >;
+  readonly clear: Effect.Effect<void, TxIngressQueueError>;
 };
 
 export class TxIngressQueue extends Context.Tag("TxIngressQueue")<

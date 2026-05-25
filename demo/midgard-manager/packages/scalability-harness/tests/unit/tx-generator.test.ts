@@ -52,7 +52,7 @@ const BASE_SCENARIO: ScalabilityScenario = {
   runId: 'test-run',
   nodeEndpoint: 'http://localhost:3000',
   prometheusEndpoint: 'http://localhost:9090',
-  outputDir: 'benchmark-runs',
+  outputDir: 'benchmark-runs/tmp',
   seed: 'test-seed',
   transactionType: 'one-to-one',
   tierDurationSeconds: 60,

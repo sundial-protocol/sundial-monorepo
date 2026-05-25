@@ -115,13 +115,24 @@ const refreshUnsubmittedBacklogGaugeFromDb = Effect.gen(function* () {
 
 // For database operations.
 const BATCH_SIZE = 100;
+const SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS = 30_000;
 
 const submitSignedTxCBOR = (
   l1CborBytes: Buffer,
-): Effect.Effect<string, TxSignError | TxSubmitError | SDK.LucidError, Lucid> =>
+  headerHashHex: string,
+): Effect.Effect<
+  string,
+  TxSignError | TxSubmitError | SDK.LucidError,
+  Lucid | NodeConfig
+> =>
   Effect.gen(function* () {
     const lucid = yield* Lucid;
+    const nodeConfig = yield* NodeConfig;
     const signedTxHex = SDK.bufferToHex(l1CborBytes);
+    const timeoutMs = Math.max(
+      SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS,
+      nodeConfig.WAIT_BETWEEN_BLOCK_SUBMISSIONS,
+    );
     // Some commitment txs require an additional operator witness (e.g. merge
     // signer) beyond the witness already embedded by the commitment worker.
     // Re-signing with the merge wallet preserves existing witnesses while
@@ -131,13 +142,23 @@ const submitSignedTxCBOR = (
       .fromTx(signedTxHex)
       .sign.withWallet()
       .completeProgram();
-    return yield* signedTx.submitProgram();
+    return yield* signedTx.submitProgram().pipe(
+      Effect.timeoutFail({
+        duration: `${timeoutMs} millis`,
+        onTimeout: () =>
+          new TxSubmitError({
+            message: `Timed out after ${timeoutMs}ms while submitting L1 commitment tx (header_hash=${headerHashHex})`,
+            cause: "Timed out waiting for submitProgram()",
+            txHash: "<unknown>",
+          }),
+      }),
+    );
   }).pipe(
     Effect.mapError((e) => {
       const commonMsg = "Failed to submit previously built and signed tx";
       if (e._tag === "TxSubmitError") {
         return new TxSubmitError({
-          message: commonMsg,
+          message: `${commonMsg}: ${e.message}`,
           cause: e,
           txHash: "<unknown>",
         });
@@ -354,6 +375,7 @@ export const submitEarliestBlock = Effect.gen(function* () {
         yield* Effect.logInfo("🔗 ✉️  Submitting block commitment...");
         const txHash = yield* submitSignedTxCBOR(
           blockEntry[BlocksDB.Columns.L1_CBOR],
+          SDK.bufferToHex(blockEntry[BlocksDB.Columns.HEADER_HASH]),
         );
         yield* Effect.logInfo(`🔗 🚀 Block commitment submitted: ${txHash}`);
         yield* extractL1CommitmentFeeLovelace(

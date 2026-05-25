@@ -76,9 +76,14 @@ const COMMIT_ENDPOINT: string = "commit";
 const RESET_ENDPOINT: string = "reset";
 const SUBMIT_ENDPOINT: string = "submit";
 const STATE_QUEUE_ENDPOINT: string = "stateQueue";
+const STATE_QUEUE_ROOT_UNIT_DIAGNOSTICS_ENDPOINT: string =
+  "stateQueue/root-unit-diagnostics";
+const STATE_QUEUE_REPAIR_ROOT_UNITS_ENDPOINT: string =
+  "stateQueue/repair-root-units";
 const COMMITMENT_WALLET_BALANCE_ENDPOINT: string = "commitment-wallet/balance";
 const HEALTH_LIVE_ENDPOINT: string = "health/live";
 const HEALTH_READY_ENDPOINT: string = "health/ready";
+const COMMITMENT_WALLET_BALANCE_QUERY_TIMEOUT_MS = 4_000;
 
 const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
@@ -300,14 +305,72 @@ const getBlockHandler = Effect.gen(function* () {
 
 const getInitHandler = Effect.gen(function* () {
   yield* Effect.logInfo(`✨ Initialization request received`);
-  const txHash = yield* Initialization.program;
-  yield* Genesis.program;
-  yield* Effect.logInfo(
-    `GET /${INIT_ENDPOINT} - Initialization successful: ${txHash}`,
+  const globals = yield* Globals;
+  const clearResetInProgress = Ref.set(globals.RESET_IN_PROGRESS, false).pipe(
+    Effect.catchAllCause((cause) =>
+      Effect.logWarning(
+        `🚧 Failed to clear RESET_IN_PROGRESS after init attempt. cause=${String(cause)}`,
+      ),
+    ),
   );
-  return yield* HttpServerResponse.json({
-    message: `Initiation successful: ${txHash}`,
-  });
+  const lockAcquired = yield* Ref.modify(
+    globals.RESET_IN_PROGRESS,
+    (inProgress): [boolean, boolean] =>
+      inProgress ? [false, true] : [true, true],
+  );
+
+  if (!lockAcquired) {
+    yield* Effect.logWarning(
+      `GET /${INIT_ENDPOINT} - initialization rejected because another reset/repair/init action is in progress`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: "Reset already in progress" },
+      { status: Http2Constants.HTTP_STATUS_CONFLICT },
+    );
+  }
+
+  return yield* Effect.gen(function* () {
+    const lucid = yield* Lucid;
+    const alwaysSucceeds = yield* AlwaysSucceedsContract;
+    const stateQueueAddress = alwaysSucceeds.stateQueue.spendingScriptAddress;
+    const rootUnit = alwaysSucceeds.stateQueue.policyId + SDK.NODE_ASSET_NAME;
+    const rootUnitUtxos = yield* Effect.tryPromise({
+      try: () => lucid.api.utxosAtWithUnit(stateQueueAddress, rootUnit),
+      catch: (e) =>
+        new SDK.LucidError({
+          message:
+            "Failed to query state-queue root unit before initialization",
+          cause: e,
+        }),
+    });
+
+    if (rootUnitUtxos.length > 0) {
+      const outRefs = rootUnitUtxos.map((u) => `${u.txHash}#${u.outputIndex}`);
+      yield* Effect.logWarning(
+        `GET /${INIT_ENDPOINT} - initialization blocked: state queue already has ${rootUnitUtxos.length} root unit UTxO(s). root_unit=${rootUnit} outrefs=${outRefs.join(",")}`,
+      );
+      return yield* HttpServerResponse.json(
+        {
+          error:
+            "State queue already initialized (or dirty). Refusing to mint another root unit.",
+          rootUnit,
+          stateQueueAddress,
+          count: rootUnitUtxos.length,
+          outRefs,
+        },
+        { status: Http2Constants.HTTP_STATUS_CONFLICT },
+      );
+    }
+
+    const txHash = yield* Initialization.program;
+    yield* Genesis.program;
+    yield* Effect.logInfo(
+      `GET /${INIT_ENDPOINT} - Initialization successful: ${txHash}`,
+    );
+    return yield* HttpServerResponse.json({
+      message: `Initiation successful: ${txHash}`,
+    });
+  }).pipe(Effect.ensuring(clearResetInProgress));
 }).pipe(
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", INIT_ENDPOINT, e)),
   Effect.catchTag("LucidError", (e) =>
@@ -378,29 +441,136 @@ const getMergeHandler = Effect.gen(function* () {
   ),
 );
 
-const getResetHandler = Effect.gen(function* () {
-  yield* Effect.logInfo(`🚧 Reset request received`);
-  yield* Reset.program;
+const createLockedActionHandler = (
+  endpoint: string,
+  successMessage: string,
+  actionProgram: Effect.Effect<void, any, any>,
+) =>
+  Effect.gen(function* () {
+    yield* Effect.logInfo(`GET /${endpoint} - request received`);
+    const globals = yield* Globals;
+    const lockAcquired = yield* Ref.modify(
+      globals.RESET_IN_PROGRESS,
+      (inProgress): [boolean, boolean] =>
+        inProgress ? [false, true] : [true, true],
+    );
 
-  return yield* HttpServerResponse.json({
-    message: `Collected all UTxOs successfully!`,
+    if (!lockAcquired) {
+      yield* Effect.logWarning(
+        `GET /${endpoint} - action already in progress; rejecting concurrent request`,
+      );
+      return yield* HttpServerResponse.json(
+        { error: "Reset already in progress" },
+        { status: Http2Constants.HTTP_STATUS_CONFLICT },
+      );
+    }
+
+    yield* actionProgram;
+
+    return yield* HttpServerResponse.json({
+      message: successMessage,
+    });
+  }).pipe(
+    Effect.catchTag("HttpBodyError", (e) => failWith500("GET", endpoint, e)),
+    Effect.catchTag("DatabaseError", (e) =>
+      handleDBGetFailure(endpoint, e),
+    ),
+    Effect.catchTag("TxSubmitError", (e) =>
+      handleTxGetFailure(endpoint, e),
+    ),
+    Effect.catchTag("TxSignError", (e) =>
+      handleTxGetFailure(endpoint, e),
+    ),
+    Effect.catchTag("TxConfirmError", (e) =>
+      handleTxGetFailure(endpoint, e),
+    ),
+    Effect.catchTag("LucidError", (e) =>
+      handleGenericGetFailure(endpoint, e),
+    ),
+  );
+
+const createResetHandler = (resetProgram: Effect.Effect<void, any, any>) =>
+  createLockedActionHandler(
+    RESET_ENDPOINT,
+    "Collected all UTxOs successfully!",
+    resetProgram,
+  );
+
+const createStateQueueRootUnitRepairHandler = (
+  repairProgram: Effect.Effect<void, any, any>,
+) =>
+  createLockedActionHandler(
+    STATE_QUEUE_REPAIR_ROOT_UNITS_ENDPOINT,
+    "State-queue root-unit repair completed successfully!",
+    repairProgram,
+  );
+
+const stateQueueRootUnitDiagnosticsSnapshot = Effect.gen(function* () {
+  const lucid = yield* Lucid;
+  const alwaysSucceeds = yield* AlwaysSucceedsContract;
+  const globals = yield* Globals;
+  const stateQueueAddress = alwaysSucceeds.stateQueue.spendingScriptAddress;
+  const rootUnit = alwaysSucceeds.stateQueue.policyId + SDK.NODE_ASSET_NAME;
+  const resetInProgress = yield* Ref.get(globals.RESET_IN_PROGRESS);
+  const utxos = yield* Effect.tryPromise({
+    try: () => lucid.api.utxosAtWithUnit(stateQueueAddress, rootUnit),
+    catch: (e) =>
+      new Error(
+        `Failed to query state-queue root unit UTxOs: ${e instanceof Error ? e.message : String(e)}`,
+      ),
   });
-}).pipe(
-  Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "reset", e)),
-  Effect.catchTag("DatabaseError", (e) =>
-    handleDBGetFailure(RESET_ENDPOINT, e),
-  ),
-  Effect.catchTag("TxSubmitError", (e) =>
-    handleTxGetFailure(RESET_ENDPOINT, e),
-  ),
-  Effect.catchTag("TxSignError", (e) => handleTxGetFailure(RESET_ENDPOINT, e)),
-  Effect.catchTag("TxConfirmError", (e) =>
-    handleTxGetFailure(RESET_ENDPOINT, e),
-  ),
-  Effect.catchTag("LucidError", (e) =>
-    handleGenericGetFailure(RESET_ENDPOINT, e),
-  ),
+  const outRefs = utxos.map((u) => `${u.txHash}#${u.outputIndex}`);
+
+  return {
+    status: utxos.length === 1 ? "ok" : ("invalid" as const),
+    resetInProgress,
+    stateQueueAddress,
+    rootUnit,
+    count: utxos.length,
+    outRefs,
+  };
+});
+
+const createStateQueueRootUnitDiagnosticsHandler = (
+  snapshotProgram: Effect.Effect<{
+    status: "ok" | "invalid";
+    resetInProgress: boolean;
+    stateQueueAddress: string;
+    rootUnit: string;
+    count: number;
+    outRefs: string[];
+  }>,
+) =>
+  Effect.gen(function* () {
+    const snapshot = yield* snapshotProgram;
+    return yield* HttpServerResponse.json(snapshot);
+  }).pipe(
+    Effect.catchAll((e) =>
+      Effect.gen(function* () {
+        const cause = e instanceof Error ? e.message : String(e);
+        yield* Effect.logWarning(
+          `GET /${STATE_QUEUE_ROOT_UNIT_DIAGNOSTICS_ENDPOINT} - diagnostics query failed: ${cause}`,
+        );
+        return yield* HttpServerResponse.json(
+          {
+            status: "error",
+            error: "Failed to query state-queue root-unit diagnostics",
+            cause,
+          },
+          { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
+        );
+      }),
+    ),
+  );
+
+const getResetHandler = createResetHandler(Reset.program);
+const getStateQueueRootUnitRepairHandler = createStateQueueRootUnitRepairHandler(
+  Reset.repairStateQueueRootUnitsProgram,
 );
+const getStateQueueRootUnitDiagnosticsHandler =
+  createStateQueueRootUnitDiagnosticsHandler(
+    stateQueueRootUnitDiagnosticsSnapshot,
+  );
 
 const getTxsOfAddressHandler = Effect.gen(function* () {
   const params = yield* HttpServerRequest.ParsedSearchParams;
@@ -591,11 +761,11 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
       );
 
       if (
-        snapshot.streamDepth >= submitIngressConfig.txQueueCapacity ||
+        snapshot.lagCount >= submitIngressConfig.txQueueCapacity ||
         snapshot.pendingCount >= submitIngressConfig.txQueueMaxPending
       ) {
         yield* Effect.logInfo(
-          `POST /${SUBMIT_ENDPOINT} - stream backpressure rejection: stream_depth=${snapshot.streamDepth} pending=${snapshot.pendingCount} max_depth=${submitIngressConfig.txQueueCapacity} max_pending=${submitIngressConfig.txQueueMaxPending}`,
+          `POST /${SUBMIT_ENDPOINT} - stream backpressure rejection: lag=${snapshot.lagCount} pending=${snapshot.pendingCount} max_lag=${submitIngressConfig.txQueueCapacity} max_pending=${submitIngressConfig.txQueueMaxPending}`,
         );
         yield* Metric.increment(txQueueBackpressureRejectedCounter);
         return yield* HttpServerResponse.json(
@@ -642,6 +812,10 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
   );
 
 export const postSubmitHandlerForTesting = postSubmitHandler;
+export const createResetHandlerForTesting = createResetHandler;
+export const createLockedActionHandlerForTesting = createLockedActionHandler;
+export const getStateQueueRootUnitDiagnosticsHandlerForTesting =
+  createStateQueueRootUnitDiagnosticsHandler;
 
 const getCommitmentWalletBalanceHandler = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
@@ -670,7 +844,15 @@ const getCommitmentWalletBalanceHandler = Effect.gen(function* () {
       new Error(
         `Failed to query commitment wallet UTxOs: ${e instanceof Error ? e.message : String(e)}`,
       ),
-  });
+  }).pipe(
+    Effect.timeoutFail({
+      duration: `${COMMITMENT_WALLET_BALANCE_QUERY_TIMEOUT_MS} millis`,
+      onTimeout: () =>
+        new Error(
+          `Timed out after ${COMMITMENT_WALLET_BALANCE_QUERY_TIMEOUT_MS}ms while querying commitment wallet UTxOs`,
+        ),
+    }),
+  );
   const lovelaceBalance = utxos.reduce(
     (sum, u) => sum + (u.assets.lovelace ?? 0n),
     0n,
@@ -703,6 +885,7 @@ const router = (
   | AlwaysSucceedsContract
   | HttpServerRequest.HttpServerRequest
   | Globals
+  | TxIngressQueue
 > =>
   HttpRouter.empty
     .pipe(
@@ -717,6 +900,14 @@ const router = (
       HttpRouter.get(`/${MERGE_ENDPOINT}`, getMergeHandler),
       HttpRouter.get(`/${RESET_ENDPOINT}`, getResetHandler),
       HttpRouter.get(`/${STATE_QUEUE_ENDPOINT}`, getStateQueueHandler),
+      HttpRouter.get(
+        `/${STATE_QUEUE_ROOT_UNIT_DIAGNOSTICS_ENDPOINT}`,
+        getStateQueueRootUnitDiagnosticsHandler,
+      ),
+      HttpRouter.get(
+        `/${STATE_QUEUE_REPAIR_ROOT_UNITS_ENDPOINT}`,
+        getStateQueueRootUnitRepairHandler,
+      ),
       HttpRouter.get(
         `/${COMMITMENT_WALLET_BALANCE_ENDPOINT}`,
         getCommitmentWalletBalanceHandler,
