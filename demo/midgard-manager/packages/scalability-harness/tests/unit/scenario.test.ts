@@ -6,7 +6,7 @@ const VALID_SCENARIO = {
   runId: 'baseline-100-800',
   nodeEndpoint: 'http://localhost:3000',
   prometheusEndpoint: 'http://localhost:9090',
-  outputDir: 'benchmark-runs',
+  outputDir: 'benchmark-runs/tmp',
   seed: 'test-seed',
   replayCorpusPath: 'scenarios/corpora/replay-baseline.json',
   transactionType: 'one-to-one',

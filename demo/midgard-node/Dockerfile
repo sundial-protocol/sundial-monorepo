@@ -4,12 +4,15 @@ RUN corepack enable
 FROM base AS build
 WORKDIR /workspace
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY midgard-sdk ./midgard-sdk/
-COPY midgard-node ./midgard-node/
-COPY midgard-ts ./midgard-ts/
+COPY midgard-sdk/package.json ./midgard-sdk/package.json
+COPY midgard-node/package.json ./midgard-node/package.json
+COPY midgard-ts/package.json ./midgard-ts/package.json
 ENV CI=true
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
   pnpm install --frozen-lockfile
+COPY midgard-sdk ./midgard-sdk/
+COPY midgard-node ./midgard-node/
+COPY midgard-ts ./midgard-ts/
 RUN pnpm --filter @al-ft/midgard-sdk run build
 RUN pnpm --filter sundial-node run build
 RUN pnpm --filter sundial-node deploy --prod --legacy /deploy

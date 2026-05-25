@@ -214,7 +214,7 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     processingFailedDelta: lookupCounterDeltaWithZeroBaselineFallback(
       counterDeltas,
       metricWindow,
-      'tx_submissions_processing_failed_total'
+      'tx_stream_fail_total'
     ),
     committedTxDelta,
     committedBlockDelta: lookupCounterDeltaWithZeroBaselineFallback(

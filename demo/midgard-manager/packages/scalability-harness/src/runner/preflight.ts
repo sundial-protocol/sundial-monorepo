@@ -670,7 +670,7 @@ async function checkCommitPipelineReady(
       }
     }
 
-    return fail(
+    return observe(
       'commit_pipeline_ready',
       `Commit pipeline is cold: commit_block_count_total=${last.commitValue}, submit_block_count_total=${last.submitValue} after ${COMMIT_PIPELINE_RECHECK_ATTEMPTS} rechecks.`,
       'Warm up the commit+submit pipeline so at least one block has been committed and submitted, then rerun preflight.'

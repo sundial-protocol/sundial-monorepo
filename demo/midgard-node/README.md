@@ -147,6 +147,45 @@ cd midgard-node
 pnpm test
 ```
 
+## HTTP Operational Endpoints
+
+Reset and state-queue diagnostics endpoints are useful before scalability or
+replay runs.
+
+- `GET /reset`
+  - Starts a reset operation.
+  - If a reset is already in progress, the node returns `409 Conflict`:
+    `{"error":"Reset already in progress"}`.
+  - This prevents concurrent resets from racing each other.
+- `GET /stateQueue/root-unit-diagnostics`
+  - Returns current root-unit health for the state queue.
+  - Response shape:
+    - `status`: `ok` when exactly one root unit exists, otherwise `invalid`.
+    - `resetInProgress`: current in-memory reset lock state.
+    - `stateQueueAddress`: address queried.
+    - `rootUnit`: unit queried (`policyId + NODE_ASSET_NAME`).
+    - `count`: number of matching UTxOs found.
+    - `outRefs`: matching outrefs (`txHash#outputIndex`).
+  - On provider/query failure, returns `503 Service Unavailable` with
+    `status: "error"`.
+- `GET /stateQueue/repair-root-units`
+  - Runs a targeted repair that burns duplicate state-queue root units when
+    `count > 1`.
+  - This endpoint is intended for recovery when full `/reset` is too slow for
+    deep historical state.
+  - If another reset/repair is already in progress, returns `409 Conflict`:
+    `{"error":"Reset already in progress"}`.
+  - Successful repair sets root-unit count to `0`; run `GET /init` once after
+    repair to mint a fresh single root unit.
+
+Quick checks:
+
+```sh
+curl -i http://localhost:3000/reset
+curl -s http://localhost:3000/stateQueue/root-unit-diagnostics | jq .
+curl -i http://localhost:3000/stateQueue/repair-root-units
+```
+
 ## Operational Metrics
 
 When the node runs with monitoring enabled, Prometheus metrics include block

@@ -5,7 +5,7 @@
   "prometheusEndpoint": "http://localhost:9090",
   "lokiEndpoint": "http://localhost:3100",
   "tempoEndpoint": "http://localhost:3200",
-  "outputDir": "benchmark-runs",
+  "outputDir": "benchmark-runs/tmp",
   "seed": "warmup-2026-05-18",
   "l1ProviderMode": "emulator",
   "walletMode": "external-key",

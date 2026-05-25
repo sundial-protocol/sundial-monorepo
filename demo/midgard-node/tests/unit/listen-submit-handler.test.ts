@@ -34,6 +34,7 @@ const makeQueueStub = (
     pendingCount: 0,
     lagCount: 0,
   }),
+  clear: Effect.void,
   ...overrides,
 });
 

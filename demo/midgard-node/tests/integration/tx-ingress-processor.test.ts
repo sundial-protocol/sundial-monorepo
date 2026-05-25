@@ -33,6 +33,7 @@ const makeQueueStub = (
       pendingCount: 0,
       lagCount: messages.length,
     }),
+    clear: Effect.void,
   };
 
   return { queue, ackSpy, failedSpy };

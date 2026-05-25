@@ -132,7 +132,7 @@ const makeConfig = Effect.gen(function* () {
     "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
   ).pipe(Config.withDefault(20_000_000));
   const txQueueCapacity = yield* Config.integer("TX_QUEUE_CAPACITY").pipe(
-    Config.withDefault(10_000),
+    Config.withDefault(250_000),
   );
   const txQueueMaxPending = yield* Config.integer("TX_QUEUE_MAX_PENDING").pipe(
     Config.withDefault(20_000),

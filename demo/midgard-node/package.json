@@ -39,7 +39,7 @@
     "docker:down:tempo": "docker compose rm -sfv tempo",
     "docker:down:all": "npm run docker:down:node && npm run docker:down:postgres && npm run docker:down:redis && npm run docker:down:prometheus && npm run docker:down:loki && npm run docker:down:promtail && npm run docker:down:cadvisor && npm run docker:down:grafana && npm run docker:down:tempo-init && npm run docker:down:tempo",
     "docker:restart:node:simple": "docker compose up -d --no-deps --force-recreate node",
-    "docker:restart:node:full": "docker compose up -d --no-deps --build --force-recreate node",
+    "docker:restart:node:full": "bash ./scripts/docker/restart-node-full.sh",
     "docker:restart:postgres": "docker compose up -d --no-deps --force-recreate postgres",
     "docker:restart:redis": "docker compose up -d --no-deps --force-recreate redis",
     "docker:restart:prometheus": "docker compose up -d --no-deps --force-recreate prometheus",

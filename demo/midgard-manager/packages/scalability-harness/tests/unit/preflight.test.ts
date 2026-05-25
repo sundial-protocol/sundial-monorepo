@@ -180,7 +180,7 @@ describe('runExecutionReadinessPreflight', () => {
           tx_submissions_enqueued_total: [],
           tx_submissions_rejected_total: [],
           tx_submissions_mempool_accepted_total: [],
-          tx_submissions_processing_failed_total: [],
+          tx_stream_fail_total: [],
           // commit pipeline readiness is now a separate blocking gate; keep these warm
           // here so this test remains focused on required_metrics_presence behavior.
           commit_block_count_total: [{ value: [1, '1'] }],
@@ -276,7 +276,7 @@ describe('runExecutionReadinessPreflight', () => {
     expect(backlogCheck?.summary).toMatch(/Submit backlog increased slightly during preflight/i);
   });
 
-  it('blocks when commit pipeline is cold at run start', async () => {
+  it('does not block when commit pipeline is cold at run start', async () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-commit-cold-'));
     const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
       dependencies: {
@@ -292,9 +292,12 @@ describe('runExecutionReadinessPreflight', () => {
       },
     });
 
-    expect(result.passed).toBe(false);
-    expect(result.classification).toBe('Blocked');
-    expect(result.checks.find((c) => c.name === 'commit_pipeline_ready')?.passed).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.classification).toBe('Passed');
+    const commitCheck = result.checks.find((c) => c.name === 'commit_pipeline_ready');
+    expect(commitCheck?.passed).toBe(false);
+    expect(commitCheck?.blocking).toBe(false);
+    expect(commitCheck?.summary).toMatch(/Commit pipeline is cold/i);
   });
 
   it('blocks when artifact output directory is not writable', async () => {

@@ -5,7 +5,6 @@ import { Address } from "@lucid-evolution/lucid";
 import * as SDK from "@al-ft/midgard-sdk";
 import {
   DatabaseError,
-  NotFoundError,
   clearTable,
   sqlErrorToDatabaseError,
 } from "@/database/utils/common.js";
@@ -184,15 +183,9 @@ export const aggregateProcessedTxs = (
         const ledgerEntry = inputLedgerEntriesByOutRef.get(spentOutRefHex);
 
         if (ledgerEntry === undefined) {
-          yield* new NotFoundError({
-            message: `Missing spent outref ledger entry during address history aggregation`,
-            cause: {
-              referenceLedgerTableName,
-              spentOutRefHex,
-            },
-            table: referenceLedgerTableName,
-            txIdHex: processedTx.txId.toString("hex"),
-          });
+          yield* Effect.logDebug(
+            `${tableName} db: spent outref not found in ${referenceLedgerTableName}; skipping input address tracking. txId=${processedTx.txId.toString("hex")} spentOutRef=${spentOutRefHex}`,
+          );
           continue;
         }
 

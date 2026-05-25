@@ -13,6 +13,7 @@ utils.log
 # temp directory
 .temp
 .tmp
+tmp
 audits
 .terraform/
 *.tfstate

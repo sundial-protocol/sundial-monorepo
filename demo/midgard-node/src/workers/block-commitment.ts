@@ -37,6 +37,14 @@ import { SqlClient } from "@effect/sql";
 const sumBufferBytes = (buffers: readonly Buffer[]): number =>
   buffers.reduce((acc, next) => acc + next.length, 0);
 
+type NoopCommitmentResult = {
+  noOpReason: "no_events_in_window";
+};
+
+const NOOP_COMMITMENT_RESULT: NoopCommitmentResult = {
+  noOpReason: "no_events_in_window",
+};
+
 const buildPreflightWindowStats = (events: BlocksDB.Events): BlocksDB.Stats => {
   const { withdrawals, txOrders, txRequests, deposits } = events;
   return {
@@ -57,7 +65,7 @@ const buildPreflightWindowStats = (events: BlocksDB.Events): BlocksDB.Stats => {
 const mainProgram = (
   ledgerTrie: MidgardMpt,
 ): Effect.Effect<
-  string | BlocksDB.Stats,
+  string | BlocksDB.Stats | NoopCommitmentResult,
   | SDK.CborDeserializationError
   | SDK.CborSerializationError
   | SDK.CmlDeserializationError
@@ -113,6 +121,12 @@ const mainProgram = (
             yield* Effect.logWarning(
               `Commitment preflight threshold breach: header_hash=${latestBlock[BlocksDB.Columns.HEADER_HASH].toString("hex")} breaches=${thresholdBreaches.join(",")} tx_requests=${preflightStats[BlocksDB.Columns.TX_REQUESTS_COUNT]}/${nodeConfig.COMMITMENT_WINDOW_WARN_TX_REQUESTS} total_events=${totalEventsCount}/${nodeConfig.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS} total_events_size_bytes=${preflightStats[BlocksDB.Columns.TOTAL_EVENTS_SIZE]}/${nodeConfig.COMMITMENT_WINDOW_WARN_TOTAL_BYTES}`,
             );
+          }
+          if (totalEventsCount === 0) {
+            yield* Effect.logInfo(
+              "No events in commitment window; skipping empty block commitment.",
+            );
+            return NOOP_COMMITMENT_RESULT;
           }
           yield* ledgerTrie.checkpoint();
 
@@ -201,6 +215,13 @@ const wrapper = (ledgerTrie: MidgardMpt) =>
       const output: WorkerOutput = {
         type: "FailureOutput",
         error: result,
+      };
+      return output;
+    }
+    if ("noOpReason" in result) {
+      const output: WorkerOutput = {
+        type: "NoopCommitmentOutput",
+        reason: result.noOpReason,
       };
       return output;
     }

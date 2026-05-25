@@ -63,7 +63,7 @@ function makeWindowSummary(
       makeCounterDelta('tx_submissions_enqueued_total', o.enqueuedDelta),
       makeCounterDelta('tx_submissions_rejected_total', o.rejectedDelta),
       makeCounterDelta('tx_submissions_mempool_accepted_total', o.mempoolAcceptedDelta),
-      makeCounterDelta('tx_submissions_processing_failed_total', o.processingFailedDelta),
+      makeCounterDelta('tx_stream_fail_total', o.processingFailedDelta),
       makeCounterDelta('commit_block_tx_count_total', o.committedTxDelta),
       makeCounterDelta('commit_block_count_total', o.committedBlockDelta),
       makeCounterDelta('submit_block_count_total', o.submittedBlockDelta),
@@ -370,7 +370,7 @@ describe('buildTierSummary — normal tier', () => {
     expect(s.mempoolAcceptedDelta).toBe(540);
   });
 
-  it('extracts processingFailedDelta from tx_submissions_processing_failed_total', () => {
+  it('extracts processingFailedDelta from tx_stream_fail_total', () => {
     const s = buildTierSummary(
       makeInput({ windowSummary: makeWindowSummary({ processingFailedDelta: 3 }) })
     );

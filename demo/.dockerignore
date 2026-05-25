@@ -10,3 +10,11 @@ coverage
 .tmp
 temp
 gitleaks-report.json
+
+# Midgard node runtime/build-unrelated or mutable directories.
+# Excluding these prevents large and frequently changing files from
+# invalidating Docker build cache layers.
+midgard-node/infra
+midgard-node/db
+midgard-node/test-mpt-db
+midgard-node/tempo-data
