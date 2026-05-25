@@ -44,13 +44,13 @@ describe('isCounter', () => {
   });
 
   it('returns false for gauge metrics', () => {
-    expect(isCounter('tx_queue_size')).toBe(false);
-    expect(isCounter('tx_queue_peak_size')).toBe(false);
+    expect(isCounter('tx_stream_depth')).toBe(false);
+    expect(isCounter('tx_stream_depth_peak')).toBe(false);
     expect(isCounter('mempool_tx_count')).toBe(false);
   });
 
   it('returns false for up with label selector', () => {
-    expect(isCounter('up{job="midgard_nodes"}')).toBe(false);
+    expect(isCounter('up{job="sundial_nodes"}')).toBe(false);
   });
 
   it('returns false for metrics wrapped in rate()', () => {
@@ -253,7 +253,7 @@ describe('computeCounterDelta', () => {
 // ---------------------------------------------------------------------------
 
 const COUNTER_QUERY = 'tx_submissions_enqueued_total';
-const GAUGE_QUERY = 'tx_queue_size';
+const GAUGE_QUERY = 'tx_stream_depth';
 
 function makeWindow(overrides?: Partial<TierMetricWindow>): TierMetricWindow {
   return {
@@ -348,7 +348,7 @@ const T0 = new Date('2026-05-18T10:00:00.000Z');
 const T1 = new Date('2026-05-18T10:01:00.000Z');
 const T2 = new Date('2026-05-18T10:01:00.000Z');
 const T3 = new Date('2026-05-18T10:01:30.000Z');
-const QUERIES = ['tx_submissions_enqueued_total', 'tx_queue_size'] as const;
+const QUERIES = ['tx_submissions_enqueued_total', 'tx_stream_depth'] as const;
 
 function makeVectorResponse(value: number) {
   return {

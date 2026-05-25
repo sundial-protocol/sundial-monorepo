@@ -92,7 +92,8 @@ program
   .option('--replay-count <number>', 'Maximum number of replay entries to consume')
   .action(async (options: GeneratorOptions) => {
     try {
-      let walletSeedOrPrivateKey = options.privateKey;
+      const walletPrivateKeyFromEnv = process.env.WALLET_PRIVATE_KEY;
+      let walletSeedOrPrivateKey = options.privateKey ?? walletPrivateKeyFromEnv;
       let initialUTxO;
 
       if (options.testWallet) {
@@ -115,7 +116,11 @@ program
 
         console.log(chalk.gray(`Generated test wallet with address: ${wallet.address}`));
       } else if (!walletSeedOrPrivateKey) {
-        console.error(chalk.red('Error: Either --private-key or --test-wallet must be provided'));
+        console.error(
+          chalk.red(
+            'Error: Either --private-key, WALLET_PRIVATE_KEY environment variable, or --test-wallet must be provided'
+          )
+        );
         process.exit(1);
       }
 

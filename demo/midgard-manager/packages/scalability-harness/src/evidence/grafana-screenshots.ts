@@ -19,7 +19,7 @@ const DEFAULT_THEME = 'light';
 const ONE_MINUTE_MS = 60_000;
 
 const PEAK_METRICS = [
-  'tx_queue_size',
+  'tx_stream_depth',
   'mempool_tx_count',
   'commit_block_duration_seconds',
 ] as const;
@@ -584,7 +584,7 @@ export class GrafanaScreenshotService {
     if (reason === 'prometheus_down') {
       return (
         findFirstSeriesValueByPredicate(
-          window.ranges['up{job="midgard_nodes"}'],
+          window.ranges['up{job="sundial_nodes"}'],
           (value) => value <= 0
         ) ?? fallback
       );
@@ -612,10 +612,10 @@ export class GrafanaScreenshotService {
 
     if (reason === 'recovery_queue_exceeded') {
       if (stopConditions.maxRecoveryQueueSize === undefined) return fallback;
-      const baseline = window.before['tx_queue_size'] ?? 0;
+      const baseline = window.before['tx_stream_depth'] ?? 0;
       return (
         findFirstSeriesValueByPredicate(
-          window.ranges['tx_queue_size'],
+          window.ranges['tx_stream_depth'],
           (value) => value - baseline > stopConditions.maxRecoveryQueueSize!
         ) ?? fallback
       );

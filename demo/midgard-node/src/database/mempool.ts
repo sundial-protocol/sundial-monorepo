@@ -53,6 +53,22 @@ const chunkProcessedTxs = (processedTxs: ProcessedTx[]): ProcessedTx[][] => {
   return chunks;
 };
 
+const applyProcessedTxToMempoolProjection = (
+  processedTx: ProcessedTx,
+): Effect.Effect<void, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
+      yield* AddressHistoryDB.aggregateProcessedTxs(
+        MempoolLedgerDB.tableName,
+        [processedTx],
+        AddressHistoryDB.Status.SLATED,
+      );
+
+    yield* AddressHistoryDB.upsertEntries(addressHistoryEntries);
+    yield* MempoolLedgerDB.insert(collectiveProduced);
+    yield* MempoolLedgerDB.clearUTxOs(collectiveSpent);
+  });
+
 const toProducedColumns = (
   processedTx: ProcessedTx,
 ): {
@@ -198,25 +214,27 @@ export const insertMultiple = (
               normalizeTxIdToHex(row[Tx.Columns.TX_ID]),
             ),
           );
-          const newlyInsertedProcessedTxs = txChunk.filter((processedTx) =>
-            insertedTxIdsHex.has(processedTx.txId.toString("hex")),
-          );
+          const projectedTxIdsHex = new Set<string>();
+          const newlyInsertedProcessedTxs = txChunk.filter((processedTx) => {
+            const txIdHex = processedTx.txId.toString("hex");
+            if (!insertedTxIdsHex.has(txIdHex) || projectedTxIdsHex.has(txIdHex)) {
+              return false;
+            }
+            projectedTxIdsHex.add(txIdHex);
+            return true;
+          });
 
           if (newlyInsertedProcessedTxs.length === 0) {
             return 0;
           }
 
-          const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
-            yield* AddressHistoryDB.aggregateProcessedTxs(
-              MempoolLedgerDB.tableName,
-              newlyInsertedProcessedTxs,
-              AddressHistoryDB.Status.SLATED,
-            );
-
-          // Apply projection changes in the same transaction as row insertion.
-          yield* AddressHistoryDB.upsertEntries(addressHistoryEntries);
-          yield* MempoolLedgerDB.insert(collectiveProduced);
-          yield* MempoolLedgerDB.clearUTxOs(collectiveSpent);
+          // Apply projection changes in insertion order so a later tx can
+          // spend outputs produced by an earlier tx in the same stream chunk.
+          yield* Effect.forEach(
+            newlyInsertedProcessedTxs,
+            applyProcessedTxToMempoolProjection,
+            { discard: true },
+          );
 
           return insertedTxRows.length;
         }),

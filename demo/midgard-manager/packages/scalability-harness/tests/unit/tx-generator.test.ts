@@ -319,6 +319,25 @@ describe('startTxGenerator', () => {
     expect(args).toContain('--test-wallet');
   });
 
+  it('omits --test-wallet when scenario walletMode is external-key', async () => {
+    const { spawnFn, ...spawner } = makeMockSpawner(proc);
+    proc.simulateExit(0);
+
+    await startTxGenerator(
+      {
+        ...BASE_SCENARIO,
+        walletMode: 'external-key',
+      },
+      BASE_TIER,
+      writer,
+      '/tmp/tier-0',
+      { spawner }
+    );
+
+    const [, args] = spawnFn.mock.calls[0];
+    expect(args).not.toContain('--test-wallet');
+  });
+
   it('passes --ratio when transactionType is mixed', async () => {
     const { spawnFn, ...spawner } = makeMockSpawner(proc);
     proc.simulateExit(0);

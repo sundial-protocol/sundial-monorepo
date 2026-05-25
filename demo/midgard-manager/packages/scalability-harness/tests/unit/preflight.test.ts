@@ -39,6 +39,8 @@ function makeScenario(outputDir: string): ScalabilityScenario {
 function makePromFactory(overrides?: Partial<Record<string, Array<{ value: [number, string] }>>>) {
   const defaultSeries: Array<{ value: [number, string] }> = [{ value: [1, '1'] }];
   const defaultMempoolSeries: Array<{ value: [number, string] }> = [{ value: [1, '0'] }];
+  const defaultStreamDepthSeries: Array<{ value: [number, string] }> = [{ value: [1, '0'] }];
+  const defaultStreamPendingSeries: Array<{ value: [number, string] }> = [{ value: [1, '0'] }];
   return () => ({
     queryInstant: async (query: string) => {
       if (overrides && query in overrides) {
@@ -46,6 +48,12 @@ function makePromFactory(overrides?: Partial<Record<string, Array<{ value: [numb
       }
       if (query === 'mempool_tx_count') {
         return defaultMempoolSeries;
+      }
+      if (query === 'tx_stream_depth') {
+        return defaultStreamDepthSeries;
+      }
+      if (query === 'tx_stream_pending') {
+        return defaultStreamPendingSeries;
       }
       return defaultSeries;
     },
@@ -86,7 +94,7 @@ describe('runExecutionReadinessPreflight', () => {
         delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
-          'up{job="midgard_nodes"}': [{ value: [1, '0'] }],
+          'up{job="sundial_nodes"}': [{ value: [1, '0'] }],
         }),
         txGeneratorInvoker: PASSING_TX_INVOKER,
         nodeBalanceFetcher: NULL_BALANCE_FETCHER,
@@ -105,8 +113,8 @@ describe('runExecutionReadinessPreflight', () => {
         delay: NOOP_PREFLIGHT_DELAY,
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: makePromFactory({
-          // tx_queue_size is always-present — its absence means the node is not running fibers
-          tx_queue_size: [],
+          // tx_stream_depth is always-present — its absence means the node is not running fibers
+          tx_stream_depth: [],
         }),
         txGeneratorInvoker: PASSING_TX_INVOKER,
         nodeBalanceFetcher: NULL_BALANCE_FETCHER,
@@ -134,6 +142,29 @@ describe('runExecutionReadinessPreflight', () => {
     expect(result.passed).toBe(false);
     expect(result.classification).toBe('Blocked');
     expect(result.checks.find((c) => c.name === 'no_preexisting_mempool_backlog')?.passed).toBe(
+      false
+    );
+  });
+
+  it('blocks when pre-existing tx stream backlog is non-zero', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-stream-backlog-'));
+    const result = await runExecutionReadinessPreflight(makeScenario(outputDir), {
+      dependencies: {
+        delay: NOOP_PREFLIGHT_DELAY,
+        probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+        prometheusClientFactory: makePromFactory({
+          tx_stream_depth: [{ value: [1, '1200'] }],
+          tx_stream_pending: [{ value: [1, '700'] }],
+          mempool_tx_count: [{ value: [1, '0'] }],
+        }),
+        txGeneratorInvoker: PASSING_TX_INVOKER,
+        nodeBalanceFetcher: NULL_BALANCE_FETCHER,
+      },
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.classification).toBe('Blocked');
+    expect(result.checks.find((c) => c.name === 'no_preexisting_stream_backlog')?.passed).toBe(
       false
     );
   });
@@ -183,7 +214,7 @@ describe('runExecutionReadinessPreflight', () => {
           commit_block_count_total: [{ value: [1, '319'] }],
           submit_block_count_total: [{ value: [1, '317'] }],
           mempool_tx_count: [{ value: [1, '0'] }],
-          tx_queue_size: [{ value: [1, '0'] }],
+          tx_stream_depth: [{ value: [1, '0'] }],
         }),
         txGeneratorInvoker: PASSING_TX_INVOKER,
         nodeBalanceFetcher: NULL_BALANCE_FETCHER,
@@ -221,7 +252,10 @@ describe('runExecutionReadinessPreflight', () => {
               submitCalls += 1;
               return [{ value: [1, '99'] as [number, string] }];
             }
-            if (query === 'tx_queue_size') {
+            if (query === 'tx_stream_depth') {
+              return [{ value: [1, '0'] as [number, string] }];
+            }
+            if (query === 'tx_stream_pending') {
               return [{ value: [1, '0'] as [number, string] }];
             }
             if (query === 'mempool_tx_count') {
@@ -303,6 +337,32 @@ describe('runExecutionReadinessPreflight', () => {
     expect(result.passed).toBe(false);
     expect(result.checks.find((c) => c.name === 'tx_generator_invocable')?.passed).toBe(false);
     expect(result.blockedReasons).toContain('fix it');
+  });
+
+  it('blocks when walletMode is external-key and WALLET_PRIVATE_KEY is missing', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'harness-preflight-wallet-mode-'));
+    const result = await runExecutionReadinessPreflight(
+      {
+        ...makeScenario(outputDir),
+        walletMode: 'external-key',
+      },
+      {
+        dependencies: {
+          delay: NOOP_PREFLIGHT_DELAY,
+          probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
+          prometheusClientFactory: makePromFactory(),
+          txGeneratorInvoker: PASSING_TX_INVOKER,
+          nodeBalanceFetcher: NULL_BALANCE_FETCHER,
+        },
+      }
+    );
+
+    const walletModeCheck = result.checks.find((c) => c.name === 'wallet_mode_readiness');
+    expect(walletModeCheck).toBeDefined();
+    expect(walletModeCheck?.passed).toBe(false);
+    expect(walletModeCheck?.blocking).not.toBe(false);
+    expect(walletModeCheck?.summary).toMatch(/WALLET_PRIVATE_KEY/i);
+    expect(result.passed).toBe(false);
   });
 
   it('observes (non-blocking) when commitment wallet balance is unavailable', async () => {

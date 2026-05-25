@@ -154,7 +154,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     slug: 'tx-queue',
     title: 'Midgard Transactions in Queue',
     section: 'Queue and Mempool',
-    metric: 'tx_queue_size',
+    metric: 'tx_stream_depth',
     rate: false,
     unit: 'txs',
     formatY: 'default',

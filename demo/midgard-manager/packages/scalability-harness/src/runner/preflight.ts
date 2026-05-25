@@ -26,6 +26,8 @@ const COMMIT_PIPELINE_RECHECK_DELAY_MS = 2_000;
 const MEMPOOL_BACKLOG_RECHECK_ATTEMPTS = 3;
 const MEMPOOL_BACKLOG_RECHECK_DELAY_MS = 200;
 const MAX_PREFLIGHT_MEMPOOL_TX_COUNT = 0;
+const STREAM_BACKLOG_RECHECK_ATTEMPTS = 3;
+const STREAM_BACKLOG_RECHECK_DELAY_MS = 200;
 const FALLBACK_FEE_PER_BLOCK_LOVELACE = 300_000n;
 const FALLBACK_BLOCK_RATE_PER_SECOND = 1 / 30;
 const BALANCE_SAFETY_MULTIPLIER_NUMERATOR = 3n;
@@ -41,6 +43,8 @@ export const PREFLIGHT_CHECK_NAMES = [
   'no_unsubmitted_block_backlog',
   'commit_pipeline_ready',
   'no_preexisting_mempool_backlog',
+  'no_preexisting_stream_backlog',
+  'wallet_mode_readiness',
   'artifact_directory_writable',
   'tx_generator_invocable',
   'commitment_wallet_balance',
@@ -172,12 +176,12 @@ async function checkPrometheusScrapeHealth(
     ) ?? new PrometheusClient(scenario.prometheusEndpoint, dependencies?.prometheusFetcher);
 
   try {
-    const up = await client.queryInstant('up{job="midgard_nodes"}');
+    const up = await client.queryInstant('up{job="sundial_nodes"}');
     if (up.length === 0) {
       return fail(
         'prometheus_scrape_health',
-        'Prometheus scrape-health query returned no series for up{job="midgard_nodes"}.',
-        'Fix Prometheus target labels/job naming so midgard node appears under job="midgard_nodes".'
+        'Prometheus scrape-health query returned no series for up{job="sundial_nodes"}.',
+        'Fix Prometheus target labels/job naming so midgard node appears under job="sundial_nodes".'
       );
     }
 
@@ -480,6 +484,117 @@ async function checkNoPreexistingMempoolBacklog(
       'Verify Prometheus is reachable and exposes mempool_tx_count.'
     );
   }
+}
+
+async function checkNoPreexistingStreamBacklog(
+  scenario: ScalabilityScenario,
+  dependencies?: PreflightDependencies
+): Promise<PreflightCheckResult> {
+  const client =
+    dependencies?.prometheusClientFactory?.(
+      scenario.prometheusEndpoint,
+      dependencies.prometheusFetcher
+    ) ?? new PrometheusClient(scenario.prometheusEndpoint, dependencies?.prometheusFetcher);
+
+  try {
+    const queryStreamBacklog = async (): Promise<
+      | { ok: true; streamDepth: number; pendingCount: number }
+      | { ok: false; reason: string; actionableReason: string }
+    > => {
+      const [streamDepthSeries, pendingSeries] = await Promise.all([
+        client.queryInstant('tx_stream_depth'),
+        client.queryInstant('tx_stream_pending'),
+      ]);
+
+      if (streamDepthSeries.length === 0 || pendingSeries.length === 0) {
+        return {
+          ok: false,
+          reason:
+            'Could not evaluate pre-existing tx stream backlog: tx_stream_depth or tx_stream_pending is missing.',
+          actionableReason:
+            'Ensure tx_stream_depth and tx_stream_pending are exposed in Prometheus before running the harness.',
+        };
+      }
+
+      const streamDepth = parseFloat(streamDepthSeries[0].value[1]);
+      const pendingCount = parseFloat(pendingSeries[0].value[1]);
+      if (isNaN(streamDepth) || isNaN(pendingCount)) {
+        return {
+          ok: false,
+          reason:
+            'Could not evaluate pre-existing tx stream backlog: tx_stream_depth or tx_stream_pending is not numeric.',
+          actionableReason:
+            'Verify Prometheus returns numeric values for tx_stream_depth and tx_stream_pending.',
+        };
+      }
+      return { ok: true, streamDepth, pendingCount };
+    };
+
+    const initial = await queryStreamBacklog();
+    if (!initial.ok) {
+      return fail('no_preexisting_stream_backlog', initial.reason, initial.actionableReason);
+    }
+
+    if (initial.streamDepth <= 0 && initial.pendingCount <= 0) {
+      return pass(
+        'no_preexisting_stream_backlog',
+        `No pre-existing tx stream backlog detected (tx_stream_depth=${initial.streamDepth}, tx_stream_pending=${initial.pendingCount}).`
+      );
+    }
+
+    let last = initial;
+    const delay = getPreflightDelay(dependencies);
+    for (let attempt = 1; attempt <= STREAM_BACKLOG_RECHECK_ATTEMPTS; attempt += 1) {
+      await delay(STREAM_BACKLOG_RECHECK_DELAY_MS);
+      const probe = await queryStreamBacklog();
+      if (!probe.ok) {
+        return fail('no_preexisting_stream_backlog', probe.reason, probe.actionableReason);
+      }
+      last = probe;
+      if (probe.streamDepth <= 0 && probe.pendingCount <= 0) {
+        return pass(
+          'no_preexisting_stream_backlog',
+          `Transient tx stream backlog resolved before run start (depth: ${initial.streamDepth}→${probe.streamDepth}, pending: ${initial.pendingCount}→${probe.pendingCount}).`
+        );
+      }
+    }
+
+    return fail(
+      'no_preexisting_stream_backlog',
+      `Preflight detected tx stream backlog: tx_stream_depth ${initial.streamDepth}→${last.streamDepth}, tx_stream_pending ${initial.pendingCount}→${last.pendingCount} after ${STREAM_BACKLOG_RECHECK_ATTEMPTS} rechecks.`,
+      'Clear or recover tx-ingress stream backlog before running load tiers (for example, reset node state or allow tx processors to drain and ACK pending entries).'
+    );
+  } catch (err) {
+    return fail(
+      'no_preexisting_stream_backlog',
+      `Pre-existing tx stream backlog check failed: ${err instanceof Error ? err.message : String(err)}`,
+      'Verify Prometheus is reachable and exposes tx_stream_depth / tx_stream_pending.'
+    );
+  }
+}
+
+async function checkWalletModeReadiness(
+  scenario: ScalabilityScenario
+): Promise<PreflightCheckResult> {
+  const walletMode = scenario.walletMode ?? 'test-wallet';
+  if (walletMode === 'test-wallet') {
+    return observe(
+      'wallet_mode_readiness',
+      'walletMode=test-wallet: preflight cannot verify dynamic wallet provisioning before load starts.',
+      'For formal replay/scalability runs, prefer walletMode=external-key and set WALLET_PRIVATE_KEY to a pre-funded key whose UTxOs are initialized on the node.'
+    );
+  }
+
+  const walletPrivateKey = process.env.WALLET_PRIVATE_KEY;
+  if (walletPrivateKey === undefined || walletPrivateKey.trim().length === 0) {
+    return fail(
+      'wallet_mode_readiness',
+      'walletMode=external-key but WALLET_PRIVATE_KEY is missing.',
+      'Set WALLET_PRIVATE_KEY to a pre-funded key for tx-generator and rerun preflight.'
+    );
+  }
+
+  return pass('wallet_mode_readiness', 'walletMode=external-key with WALLET_PRIVATE_KEY present.');
 }
 
 async function checkCommitPipelineReady(
@@ -870,6 +985,8 @@ export async function runExecutionReadinessPreflight(
   checks.push(await checkNoUnsubmittedBlockBacklog(scenario, options.dependencies));
   checks.push(await checkCommitPipelineReady(scenario, options.dependencies));
   checks.push(await checkNoPreexistingMempoolBacklog(scenario, options.dependencies));
+  checks.push(await checkNoPreexistingStreamBacklog(scenario, options.dependencies));
+  checks.push(await checkWalletModeReadiness(scenario));
   checks.push(await checkArtifactDirectoryWritable(outputDir));
   checks.push(await checkTxGeneratorInvocable(cwd, options.dependencies));
   checks.push(await checkCommitmentWalletBalance(scenario, options.dependencies));

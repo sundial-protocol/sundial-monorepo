@@ -8,8 +8,6 @@ import packageJson from "../package.json" with { type: "json" };
 import { Effect, pipe } from "effect";
 import dotenv from "dotenv";
 import { NodeRuntime } from "@effect/platform-node";
-import { DatabaseError } from "@/database/utils/common.js";
-import { SqlError } from "@effect/sql";
 
 dotenv.config();
 const VERSION = packageJson.version;
@@ -62,22 +60,16 @@ program
   .action(async (_args, options) => {
     console.log("🌳 Midgard");
     const { withMonitoring } = options.opts();
-    const mainEffect: Effect.Effect<
-      void,
-      | DatabaseError
-      | SqlError.SqlError
-      | Services.ConfigError
-      | Services.DatabaseInitializationError,
-      never
-    > = pipe(
+    const mainEffect = pipe(
       runNode(withMonitoring),
+      Effect.provide(Services.RedisStreamsTxIngressQueueLive),
       Effect.provide(Services.NodeConfig.layer),
       Effect.provide(Services.AlwaysSucceedsContract.Default),
       Effect.provide(Services.Lucid.Default),
       Effect.provide(Services.Globals.Default),
     );
 
-    NodeRuntime.runMain(mainEffect, { teardown: undefined });
+    NodeRuntime.runMain(Effect.scoped(mainEffect), { teardown: undefined });
   });
 
 program.parse(process.argv);

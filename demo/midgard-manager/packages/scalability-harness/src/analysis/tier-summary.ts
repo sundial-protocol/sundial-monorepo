@@ -191,7 +191,7 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
   const l1CommitmentFeeLastLovelace =
     metricWindow?.afterLoad['l1_commitment_fee_lovelace_last'] ?? null;
 
-  const queueGauge = lookupGauge(gaugeSummaries, 'tx_queue_size');
+  const queueGauge = lookupGauge(gaugeSummaries, 'tx_stream_depth');
   const mempoolGauge = lookupGauge(gaugeSummaries, 'mempool_tx_count');
   const acceptedToCommitted = estimateAcceptedToCommittedLatency(metricWindow);
 
@@ -253,7 +253,7 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     observedCommittedTps: deriveTps(committedTxDelta, loadDurationSeconds),
     peakQueueSize: queueGauge?.peak ?? null,
     finalQueueSizeAfterRecovery: queueGauge?.final ?? null,
-    finalQueueDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(metricWindow, 'tx_queue_size'),
+    finalQueueDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(metricWindow, 'tx_stream_depth'),
     peakMempoolSize: mempoolGauge?.peak ?? null,
     finalMempoolSizeAfterRecovery: mempoolGauge?.final ?? null,
     finalMempoolDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(

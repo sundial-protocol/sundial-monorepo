@@ -72,7 +72,7 @@ function makeWindowSummary(
       makeCounterDelta('l1_commitment_fees_lovelace_total', o.l1CommitmentFeesDeltaLovelace),
     ],
     gaugeSummaries: [
-      makeGaugeSummary('tx_queue_size', o.queuePeak, o.queueFinal),
+      makeGaugeSummary('tx_stream_depth', o.queuePeak, o.queueFinal),
       makeGaugeSummary('mempool_tx_count', o.mempoolPeak, o.mempoolFinal),
     ],
   };
@@ -517,12 +517,12 @@ describe('buildTierSummary — normal tier', () => {
     expect(s.observedEnqueuedTps).not.toBeCloseTo(s.observedMempoolAcceptedTps as number, 2);
   });
 
-  it('extracts peakQueueSize from tx_queue_size gauge peak', () => {
+  it('extracts peakQueueSize from tx_stream_depth gauge peak', () => {
     const s = buildTierSummary(makeInput({ windowSummary: makeWindowSummary({ queuePeak: 50 }) }));
     expect(s.peakQueueSize).toBe(50);
   });
 
-  it('extracts finalQueueSizeAfterRecovery from tx_queue_size gauge final', () => {
+  it('extracts finalQueueSizeAfterRecovery from tx_stream_depth gauge final', () => {
     const s = buildTierSummary(makeInput({ windowSummary: makeWindowSummary({ queueFinal: 2 }) }));
     expect(s.finalQueueSizeAfterRecovery).toBe(2);
   });
@@ -538,9 +538,9 @@ describe('buildTierSummary — normal tier', () => {
           stoppedAt: STOPPED_AT,
           recoveryStartedAt: STOPPED_AT,
           recoveryStoppedAt: STOPPED_AT,
-          before: { tx_queue_size: 4 },
+          before: { tx_stream_depth: 4 },
           afterLoad: {},
-          afterRecovery: { tx_queue_size: 15 },
+          afterRecovery: { tx_stream_depth: 15 },
           ranges: {},
         },
       })

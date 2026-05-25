@@ -122,7 +122,15 @@ const submitSignedTxCBOR = (
   Effect.gen(function* () {
     const lucid = yield* Lucid;
     const signedTxHex = SDK.bufferToHex(l1CborBytes);
-    const signedTx = yield* lucid.api.fromTx(signedTxHex).completeProgram();
+    // Some commitment txs require an additional operator witness (e.g. merge
+    // signer) beyond the witness already embedded by the commitment worker.
+    // Re-signing with the merge wallet preserves existing witnesses while
+    // appending the currently required one before submit.
+    yield* lucid.switchToOperatorsMergingWallet;
+    const signedTx = yield* lucid.api
+      .fromTx(signedTxHex)
+      .sign.withWallet()
+      .completeProgram();
     return yield* signedTx.submitProgram();
   }).pipe(
     Effect.mapError((e) => {
@@ -476,6 +484,11 @@ export const blockSubmissionFiber = (
     );
     const action = submitEarliestBlock.pipe(
       Effect.withSpan("submit-blocks-fiber"),
+      Effect.ensuring(
+        refreshUnsubmittedBacklogGaugeFromDb.pipe(
+          Effect.catchAllCause(Effect.logWarning),
+        ),
+      ),
       Effect.catchAllCause(Effect.logWarning),
     );
     yield* Effect.repeat(action, schedule);

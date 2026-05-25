@@ -1,23 +1,70 @@
 import { fromHex } from "@lucid-evolution/lucid";
-import { Chunk, Effect, Metric, pipe, Queue, Ref, Schedule } from "effect";
+import { Effect, Metric, pipe, Ref, Schedule } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { MempoolDB } from "@/database/index.js";
-import { breakDownTx } from "@/utils.js";
+import { breakDownTx, ProcessedTx } from "@/utils.js";
 import { DatabaseError } from "@/database/utils/common.js";
-import { Database } from "@/services/database.js";
+import {
+  Database,
+  TxIngressMessage,
+  TxIngressQueue,
+  TxIngressQueueError,
+} from "@/services/index.js";
 
 const TX_QUEUE_PERSIST_CHUNK_SIZE = 100;
 
-const txQueueSizeGauge = Metric.gauge("tx_queue_size", {
-  description: "Tx queue size sampled before each drain cycle",
+const txStreamDepthGauge = Metric.gauge("tx_stream_depth", {
+  description:
+    "Tx ingress Redis stream depth sampled before each consume cycle",
   bigint: true,
 }).register();
 
-const txQueuePeakSizeGauge = Metric.gauge("tx_queue_peak_size", {
+const txStreamPeakDepthGauge = Metric.gauge("tx_stream_depth_peak", {
   description:
-    "High-water mark of tx queue size since fiber startup; never decreases on drain so Prometheus scrapes capture burst spikes between polling cycles",
+    "High-water mark of Redis stream depth since fiber startup to preserve burst visibility between scrapes",
   bigint: true,
 }).register();
+
+const txStreamPendingGauge = Metric.gauge("tx_stream_pending", {
+  description: "Pending entry count in the Redis consumer group for tx ingress",
+  bigint: true,
+}).register();
+
+const txStreamConsumerLagGauge = Metric.gauge("tx_stream_consumer_lag", {
+  description:
+    "Approximate number of stream entries that are not currently pending in the consumer group",
+  bigint: true,
+}).register();
+
+const txStreamAckCounter = Metric.counter("tx_stream_ack_total", {
+  description: "Acknowledged tx ingress messages after durable mempool insert",
+  bigint: true,
+  incremental: true,
+}).register();
+
+const txStreamProcessingFailCounter = Metric.counter("tx_stream_fail_total", {
+  description:
+    "Tx ingress message processing failures before durable insert, including malformed CBOR and persistence failures",
+  bigint: true,
+  incremental: true,
+}).register();
+
+const txStreamRetryCounter = Metric.counter("tx_stream_retry_total", {
+  description:
+    "Tx ingress messages left pending for retry because delivery attempts have not reached dead-letter threshold",
+  bigint: true,
+  incremental: true,
+}).register();
+
+const txStreamDeadLetterCounter = Metric.counter(
+  "tx_stream_dead_letter_total",
+  {
+    description:
+      "Tx ingress messages moved to the dead-letter stream after exceeding max delivery attempts",
+    bigint: true,
+    incremental: true,
+  },
+).register();
 
 const txMempoolAcceptedCounter = Metric.counter(
   "tx_submissions_mempool_accepted",
@@ -29,124 +76,214 @@ const txMempoolAcceptedCounter = Metric.counter(
   },
 ).register();
 
-const txProcessingFailedCounter = Metric.counter(
-  "tx_submissions_processing_failed",
-  {
-    description:
-      "A counter for tracking L2 transaction processing failures: incremented once per malformed-CBOR tx rejected during deserialization, and once per batch on mempool insertion errors",
-    bigint: true,
-    incremental: true,
-  },
-).register();
-
 export const txQueueProcessorMetrics = {
-  txQueueSizeGauge,
-  txQueuePeakSizeGauge,
+  txStreamDepthGauge,
+  txStreamPeakDepthGauge,
+  txStreamPendingGauge,
+  txStreamConsumerLagGauge,
+  txStreamAckCounter,
+  txStreamProcessingFailCounter,
+  txStreamRetryCounter,
+  txStreamDeadLetterCounter,
   txMempoolAcceptedCounter,
-  txProcessingFailedCounter,
 } as const;
 
+const partitionMessages = (
+  messages: readonly TxIngressMessage[],
+  chunkSize: number,
+): readonly (readonly TxIngressMessage[])[] => {
+  if (messages.length === 0) {
+    return [];
+  }
+
+  const chunks: TxIngressMessage[][] = [];
+  for (
+    let startIndex = 0;
+    startIndex < messages.length;
+    startIndex += chunkSize
+  ) {
+    chunks.push(messages.slice(startIndex, startIndex + chunkSize));
+  }
+  return chunks;
+};
+
+const registerFailedMessage = (
+  message: TxIngressMessage,
+  reason: string,
+  withMonitoring?: boolean,
+) =>
+  Effect.gen(function* () {
+    const txIngressQueue = yield* TxIngressQueue;
+    if (withMonitoring) {
+      yield* Metric.increment(txStreamProcessingFailCounter);
+    }
+
+    const disposition = yield* txIngressQueue.handleFailedMessage(
+      message,
+      reason,
+    );
+    if (!withMonitoring) {
+      return;
+    }
+
+    if (disposition === "dead_lettered") {
+      yield* Metric.increment(txStreamDeadLetterCounter);
+    } else {
+      yield* Metric.increment(txStreamRetryCounter);
+    }
+  });
+
 export const txQueueProcessorAction = (
-  txQueue: Queue.Dequeue<string>,
   txQueueDrainBatchSize: number,
   txParseConcurrency: number,
+  streamBlockMs: number,
   withMonitoring?: boolean,
   peakRef?: Ref.Ref<bigint>,
 ): Effect.Effect<
   void,
-  DatabaseError | SDK.CmlDeserializationError | SDK.DataCoercionError,
-  Database
+  | DatabaseError
+  | SDK.CmlDeserializationError
+  | SDK.DataCoercionError
+  | TxIngressQueueError,
+  Database | TxIngressQueue
 > =>
   Effect.gen(function* () {
-    const queueSize = yield* txQueue.size;
+    const txIngressQueue = yield* TxIngressQueue;
 
+    const snapshot = yield* txIngressQueue.snapshotMetrics;
     if (withMonitoring) {
-      yield* Metric.set(txQueueSizeGauge, BigInt(queueSize));
+      yield* Metric.set(txStreamDepthGauge, BigInt(snapshot.streamDepth));
+      yield* Metric.set(txStreamPendingGauge, BigInt(snapshot.pendingCount));
+      yield* Metric.set(txStreamConsumerLagGauge, BigInt(snapshot.lagCount));
       if (peakRef !== undefined) {
         const newPeak = yield* Ref.updateAndGet(peakRef, (prev) =>
-          prev >= BigInt(queueSize) ? prev : BigInt(queueSize),
+          prev >= BigInt(snapshot.streamDepth)
+            ? prev
+            : BigInt(snapshot.streamDepth),
         );
-        yield* Metric.set(txQueuePeakSizeGauge, newPeak);
+        yield* Metric.set(txStreamPeakDepthGauge, newPeak);
       }
     }
 
-    const txStringsChunk: Chunk.Chunk<string> = yield* txQueue.takeUpTo(
+    const messages = yield* txIngressQueue.consumeBatch(
       txQueueDrainBatchSize,
+      streamBlockMs,
     );
-    const txStrings = Chunk.toReadonlyArray(txStringsChunk);
-    let insertedTxCount = 0;
 
-    for (
-      let startIndex = 0;
-      startIndex < txStrings.length;
-      startIndex += TX_QUEUE_PERSIST_CHUNK_SIZE
-    ) {
-      const txStringsPersistChunk = txStrings.slice(
-        startIndex,
-        startIndex + TX_QUEUE_PERSIST_CHUNK_SIZE,
+    if (messages.length === 0) {
+      return;
+    }
+
+    const messageChunks = partitionMessages(
+      messages,
+      TX_QUEUE_PERSIST_CHUNK_SIZE,
+    );
+
+    for (const messageChunk of messageChunks) {
+      const parsedOutcomes = yield* Effect.forEach(
+        messageChunk,
+        (message) =>
+          breakDownTx(fromHex(message.txCbor)).pipe(
+            Effect.either,
+            Effect.map((parsed) => ({ message, parsed })),
+          ),
+        {
+          concurrency: txParseConcurrency,
+        },
       );
-      const [malformedErrors, processedTxs] = yield* Effect.partition(
-        txStringsPersistChunk,
-        (tx) => breakDownTx(fromHex(tx)),
-        { concurrency: txParseConcurrency },
+
+      const validMessages: TxIngressMessage[] = [];
+      const processedTxs: ProcessedTx[] = [];
+
+      for (const outcome of parsedOutcomes) {
+        if (outcome.parsed._tag === "Left") {
+          const error = outcome.parsed.left;
+          yield* Effect.logWarning(
+            `Dropping malformed tx for stream message ${outcome.message.id}; CBOR deserialization failed: ${error.message}`,
+          );
+          yield* registerFailedMessage(
+            outcome.message,
+            `malformed_cbor:${error.message}`,
+            withMonitoring,
+          );
+          continue;
+        }
+
+        validMessages.push(outcome.message);
+        processedTxs.push(outcome.parsed.right);
+      }
+
+      if (processedTxs.length === 0) {
+        continue;
+      }
+
+      const persistResult = yield* Effect.either(
+        MempoolDB.insertMultiple(processedTxs),
       );
-      for (const error of malformedErrors) {
+      if (persistResult._tag === "Left") {
+        const reason = `mempool_insert_failed:${persistResult.left.message}`;
         yield* Effect.logWarning(
-          `Dropping malformed tx; CBOR deserialization failed: ${error.message}`,
+          `Failed to persist ${processedTxs.length} tx(s) from stream chunk; keeping entries pending for retry: ${persistResult.left.message}`,
         );
-      }
-      if (withMonitoring && malformedErrors.length > 0) {
-        yield* Metric.incrementBy(
-          txProcessingFailedCounter,
-          BigInt(malformedErrors.length),
+        yield* Effect.forEach(
+          validMessages,
+          (message) => registerFailedMessage(message, reason, withMonitoring),
+          { discard: true },
         );
+        continue;
       }
-      if (processedTxs.length > 0) {
-        insertedTxCount += yield* MempoolDB.insertMultiple(processedTxs);
-      }
-    }
 
-    if (withMonitoring && insertedTxCount > 0) {
-      yield* Metric.incrementBy(
-        txMempoolAcceptedCounter,
-        BigInt(insertedTxCount),
+      const ackedCount = yield* txIngressQueue.ack(
+        validMessages.map((m) => m.id),
       );
+      if (withMonitoring && ackedCount > 0) {
+        yield* Metric.incrementBy(txStreamAckCounter, BigInt(ackedCount));
+      }
+
+      if (withMonitoring && persistResult.right > 0) {
+        yield* Metric.incrementBy(
+          txMempoolAcceptedCounter,
+          BigInt(persistResult.right),
+        );
+      }
     }
-  }).pipe(
-    Effect.tapErrorCause(() =>
-      withMonitoring
-        ? Metric.increment(txProcessingFailedCounter)
-        : Effect.void,
-    ),
-  );
+  });
 
 export const txQueueProcessorFiber = (
   schedule: Schedule.Schedule<number>,
-  txQueue: Queue.Dequeue<string>,
   txQueueDrainBatchSize: number,
   txParseConcurrency: number,
+  streamBlockMs: number,
   withMonitoring?: boolean,
-): Effect.Effect<void, never, Database> =>
+): Effect.Effect<void, never, Database | TxIngressQueue> =>
   pipe(
     Effect.gen(function* () {
+      const txIngressQueue = yield* TxIngressQueue;
+      yield* txIngressQueue.ensureConsumerGroup;
       yield* Effect.logInfo("🔶 Tx queue processor fiber started.");
       const peakRef = yield* Ref.make(0n);
+
       if (withMonitoring) {
-        // Ensure metric series are initialized before the first queue sample.
-        yield* Metric.set(txQueueSizeGauge, 0n);
-        yield* Metric.set(txQueuePeakSizeGauge, 0n);
+        yield* Metric.set(txStreamDepthGauge, 0n);
+        yield* Metric.set(txStreamPeakDepthGauge, 0n);
+        yield* Metric.set(txStreamPendingGauge, 0n);
+        yield* Metric.set(txStreamConsumerLagGauge, 0n);
+        yield* Metric.incrementBy(txStreamAckCounter, 0n);
+        yield* Metric.incrementBy(txStreamProcessingFailCounter, 0n);
+        yield* Metric.incrementBy(txStreamRetryCounter, 0n);
+        yield* Metric.incrementBy(txStreamDeadLetterCounter, 0n);
         yield* Metric.incrementBy(txMempoolAcceptedCounter, 0n);
-        yield* Metric.incrementBy(txProcessingFailedCounter, 0n);
       }
+
       yield* Effect.repeat(
         txQueueProcessorAction(
-          txQueue,
           txQueueDrainBatchSize,
           txParseConcurrency,
+          streamBlockMs,
           withMonitoring,
           withMonitoring ? peakRef : undefined,
         ).pipe(Effect.catchAllCause(Effect.logWarning)),
         schedule,
       );
     }),
-  );
+  ).pipe(Effect.catchAllCause(Effect.logWarning));

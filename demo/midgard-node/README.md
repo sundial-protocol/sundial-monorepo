@@ -86,13 +86,31 @@ POSTGRES_HOST=localhost
 LEDGER_MPT_DB_PATH=midgard-ledger-mpt-db
 MEMPOOL_MPT_DB_PATH=midgard-mempool-mpt-db
 TX_QUEUE_CAPACITY=10000
+TX_QUEUE_MAX_PENDING=20000
 TX_QUEUE_DRAIN_BATCH_SIZE=250
 TX_QUEUE_OFFER_TIMEOUT_MS=100
+TX_QUEUE_CLAIM_IDLE_MS=30000
+TX_QUEUE_CLAIM_BATCH_SIZE=100
+TX_QUEUE_MAX_DELIVERY_ATTEMPTS=5
+TX_QUEUE_DEAD_LETTER_STREAM=midgard:tx-submissions:dead-letter
+NODE_ROLE=all
+REDIS_URL=redis://localhost:6379
+REDIS_STREAM_KEY=midgard:tx-submissions
+REDIS_STREAM_CONSUMER_GROUP=midgard-tx-processors
+REDIS_STREAM_CONSUMER_NAME=midgard-node-1
+REDIS_STREAM_BLOCK_MS=1000
 COMMITMENT_WORKER_TIMEOUT_MS=300000
 COMMITMENT_WINDOW_WARN_TX_REQUESTS=50000
 COMMITMENT_WINDOW_WARN_TOTAL_EVENTS=60000
 COMMITMENT_WINDOW_WARN_TOTAL_BYTES=20000000
 ```
+
+Role notes:
+
+- `NODE_ROLE=api`: run HTTP API ingress only (`POST /submit` enqueues into Redis Streams).
+- `NODE_ROLE=tx-processor`: run Redis consumer-group tx workers only.
+- `NODE_ROLE=sequencer`: run block commitment/submission/merge/user-event sync only.
+- `NODE_ROLE=all`: run all roles in one process (default).
 
 With a properly setup database, the following set of commands should start the
 most up to date `midgard-node`:
@@ -141,3 +159,13 @@ Important commitment seeding metrics:
 - `blocks_db_seed_failures_total`
 - `blocks_db_seed_duration_seconds`
 - `blocks_db_seed_traversal_hops_last`
+
+Important tx ingress metrics:
+
+- `tx_stream_depth`
+- `tx_stream_pending`
+- `tx_stream_consumer_lag`
+- `tx_stream_ack_total`
+- `tx_stream_fail_total`
+- `tx_stream_retry_total`
+- `tx_stream_dead_letter_total`

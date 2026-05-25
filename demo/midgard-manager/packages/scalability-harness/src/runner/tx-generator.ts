@@ -241,6 +241,7 @@ function buildArgs(
   cwd: string
 ): string[] {
   const generatorSeed = toGeneratorSeed(tier.seed);
+  const walletMode = scenario.walletMode ?? 'test-wallet';
   const args = [
     '--filter',
     '@midgard-manager/tx-generator',
@@ -278,8 +279,11 @@ function buildArgs(
     generatorSeed,
     '--output-dir',
     tierArtifactDir,
-    '--test-wallet',
   ];
+
+  if (walletMode === 'test-wallet') {
+    args.push('--test-wallet');
+  }
 
   if (scenario.transactionType === 'mixed' && scenario.oneToOneRatio !== undefined) {
     args.push('--ratio', String(scenario.oneToOneRatio));

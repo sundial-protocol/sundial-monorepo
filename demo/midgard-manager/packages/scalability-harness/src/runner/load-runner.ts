@@ -309,12 +309,12 @@ export function checkMetricStopConditions(
 ): MetricStopCondition | null {
   if (stopConditions.stopOnPrometheusDown) {
     // null = Prometheus unreachable; 0 = node not being scraped — both treated as down
-    const upValue = window.afterLoad['up{job="midgard_nodes"}'] ?? null;
+    const upValue = window.afterLoad['up{job="sundial_nodes"}'] ?? null;
     if (upValue === null || upValue === 0) {
       return {
         reason: 'prometheus_down',
         metricValues: {
-          'up{job="midgard_nodes"}': upValue !== null ? upValue : false,
+          'up{job="sundial_nodes"}': upValue !== null ? upValue : false,
         },
       };
     }
@@ -364,8 +364,8 @@ export function checkMetricStopConditions(
   }
 
   if (stopConditions.maxRecoveryQueueSize !== undefined) {
-    const beforeQueueSize = window.before['tx_queue_size'] ?? null;
-    const afterRecoveryQueueSize = window.afterRecovery['tx_queue_size'] ?? null;
+    const beforeQueueSize = window.before['tx_stream_depth'] ?? null;
+    const afterRecoveryQueueSize = window.afterRecovery['tx_stream_depth'] ?? null;
     if (beforeQueueSize !== null && afterRecoveryQueueSize !== null) {
       const queueGrowth = afterRecoveryQueueSize - beforeQueueSize;
       if (queueGrowth > stopConditions.maxRecoveryQueueSize) {
@@ -536,12 +536,12 @@ async function checkLiveMetricStopCondition(
 
   try {
     if (stopConditions.stopOnPrometheusDown) {
-      const upValue = await queryInstantScalar(prometheusClient, 'up{job="midgard_nodes"}');
+      const upValue = await queryInstantScalar(prometheusClient, 'up{job="sundial_nodes"}');
       if (upValue === null || upValue === 0) {
         return {
           reason: 'prometheus_down',
           metricValues: {
-            'up{job="midgard_nodes"}': upValue !== null ? upValue : false,
+            'up{job="sundial_nodes"}': upValue !== null ? upValue : false,
           },
         };
       }

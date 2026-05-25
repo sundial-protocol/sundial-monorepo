@@ -112,7 +112,7 @@ describe('buildDataRows — direct metric', () => {
   it('produces one row per data point for a single-series metric', () => {
     const spec = PANEL_SPECS.find((s) => s.slug === 'tx-queue')!;
     const rows = buildDataRows(realWindows, spec);
-    // tx_queue_size has 1 series × 49 points in this run
+    // tx_stream_depth has 1 series × 49 points in this run
     expect(rows.length).toBe(49);
   });
 
