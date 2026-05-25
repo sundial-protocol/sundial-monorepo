@@ -38,14 +38,14 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:e2e:start -->
-<img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-passing-brightgreen?style=flat-square" />
+<img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-failing-red?style=flat-square" />
 <!-- badge:e2e:end -->
     </td>
   </tr>
   <tr>
     <td>
       <!-- badge:node-coverage:start -->
-<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-79.0%25-orange?style=flat-square" />
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-78.4%25-orange?style=flat-square" />
 <!-- badge:node-coverage:end -->
     </td>
     <td>

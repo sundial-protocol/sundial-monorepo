@@ -1,12 +1,12 @@
 {
-  "runId": "baseline-100-800-replay",
-  "description": "Baseline step-ramp from 100 to 800 TPS using a 2x multiplier across short tiers. Establishes throughput progression evidence and harness pacing before the sustained initial-TPS validation run (§8.1). One-to-one transaction mode.",
+  "runId": "baseline-100-5000-replay",
+  "description": "Baseline step-ramp from 100 to 5,000 TPS using a 2x multiplier across short tiers. Establishes throughput progression evidence and harness pacing before sustained higher-TPS validation runs (§8.1). One-to-one transaction mode.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",
   "lokiEndpoint": "http://localhost:3100",
   "tempoEndpoint": "http://localhost:3200",
   "outputDir": "benchmark-runs",
-  "seed": "baseline-2026-05-18",
+  "seed": "baseline-100-5000-2026-05-18",
   "l1ProviderMode": "emulator",
   "walletMode": "external-key",
   "walletProvisioningNote": "external-key mode — set WALLET_PRIVATE_KEY to a pre-funded key whose UTxOs are initialized on the node before running replay scenarios",
@@ -15,7 +15,7 @@
   "tierDurationSeconds": 180,
   "recoverySeconds": 90,
   "startTps": 100,
-  "maxTps": 800,
+  "maxTps": 5000,
   "stepMultiplier": 2,
   "txGeneratorTaskCostSeconds": 0.2,
   "retryAttempts": 3,
@@ -26,7 +26,7 @@
     "stopOnCommitmentFailure": true,
     "maxCommitmentFailureRatio": 0.0001,
     "stopOnMergeFailure": false,
-    "maxRecoveryQueueSize": 10000,
-    "maxRecoveryMempoolSize": 5000
+    "maxRecoveryQueueSize": 40000,
+    "maxRecoveryMempoolSize": 25000
   }
 }

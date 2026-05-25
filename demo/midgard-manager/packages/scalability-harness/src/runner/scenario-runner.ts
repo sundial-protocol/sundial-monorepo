@@ -62,10 +62,10 @@ function buildCollapseInputs(
       'commit_block_commitment_failures_total'
     ),
     mergeFailuresDelta: lookupCounterDelta(result.windowSummary, 'merge_block_failures_total'),
-    beforeQueueSize: result.metricWindow?.before['tx_queue_size'] ?? null,
+    beforeQueueSize: result.metricWindow?.before['tx_stream_depth'] ?? null,
     beforeMempoolSize: result.metricWindow?.before['mempool_tx_count'] ?? null,
     afterLoadMempoolSize: result.metricWindow?.afterLoad['mempool_tx_count'] ?? null,
-    recoveryQueueSize: lookupGaugeFinal(result.windowSummary, 'tx_queue_size'),
+    recoveryQueueSize: lookupGaugeFinal(result.windowSummary, 'tx_stream_depth'),
     recoveryMempoolSize: lookupGaugeFinal(result.windowSummary, 'mempool_tx_count'),
     beforeUnsubmittedBlockBacklog: result.metricWindow?.before['unsubmitted_block_backlog'] ?? null,
     recoveryUnsubmittedBlockBacklog:

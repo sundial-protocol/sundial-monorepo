@@ -60,8 +60,8 @@ export const NODE_METRICS = [
   'tx_submissions_rejected_total',
   'tx_submissions_mempool_accepted_total',
   'tx_submissions_processing_failed_total',
-  'tx_queue_size',
-  'tx_queue_peak_size',
+  'tx_stream_depth',
+  'tx_stream_depth_peak',
   'mempool_tx_count',
   'unsubmitted_block_backlog',
   'commit_block_count_total',
@@ -77,7 +77,7 @@ export const NODE_METRICS = [
   'commit_block_commitment_failures_total',
   'merge_block_count_total',
   'merge_block_failures_total',
-  'up{job="midgard_nodes"}',
+  'up{job="sundial_nodes"}',
 ] as const;
 
 export type NodeMetric = (typeof NODE_METRICS)[number];
@@ -87,9 +87,9 @@ export type NodeMetric = (typeof NODE_METRICS)[number];
 // Used by the preflight check to distinguish "node running but idle" from
 // "node not running / telemetry pipeline broken".
 export const ALWAYS_PRESENT_NODE_METRICS = [
-  'up{job="midgard_nodes"}',
-  'tx_queue_size',
-  'tx_queue_peak_size',
+  'up{job="sundial_nodes"}',
+  'tx_stream_depth',
+  'tx_stream_depth_peak',
   'mempool_tx_count',
   'unsubmitted_block_backlog',
 ] as const;

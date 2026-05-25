@@ -54,7 +54,11 @@ describe("NodeConfig", () => {
         expect(config.PROM_METRICS_PORT).toBe(9464);
         expect(config.POSTGRES_USER).toBe("postgres");
         expect(config.POSTGRES_DB).toBe("midgard");
+        expect(config.REDIS_URL).toBe("redis://redis:6379");
+        expect(config.REDIS_STREAM_KEY).toBe("midgard:tx-submissions");
+        expect(config.NODE_ROLE).toBe("all");
         expect(config.TX_QUEUE_CAPACITY).toBe(10_000);
+        expect(config.TX_QUEUE_MAX_PENDING).toBe(20_000);
         expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(250);
         expect(config.TX_QUEUE_OFFER_TIMEOUT_MS).toBe(100);
         expect(config.COMMITMENT_WORKER_TIMEOUT_MS).toBe(300_000);
@@ -100,7 +104,7 @@ describe("NodeConfig", () => {
         expect(result._tag).toBe("Left");
         if (result._tag === "Left") {
           expect(result.left).toBeInstanceOf(ConfigError);
-          expect(result.left.message).toContain("POSTGRES_HOST");
+          expect(result.left.message).toContain("REDIS_URL");
         }
       });
     },

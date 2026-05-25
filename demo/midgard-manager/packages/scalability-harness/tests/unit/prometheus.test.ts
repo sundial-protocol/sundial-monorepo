@@ -95,10 +95,10 @@ describe('PrometheusClient.queryInstant', () => {
   it('passes the query as a URL parameter', async () => {
     const fetcher = makeFetcher(vectorResponse([{ value: '1' }]));
     const client = new PrometheusClient('http://localhost:9090', fetcher);
-    await client.queryInstant('up{job="midgard_nodes"}');
+    await client.queryInstant('up{job="sundial_nodes"}');
     const [url] = vi.mocked(fetcher).mock.calls[0];
     expect(url).toContain('/api/v1/query');
-    expect(url).toContain(encodeURIComponent('up{job="midgard_nodes"}'));
+    expect(url).toContain(encodeURIComponent('up{job="sundial_nodes"}'));
   });
 
   it('includes the time parameter when provided', async () => {
@@ -245,7 +245,7 @@ describe('flattenToScalars', () => {
   it('strips label selectors from keys', () => {
     const snapshots = [
       {
-        query: 'up{job="midgard_nodes"}',
+        query: 'up{job="sundial_nodes"}',
         capturedAt: '',
         result: [{ metric: {}, value: [1234, '1'] as [number, string] }],
       },

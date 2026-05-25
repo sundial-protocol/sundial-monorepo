@@ -26,36 +26,39 @@ A plan runs an ordered sequence of scenarios and produces an aggregated report.
 
 ```bash
 # Full §8.1 benchmark sequence
-node dist/bin/index.js run --plan plans/standard-progression.json
+npm run start -- run --plan plans/standard-progression.json
 
 # §8.3 saturation discovery sequence
-node dist/bin/index.js run --plan plans/saturation.json
+npm run start -- run --plan plans/saturation.json
 
 # Dry run — validate all scenarios and print tier breakdowns without load
-node dist/bin/index.js run --plan plans/standard-progression.json --dry-run
+npm run start -- run --plan plans/standard-progression.json --dry-run
 
 # Override output directory
-node dist/bin/index.js run --plan plans/standard-progression.json --output-dir /tmp/bench
+npm run start -- run --plan plans/standard-progression.json --output-dir /tmp/bench
 ```
 
 ### Run a single scenario
 
+Paths passed to `--scenario` and `--plan` are resolved from the current working directory.
+If you are already in `demo/midgard-manager/packages/scalability-harness`, use paths like `scenarios/...` and `plans/...` (do not prefix with `demo/midgard-manager/packages/scalability-harness/...`).
+
 ```bash
-node dist/bin/index.js run --scenario scenarios/warmup.json
-node dist/bin/index.js run --scenario scenarios/warmup.json --dry-run
-node dist/bin/index.js run --scenario scenarios/stress-10000.json --max-tier 2
-node dist/bin/index.js run --scenario scenarios/initial-800.json --run-id initial-800-v2
+npm run start -- run --scenario scenarios/warmup.json
+npm run start -- run --scenario scenarios/warmup.json --dry-run
+npm run start -- run --scenario scenarios/stress-10000.json --max-tier 2
+npm run start -- run --scenario scenarios/initial-800.json --run-id initial-800-v2
 ```
 
 ### Other commands
 
 ```bash
 # Run preflight checks against a scenario's endpoints
-node dist/bin/index.js preflight --scenario scenarios/warmup.json
+npm run start -- preflight --scenario scenarios/warmup.json
 
 # Print load tiers for a scenario without running
-node dist/bin/index.js tiers --scenario scenarios/practical-24985.json
-node dist/bin/index.js tiers --scenario scenarios/saturation-ramp-25pct.json --max-tier 4
+npm run start -- tiers --scenario scenarios/practical-24985.json
+npm run start -- tiers --scenario scenarios/saturation-ramp-25pct.json --max-tier 4
 ```
 
 ### Collateral top-up (block commitment wallet)
@@ -66,6 +69,8 @@ top up the block-commitment operator wallet before running formal scalability sc
 The top-up script reads credentials/seeds from `demo/midgard-manager/scripts/.env`.
 Copy `demo/midgard-manager/scripts/.env.example` to `.env` and set:
 `BLOCKFROST_URL`, `BLOCKFROST_KEY`, `MAIN_SEED`, `BC_SEED`.
+Optionally set `BC_TOPUP_LOVELACE` (integer lovelace) to override the default
+`1000000000` lovelace transfer.
 
 ```bash
 # From demo/ (workspace shortcut)
@@ -76,6 +81,9 @@ npm --prefix midgard-manager run wallet:block-commitment:topup
 
 # Check current balance only (no top-up tx)
 npm --prefix midgard-manager run wallet:block-commitment:check
+
+# Optional explicit one-off amount override
+npm --prefix midgard-manager run wallet:block-commitment:topup -- --topup-lovelace=25000000
 ```
 
 ### Flags reference
@@ -107,6 +115,8 @@ Preflight checks:
 - `no_unsubmitted_block_backlog`
 - `commit_pipeline_ready`
 - `no_preexisting_mempool_backlog`
+- `no_preexisting_stream_backlog`
+- `wallet_mode_readiness`
 - `artifact_directory_writable`
 - `tx_generator_invocable`
 
@@ -250,6 +260,9 @@ Scenario subdirectories are named `<NN>-<runId>` so they sort in execution order
 | `runClassificationPolicy`   | object? | Optional overrides for formal run-classification thresholds                                         |
 | `stopConditions`            | object  | Conditions that abort the run early                                                                 |
 
+For formal replay/scalability scenarios, use `walletMode: "external-key"` and export
+`WALLET_PRIVATE_KEY` to a pre-funded key whose UTxOs are initialized on the node.
+
 ### Grafana Screenshots
 
 When `grafanaScreenshots.enabled` is true, the harness captures event-based screenshots:
@@ -290,7 +303,7 @@ Runtime prerequisite: install `playwright` in this package and ensure Chromium i
 | `stopOnCommitmentFailure`          | boolean       | Abort if block commitment stops advancing                                                                                       |
 | `maxCommitmentFailureRatio`        | number? (0–1) | Optional budget for commitment failures (`commitment_failures / mempool_accepted`)                                              |
 | `stopOnMergeFailure`               | boolean       | Abort if merge stops advancing                                                                                                  |
-| `maxRecoveryQueueSize`             | number?       | Abort if queue growth `(tx_queue_size_after_recovery - tx_queue_size_before_tier)` exceeds this                                 |
+| `maxRecoveryQueueSize`             | number?       | Abort if queue growth `(tx_stream_depth_after_recovery - tx_stream_depth_before_tier)` exceeds this                                 |
 | `maxRecoveryMempoolSize`           | number?       | Abort if mempool growth `(mempool_tx_count_after_recovery - mempool_tx_count_before_tier)` exceeds this                         |
 | `maxUnsubmittedBlockBacklogGrowth` | number?       | Abort if `(commit_block_count_total Δ - submit_block_count_total Δ)` exceeds this over the tier window (default threshold: `0`) |
 | `minCommitToAcceptedRatio`         | number? (0–1) | Abort if committed tx ratio (`committed / mempool_accepted`) falls below this floor                                             |
@@ -300,7 +313,7 @@ Runtime prerequisite: install `playwright` in this package and ensure Chromium i
 
 Scalability reports use three distinct node pipeline boundaries:
 
-- `tx_submissions_enqueued_total` — HTTP enqueue throughput (in-memory queue)
+- `tx_submissions_enqueued_total` — HTTP enqueue throughput (durable Redis ingress stream)
 - `tx_submissions_mempool_accepted_total` — durable intake throughput (`MempoolDB` persistence)
 - `commit_block_tx_count_total` — committed throughput (included in committed blocks)
 - `l1_commitment_fees_lovelace_total` — total L1 commitment fees spent during the window

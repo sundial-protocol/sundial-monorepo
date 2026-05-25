@@ -4,6 +4,8 @@ import {
   Lucid,
   AlwaysSucceedsContract,
   Globals,
+  TxIngressQueue,
+  TxIngressQueueService,
 } from "@/services/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
@@ -24,7 +26,6 @@ import {
   Layer,
   Metric,
   pipe,
-  Queue,
   Ref,
   Schedule,
 } from "effect";
@@ -62,6 +63,7 @@ import {
   monitorMempoolFiber,
   blockSubmissionFiber,
   txQueueProcessorFiber,
+  txQueueProcessorMetrics,
 } from "@/fibers/index.js";
 
 const TX_ENDPOINT: string = "tx";
@@ -80,7 +82,7 @@ const HEALTH_READY_ENDPOINT: string = "health/ready";
 
 const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
-    "A counter for tracking L2 transaction submissions that passed hex validation and were enqueued into the in-memory processing queue",
+    "A counter for tracking L2 transaction submissions that passed hex validation and were enqueued to the durable ingress stream",
   bigint: true,
   incremental: true,
 }).register();
@@ -96,7 +98,7 @@ const txQueueBackpressureRejectedCounter = Metric.counter(
   "tx_submissions_rejected_queue_backpressure",
   {
     description:
-      "A counter for tracking L2 transaction submissions rejected because the in-memory queue stayed saturated beyond the configured offer timeout",
+      "A counter for tracking L2 transaction submissions rejected because the durable ingress stream exceeded configured backpressure thresholds",
     bigint: true,
     incremental: true,
   },
@@ -554,12 +556,15 @@ const getLogGlobalsHandler = Effect.gen(function* () {
   Effect.catchTag("HttpBodyError", (e) => failWith500("GET", "logGlobals", e)),
 );
 
-const postSubmitHandler = (
-  txQueue: Queue.Enqueue<string>,
-  txQueueOfferTimeoutMs: number,
-) =>
+type SubmitIngressConfig = {
+  readonly txIngressQueue: TxIngressQueueService;
+  readonly txQueueOfferTimeoutMs: number;
+  readonly txQueueCapacity: number;
+  readonly txQueueMaxPending: number;
+};
+
+const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
   Effect.gen(function* () {
-    // yield* Effect.logInfo(`◻️  Submit request received for transaction`);
     const request = yield* HttpServerRequest.HttpServerRequest;
     const txString = yield* request.text;
     if (!isHexString(txString)) {
@@ -570,16 +575,46 @@ const postSubmitHandler = (
         { status: 400 },
       );
     } else {
+      const snapshot =
+        yield* submitIngressConfig.txIngressQueue.snapshotMetrics;
+      yield* Metric.set(
+        txQueueProcessorMetrics.txStreamDepthGauge,
+        BigInt(snapshot.streamDepth),
+      );
+      yield* Metric.set(
+        txQueueProcessorMetrics.txStreamPendingGauge,
+        BigInt(snapshot.pendingCount),
+      );
+      yield* Metric.set(
+        txQueueProcessorMetrics.txStreamConsumerLagGauge,
+        BigInt(snapshot.lagCount),
+      );
+
+      if (
+        snapshot.streamDepth >= submitIngressConfig.txQueueCapacity ||
+        snapshot.pendingCount >= submitIngressConfig.txQueueMaxPending
+      ) {
+        yield* Effect.logInfo(
+          `POST /${SUBMIT_ENDPOINT} - stream backpressure rejection: stream_depth=${snapshot.streamDepth} pending=${snapshot.pendingCount} max_depth=${submitIngressConfig.txQueueCapacity} max_pending=${submitIngressConfig.txQueueMaxPending}`,
+        );
+        yield* Metric.increment(txQueueBackpressureRejectedCounter);
+        return yield* HttpServerResponse.json(
+          { error: `Transaction queue is saturated; retry later` },
+          { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
+        );
+      }
+
       const offered = yield* Effect.raceFirst(
-        txQueue.offer(txString),
-        Effect.sleep(Duration.millis(txQueueOfferTimeoutMs)).pipe(
-          Effect.as(false),
-        ),
+        submitIngressConfig.txIngressQueue
+          .enqueue(txString)
+          .pipe(Effect.as(true)),
+        Effect.sleep(
+          Duration.millis(submitIngressConfig.txQueueOfferTimeoutMs),
+        ).pipe(Effect.as(false)),
       );
       if (!offered) {
-        const queueSize = yield* txQueue.size;
         yield* Effect.logInfo(
-          `POST /${SUBMIT_ENDPOINT} - queue backpressure rejection: size=${queueSize} timeout_ms=${txQueueOfferTimeoutMs}`,
+          `POST /${SUBMIT_ENDPOINT} - enqueue timeout rejection: timeout_ms=${submitIngressConfig.txQueueOfferTimeoutMs}`,
         );
         yield* Metric.increment(txQueueBackpressureRejectedCounter);
         return yield* HttpServerResponse.json(
@@ -595,6 +630,14 @@ const postSubmitHandler = (
   }).pipe(
     Effect.catchTag("HttpBodyError", (e) =>
       failWith500("POST", "submit", e, "▫️ L2 transaction failed"),
+    ),
+    Effect.catchTag("TxIngressQueueError", (e) =>
+      failWith500(
+        "POST",
+        "submit",
+        e.cause,
+        "Failed to enqueue transaction into ingress stream",
+      ),
     ),
   );
 
@@ -650,8 +693,7 @@ const getCommitmentWalletBalanceHandler = Effect.gen(function* () {
 );
 
 const router = (
-  txQueue: Queue.Queue<string>,
-  txQueueOfferTimeoutMs: number,
+  submitIngressConfig: SubmitIngressConfig,
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   HttpBodyError,
@@ -683,7 +725,7 @@ const router = (
       HttpRouter.get(`/logGlobals`, getLogGlobalsHandler),
       HttpRouter.post(
         `/${SUBMIT_ENDPOINT}`,
-        postSubmitHandler(txQueue, txQueueOfferTimeoutMs),
+        postSubmitHandler(submitIngressConfig),
       ),
     )
     .pipe(
@@ -696,57 +738,122 @@ const router = (
       ),
     );
 
+const apiIngressRouter = (
+  submitIngressConfig: SubmitIngressConfig,
+): Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  HttpBodyError,
+  Database | HttpServerRequest.HttpServerRequest
+> =>
+  HttpRouter.empty
+    .pipe(
+      HttpRouter.get(`/${HEALTH_LIVE_ENDPOINT}`, getHealthLiveHandler),
+      HttpRouter.get(`/${HEALTH_READY_ENDPOINT}`, getHealthReadyHandler),
+      HttpRouter.post(
+        `/${SUBMIT_ENDPOINT}`,
+        postSubmitHandler(submitIngressConfig),
+      ),
+    )
+    .pipe(
+      Effect.catchAllCause((cause) =>
+        failWith500Helper(
+          "API ingress router unexpected failure",
+          "unknown endpoint",
+          Cause.pretty(cause),
+        ),
+      ),
+    );
+
 export const runNode = (withMonitoring?: boolean) =>
   Effect.gen(function* () {
     const nodeConfig = yield* NodeConfig;
+    const shouldRunApiRole =
+      nodeConfig.NODE_ROLE === "all" || nodeConfig.NODE_ROLE === "api";
+    const shouldRunTxProcessorRole =
+      nodeConfig.NODE_ROLE === "all" || nodeConfig.NODE_ROLE === "tx-processor";
+    const shouldRunSequencerRole =
+      nodeConfig.NODE_ROLE === "all" || nodeConfig.NODE_ROLE === "sequencer";
 
-    const txQueue = yield* Queue.bounded<string>(nodeConfig.TX_QUEUE_CAPACITY);
+    const txIngressQueue =
+      shouldRunApiRole || shouldRunTxProcessorRole
+        ? yield* TxIngressQueue
+        : null;
+    if (txIngressQueue !== null) {
+      yield* txIngressQueue.ensureConsumerGroup;
+    }
 
     yield* DBInitialization.program.pipe(
       Effect.provide(Database.Sequencer.layer),
     );
 
-    yield* Genesis.program.pipe(Effect.provide(Database.Sequencer.layer));
+    if (shouldRunSequencerRole) {
+      yield* Genesis.program.pipe(Effect.provide(Database.Sequencer.layer));
+    }
 
-    const appThread = Layer.launch(
-      Layer.provide(
-        HttpServer.serve(router(txQueue, nodeConfig.TX_QUEUE_OFFER_TIMEOUT_MS)),
-        NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
-      ),
-    );
+    const appThread =
+      shouldRunApiRole && txIngressQueue !== null
+        ? Layer.launch(
+            Layer.provide(
+              HttpServer.serve(
+                nodeConfig.NODE_ROLE === "api"
+                  ? apiIngressRouter({
+                      txIngressQueue,
+                      txQueueOfferTimeoutMs:
+                        nodeConfig.TX_QUEUE_OFFER_TIMEOUT_MS,
+                      txQueueCapacity: nodeConfig.TX_QUEUE_CAPACITY,
+                      txQueueMaxPending: nodeConfig.TX_QUEUE_MAX_PENDING,
+                    })
+                  : router({
+                      txIngressQueue,
+                      txQueueOfferTimeoutMs:
+                        nodeConfig.TX_QUEUE_OFFER_TIMEOUT_MS,
+                      txQueueCapacity: nodeConfig.TX_QUEUE_CAPACITY,
+                      txQueueMaxPending: nodeConfig.TX_QUEUE_MAX_PENDING,
+                    }),
+              ),
+              NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
+            ),
+          )
+        : Effect.void;
 
     const mkSchedule = (millisBetweenRuns: number) =>
       Schedule.spaced(Duration.millis(millisBetweenRuns));
 
-    const sequencerProgram = Effect.all(
-      [
-        blockCommitmentFiber(
-          mkSchedule(nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENTS),
-        ),
-        blockSubmissionFiber(
-          mkSchedule(nodeConfig.WAIT_BETWEEN_BLOCK_SUBMISSIONS),
-        ),
-        syncUserEventsFiber(
-          mkSchedule(nodeConfig.WAIT_BETWEEN_USER_EVENT_FETCHES),
-        ),
-        mergeFiber(mkSchedule(nodeConfig.WAIT_BETWEEN_MERGE_TXS)),
-      ],
-      {
-        concurrency: "unbounded",
-      },
-    ).pipe(Effect.provide(Database.Sequencer.layer));
+    const sequencerProgram = shouldRunSequencerRole
+      ? Effect.all(
+          [
+            blockCommitmentFiber(
+              mkSchedule(nodeConfig.WAIT_BETWEEN_BLOCK_COMMITMENTS),
+            ),
+            blockSubmissionFiber(
+              mkSchedule(nodeConfig.WAIT_BETWEEN_BLOCK_SUBMISSIONS),
+            ),
+            syncUserEventsFiber(
+              mkSchedule(nodeConfig.WAIT_BETWEEN_USER_EVENT_FETCHES),
+            ),
+            mergeFiber(mkSchedule(nodeConfig.WAIT_BETWEEN_MERGE_TXS)),
+          ],
+          {
+            concurrency: "unbounded",
+          },
+        ).pipe(Effect.provide(Database.Sequencer.layer))
+      : Effect.void;
 
     const rpcProgram = Effect.all(
       [
         appThread,
-        withMonitoring ? monitorMempoolFiber(mkSchedule(1000)) : Effect.void,
-        txQueueProcessorFiber(
-          mkSchedule(500),
-          txQueue,
-          nodeConfig.TX_QUEUE_DRAIN_BATCH_SIZE,
-          nodeConfig.TX_PARSE_CONCURRENCY,
-          withMonitoring,
-        ),
+        withMonitoring && (shouldRunApiRole || shouldRunTxProcessorRole)
+          ? monitorMempoolFiber(mkSchedule(1000))
+          : Effect.void,
+        shouldRunTxProcessorRole
+          ? txQueueProcessorFiber(
+              mkSchedule(500),
+              nodeConfig.TX_QUEUE_DRAIN_BATCH_SIZE,
+              nodeConfig.TX_PARSE_CONCURRENCY,
+              nodeConfig.REDIS_STREAM_BLOCK_MS,
+              withMonitoring,
+            )
+          : Effect.void,
       ],
       {
         concurrency: "unbounded",

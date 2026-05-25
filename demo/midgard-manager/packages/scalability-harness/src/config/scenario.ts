@@ -41,7 +41,7 @@ export interface StopConditions {
   // ratio exceeds this threshold. Use 0.0001 for a 0.01% budget.
   maxCommitmentFailureRatio?: number;
   // Queue growth threshold over the full tier window:
-  // (tx_queue_size_after_recovery - tx_queue_size_before_tier).
+  // (tx_stream_depth_after_recovery - tx_stream_depth_before_tier).
   maxRecoveryQueueSize?: number;
   // Mempool growth threshold over the full tier window:
   // (mempool_tx_count_after_recovery - mempool_tx_count_before_tier).

@@ -214,7 +214,7 @@ describe('checkMetricStopConditions', () => {
   // ---- stopOnPrometheusDown ------------------------------------------------
 
   it('returns null when stopOnPrometheusDown is false even when up metric is 0', () => {
-    const window = makeEmptyWindow({ afterLoad: { 'up{job="midgard_nodes"}': 0 } });
+    const window = makeEmptyWindow({ afterLoad: { 'up{job="sundial_nodes"}': 0 } });
     expect(
       checkMetricStopConditions(
         { ...BASE_SC, stopOnPrometheusDown: false },
@@ -227,7 +227,7 @@ describe('checkMetricStopConditions', () => {
   });
 
   it('returns prometheus_down when up metric is 0 and stopOnPrometheusDown is true', () => {
-    const window = makeEmptyWindow({ afterLoad: { 'up{job="midgard_nodes"}': 0 } });
+    const window = makeEmptyWindow({ afterLoad: { 'up{job="sundial_nodes"}': 0 } });
     const result = checkMetricStopConditions(
       { ...BASE_SC, stopOnPrometheusDown: true },
       window,
@@ -251,7 +251,7 @@ describe('checkMetricStopConditions', () => {
   });
 
   it('returns null when up metric is 1 and stopOnPrometheusDown is true', () => {
-    const window = makeEmptyWindow({ afterLoad: { 'up{job="midgard_nodes"}': 1 } });
+    const window = makeEmptyWindow({ afterLoad: { 'up{job="sundial_nodes"}': 1 } });
     expect(
       checkMetricStopConditions(
         { ...BASE_SC, stopOnPrometheusDown: true },
@@ -264,7 +264,7 @@ describe('checkMetricStopConditions', () => {
   });
 
   it('includes the up metric value in metricValues for prometheus_down', () => {
-    const window = makeEmptyWindow({ afterLoad: { 'up{job="midgard_nodes"}': 0 } });
+    const window = makeEmptyWindow({ afterLoad: { 'up{job="sundial_nodes"}': 0 } });
     const result = checkMetricStopConditions(
       { ...BASE_SC, stopOnPrometheusDown: true },
       window,
@@ -272,7 +272,7 @@ describe('checkMetricStopConditions', () => {
       60,
       100
     );
-    expect(result?.metricValues).toMatchObject({ 'up{job="midgard_nodes"}': 0 });
+    expect(result?.metricValues).toMatchObject({ 'up{job="sundial_nodes"}': 0 });
   });
 
   // ---- stopOnCommitmentFailure ---------------------------------------------
@@ -449,7 +449,7 @@ describe('checkMetricStopConditions', () => {
   // ---- maxRecoveryQueueSize ------------------------------------------------
 
   it('returns null when maxRecoveryQueueSize is not set', () => {
-    const window = makeEmptyWindow({ afterRecovery: { tx_queue_size: 99999 } });
+    const window = makeEmptyWindow({ afterRecovery: { tx_stream_depth: 99999 } });
     expect(
       checkMetricStopConditions(
         { ...BASE_SC, maxRecoveryQueueSize: undefined },
@@ -463,8 +463,8 @@ describe('checkMetricStopConditions', () => {
 
   it('returns recovery_queue_exceeded when tx_queue growth exceeds threshold', () => {
     const window = makeEmptyWindow({
-      before: { tx_queue_size: 1000 },
-      afterRecovery: { tx_queue_size: 15000 },
+      before: { tx_stream_depth: 1000 },
+      afterRecovery: { tx_stream_depth: 15000 },
     });
     const result = checkMetricStopConditions(
       { ...BASE_SC, maxRecoveryQueueSize: 10000 },
@@ -479,8 +479,8 @@ describe('checkMetricStopConditions', () => {
 
   it('returns null when tx_queue growth is at or below threshold', () => {
     const window = makeEmptyWindow({
-      before: { tx_queue_size: 1000 },
-      afterRecovery: { tx_queue_size: 11000 },
+      before: { tx_stream_depth: 1000 },
+      afterRecovery: { tx_stream_depth: 11000 },
     });
     expect(
       checkMetricStopConditions(
@@ -493,7 +493,7 @@ describe('checkMetricStopConditions', () => {
     ).toBeNull();
   });
 
-  it('returns null when tx_queue_size is absent (null)', () => {
+  it('returns null when tx_stream_depth is absent (null)', () => {
     const window = makeEmptyWindow({ afterRecovery: {} });
     expect(
       checkMetricStopConditions(
@@ -843,7 +843,7 @@ describe('checkMetricStopConditions', () => {
   // ---- priority ordering ---------------------------------------------------
 
   it('returns prometheus_down before checking commitment_failure', () => {
-    const window = makeEmptyWindow({ afterLoad: { 'up{job="midgard_nodes"}': 0 } });
+    const window = makeEmptyWindow({ afterLoad: { 'up{job="sundial_nodes"}': 0 } });
     const summary = makeWindowSummary({
       counterDeltas: [
         { query: 'commit_block_commitment_failures_total', deltaLoad: 5, deltaRecovery: 5 },
@@ -1041,7 +1041,7 @@ describe('runTier', () => {
     const window = makeEmptyWindow({
       before: makePrimaryMetricSnapshot(1),
       afterLoad: {
-        tx_queue_size: 42,
+        tx_stream_depth: 42,
       },
       afterRecovery: makePrimaryMetricSnapshot(3),
     });
@@ -1058,7 +1058,7 @@ describe('runTier', () => {
     expect(afterLoadSnapshot).toBeDefined();
     if (afterLoadSnapshot?.event === 'prometheus_snapshot') {
       expect(afterLoadSnapshot.ok).toBe(false);
-      expect(afterLoadSnapshot.metrics.tx_queue_size).toBe(42);
+      expect(afterLoadSnapshot.metrics.tx_stream_depth).toBe(42);
       expect(afterLoadSnapshot.errorMessage).toContain('Missing primary metrics for after_load');
     }
   });
@@ -1162,8 +1162,8 @@ describe('runTier', () => {
 
   it('emits stop_condition event when metric stop condition fires', async () => {
     const window = makeEmptyWindow({
-      before: { tx_queue_size: 1000 },
-      afterRecovery: { tx_queue_size: 20000 },
+      before: { tx_stream_depth: 1000 },
+      afterRecovery: { tx_stream_depth: 20000 },
     });
     const opts = makeOptions({
       collectWindowFn: vi.fn().mockResolvedValue(window),

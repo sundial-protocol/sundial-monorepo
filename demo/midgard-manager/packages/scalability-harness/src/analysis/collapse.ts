@@ -24,7 +24,7 @@ export interface CollapseInputs {
   nodeUnavailable: boolean;
   consecutiveProbeFailures?: number;
 
-  // Prometheus up{job="midgard_nodes"} instant scalar. null = metric unreachable.
+  // Prometheus up{job="sundial_nodes"} instant scalar. null = metric unreachable.
   prometheusUp: number | null;
 
   // TX generator exit code. undefined = not tracked; null = killed by signal (clean shutdown).

@@ -219,11 +219,11 @@ it.effect("insertMultiple chunks projection writes into transactions", () => {
       expect(sqlHarness.getTransactionCallCount()).toBe(2);
       expect(
         vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
-      ).toHaveBeenCalledTimes(2);
-      const chunkSizes = vi
+      ).toHaveBeenCalledTimes(101);
+      const txBatchSizes = vi
         .mocked(AddressHistoryDB.aggregateProcessedTxs)
         .mock.calls.map((call) => call[1].length);
-      expect(chunkSizes).toEqual([100, 1]);
+      expect(txBatchSizes.every((size) => size === 1)).toBe(true);
     }),
     Effect.provide(sqlHarness.layer),
   );

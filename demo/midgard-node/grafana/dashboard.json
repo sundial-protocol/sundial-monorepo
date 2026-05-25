@@ -109,7 +109,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "tx_queue_size{instance=\"node:9464\"}",
+          "expr": "tx_stream_depth{instance=\"node:9464\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",

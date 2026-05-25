@@ -6,7 +6,7 @@ export default defineConfig({
     pool: "forks",
     reporters: [["default", { summary: false }]],
     include: ["./tests/**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-    exclude: ["./tests/unit/**", "./tests/integration/**"],
+    exclude: ["./tests/unit/**", "./tests/integration/**", "./tests/e2e/**"],
     setupFiles: [path.resolve(__dirname, "../vitest/sdk.unit.setup.mjs")],
     testTimeout: 420_000,
     hookTimeout: 420_000,
