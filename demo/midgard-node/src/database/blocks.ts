@@ -91,9 +91,12 @@ export type EntryNoMeta = Stats & {
 
 export enum Status {
   UNSUBMITTED = 0,
-  SUBMITTED = 1,
-  CONFIRMED = 2,
-  MERGED = 3,
+  // Marked before any L1 interaction so crash-recovery can distinguish
+  // never-tried (UNSUBMITTED) from in-flight (SUBMITTING) on restart.
+  SUBMITTING = 1,
+  SUBMITTED = 2,
+  CONFIRMED = 3,
+  MERGED = 4,
 }
 
 enum IndexNames {
@@ -151,7 +154,7 @@ export const createTable: Effect.Effect<void, DatabaseError, Database> =
         yield* sql`CREATE INDEX IF NOT EXISTS ${sql(
           IndexNames.UNSUBMITTED_HEIGHT,
         )} ON ${sql(tableName)} (${sql(Columns.HEIGHT)})
-        WHERE ${sql(Columns.STATUS)} = ${sql.literal(String(Status.UNSUBMITTED))};`;
+        WHERE ${sql(Columns.STATUS)} <= ${sql.literal(String(Status.SUBMITTING))};`;
       }),
     );
   }).pipe(
@@ -244,7 +247,7 @@ export const retrieveEventsForCommitment = (
     // submission retrieval for this exact interval.
     const txRequests =
       txRequestsInWindow.length > 0 ||
-      latestBlock[Columns.STATUS] === Status.UNSUBMITTED
+      latestBlock[Columns.STATUS] < Status.SUBMITTED
         ? txRequestsInWindow
         : yield* Effect.gen(function* () {
             const staleTxRequests =
@@ -270,7 +273,7 @@ export const retrieveEventsForCommitment = (
     };
   });
 
-export const retrieveEarliestUnsubmittedEntry: Effect.Effect<
+export const retrieveEarliestPendingEntry: Effect.Effect<
   Option.Option<Entry>,
   DatabaseError,
   Database
@@ -278,7 +281,7 @@ export const retrieveEarliestUnsubmittedEntry: Effect.Effect<
   const sql = yield* SqlClient.SqlClient;
   const rows = yield* sql<Entry>`
     SELECT * FROM ${sql(tableName)}
-    WHERE ${sql(Columns.STATUS)} = ${Status.UNSUBMITTED}
+    WHERE ${sql(Columns.STATUS)} <= ${Status.SUBMITTING}
     ORDER BY ${sql(Columns.HEIGHT)} ASC
     LIMIT 1`;
   if (rows.length <= 0) {
@@ -286,7 +289,7 @@ export const retrieveEarliestUnsubmittedEntry: Effect.Effect<
   } else {
     return Option.some(rows[0]);
   }
-}).pipe(sqlErrorToDatabaseError(tableName, "retrieveEarliestUnsubmittedEntry"));
+}).pipe(sqlErrorToDatabaseError(tableName, "retrieveEarliestPendingEntry"));
 
 export const retrieveLatestEntry: Effect.Effect<
   Option.Option<Entry>,
@@ -458,5 +461,46 @@ export const deleteUpToAndIncludingBlock = (
       "Failed to delete unsubmitted blocks up to the given block",
     ),
   );
+
+// Resets any blocks that were SUBMITTING at crash/restart time back to
+// UNSUBMITTED so the submission fiber can retry them with the L1 pre-check.
+export const resetSubmittingToUnsubmitted: Effect.Effect<
+  number,
+  DatabaseError,
+  Database
+> = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const rows = yield* sql<{ count: string }>`
+    WITH updated AS (
+      UPDATE ${sql(tableName)}
+      SET ${sql(Columns.STATUS)} = ${Status.UNSUBMITTED}
+      WHERE ${sql(Columns.STATUS)} = ${Status.SUBMITTING}
+      RETURNING 1
+    )
+    SELECT COUNT(*) AS count FROM updated`;
+  return Number(rows[0]?.count ?? "0");
+}).pipe(
+  sqlErrorToDatabaseError(
+    tableName,
+    "Failed to reset SUBMITTING blocks to UNSUBMITTED",
+  ),
+);
+
+// Counts blocks that have not yet reached SUBMITTED (i.e. UNSUBMITTED or
+// SUBMITTING). Used for the unsubmitted-backlog gauge.
+export const countPendingBlocks: Effect.Effect<
+  bigint,
+  DatabaseError,
+  Database
+> = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const rows = yield* sql<{
+    count: string;
+  }>`SELECT COUNT(*) AS count FROM ${sql(tableName)} WHERE ${sql(Columns.STATUS)} < ${Status.SUBMITTED}`;
+  return BigInt(rows[0]?.count ?? "0");
+}).pipe(
+  Effect.withLogSpan(`countPendingBlocks ${tableName}`),
+  sqlErrorToDatabaseError(tableName, "Failed to count pending blocks"),
+);
 
 export const clear = clearTable(tableName);

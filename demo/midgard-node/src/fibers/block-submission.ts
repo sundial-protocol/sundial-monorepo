@@ -9,7 +9,8 @@ import {
   NodeConfig,
 } from "@/services/index.js";
 import { TxSignError, TxSubmitError } from "@/transactions/utils.js";
-import { Effect, Metric, Option, Schedule } from "effect";
+import { Cause, Effect, Metric, Option, Schedule } from "effect";
+import { deserializeUTxOsFromStorage } from "@/database/utils/common.js";
 import {
   DepositsDB,
   LatestLedgerDB,
@@ -75,23 +76,23 @@ export const initializeSubmissionMetrics = Effect.all([
 ]);
 
 const loadSubmissionMetricsBaselineFromDb = Effect.gen(function* () {
-  const [submittedOrLaterCount, unsubmittedCount] = yield* Effect.all(
+  const [submittedOrLaterCount, pendingCount] = yield* Effect.all(
     [
       BlocksDB.countWithMinimumStatus(BlocksDB.Status.SUBMITTED),
-      BlocksDB.countByStatus(BlocksDB.Status.UNSUBMITTED),
+      BlocksDB.countPendingBlocks,
     ],
     { concurrency: "unbounded" },
   );
   return {
     submittedOrLaterCount,
-    unsubmittedCount,
+    pendingCount,
   };
 });
 
 const reconcileSubmissionMetricsFromDb = Effect.gen(function* () {
   // On node boot, restore counters/gauges from persisted block statuses.
   yield* initializeSubmissionMetrics;
-  const { submittedOrLaterCount, unsubmittedCount } =
+  const { submittedOrLaterCount, pendingCount } =
     yield* loadSubmissionMetricsBaselineFromDb;
   yield* Metric.incrementBy(
     blockSubmissionMetrics.submitBlockCounter,
@@ -99,23 +100,31 @@ const reconcileSubmissionMetricsFromDb = Effect.gen(function* () {
   );
   yield* Metric.set(
     blockSubmissionMetrics.unsubmittedBlockBacklogGauge,
-    unsubmittedCount,
+    pendingCount,
   );
 });
 
 const refreshUnsubmittedBacklogGaugeFromDb = Effect.gen(function* () {
-  const unsubmittedCount = yield* BlocksDB.countByStatus(
-    BlocksDB.Status.UNSUBMITTED,
-  );
+  const pendingCount = yield* BlocksDB.countPendingBlocks;
   yield* Metric.set(
     blockSubmissionMetrics.unsubmittedBlockBacklogGauge,
-    unsubmittedCount,
+    pendingCount,
   );
 });
 
-// For database operations.
-const BATCH_SIZE = 100;
+// Submission DB batching uses adaptive sizing so small blocks avoid oversized
+// transactions while large replay windows reduce round-trips.
+const MIN_SUBMISSION_BATCH_SIZE = 250;
+const DEFAULT_SUBMISSION_BATCH_SIZE = 1000;
+const MAX_SUBMISSION_BATCH_SIZE = 5000;
 const SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS = 30_000;
+
+export const resolveSubmissionBatchSize = (itemCount: number): number => {
+  if (itemCount >= 20_000) return MAX_SUBMISSION_BATCH_SIZE;
+  if (itemCount >= 5_000) return 2500;
+  if (itemCount >= 1_000) return DEFAULT_SUBMISSION_BATCH_SIZE;
+  return MIN_SUBMISSION_BATCH_SIZE;
+};
 
 const submitSignedTxCBOR = (
   l1CborBytes: Buffer,
@@ -137,18 +146,20 @@ const submitSignedTxCBOR = (
     // signer) beyond the witness already embedded by the commitment worker.
     // Re-signing with the merge wallet preserves existing witnesses while
     // appending the currently required one before submit.
-    yield* lucid.switchToOperatorsMergingWallet;
-    const signedTx = yield* lucid.api
-      .fromTx(signedTxHex)
-      .sign.withWallet()
-      .completeProgram();
-    return yield* signedTx.submitProgram().pipe(
+    return yield* Effect.gen(function* () {
+      yield* lucid.switchToOperatorsMergingWallet;
+      const signedTx = yield* lucid.api
+        .fromTx(signedTxHex)
+        .sign.withWallet()
+        .completeProgram();
+      return yield* signedTx.submitProgram();
+    }).pipe(
       Effect.timeoutFail({
         duration: `${timeoutMs} millis`,
         onTimeout: () =>
           new TxSubmitError({
-            message: `Timed out after ${timeoutMs}ms while submitting L1 commitment tx (header_hash=${headerHashHex})`,
-            cause: "Timed out waiting for submitProgram()",
+            message: `Timed out after ${timeoutMs}ms while signing/submitting L1 commitment tx (header_hash=${headerHashHex})`,
+            cause: "Timed out waiting for sign/submit flow",
             txHash: "<unknown>",
           }),
       }),
@@ -362,9 +373,45 @@ const processEventsForLedgerApplication = (
     };
   });
 
+// Checks whether the commitment tx for a block is already on L1 by querying
+// for any of its produced UTxOs. Returns false on any provider error so the
+// caller falls through to normal submission.
+const checkL1TxProgram = (
+  producedUtxosBytes: Buffer,
+  headerHashHex: string,
+): Effect.Effect<boolean, never, Lucid> =>
+  Effect.gen(function* () {
+    const lucid = yield* Lucid;
+    const producedUTxOs =
+      yield* deserializeUTxOsFromStorage(producedUtxosBytes);
+    if (producedUTxOs.length === 0) {
+      return false;
+    }
+    const outRefs = producedUTxOs.map((utxo) => ({
+      txHash: utxo.txHash,
+      outputIndex: utxo.outputIndex,
+    }));
+    const foundUTxOs = yield* Effect.promise(() =>
+      lucid.api.utxosByOutRef(outRefs),
+    );
+    const found = foundUTxOs.length > 0;
+    if (found) {
+      yield* Effect.logInfo(
+        `🔗 ✅ Commitment tx already on L1 (header_hash=${headerHashHex}), skipping submission.`,
+      );
+    }
+    return found;
+  }).pipe(
+    Effect.catchAllCause((cause) =>
+      Effect.logWarning(
+        `🔗 ⚠️  L1 pre-check failed for header_hash=${headerHashHex}, will attempt submission: ${Cause.pretty(cause)}`,
+      ).pipe(Effect.as(false)),
+    ),
+  );
+
 export const submitEarliestBlock = Effect.gen(function* () {
-  const optUnsubmittedBlock = yield* BlocksDB.retrieveEarliestUnsubmittedEntry;
-  yield* Option.match(optUnsubmittedBlock, {
+  const optPendingBlock = yield* BlocksDB.retrieveEarliestPendingEntry;
+  yield* Option.match(optPendingBlock, {
     onNone: () =>
       Effect.gen(function* () {
         yield* Effect.logInfo("No unsubmitted blocks in queue.");
@@ -372,12 +419,34 @@ export const submitEarliestBlock = Effect.gen(function* () {
       }),
     onSome: (blockEntry) =>
       Effect.gen(function* () {
-        yield* Effect.logInfo("🔗 ✉️  Submitting block commitment...");
-        const txHash = yield* submitSignedTxCBOR(
-          blockEntry[BlocksDB.Columns.L1_CBOR],
-          SDK.bufferToHex(blockEntry[BlocksDB.Columns.HEADER_HASH]),
+        const headerHashHex = SDK.bufferToHex(
+          blockEntry[BlocksDB.Columns.HEADER_HASH],
         );
-        yield* Effect.logInfo(`🔗 🚀 Block commitment submitted: ${txHash}`);
+
+        // Mark SUBMITTING before any L1 interaction so crash-recovery on
+        // restart can distinguish in-flight blocks from never-tried ones (M-53).
+        yield* BlocksDB.setStatusOfEntry(
+          blockEntry,
+          BlocksDB.Status.SUBMITTING,
+        );
+
+        yield* Effect.logInfo("🔗 ✉️  Submitting block commitment...");
+
+        // L1 pre-check: if the commitment tx already landed (e.g. a prior
+        // attempt timed out), skip sign+submit and go straight to DB apply
+        // (M-52).
+        const txAlreadyOnL1 = yield* checkL1TxProgram(
+          blockEntry[BlocksDB.Columns.PRODUCED_UTXOS],
+          headerHashHex,
+        );
+
+        if (!txAlreadyOnL1) {
+          const txHash = yield* submitSignedTxCBOR(
+            blockEntry[BlocksDB.Columns.L1_CBOR],
+            headerHashHex,
+          );
+          yield* Effect.logInfo(`🔗 🚀 Block commitment submitted: ${txHash}`);
+        }
         yield* extractL1CommitmentFeeLovelace(
           blockEntry[BlocksDB.Columns.L1_CBOR],
         ).pipe(
@@ -414,7 +483,7 @@ export const submitEarliestBlock = Effect.gen(function* () {
         );
 
         const addToLedgerProgram = batchProgram(
-          BATCH_SIZE,
+          resolveSubmissionBatchSize(allProducedLedgerEntries.length),
           allProducedLedgerEntries.length,
           "Insert new entries to LatestLedgerDB",
           (startIndex, endIndex) =>
@@ -425,7 +494,7 @@ export const submitEarliestBlock = Effect.gen(function* () {
         );
 
         const removeFromLedgerProgram = batchProgram(
-          BATCH_SIZE,
+          resolveSubmissionBatchSize(allSpentOutRefs.length),
           allSpentOutRefs.length,
           "Remove spent outrefs from LatestLedgerDB",
           (startIndex, endIndex) =>
@@ -443,7 +512,7 @@ export const submitEarliestBlock = Effect.gen(function* () {
         });
 
         const transferMempoolTxsProgram = batchProgram(
-          BATCH_SIZE,
+          resolveSubmissionBatchSize(txRequests.length),
           txRequests.length,
           "Transfer of MempoolDB entries to ImmutableDB and BlocksTxsDB",
           (startIndex, endIndex) => {
@@ -464,7 +533,7 @@ export const submitEarliestBlock = Effect.gen(function* () {
         );
 
         const addToAddressHistoryProgram = batchProgram(
-          BATCH_SIZE,
+          resolveSubmissionBatchSize(allAddressHistoryEntries.length),
           allAddressHistoryEntries.length,
           "Insert AddressHistoryDB entries for all events",
           (startIndex, endIndex) =>
@@ -492,6 +561,18 @@ export const submitEarliestBlock = Effect.gen(function* () {
   });
 });
 
+// On startup, resets any blocks left in SUBMITTING state (crashed mid-flight)
+// back to UNSUBMITTED so the normal loop picks them up with the L1 pre-check.
+export const reconcileSubmittingBlocks: Effect.Effect<void, never, Database> =
+  Effect.gen(function* () {
+    const count = yield* BlocksDB.resetSubmittingToUnsubmitted;
+    if (count > 0) {
+      yield* Effect.logInfo(
+        `🔗 🔄 Reconciled ${count} SUBMITTING block(s) back to UNSUBMITTED for L1 pre-check on retry.`,
+      );
+    }
+  }).pipe(Effect.catchAllCause(Effect.logWarning));
+
 export const blockSubmissionFiber = (
   schedule: Schedule.Schedule<number>,
 ): Effect.Effect<
@@ -501,6 +582,7 @@ export const blockSubmissionFiber = (
 > =>
   Effect.gen(function* () {
     yield* Effect.logInfo("🔗 Block submission fiber started.");
+    yield* reconcileSubmittingBlocks;
     yield* reconcileSubmissionMetricsFromDb.pipe(
       Effect.catchAllCause(Effect.logWarning),
     );

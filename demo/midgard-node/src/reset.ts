@@ -172,7 +172,12 @@ export const program: Effect.Effect<
   | TxConfirmError
   | DatabaseError
   | FileSystemError,
-  Lucid | NodeConfig | AlwaysSucceedsContract | Globals | Database | TxIngressQueue
+  | Lucid
+  | NodeConfig
+  | AlwaysSucceedsContract
+  | Globals
+  | Database
+  | TxIngressQueue
 > = Effect.gen(function* () {
   const globals = yield* Globals;
   const txIngressQueue = yield* TxIngressQueue;
@@ -299,7 +304,9 @@ export const repairStateQueueRootUnitsProgram: Effect.Effect<
     });
 
     if (remaining.length !== 0) {
-      const remainingRefs = remaining.map((u) => `${u.txHash}#${u.outputIndex}`);
+      const remainingRefs = remaining.map(
+        (u) => `${u.txHash}#${u.outputIndex}`,
+      );
       return yield* Effect.fail(
         new SDK.LucidError({
           message: `Root-unit repair incomplete: expected 0 root-unit UTxOs, got ${remaining.length}`,
@@ -318,7 +325,8 @@ export const repairStateQueueRootUnitsProgram: Effect.Effect<
         onTimeout: () =>
           new SDK.LucidError({
             message: `Timed out after ${REPAIR_ROOT_UNITS_TIMEOUT_MS}ms while repairing state-queue root units`,
-            cause: "Timed out waiting for L1/provider response during root-unit repair",
+            cause:
+              "Timed out waiting for L1/provider response during root-unit repair",
           }),
       }),
     )

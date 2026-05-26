@@ -28,6 +28,7 @@ import { generateCharts } from '../report/charts.js';
 import { renderReport } from '../report/markdown.js';
 import type { TierRunResult } from './load-runner.js';
 import { runTier } from './load-runner.js';
+import { ensureSeedReadiness } from './seed-readiness.js';
 import { computeSettings } from './tx-generator.js';
 
 function lookupCounterDelta(summary: TierWindowSummary | null, query: string): number | null {
@@ -36,6 +37,11 @@ function lookupCounterDelta(summary: TierWindowSummary | null, query: string): n
 
 function lookupGaugeFinal(summary: TierWindowSummary | null, query: string): number | null {
   return summary?.gaugeSummaries.find((s) => s.query === query)?.final ?? null;
+}
+
+function formatNullableNumber(value: number | null | undefined, digits = 2): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'n/a';
+  return value.toFixed(digits);
 }
 
 function derivePrometheusUp(result: TierRunResult): number | null {
@@ -145,8 +151,33 @@ export async function runScenario(
   const lokiCaptures: LokiTierCapture[] = [];
   const tempoCaptures: TempoTierCapture[] = [];
   let harnessErrorOccurred = false;
+  console.log(
+    chalk.gray(
+      `  Scenario runner initialized runId=${scenario.runId} tiers=${tiers.length} ` +
+        `node=${scenario.nodeEndpoint} metrics=${scenario.prometheusEndpoint}`
+    )
+  );
 
-  for (const tier of tiers) {
+  try {
+    console.log(
+      chalk.gray('  Seed readiness gate: checking node/bootstrap state before tier execution...')
+    );
+    const seedReadiness = await ensureSeedReadiness({
+      nodeEndpoint: scenario.nodeEndpoint,
+      prometheusClient,
+    });
+    console.log(
+      chalk.gray(
+        `  Seed readiness: ${seedReadiness.outcome} (elapsed=${(seedReadiness.elapsedMs / 1000).toFixed(1)}s, ` +
+          `attempts=${seedReadiness.seedAttemptsDelta}, failures=${seedReadiness.seedFailuresDelta})`
+      )
+    );
+  } catch (err) {
+    console.error(chalk.red(`  Seed readiness failed: ${String(err)}`));
+    harnessErrorOccurred = true;
+  }
+
+  for (const tier of harnessErrorOccurred ? [] : tiers) {
     const generatorSettings = computeSettings(
       tier.targetTps,
       scenario.txGeneratorTaskCostSeconds,
@@ -229,6 +260,22 @@ export async function runScenario(
     });
 
     analysisSummaries.push(summary);
+    console.log(
+      chalk.gray(
+        `  [${tier.tierIndex}] tier summary: ` +
+          `result=${summary.result} committed_tps=${formatNullableNumber(summary.observedCommittedTps)} ` +
+          `accepted_tps=${formatNullableNumber(summary.observedMempoolAcceptedTps)} ` +
+          `committed_tx_delta=${formatNullableNumber(summary.committedTxDelta, 0)} ` +
+          `commit_failures_delta=${formatNullableNumber(summary.commitmentFailureDelta, 0)} ` +
+          `queue_after_recovery=${formatNullableNumber(summary.finalQueueSizeAfterRecovery, 0)} ` +
+          `mempool_after_recovery=${formatNullableNumber(summary.finalMempoolSizeAfterRecovery, 0)}`
+      )
+    );
+    if (collapseResult !== null) {
+      console.log(
+        chalk.yellow(`  [${tier.tierIndex}] collapse diagnostics: reason=${collapseResult.reason}`)
+      );
+    }
     if (result.metricWindow !== null) prometheusWindows.push(result.metricWindow);
     if (result.lokiCapture !== null) lokiCaptures.push(result.lokiCapture);
     if (result.tempoCapture !== null) tempoCaptures.push(result.tempoCapture);
@@ -269,7 +316,12 @@ export async function runScenario(
     console.log(chalk.gray(`  [${tier.tierIndex}] done — ${label}`));
 
     if (!result.shouldContinue || collapseResult !== null) {
-      console.log(chalk.yellow('  Stop condition triggered — no further tiers will run.'));
+      console.log(
+        chalk.yellow(
+          `  Stop condition triggered — no further tiers will run ` +
+            `(tier=${tier.tierIndex}, reason=${result.stopReason}, collapse=${collapseResult?.reason ?? 'none'}).`
+        )
+      );
       break;
     }
   }

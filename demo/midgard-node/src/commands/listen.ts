@@ -441,10 +441,10 @@ const getMergeHandler = Effect.gen(function* () {
   ),
 );
 
-const createLockedActionHandler = (
+const createLockedActionHandler = <R>(
   endpoint: string,
   successMessage: string,
-  actionProgram: Effect.Effect<void, any, any>,
+  actionProgram: Effect.Effect<void, any, R>,
 ) =>
   Effect.gen(function* () {
     yield* Effect.logInfo(`GET /${endpoint} - request received`);
@@ -472,32 +472,22 @@ const createLockedActionHandler = (
     });
   }).pipe(
     Effect.catchTag("HttpBodyError", (e) => failWith500("GET", endpoint, e)),
-    Effect.catchTag("DatabaseError", (e) =>
-      handleDBGetFailure(endpoint, e),
-    ),
-    Effect.catchTag("TxSubmitError", (e) =>
-      handleTxGetFailure(endpoint, e),
-    ),
-    Effect.catchTag("TxSignError", (e) =>
-      handleTxGetFailure(endpoint, e),
-    ),
-    Effect.catchTag("TxConfirmError", (e) =>
-      handleTxGetFailure(endpoint, e),
-    ),
-    Effect.catchTag("LucidError", (e) =>
-      handleGenericGetFailure(endpoint, e),
-    ),
+    Effect.catchTag("DatabaseError", (e) => handleDBGetFailure(endpoint, e)),
+    Effect.catchTag("TxSubmitError", (e) => handleTxGetFailure(endpoint, e)),
+    Effect.catchTag("TxSignError", (e) => handleTxGetFailure(endpoint, e)),
+    Effect.catchTag("TxConfirmError", (e) => handleTxGetFailure(endpoint, e)),
+    Effect.catchTag("LucidError", (e) => handleGenericGetFailure(endpoint, e)),
   );
 
-const createResetHandler = (resetProgram: Effect.Effect<void, any, any>) =>
+const createResetHandler = <R>(resetProgram: Effect.Effect<void, any, R>) =>
   createLockedActionHandler(
     RESET_ENDPOINT,
     "Collected all UTxOs successfully!",
     resetProgram,
   );
 
-const createStateQueueRootUnitRepairHandler = (
-  repairProgram: Effect.Effect<void, any, any>,
+const createStateQueueRootUnitRepairHandler = <R>(
+  repairProgram: Effect.Effect<void, any, R>,
 ) =>
   createLockedActionHandler(
     STATE_QUEUE_REPAIR_ROOT_UNITS_ENDPOINT,
@@ -522,7 +512,7 @@ const stateQueueRootUnitDiagnosticsSnapshot = Effect.gen(function* () {
   const outRefs = utxos.map((u) => `${u.txHash}#${u.outputIndex}`);
 
   return {
-    status: utxos.length === 1 ? "ok" : ("invalid" as const),
+    status: (utxos.length === 1 ? "ok" : "invalid") as "ok" | "invalid",
     resetInProgress,
     stateQueueAddress,
     rootUnit,
@@ -531,15 +521,19 @@ const stateQueueRootUnitDiagnosticsSnapshot = Effect.gen(function* () {
   };
 });
 
-const createStateQueueRootUnitDiagnosticsHandler = (
-  snapshotProgram: Effect.Effect<{
-    status: "ok" | "invalid";
-    resetInProgress: boolean;
-    stateQueueAddress: string;
-    rootUnit: string;
-    count: number;
-    outRefs: string[];
-  }>,
+const createStateQueueRootUnitDiagnosticsHandler = <E, R>(
+  snapshotProgram: Effect.Effect<
+    {
+      status: "ok" | "invalid";
+      resetInProgress: boolean;
+      stateQueueAddress: string;
+      rootUnit: string;
+      count: number;
+      outRefs: string[];
+    },
+    E,
+    R
+  >,
 ) =>
   Effect.gen(function* () {
     const snapshot = yield* snapshotProgram;
@@ -564,9 +558,8 @@ const createStateQueueRootUnitDiagnosticsHandler = (
   );
 
 const getResetHandler = createResetHandler(Reset.program);
-const getStateQueueRootUnitRepairHandler = createStateQueueRootUnitRepairHandler(
-  Reset.repairStateQueueRootUnitsProgram,
-);
+const getStateQueueRootUnitRepairHandler =
+  createStateQueueRootUnitRepairHandler(Reset.repairStateQueueRootUnitsProgram);
 const getStateQueueRootUnitDiagnosticsHandler =
   createStateQueueRootUnitDiagnosticsHandler(
     stateQueueRootUnitDiagnosticsSnapshot,

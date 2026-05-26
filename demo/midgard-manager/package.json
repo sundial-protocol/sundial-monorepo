@@ -8,7 +8,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "npm run build:root && npm run build:packages",
+    "build": "pnpm run build:root && pnpm run build:packages",
     "build:root": "node -e \"process.exit(0)\"",
     "build:packages": "pnpm --recursive --filter '@midgard-manager/*' run build",
     "dev": "pnpm --filter @midgard-manager/* dev",
@@ -25,8 +25,8 @@
     "scalability-harness": "pnpm --filter @midgard-manager/scalability-harness start",
     "wallet:block-commitment:topup": "node scripts/fund-bc-wallet.mjs",
     "wallet:block-commitment:check": "node scripts/fund-bc-wallet.mjs --check",
-    "wallet:topup:block-commitment": "npm run wallet:block-commitment:topup",
-    "node:clear:all": "npm run node:clear:mempool && npm run node:clear:submit-blocks && npm run node:reset:postgres && npm run node:reset:auto",
+    "wallet:topup:block-commitment": "pnpm run wallet:block-commitment:topup",
+    "node:clear:all": "pnpm run node:clear:mempool && pnpm run node:clear:submit-blocks && pnpm run node:reset:postgres && pnpm run node:reset:auto",
     "node:clear:mempool": "node scripts/reset-node-state.mjs --mode mempool",
     "node:clear:submit-blocks": "node scripts/reset-node-state.mjs --mode submit-blocks",
     "node:reset:postgres": "node scripts/reset-node-state.mjs --mode postgres",

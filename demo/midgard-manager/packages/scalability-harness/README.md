@@ -303,7 +303,7 @@ Runtime prerequisite: install `playwright` in this package and ensure Chromium i
 | `stopOnCommitmentFailure`          | boolean       | Abort if block commitment stops advancing                                                                                       |
 | `maxCommitmentFailureRatio`        | number? (0–1) | Optional budget for commitment failures (`commitment_failures / mempool_accepted`)                                              |
 | `stopOnMergeFailure`               | boolean       | Abort if merge stops advancing                                                                                                  |
-| `maxRecoveryQueueSize`             | number?       | Abort if queue growth `(tx_stream_depth_after_recovery - tx_stream_depth_before_tier)` exceeds this                                 |
+| `maxRecoveryQueueSize`             | number?       | Abort if queue growth `(tx_stream_depth_after_recovery - tx_stream_depth_before_tier)` exceeds this                             |
 | `maxRecoveryMempoolSize`           | number?       | Abort if mempool growth `(mempool_tx_count_after_recovery - mempool_tx_count_before_tier)` exceeds this                         |
 | `maxUnsubmittedBlockBacklogGrowth` | number?       | Abort if `(commit_block_count_total Δ - submit_block_count_total Δ)` exceeds this over the tier window (default threshold: `0`) |
 | `minCommitToAcceptedRatio`         | number? (0–1) | Abort if committed tx ratio (`committed / mempool_accepted`) falls below this floor                                             |

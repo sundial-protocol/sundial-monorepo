@@ -1,6 +1,8 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import chalk from 'chalk';
+
 import type { ScalabilityScenario, StopConditions } from '../config/scenario.js';
 import type { LoadTier } from '../config/tiers.js';
 import type { ArtifactWriter, TierSummary } from '../evidence/artifacts.js';
@@ -33,7 +35,17 @@ const DEFAULT_LOKI_POST_WINDOW_TAIL_SECONDS = 60;
 const DEFAULT_MAX_UNSUBMITTED_BLOCK_BACKLOG_GROWTH = 0;
 
 type SnapshotCapture = PrometheusSnapshotEvent['capture'];
-type TierExecutionPhase = 'load' | 'recovery';
+export type TierExecutionPhase = 'load' | 'recovery';
+
+export interface ProgressReporter {
+  updatePhase: (phase: TierExecutionPhase) => void;
+  updateProbeStats: (input: {
+    totalProbes: number;
+    failedProbes: number;
+    consecutiveFailures: number;
+  }) => void;
+  stop: () => void;
+}
 
 export interface TierRunOptions {
   runnerOptions?: RunnerOptions;
@@ -44,6 +56,13 @@ export interface TierRunOptions {
   tierDurationMs?: number;
   recoveryDurationMs?: number;
   rangeStepSeconds?: number;
+  progressReporterFactory?: (params: {
+    tierIndex: number;
+    targetTps: number;
+    loadDurationMs: number;
+    recoveryDurationMs: number;
+    tierArtifactDir: string;
+  }) => ProgressReporter;
   // Injectable for testing
   collectWindowFn?: (
     client: PrometheusClient,
@@ -199,36 +218,39 @@ function formatSubmissionProgress(aggregate: SubmissionAggregate | null): string
   );
 }
 
+function formatNullableNumber(value: number | null | undefined, digits = 2): string {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return 'n/a';
+  }
+  return value.toFixed(digits);
+}
+
+function formatStopMetricValues(values: Record<string, number | boolean>): string {
+  const entries = Object.entries(values);
+  if (entries.length === 0) return 'none';
+  return entries
+    .map(
+      ([metric, value]) =>
+        `${metric}=${typeof value === 'number' ? formatNullableNumber(value, 4) : value}`
+    )
+    .join(', ');
+}
+
+function lookupCounterDelta(summary: TierWindowSummary | null, query: string): number | null {
+  return summary?.counterDeltas.find((delta) => delta.query === query)?.deltaLoad ?? null;
+}
+
+function lookupGaugeFinal(summary: TierWindowSummary | null, query: string): number | null {
+  return summary?.gaugeSummaries.find((gauge) => gauge.query === query)?.final ?? null;
+}
+
 function createTierProgressReporter(params: {
   tierIndex: number;
   targetTps: number;
   loadDurationMs: number;
   recoveryDurationMs: number;
   tierArtifactDir: string;
-}): {
-  updatePhase: (phase: TierExecutionPhase) => void;
-  updateProbeStats: (input: {
-    totalProbes: number;
-    failedProbes: number;
-    consecutiveFailures: number;
-  }) => void;
-  stop: () => void;
-} {
-  const disableProgressReporter = process.env.VITEST === 'true';
-  if (disableProgressReporter) {
-    return {
-      updatePhase: () => {
-        // no-op in test mode
-      },
-      updateProbeStats: () => {
-        // no-op in test mode
-      },
-      stop: () => {
-        // no-op in test mode
-      },
-    };
-  }
-
+}): ProgressReporter {
   const { tierIndex, targetTps, loadDurationMs, recoveryDurationMs, tierArtifactDir } = params;
   let phase: TierExecutionPhase = 'load';
   let phaseStartedAtMs = Date.now();
@@ -632,6 +654,7 @@ export async function runTier(
     tierDurationMs = tier.durationSeconds * 1000,
     recoveryDurationMs = tier.recoverySeconds * 1000,
     rangeStepSeconds = RANGE_STEP_SECONDS,
+    progressReporterFactory = createTierProgressReporter,
     collectWindowFn = collectTierWindow,
     hostResourceCollectorFactory = createHostResourceCollector,
     lokiClient,
@@ -645,6 +668,12 @@ export async function runTier(
 
   const startedAt = new Date();
   const hostResourceCollector = hostResourceCollectorFactory();
+  console.log(
+    chalk.gray(
+      `  [${tier.tierIndex}] tier bootstrap runId=${scenario.runId} target=${tier.targetTps}TPS ` +
+        `load=${tier.durationSeconds}s recovery=${tier.recoverySeconds}s seed=${tier.seed}`
+    )
+  );
 
   await writer.appendLoadEvent(
     makeEvent<TierStartedEvent>({
@@ -664,7 +693,16 @@ export async function runTier(
     tierArtifactDir,
     runnerOptions
   );
-  const progressReporter = createTierProgressReporter({
+  console.log(
+    chalk.gray(
+      `  [${tier.tierIndex}] tx-generator started pid=${generatorHandle.pid ?? 'n/a'} ` +
+        `batch=${formatNullableNumber(generatorHandle.settings.batchSize, 0)} ` +
+        `interval=${formatNullableNumber(generatorHandle.settings.intervalSeconds, 3)}s ` +
+        `concurrency=${formatNullableNumber(generatorHandle.settings.concurrency, 0)} ` +
+        `maxInFlight=${formatNullableNumber(generatorHandle.settings.maxInFlight, 0)}`
+    )
+  );
+  const progressReporter = progressReporterFactory({
     tierIndex: tier.tierIndex,
     targetTps: tier.targetTps,
     loadDurationMs: tierDurationMs,
@@ -687,6 +725,14 @@ export async function runTier(
       scenario.stopConditions,
       prometheusClient
     );
+    console.log(
+      chalk.gray(
+        `  [${tier.tierIndex}] live metric baseline: ` +
+          `commit_failures=${formatNullableNumber(liveMetricBaseline.commitmentFailuresTotal, 0)} ` +
+          `merge_failures=${formatNullableNumber(liveMetricBaseline.mergeFailuresTotal, 0)} ` +
+          `mempool_accepted=${formatNullableNumber(liveMetricBaseline.mempoolAcceptedTotal, 0)}`
+      )
+    );
     const { controller: loadController, cancel: cancelLoadTimer } =
       createTimedController(tierDurationMs);
     let liveMetricCheckInFlight = false;
@@ -701,6 +747,12 @@ export async function runTier(
         .then((stopCondition) => {
           if (stopCondition !== null && liveMetricStopCondition === null) {
             liveMetricStopCondition = stopCondition;
+            console.log(
+              chalk.yellow(
+                `  [${tier.tierIndex}] live stop condition detected during load: ${stopCondition.reason} ` +
+                  `(${formatStopMetricValues(stopCondition.metricValues)})`
+              )
+            );
             loadController.abort();
           }
         })
@@ -744,6 +796,21 @@ export async function runTier(
       throw new Error('tx-generator did not return a result');
     }
     const elapsedMs = stoppedAt.getTime() - startedAt.getTime();
+    console.log(
+      chalk.gray(
+        `  [${tier.tierIndex}] load phase ended elapsed=${formatDuration(elapsedMs)} ` +
+          `probe_failures=${probeResult.failedProbes}/${probeResult.totalProbes} ` +
+          `consecutive_failures=${probeResult.consecutiveFailures} ` +
+          `probe_stop=${probeResult.stopConditionTriggered}`
+      )
+    );
+    console.log(
+      chalk.gray(
+        `  [${tier.tierIndex}] tx-generator stopped exitCode=${generatorResult.exitCode ?? 'null'} ` +
+          `signal=${generatorResult.signal ?? 'none'} ` +
+          `${formatSubmissionProgress(generatorResult.submissionAggregate)}`
+      )
+    );
 
     await writer.appendLoadEvent(
       makeEvent<TierStoppedEvent>({
@@ -760,6 +827,7 @@ export async function runTier(
     );
 
     if (liveMetricStopCondition !== null) {
+      console.log(chalk.yellow(`  [${tier.tierIndex}] recovery skipped due live stop condition.`));
       recoveryStartedAt = new Date();
       recoveryStoppedAt = recoveryStartedAt;
       recoveryProbeResult = {
@@ -769,6 +837,7 @@ export async function runTier(
         failedProbes: 0,
       };
     } else {
+      console.log(chalk.gray(`  [${tier.tierIndex}] recovery phase started`));
       recoveryStartedAt = new Date();
       progressReporter.updatePhase('recovery');
       const { controller: recoveryController, cancel: cancelRecoveryTimer } =
@@ -791,6 +860,15 @@ export async function runTier(
       );
       cancelRecoveryTimer();
       recoveryStoppedAt = new Date();
+      console.log(
+        chalk.gray(
+          `  [${tier.tierIndex}] recovery phase ended elapsed=${formatDuration(
+            recoveryStoppedAt.getTime() - recoveryStartedAt.getTime()
+          )} probe_failures=${recoveryProbeResult.failedProbes}/${recoveryProbeResult.totalProbes} ` +
+            `consecutive_failures=${recoveryProbeResult.consecutiveFailures} ` +
+            `probe_stop=${recoveryProbeResult.stopConditionTriggered}`
+        )
+      );
     }
 
     const afterRecoveryResourceSnapshot = await hostResourceCollector.captureSnapshot();
@@ -849,6 +927,25 @@ export async function runTier(
 
       windowSummary = summarizeTierWindow(metricWindow, ALL_QUERIES);
       evidenceIncomplete = computeEvidenceIncomplete(metricWindow);
+      console.log(
+        chalk.gray(
+          `  [${tier.tierIndex}] metric summary: ` +
+            `accepted_delta=${formatNullableNumber(
+              lookupCounterDelta(windowSummary, 'tx_submissions_mempool_accepted_total'),
+              0
+            )} ` +
+            `committed_delta=${formatNullableNumber(
+              lookupCounterDelta(windowSummary, 'commit_block_tx_count_total'),
+              0
+            )} ` +
+            `commit_failures_delta=${formatNullableNumber(
+              lookupCounterDelta(windowSummary, 'commit_block_commitment_failures_total'),
+              0
+            )} ` +
+            `queue_final=${formatNullableNumber(lookupGaugeFinal(windowSummary, 'tx_stream_depth'), 0)} ` +
+            `mempool_final=${formatNullableNumber(lookupGaugeFinal(windowSummary, 'mempool_tx_count'), 0)}`
+        )
+      );
       metricStopCondition =
         liveMetricStopCondition ??
         checkMetricStopConditions(
@@ -860,6 +957,11 @@ export async function runTier(
         );
     } catch (err) {
       evidenceIncomplete = true;
+      console.error(
+        chalk.red(
+          `  [${tier.tierIndex}] metric collection failed; evidence marked incomplete: ${String(err)}`
+        )
+      );
       await writer.appendLoadEvent(
         makeEvent<HarnessErrorEvent>({
           event: 'harness_error',
@@ -872,6 +974,12 @@ export async function runTier(
     }
 
     if (metricStopCondition !== null) {
+      console.log(
+        chalk.yellow(
+          `  [${tier.tierIndex}] stop condition: ${metricStopCondition.reason} ` +
+            `(${formatStopMetricValues(metricStopCondition.metricValues)})`
+        )
+      );
       await writer.appendLoadEvent(
         makeEvent<StopConditionEvent>({
           event: 'stop_condition',
@@ -886,6 +994,12 @@ export async function runTier(
     const txGeneratorFailed = generatorResult.exitCode !== null && generatorResult.exitCode !== 0;
     if (txGeneratorFailed) {
       evidenceIncomplete = true;
+      console.error(
+        chalk.red(
+          `  [${tier.tierIndex}] tx-generator failed (exitCode=${generatorResult.exitCode}, ` +
+            `signal=${generatorResult.signal ?? 'none'}).`
+        )
+      );
       await writer.appendLoadEvent(
         makeEvent<HarnessErrorEvent>({
           event: 'harness_error',
@@ -984,6 +1098,12 @@ export async function runTier(
         ? 'error'
         : 'stop_condition'
       : 'completed';
+    console.log(
+      chalk.gray(
+        `  [${tier.tierIndex}] tier outcome reason=${stopReason} ` +
+          `stop_condition_triggered=${stopConditionTriggered} continue=${!stopConditionTriggered}`
+      )
+    );
 
     const tierSummary: TierSummary = {
       tierIndex: tier.tierIndex,
