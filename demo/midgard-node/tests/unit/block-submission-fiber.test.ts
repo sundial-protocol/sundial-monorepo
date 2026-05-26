@@ -117,8 +117,10 @@ vi.mock("@/utils.js", () => ({
 // Import after mocks are set up.
 import {
   blockSubmissionMetrics,
+  isIdempotentSubmitErrorCandidate,
   submitEarliestBlock,
 } from "@/fibers/block-submission.js";
+import { TxSubmitError } from "@/transactions/utils.js";
 
 const sqlHarness = createMockSqlHarness();
 
@@ -174,6 +176,13 @@ function runAction(layer = baseLayer) {
 function runActionExpectLucidFailure(layer = baseLayer) {
   return submitEarliestBlock.pipe(
     Effect.catchTag("LucidError", () => Effect.void),
+    Effect.provide(layer),
+  );
+}
+
+function runActionExpectSubmitFailure(layer = baseLayer) {
+  return submitEarliestBlock.pipe(
+    Effect.catchTag("TxSubmitError", () => Effect.void),
     Effect.provide(layer),
   );
 }
@@ -382,4 +391,111 @@ describe("submitEarliestBlock — L1 pre-check (M-52)", () => {
         expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
       }),
   );
+});
+
+describe("submitEarliestBlock — idempotent submit recovery", () => {
+  it.effect(
+    "treats 'already included / inputs spent' submit errors as idempotent-success when re-check confirms L1 inclusion",
+    () =>
+      Effect.gen(function* () {
+        retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+        deserializeUTxOsFn.mockReturnValue(
+          Effect.succeed([{ txHash: "aabbcc", outputIndex: 0 }]),
+        );
+        // First pre-check: not found on L1, then retry pre-check after submit
+        // error: found on L1.
+        fakeUtxosByOutRef
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ txHash: "aabbcc", outputIndex: 0 }]);
+        fakeSubmitProgram.mockReturnValue(
+          Effect.fail(
+            new TxSubmitError({
+              message:
+                'Failed to submit previously built and signed tx: ConwayMempoolFailure "All inputs are spent. Transaction has probably already been included"',
+              cause: "ConwayMempoolFailure All inputs are spent",
+              txHash: "<unknown>",
+            }),
+          ) as any,
+        );
+
+        const delta = yield* metricDelta(
+          readSubmitCounter,
+          runAction(),
+          (state) => state.count,
+        );
+
+        expect(delta).toBe(1n);
+        expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
+        expect(setStatusFn).toHaveBeenCalledTimes(2);
+        expect(setStatusFn).toHaveBeenNthCalledWith(
+          1,
+          fakeBlockEntry,
+          SUBMITTING_STATUS_SENTINEL,
+        );
+        expect(setStatusFn).toHaveBeenNthCalledWith(
+          2,
+          fakeBlockEntry,
+          SUBMITTED_STATUS_SENTINEL,
+        );
+      }),
+  );
+
+  it.effect(
+    "fails when idempotent-success candidate submit error cannot be confirmed on L1",
+    () =>
+      Effect.gen(function* () {
+        retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+        deserializeUTxOsFn.mockReturnValue(
+          Effect.succeed([{ txHash: "aabbcc", outputIndex: 0 }]),
+        );
+        // Both checks say not found on L1.
+        fakeUtxosByOutRef.mockResolvedValue([]);
+        fakeSubmitProgram.mockReturnValue(
+          Effect.fail(
+            new TxSubmitError({
+              message:
+                'Failed to submit previously built and signed tx: ConwayMempoolFailure "All inputs are spent. Transaction has probably already been included"',
+              cause: "ConwayMempoolFailure All inputs are spent",
+              txHash: "<unknown>",
+            }),
+          ) as any,
+        );
+
+        const delta = yield* metricDelta(
+          readSubmitCounter,
+          runActionExpectSubmitFailure(),
+          (state) => state.count,
+        );
+
+        expect(delta).toBe(0n);
+        expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
+        expect(setStatusFn).toHaveBeenCalledTimes(1);
+        expect(setStatusFn).toHaveBeenNthCalledWith(
+          1,
+          fakeBlockEntry,
+          SUBMITTING_STATUS_SENTINEL,
+        );
+      }),
+  );
+});
+
+describe("isIdempotentSubmitErrorCandidate", () => {
+  it("matches known already-included markers", () => {
+    const error = new TxSubmitError({
+      message:
+        'TxSubmitFail: ConwayMempoolFailure "All inputs are spent. Transaction has probably already been included"',
+      cause: "BadInputsUTxO",
+      txHash: "<unknown>",
+    });
+    expect(isIdempotentSubmitErrorCandidate(error)).toBe(true);
+  });
+
+  it("does not match unrelated submit failures", () => {
+    const error = new TxSubmitError({
+      message: "TxSubmitFail: fee too small",
+      cause: "InsufficientFee",
+      txHash: "<unknown>",
+    });
+    expect(isIdempotentSubmitErrorCandidate(error)).toBe(false);
+  });
 });

@@ -19,6 +19,7 @@ type NodeConfigDep = {
   PORT: number;
   WAIT_BETWEEN_BLOCK_COMMITMENTS: number;
   WAIT_BETWEEN_BLOCK_SUBMISSIONS: number;
+  SUBMIT_SIGNED_TX_TIMEOUT_MS: number;
   WAIT_BETWEEN_USER_EVENT_FETCHES: number;
   WAIT_BETWEEN_MERGE_TXS: number;
   COMMITMENT_WORKER_TIMEOUT_MS: number;
@@ -116,6 +117,9 @@ const makeConfig = Effect.gen(function* () {
   const waitBetweenBlockSubmissions = yield* Config.integer(
     "WAIT_BETWEEN_BLOCK_SUBMISSIONS",
   ).pipe(Config.withDefault(10000));
+  const submitSignedTxTimeoutMs = yield* Config.integer(
+    "SUBMIT_SIGNED_TX_TIMEOUT_MS",
+  ).pipe(Config.withDefault(30_000));
   const waitBetweenMergeTxs = yield* Config.integer(
     "WAIT_BETWEEN_MERGE_TXS",
   ).pipe(Config.withDefault(10000));
@@ -319,6 +323,10 @@ const makeConfig = Effect.gen(function* () {
     "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
     commitmentWindowWarnTotalBytes,
   );
+  yield* assertPositiveInteger(
+    "SUBMIT_SIGNED_TX_TIMEOUT_MS",
+    submitSignedTxTimeoutMs,
+  );
 
   return {
     L1_PROVIDER: provider,
@@ -335,6 +343,7 @@ const makeConfig = Effect.gen(function* () {
     PORT: port,
     WAIT_BETWEEN_BLOCK_COMMITMENTS: waitBetweenBlockCommitments,
     WAIT_BETWEEN_BLOCK_SUBMISSIONS: waitBetweenBlockSubmissions,
+    SUBMIT_SIGNED_TX_TIMEOUT_MS: submitSignedTxTimeoutMs,
     WAIT_BETWEEN_MERGE_TXS: waitBetweenMergeTxs,
     WAIT_BETWEEN_USER_EVENT_FETCHES: waitBetweenUserEventFetches,
     COMMITMENT_WORKER_TIMEOUT_MS: commitmentWorkerTimeoutMs,
