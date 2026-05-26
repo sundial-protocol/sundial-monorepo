@@ -2,6 +2,12 @@ import { Effect, Option, Schedule } from "effect";
 import { ConfigError, NodeConfig } from "./config.js";
 import * as LE from "@lucid-evolution/lucid";
 
+interface LucidApis {
+  mainApi: LE.LucidEvolution;
+  blockCommitmentApi: LE.LucidEvolution;
+  mergeApi: LE.LucidEvolution;
+}
+
 const makeLucidInstance = (
   nodeConfig: NodeConfig["Type"],
 ): Effect.Effect<LE.LucidEvolution, ConfigError> =>
@@ -34,9 +40,36 @@ const makeLucidInstance = (
       }),
   }).pipe(Effect.tapError(Effect.logInfo));
 
+const buildPinnedLucidApis = (
+  nodeConfig: NodeConfig["Type"],
+): Effect.Effect<LucidApis, ConfigError> =>
+  Effect.gen(function* () {
+    const mainApi = yield* makeLucidInstance(nodeConfig);
+    const blockCommitmentApi = yield* makeLucidInstance(nodeConfig);
+    const mergeApi = yield* makeLucidInstance(nodeConfig);
+
+    yield* Effect.sync(() => {
+      mainApi.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE);
+      blockCommitmentApi.selectWallet.fromSeed(
+        nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT,
+      );
+      mergeApi.selectWallet.fromSeed(
+        nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX,
+      );
+    });
+
+    return { mainApi, blockCommitmentApi, mergeApi };
+  });
+
 const makeLucid: Effect.Effect<
   {
+    // Backward-compatible alias to the main operator wallet API.
     api: LE.LucidEvolution;
+    mainApi: LE.LucidEvolution;
+    blockCommitmentApi: LE.LucidEvolution;
+    mergeApi: LE.LucidEvolution;
+    reinitializeMergeApi: Effect.Effect<void, ConfigError>;
+    // Deprecated compatibility methods; wallet switching is no longer used.
     switchToOperatorsMainWallet: Effect.Effect<void>;
     switchToOperatorsBlockCommitmentWallet: Effect.Effect<void>;
     switchToOperatorsMergingWallet: Effect.Effect<void>;
@@ -49,14 +82,14 @@ const makeLucid: Effect.Effect<
   // LUCID_INIT_MAX_RETRIES=-1 (default): retry indefinitely until the L1 provider
   // is reachable. LUCID_INIT_MAX_RETRIES=0: try once; if it fails, run in degraded
   // mode (no L1 connectivity). Use 0 in E2E test environments that don't need L1.
-  const lucidOption: Option.Option<LE.LucidEvolution> =
+  const lucidApisOption: Option.Option<LucidApis> =
     nodeConfig.LUCID_INIT_MAX_RETRIES < 0
-      ? yield* makeLucidInstance(nodeConfig)
+      ? yield* buildPinnedLucidApis(nodeConfig)
           .pipe(Effect.retry(Schedule.fixed("1000 millis")))
           .pipe(Effect.map(Option.some))
-      : yield* Effect.option(makeLucidInstance(nodeConfig));
+      : yield* Effect.option(buildPinnedLucidApis(nodeConfig));
 
-  if (Option.isNone(lucidOption)) {
+  if (Option.isNone(lucidApisOption)) {
     yield* Effect.logWarning(
       `Lucid initialization failed; node running in degraded mode (no L1 connectivity). NODE_ROLE=${nodeConfig.NODE_ROLE}`,
     );
@@ -74,28 +107,41 @@ const makeLucid: Effect.Effect<
     );
     return {
       api: degradedApi,
+      mainApi: degradedApi,
+      blockCommitmentApi: degradedApi,
+      mergeApi: degradedApi,
+      reinitializeMergeApi: degradedWalletSwitch,
       switchToOperatorsMainWallet: degradedWalletSwitch,
       switchToOperatorsBlockCommitmentWallet: degradedWalletSwitch,
       switchToOperatorsMergingWallet: degradedWalletSwitch,
     };
   }
 
-  const lucid = lucidOption.value;
+  const lucidApis = lucidApisOption.value;
+  let mergeApi = lucidApis.mergeApi;
+  const reinitializeMergeApi: Effect.Effect<void, ConfigError> = Effect.gen(
+    function* () {
+      const refreshedMergeApi = yield* makeLucidInstance(nodeConfig);
+      yield* Effect.sync(() => {
+        refreshedMergeApi.selectWallet.fromSeed(
+          nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX,
+        );
+        mergeApi = refreshedMergeApi;
+      });
+    },
+  );
+  const noOpWalletSwitch = Effect.void;
   return {
-    api: lucid,
-    switchToOperatorsMainWallet: Effect.sync(() =>
-      lucid.selectWallet.fromSeed(nodeConfig.L1_OPERATOR_SEED_PHRASE),
-    ),
-    switchToOperatorsBlockCommitmentWallet: Effect.sync(() =>
-      lucid.selectWallet.fromSeed(
-        nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT,
-      ),
-    ),
-    switchToOperatorsMergingWallet: Effect.sync(() =>
-      lucid.selectWallet.fromSeed(
-        nodeConfig.L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX,
-      ),
-    ),
+    api: lucidApis.mainApi,
+    mainApi: lucidApis.mainApi,
+    blockCommitmentApi: lucidApis.blockCommitmentApi,
+    get mergeApi() {
+      return mergeApi;
+    },
+    reinitializeMergeApi,
+    switchToOperatorsMainWallet: noOpWalletSwitch,
+    switchToOperatorsBlockCommitmentWallet: noOpWalletSwitch,
+    switchToOperatorsMergingWallet: noOpWalletSwitch,
   };
 });
 

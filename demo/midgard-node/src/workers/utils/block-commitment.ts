@@ -522,10 +522,12 @@ const prepareLucidForBlockCommitment = (
     const appendedUTxO =
       yield* BlocksDB.getAppendedStateQueueUTxOFromEntry(entry);
     const lucid = yield* Lucid;
+    const blockCommitmentApi = lucid.blockCommitmentApi;
     const lucidPreparation = Effect.gen(function* () {
-      yield* lucid.switchToOperatorsBlockCommitmentWallet;
-      yield* Effect.sync(() => lucid.api.overrideUTxOs(newWalletUTxOs));
-      return lucid.api;
+      yield* Effect.sync(() =>
+        blockCommitmentApi.overrideUTxOs(newWalletUTxOs),
+      );
+      return blockCommitmentApi;
     });
     return {
       lucidPreparation,

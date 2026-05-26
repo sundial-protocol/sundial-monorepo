@@ -388,6 +388,22 @@ export const setStatusOfEntry = (
     ),
   );
 
+export const setL1CborOfEntry = (
+  entry: Entry,
+  l1CborBytes: Buffer,
+): Effect.Effect<void, DatabaseError, Database> =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    yield* sql`UPDATE ${sql(tableName)} SET ${sql(Columns.L1_CBOR)} = ${l1CborBytes} WHERE
+    ${sql(Columns.HEADER_HASH)} = ${entry[Columns.HEADER_HASH]}
+  `;
+  }).pipe(
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to update L1 CBOR for the given block entry",
+    ),
+  );
+
 export const countByStatus = (
   status: Status,
 ): Effect.Effect<bigint, DatabaseError, Database> =>

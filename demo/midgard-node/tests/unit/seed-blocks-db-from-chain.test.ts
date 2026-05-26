@@ -70,9 +70,33 @@ const fakeLucidLayer = Layer.succeed(
     _tag: "Lucid",
     api: {
       wallet: () => ({
+        getUtxos: async () => {
+          throw new Error(
+            "main Lucid API should not be used for chain seeding",
+          );
+        },
+      }),
+    } as never,
+    mainApi: {
+      wallet: () => ({
         getUtxos: async () => [],
       }),
     } as never,
+    blockCommitmentApi: {
+      wallet: () => ({
+        getUtxos: async () => [],
+      }),
+    } as never,
+    mergeApi: {
+      wallet: () => ({
+        getUtxos: async () => {
+          throw new Error(
+            "merge Lucid API should not be used for chain seeding",
+          );
+        },
+      }),
+    } as never,
+    reinitializeMergeApi: Effect.void,
     switchToOperatorsMainWallet: Effect.void,
     switchToOperatorsBlockCommitmentWallet: Effect.void,
     switchToOperatorsMergingWallet: Effect.void,

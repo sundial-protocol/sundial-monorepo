@@ -53,8 +53,7 @@ export const program = Effect.gen(function* () {
   const lucidService = yield* Lucid;
   const contracts = yield* AlwaysSucceedsContract;
 
-  yield* lucidService.switchToOperatorsMainWallet;
-  const lucid = lucidService.api;
+  const lucid = lucidService.mainApi;
 
   const indexedFraudProofs = fraudProofsToIndexedValidators(
     contracts.fraudProofs,

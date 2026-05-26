@@ -26,15 +26,15 @@ export const mergeAction: Effect.Effect<
   }
 
   const lucid = yield* Lucid;
+  const mergeApi = lucid.mergeApi;
   const { stateQueue: stateQueueAuthValidator } = yield* AlwaysSucceedsContract;
 
   const fetchConfig: SDK.StateQueueFetchConfig = {
     stateQueueAddress: stateQueueAuthValidator.spendingScriptAddress,
     stateQueuePolicyId: stateQueueAuthValidator.policyId,
   };
-  yield* lucid.switchToOperatorsMergingWallet;
   yield* StateQueueTx.buildAndSubmitMergeTx(
-    lucid.api,
+    mergeApi,
     fetchConfig,
     stateQueueAuthValidator.spendingScript,
     stateQueueAuthValidator.mintingScript,

@@ -20,9 +20,11 @@ type NodeConfigDep = {
   WAIT_BETWEEN_BLOCK_COMMITMENTS: number;
   WAIT_BETWEEN_BLOCK_SUBMISSIONS: number;
   SUBMIT_SIGNED_TX_TIMEOUT_MS: number;
+  SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES: number;
   WAIT_BETWEEN_USER_EVENT_FETCHES: number;
   WAIT_BETWEEN_MERGE_TXS: number;
   COMMITMENT_WORKER_TIMEOUT_MS: number;
+  COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG: number;
   COMMITMENT_WINDOW_WARN_TX_REQUESTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_BYTES: number;
@@ -120,12 +122,18 @@ const makeConfig = Effect.gen(function* () {
   const submitSignedTxTimeoutMs = yield* Config.integer(
     "SUBMIT_SIGNED_TX_TIMEOUT_MS",
   ).pipe(Config.withDefault(30_000));
+  const submitSignTimeoutRecoveryMaxRetries = yield* Config.integer(
+    "SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES",
+  ).pipe(Config.withDefault(1));
   const waitBetweenMergeTxs = yield* Config.integer(
     "WAIT_BETWEEN_MERGE_TXS",
   ).pipe(Config.withDefault(10000));
   const commitmentWorkerTimeoutMs = yield* Config.integer(
     "COMMITMENT_WORKER_TIMEOUT_MS",
   ).pipe(Config.withDefault(300_000));
+  const commitmentMaxUnsubmittedBlockBacklog = yield* Config.integer(
+    "COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG",
+  ).pipe(Config.withDefault(0));
   const commitmentWindowWarnTxRequests = yield* Config.integer(
     "COMMITMENT_WINDOW_WARN_TX_REQUESTS",
   ).pipe(Config.withDefault(50_000));
@@ -290,6 +298,17 @@ const makeConfig = Effect.gen(function* () {
           }),
         );
 
+  const assertNonNegativeInteger = (fieldName: string, value: number) =>
+    value >= 0
+      ? Effect.void
+      : Effect.fail(
+          new ConfigError({
+            message: `Config field must be a non-negative integer: ${fieldName}`,
+            cause: undefined,
+            fieldsAndValues: [[fieldName, String(value)]],
+          }),
+        );
+
   yield* assertPositiveInteger("TX_QUEUE_CAPACITY", txQueueCapacity);
   yield* assertPositiveInteger("TX_QUEUE_MAX_PENDING", txQueueMaxPending);
   yield* assertPositiveInteger(
@@ -323,9 +342,17 @@ const makeConfig = Effect.gen(function* () {
     "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
     commitmentWindowWarnTotalBytes,
   );
+  yield* assertNonNegativeInteger(
+    "COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG",
+    commitmentMaxUnsubmittedBlockBacklog,
+  );
   yield* assertPositiveInteger(
     "SUBMIT_SIGNED_TX_TIMEOUT_MS",
     submitSignedTxTimeoutMs,
+  );
+  yield* assertNonNegativeInteger(
+    "SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES",
+    submitSignTimeoutRecoveryMaxRetries,
   );
 
   return {
@@ -344,9 +371,13 @@ const makeConfig = Effect.gen(function* () {
     WAIT_BETWEEN_BLOCK_COMMITMENTS: waitBetweenBlockCommitments,
     WAIT_BETWEEN_BLOCK_SUBMISSIONS: waitBetweenBlockSubmissions,
     SUBMIT_SIGNED_TX_TIMEOUT_MS: submitSignedTxTimeoutMs,
+    SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES:
+      submitSignTimeoutRecoveryMaxRetries,
     WAIT_BETWEEN_MERGE_TXS: waitBetweenMergeTxs,
     WAIT_BETWEEN_USER_EVENT_FETCHES: waitBetweenUserEventFetches,
     COMMITMENT_WORKER_TIMEOUT_MS: commitmentWorkerTimeoutMs,
+    COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG:
+      commitmentMaxUnsubmittedBlockBacklog,
     COMMITMENT_WINDOW_WARN_TX_REQUESTS: commitmentWindowWarnTxRequests,
     COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: commitmentWindowWarnTotalEvents,
     COMMITMENT_WINDOW_WARN_TOTAL_BYTES: commitmentWindowWarnTotalBytes,

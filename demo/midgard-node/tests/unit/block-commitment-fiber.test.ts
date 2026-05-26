@@ -63,6 +63,10 @@ const fakeLucidLayer = Layer.succeed(
   Lucid.of({
     _tag: "Lucid",
     api: {} as never,
+    mainApi: {} as never,
+    blockCommitmentApi: {} as never,
+    mergeApi: {} as never,
+    reinitializeMergeApi: Effect.void,
     switchToOperatorsMainWallet: Effect.void,
     switchToOperatorsBlockCommitmentWallet: Effect.void,
     switchToOperatorsMergingWallet: Effect.void,
@@ -96,6 +100,9 @@ const readFailureCounter = Metric.value(
 const readDurationHistogram = Metric.value(
   blockCommitmentMetrics.commitBlockDurationHistogram,
 );
+const readBackpressureSkipCounter = Metric.value(
+  blockCommitmentMetrics.commitBlockBackpressureSkipsCounter,
+);
 
 function runAction(layer = baseLayer) {
   return buildAndSubmitCommitmentBlockAction().pipe(
@@ -119,6 +126,27 @@ function makeShortTimeoutLayer() {
         NodeConfig.of({
           ...config,
           COMMITMENT_WORKER_TIMEOUT_MS: TEST_WORKER_TIMEOUT_MS,
+        }),
+      ),
+    );
+  });
+}
+
+function makeBackpressureThresholdLayer(maxBacklog: number) {
+  return Effect.gen(function* () {
+    const config = yield* NodeConfig.pipe(
+      Effect.provide(makeTestNodeConfigLayer()),
+    );
+    return Layer.mergeAll(
+      Globals.Default,
+      sqlHarness.layer,
+      fakeLucidLayer,
+      Layer.succeed(AlwaysSucceedsContract, null as never),
+      Layer.succeed(
+        NodeConfig,
+        NodeConfig.of({
+          ...config,
+          COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG: maxBacklog,
         }),
       ),
     );
@@ -303,6 +331,38 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
       yield* runAction();
       expect(makeWorkerInstance).not.toHaveBeenCalled();
     }),
+  );
+
+  it.effect(
+    "skips commitment worker when pending backlog exceeds threshold",
+    () =>
+      Effect.gen(function* () {
+        sqlHarness.setRows([{ count: "1" }]);
+        const delta = yield* metricDelta(
+          readBackpressureSkipCounter,
+          runAction(),
+          (state) => state.count,
+        );
+        expect(delta).toBe(1n);
+        expect(makeWorkerInstance).not.toHaveBeenCalled();
+      }),
+  );
+
+  it.effect(
+    "runs commitment worker when pending backlog equals threshold",
+    () =>
+      Effect.gen(function* () {
+        sqlHarness.setRows([{ count: "1" }]);
+        makeWorkerInstance.mockReturnValue(
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: successfulCommitmentOutput,
+          }),
+        );
+        const thresholdLayer = yield* makeBackpressureThresholdLayer(1);
+        yield* runAction(thresholdLayer);
+        expect(makeWorkerInstance).toHaveBeenCalledTimes(1);
+      }),
   );
 });
 
