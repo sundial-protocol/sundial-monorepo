@@ -20,6 +20,7 @@ import {
   blocksDbSeedingMetrics,
   ensureBlocksDBSeededFromChain,
 } from "@/fibers/seed-blocks-db-from-chain.js";
+import { DatabaseError } from "@/database/utils/common.js";
 
 const COMMITMENT_WORKER_NAME = "commit-block-header";
 const COMMITMENT_WORKER_URL = new URL("./block-commitment.js", import.meta.url);
@@ -230,6 +231,16 @@ const commitBlockCommitmentFailuresCounter = Metric.counter(
   },
 ).register();
 
+const commitBlockBackpressureSkipsCounter = Metric.counter(
+  "commit_block_backpressure_skips",
+  {
+    description:
+      "A counter for commitment cycles skipped due to unsubmitted block backlog pressure",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
 export const commitBlockDurationHistogramBoundaries =
   MetricBoundaries.exponential({ start: 0.1, factor: 2, count: 13 });
 
@@ -246,6 +257,7 @@ export const blockCommitmentMetrics = {
   commitBlockTxCounter,
   commitBlockL1UserEventsGauge,
   commitBlockCommitmentFailuresCounter,
+  commitBlockBackpressureSkipsCounter,
   commitBlockDurationHistogram,
   ...blocksDbSeedingMetrics,
 } as const;
@@ -266,10 +278,22 @@ export const buildAndSubmitCommitmentBlockAction = () =>
     const globals = yield* Globals;
     const {
       COMMITMENT_WORKER_TIMEOUT_MS,
+      COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG,
       COMMITMENT_WINDOW_WARN_TX_REQUESTS,
       COMMITMENT_WINDOW_WARN_TOTAL_EVENTS,
       COMMITMENT_WINDOW_WARN_TOTAL_BYTES,
     } = yield* NodeConfig;
+    const pendingUnsubmittedBacklog = yield* BlocksDB.countPendingBlocks;
+    const maxUnsubmittedBacklog = BigInt(
+      COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG,
+    );
+    if (pendingUnsubmittedBacklog > maxUnsubmittedBacklog) {
+      yield* Metric.increment(commitBlockBackpressureSkipsCounter);
+      yield* Effect.logWarning(
+        `Commitment backpressure active: skipping cycle because pending_unsubmitted_blocks=${pendingUnsubmittedBacklog.toString()} exceeded threshold=${COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG}`,
+      );
+      return;
+    }
 
     const workerStartMs = performance.now();
     const workerOutput: WorkerOutput = yield* runCommitmentWorkerCycle(
@@ -351,7 +375,7 @@ export const buildAndSubmitCommitmentBlockAction = () =>
 
 export const blockCommitmentAction: Effect.Effect<
   void,
-  WorkerError,
+  WorkerError | DatabaseError,
   AlwaysSucceedsContract | Database | Globals | Lucid | NodeConfig
 > = Effect.gen(function* () {
   const globals = yield* Globals;
@@ -381,6 +405,7 @@ export const blockCommitmentFiber = (
     yield* Metric.incrementBy(commitBlockCounter, 0n);
     yield* Metric.incrementBy(commitBlockTxCounter, 0n);
     yield* Metric.incrementBy(commitBlockCommitmentFailuresCounter, 0n);
+    yield* Metric.incrementBy(commitBlockBackpressureSkipsCounter, 0n);
     yield* Metric.incrementBy(
       blocksDbSeedingMetrics.seedBlocksDbAttemptsCounter,
       0n,

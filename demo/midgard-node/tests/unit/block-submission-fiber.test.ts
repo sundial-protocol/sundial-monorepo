@@ -10,6 +10,7 @@ import { metricDelta } from "./harness/metric-snapshot.js";
 // Hoisted so values can be swapped per test.
 const retrieveFn = vi.hoisted(() => vi.fn());
 const setStatusFn = vi.hoisted(() => vi.fn());
+const setL1CborFn = vi.hoisted(() => vi.fn());
 const countByStatusFn = vi.hoisted(() => vi.fn());
 const countPendingBlocksFn = vi.hoisted(() => vi.fn());
 const SUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 91_337);
@@ -17,6 +18,7 @@ const SUBMITTING_STATUS_SENTINEL = vi.hoisted(() => 1);
 const UNSUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 0);
 const fromCborBytesFn = vi.hoisted(() => vi.fn());
 const deserializeUTxOsFn = vi.hoisted(() => vi.fn());
+const reinitializeMergeApiFn = vi.hoisted(() => vi.fn());
 
 vi.mock("@/database/utils/common.js", () => ({
   deserializeUTxOsFromStorage: (...args: unknown[]) =>
@@ -29,6 +31,7 @@ vi.mock("@/database/index.js", () => ({
       return retrieveFn();
     },
     setStatusOfEntry: (...args: unknown[]) => setStatusFn(...args),
+    setL1CborOfEntry: (...args: unknown[]) => setL1CborFn(...args),
     countByStatus: (...args: unknown[]) => countByStatusFn(...args),
     countWithMinimumStatus: () => Effect.succeed(0n),
     get countPendingBlocks() {
@@ -120,7 +123,7 @@ import {
   isIdempotentSubmitErrorCandidate,
   submitEarliestBlock,
 } from "@/fibers/block-submission.js";
-import { TxSubmitError } from "@/transactions/utils.js";
+import { TxSignError, TxSubmitError } from "@/transactions/utils.js";
 
 const sqlHarness = createMockSqlHarness();
 
@@ -133,29 +136,55 @@ const readL1CommitmentFeesCounter = Metric.value(
 const readL1CommitmentFeeLastGauge = Metric.value(
   blockSubmissionMetrics.l1CommitmentFeeLovelaceLastGauge,
 );
+const readSignTimeoutCounter = Metric.value(
+  blockSubmissionMetrics.submitBlockSignTimeoutsCounter,
+);
+const readSignRecoveredCounter = Metric.value(
+  blockSubmissionMetrics.submitBlockSignRecoveredCounter,
+);
+const readSignReinitCounter = Metric.value(
+  blockSubmissionMetrics.submitBlockSignReinitCounter,
+);
 
-const fakeSubmitProgram = vi.fn(() => Effect.succeed("faketxhash"));
-const fakeCompleteProgram = vi.fn<
-  () => Effect.Effect<
-    { submitProgram: typeof fakeSubmitProgram },
-    { _tag: "RunTimeError" },
-    never
-  >
->(() => Effect.succeed({ submitProgram: fakeSubmitProgram }));
-const fakeFromTx = vi.fn(() => ({
+const SIGNED_TX_CBOR_HEX = "cafebabe";
+const fakeSubmitProgram = vi.fn<() => Effect.Effect<string, unknown, never>>(
+  () => Effect.succeed("faketxhash"),
+);
+const makeSignedTxArtifact = (cborHex = SIGNED_TX_CBOR_HEX) => ({
+  submitProgram: fakeSubmitProgram,
+  toCBOR: () => cborHex,
+});
+const fakeCompleteSignedFromCborProgram = vi.hoisted(() => vi.fn());
+const fakeSignCompleteProgram = vi.hoisted(() => vi.fn());
+const fakeFromTx = vi.fn((txHex: string) => ({
+  completeProgram: () => fakeCompleteSignedFromCborProgram(txHex),
   sign: {
     withWallet: () => ({
-      completeProgram: fakeCompleteProgram,
+      completeProgram: () => fakeSignCompleteProgram(txHex),
     }),
   },
 }));
+const fakeMainFromTx = vi.fn(() => {
+  throw new Error(
+    "mainApi.fromTx should not be used for block submission signing",
+  );
+});
 const fakeUtxosByOutRef = vi.fn(async () => [] as unknown[]);
+const fakeMainApi = {
+  utxosByOutRef: fakeUtxosByOutRef,
+  fromTx: fakeMainFromTx,
+} as never;
+const fakeMergeApi = { fromTx: fakeFromTx } as never;
 
 const fakeLucidLayer = Layer.succeed(
   Lucid,
   Lucid.of({
     _tag: "Lucid",
-    api: { fromTx: fakeFromTx, utxosByOutRef: fakeUtxosByOutRef } as never,
+    api: fakeMainApi,
+    mainApi: fakeMainApi,
+    blockCommitmentApi: fakeMainApi,
+    mergeApi: fakeMergeApi,
+    reinitializeMergeApi: Effect.suspend(() => reinitializeMergeApiFn()),
     switchToOperatorsMainWallet: Effect.void,
     switchToOperatorsBlockCommitmentWallet: Effect.void,
     switchToOperatorsMergingWallet: Effect.void,
@@ -187,6 +216,13 @@ function runActionExpectSubmitFailure(layer = baseLayer) {
   );
 }
 
+function runActionExpectSignFailure(layer = baseLayer) {
+  return submitEarliestBlock.pipe(
+    Effect.catchTag("TxSignError", () => Effect.void),
+    Effect.provide(layer),
+  );
+}
+
 const fakeBlockEntry = {
   l1_cbor: Buffer.from("deadbeef", "hex"),
   event_start_time: new Date(0),
@@ -200,11 +236,18 @@ beforeEach(() => {
   sqlHarness.reset();
   retrieveFn.mockReturnValue(Effect.succeed(Option.none()));
   setStatusFn.mockReturnValue(Effect.succeed(undefined));
+  setL1CborFn.mockReturnValue(Effect.succeed(undefined));
   countByStatusFn.mockReturnValue(Effect.succeed(0n));
   countPendingBlocksFn.mockReturnValue(Effect.succeed(0n));
   fakeSubmitProgram.mockReturnValue(Effect.succeed("faketxhash"));
-  fakeCompleteProgram.mockReturnValue(
-    Effect.succeed({ submitProgram: fakeSubmitProgram }),
+  reinitializeMergeApiFn.mockReturnValue(Effect.succeed(undefined));
+  fakeCompleteSignedFromCborProgram.mockImplementation((txHex: string) =>
+    txHex === SIGNED_TX_CBOR_HEX
+      ? Effect.succeed(makeSignedTxArtifact(SIGNED_TX_CBOR_HEX))
+      : Effect.fail({ _tag: "TxSignerError" }),
+  );
+  fakeSignCompleteProgram.mockReturnValue(
+    Effect.succeed(makeSignedTxArtifact(SIGNED_TX_CBOR_HEX)),
   );
   fromCborBytesFn.mockReturnValue({
     body: () => ({
@@ -258,7 +301,8 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
         SUBMITTED_STATUS_SENTINEL,
       );
       expect(fakeFromTx).toHaveBeenCalledWith("deadbeef");
-      expect(fakeCompleteProgram).toHaveBeenCalledTimes(1);
+      expect(fakeMainFromTx).not.toHaveBeenCalled();
+      expect(fakeSignCompleteProgram).toHaveBeenCalledTimes(1);
       expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
     }),
   );
@@ -308,7 +352,7 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
   it.effect("does NOT increment when L1 submission fails", () =>
     Effect.gen(function* () {
       retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
-      fakeCompleteProgram.mockReturnValue(
+      fakeSignCompleteProgram.mockReturnValue(
         Effect.fail({ _tag: "RunTimeError" }),
       );
 
@@ -327,6 +371,131 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
         SUBMITTING_STATUS_SENTINEL,
       );
     }),
+  );
+
+  it.effect(
+    "persists signed artifact once and retries submit without re-signing",
+    () =>
+      Effect.gen(function* () {
+        const signedBlockEntry = {
+          ...fakeBlockEntry,
+          l1_cbor: Buffer.from(SIGNED_TX_CBOR_HEX, "hex"),
+        };
+        retrieveFn
+          .mockReturnValueOnce(Effect.succeed(Option.some(fakeBlockEntry)))
+          .mockReturnValueOnce(Effect.succeed(Option.some(signedBlockEntry)));
+        fakeSubmitProgram
+          .mockReturnValueOnce(
+            Effect.fail(
+              new TxSubmitError({
+                message: "temporary submit failure",
+                cause: "node busy",
+                txHash: "<unknown>",
+              }),
+            ),
+          )
+          .mockReturnValueOnce(Effect.succeed("faketxhash-retry"));
+
+        yield* runActionExpectSubmitFailure();
+        const delta = yield* metricDelta(
+          readSubmitCounter,
+          runAction(),
+          (state) => state.count,
+        );
+
+        expect(delta).toBe(1n);
+        expect(fakeSignCompleteProgram).toHaveBeenCalledTimes(1);
+        expect(setL1CborFn).toHaveBeenCalledTimes(1);
+        expect(setL1CborFn).toHaveBeenCalledWith(
+          fakeBlockEntry,
+          Buffer.from(SIGNED_TX_CBOR_HEX, "hex"),
+        );
+        expect(fakeFromTx).toHaveBeenCalledWith("deadbeef");
+        expect(fakeFromTx).toHaveBeenCalledWith(SIGNED_TX_CBOR_HEX);
+      }),
+  );
+
+  it.effect(
+    "recovers from sign timeout by reinitializing signer context and retrying",
+    () =>
+      Effect.gen(function* () {
+        retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+        fakeSignCompleteProgram
+          .mockReturnValueOnce(
+            Effect.fail(
+              new TxSignError({
+                message:
+                  "Timed out while signing L1 commitment tx (header_hash=test)",
+                cause: "Timed out waiting for sign flow",
+                txHash: "<unknown>",
+              }),
+            ),
+          )
+          .mockReturnValueOnce(
+            Effect.succeed(makeSignedTxArtifact(SIGNED_TX_CBOR_HEX)),
+          );
+
+        const beforeTimeout = (yield* readSignTimeoutCounter.pipe(
+          Effect.provide(baseLayer),
+        )).count;
+        const beforeRecovered = (yield* readSignRecoveredCounter.pipe(
+          Effect.provide(baseLayer),
+        )).count;
+        const beforeReinit = (yield* readSignReinitCounter.pipe(
+          Effect.provide(baseLayer),
+        )).count;
+
+        yield* runAction();
+
+        const afterTimeout = (yield* readSignTimeoutCounter.pipe(
+          Effect.provide(baseLayer),
+        )).count;
+        const afterRecovered = (yield* readSignRecoveredCounter.pipe(
+          Effect.provide(baseLayer),
+        )).count;
+        const afterReinit = (yield* readSignReinitCounter.pipe(
+          Effect.provide(baseLayer),
+        )).count;
+
+        expect(afterTimeout - beforeTimeout).toBe(1n);
+        expect(afterRecovered - beforeRecovered).toBe(1n);
+        expect(afterReinit - beforeReinit).toBe(1n);
+        expect(reinitializeMergeApiFn).toHaveBeenCalledTimes(1);
+      }),
+  );
+
+  it.effect(
+    "stops after bounded sign-timeout recovery retries are exhausted",
+    () =>
+      Effect.gen(function* () {
+        retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+        fakeSignCompleteProgram
+          .mockReturnValueOnce(
+            Effect.fail(
+              new TxSignError({
+                message:
+                  "Timed out while signing L1 commitment tx (header_hash=test)",
+                cause: "Timed out waiting for sign flow",
+                txHash: "<unknown>",
+              }),
+            ),
+          )
+          .mockReturnValueOnce(
+            Effect.fail(
+              new TxSignError({
+                message:
+                  "Timed out while signing L1 commitment tx (header_hash=test)",
+                cause: "Timed out waiting for sign flow",
+                txHash: "<unknown>",
+              }),
+            ),
+          );
+
+        yield* runActionExpectSignFailure();
+
+        expect(reinitializeMergeApiFn).toHaveBeenCalledTimes(1);
+        expect(fakeSubmitProgram).not.toHaveBeenCalled();
+      }),
   );
 });
 
@@ -351,7 +520,8 @@ describe("submitEarliestBlock — L1 pre-check (M-52)", () => {
       expect(delta).toBe(1n);
       // sign+submit path skipped entirely.
       expect(fakeFromTx).not.toHaveBeenCalled();
-      expect(fakeCompleteProgram).not.toHaveBeenCalled();
+      expect(fakeCompleteSignedFromCborProgram).not.toHaveBeenCalled();
+      expect(fakeSignCompleteProgram).not.toHaveBeenCalled();
       expect(fakeSubmitProgram).not.toHaveBeenCalled();
       // SUBMITTING then SUBMITTED still called.
       expect(setStatusFn).toHaveBeenCalledTimes(2);

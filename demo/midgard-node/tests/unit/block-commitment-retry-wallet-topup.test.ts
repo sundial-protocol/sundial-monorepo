@@ -170,8 +170,22 @@ const makeLucidFixture = (freshWalletUTxOs: readonly UTxO[]) => {
 
 const makeRuntimeLayer = (
   lucidApi: Pick<LucidEvolution, "overrideUTxOs" | "wallet" | "utxosAt">,
-) =>
-  Layer.mergeAll(
+) => {
+  const nonCommitmentApi = {
+    overrideUTxOs: () => {
+      throw new Error("non-commitment Lucid API must not be used");
+    },
+    wallet: () => ({
+      address: async () => {
+        throw new Error("non-commitment wallet must not be used");
+      },
+    }),
+    utxosAt: async () => {
+      throw new Error("non-commitment provider path must not be used");
+    },
+  } as unknown as LucidEvolution;
+
+  return Layer.mergeAll(
     Layer.succeed(AlwaysSucceedsContract, {
       stateQueue: {
         spendingScript: {
@@ -188,12 +202,17 @@ const makeRuntimeLayer = (
     } as never),
     Layer.succeed(Lucid, {
       _tag: "Lucid",
-      api: lucidApi as LucidEvolution,
+      api: nonCommitmentApi,
+      mainApi: nonCommitmentApi,
+      blockCommitmentApi: lucidApi as LucidEvolution,
+      mergeApi: nonCommitmentApi,
+      reinitializeMergeApi: Effect.void,
       switchToOperatorsMainWallet: Effect.void,
       switchToOperatorsBlockCommitmentWallet: Effect.void,
       switchToOperatorsMergingWallet: Effect.void,
     }),
   );
+};
 
 const setupPrerequisites = (staleWalletUtxos: readonly UTxO[]) => {
   dbCommonMocks.deserializeUTxOsFromStorage.mockReturnValue(

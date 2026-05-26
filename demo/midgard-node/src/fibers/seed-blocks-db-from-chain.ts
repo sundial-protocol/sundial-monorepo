@@ -129,20 +129,20 @@ const seedBlocksDBFromChain: Effect.Effect<
     "🔹 BlocksDB is empty - attempting to seed from chain...",
   );
   const lucid = yield* Lucid;
+  const blockCommitmentApi = lucid.blockCommitmentApi;
   const { stateQueue } = yield* AlwaysSucceedsContract;
   const fetchConfig: SDK.StateQueueFetchConfig = {
     stateQueueAddress: stateQueue.spendingScriptAddress,
     stateQueuePolicyId: stateQueue.policyId,
   };
 
-  yield* lucid.switchToOperatorsBlockCommitmentWallet;
   const { tail: latestStateQueueUTxO, traversedHops } =
-    yield* fetchTailByTraversal(lucid.api, fetchConfig);
+    yield* fetchTailByTraversal(blockCommitmentApi, fetchConfig);
   const headerHashHex =
     yield* SDK.headerHashFromStateQueueUTxO(latestStateQueueUTxO);
 
   const walletUTxOs = yield* Effect.tryPromise({
-    try: () => lucid.api.wallet().getUtxos(),
+    try: () => blockCommitmentApi.wallet().getUtxos(),
     catch: (e) =>
       new SDK.LucidError({
         message: "Failed to fetch wallet UTxOs for BlocksDB seeding",

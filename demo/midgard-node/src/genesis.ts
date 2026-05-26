@@ -50,6 +50,7 @@ const genesisTxOrderTx = (nonceUTxO: UTxO) =>
     const { txOrder } = yield* AlwaysSucceedsContract;
     const config = yield* NodeConfig;
     const lucid = yield* Lucid;
+    const mainApi = lucid.mainApi;
 
     const l2UTxO = config.GENESIS_UTXOS[0];
     if (!l2UTxO) {
@@ -60,13 +61,10 @@ const genesisTxOrderTx = (nonceUTxO: UTxO) =>
         }),
       );
     }
-    yield* lucid.switchToOperatorsMainWallet;
-
     const l2Address = l2UTxO.address;
 
-    yield* lucid.switchToOperatorsMainWallet;
     const operatorWalletAddress = yield* Effect.tryPromise({
-      try: lucid.api.wallet().address,
+      try: mainApi.wallet().address,
       catch: (e) =>
         new SDK.LucidError({
           message:
@@ -117,7 +115,7 @@ const genesisTxOrderTx = (nonceUTxO: UTxO) =>
     };
 
     const txBuilder = yield* SDK.incompleteTxOrderTxProgram(
-      lucid.api,
+      mainApi,
       txOrderParams,
     );
     return txBuilder;
@@ -137,6 +135,7 @@ const genesisDepositTx = (
     const { deposit: depositAuthValidator } = yield* AlwaysSucceedsContract;
     const config = yield* NodeConfig;
     const lucid = yield* Lucid;
+    const mainApi = lucid.mainApi;
 
     const genesisUtxo = config.GENESIS_UTXOS[0];
     if (!genesisUtxo) {
@@ -163,10 +162,8 @@ const genesisDepositTx = (
       },
     };
 
-    yield* lucid.switchToOperatorsMainWallet;
-
     const txBuilder = yield* SDK.incompleteDepositTxProgram(
-      lucid.api,
+      mainApi,
       depositParams,
     );
     return txBuilder;
@@ -175,6 +172,7 @@ const genesisDepositTx = (
 const submitComposedGenesisUserEvents = Effect.gen(function* () {
   const config = yield* NodeConfig;
   const lucid = yield* Lucid;
+  const mainApi = lucid.mainApi;
 
   if (config.GENESIS_UTXOS.length <= 0) {
     yield* Effect.logInfo(
@@ -184,8 +182,7 @@ const submitComposedGenesisUserEvents = Effect.gen(function* () {
   }
 
   yield* Effect.logInfo(`🟣 Building composed genesis deposits + tx order...`);
-  yield* lucid.switchToOperatorsMainWallet;
-  const nonceUTxOs = yield* Effect.tryPromise(lucid.api.wallet().getUtxos).pipe(
+  const nonceUTxOs = yield* Effect.tryPromise(mainApi.wallet().getUtxos).pipe(
     Effect.andThen((utxos) => {
       if (utxos.length < 2) {
         return Effect.fail(
@@ -212,7 +209,7 @@ const submitComposedGenesisUserEvents = Effect.gen(function* () {
   const signedTx = yield* composedBuilder.completeProgram({
     localUPLCEval: false,
   });
-  yield* handleSignSubmit(lucid.api, signedTx);
+  yield* handleSignSubmit(mainApi, signedTx);
   yield* Effect.logInfo(`🟣 Composed genesis tx submitted successfully!`);
 }).pipe(Effect.tapError(Effect.logInfo));
 

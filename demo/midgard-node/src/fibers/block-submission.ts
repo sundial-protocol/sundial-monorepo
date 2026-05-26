@@ -1,5 +1,5 @@
 import * as SDK from "@al-ft/midgard-sdk";
-import { CML } from "@lucid-evolution/lucid";
+import { CML, type TxSigned } from "@lucid-evolution/lucid";
 import { SqlClient } from "@effect/sql";
 import { DatabaseError, NotFoundError } from "@/database/utils/common.js";
 import {
@@ -70,6 +70,26 @@ const submitBlockSignTimeoutsCounter = Metric.counter(
   },
 ).register();
 
+const submitBlockSignRecoveredCounter = Metric.counter(
+  "submit_block_sign_recovered",
+  {
+    description:
+      "A counter for sign-stage timeout recoveries that succeeded after signer context reinitialization",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const submitBlockSignReinitCounter = Metric.counter(
+  "submit_block_sign_reinit",
+  {
+    description:
+      "A counter for signer-context reinitialization attempts after sign-stage timeouts",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
 const submitBlockSubmitTimeoutsCounter = Metric.counter(
   "submit_block_submit_timeouts",
   {
@@ -111,6 +131,8 @@ export const blockSubmissionMetrics = {
   submitBlockSignDurationHistogram,
   submitBlockSubmitDurationHistogram,
   submitBlockSignTimeoutsCounter,
+  submitBlockSignRecoveredCounter,
+  submitBlockSignReinitCounter,
   submitBlockSubmitTimeoutsCounter,
   l1CommitmentFeesLovelaceCounter,
   l1CommitmentFeeLovelaceLastGauge,
@@ -121,6 +143,11 @@ export const initializeSubmissionMetrics = Effect.all([
   Metric.incrementBy(blockSubmissionMetrics.submitBlockCounter, 0n),
   Metric.incrementBy(blockSubmissionMetrics.submitBlockFailuresCounter, 0n),
   Metric.incrementBy(blockSubmissionMetrics.submitBlockSignTimeoutsCounter, 0n),
+  Metric.incrementBy(
+    blockSubmissionMetrics.submitBlockSignRecoveredCounter,
+    0n,
+  ),
+  Metric.incrementBy(blockSubmissionMetrics.submitBlockSignReinitCounter, 0n),
   Metric.incrementBy(
     blockSubmissionMetrics.submitBlockSubmitTimeoutsCounter,
     0n,
@@ -220,101 +247,67 @@ export const resolveSubmissionBatchSize = (itemCount: number): number => {
   return MIN_SUBMISSION_BATCH_SIZE;
 };
 
-const submitSignedTxCBOR = (
-  l1CborBytes: Buffer,
+const isWrappedTxSignerError = (error: TxSignError): boolean =>
+  typeof error.cause === "object" &&
+  error.cause !== null &&
+  "_tag" in error.cause &&
+  (error.cause as { _tag?: string })._tag === "TxSignerError";
+
+const submitSignedTxProgram = (
+  signedTx: TxSigned,
   headerHashHex: string,
-): Effect.Effect<
-  string,
-  TxSignError | TxSubmitError | SDK.LucidError,
-  Lucid | NodeConfig
-> =>
+  timeoutMs: number,
+): Effect.Effect<string, TxSubmitError, never> =>
+  Effect.gen(function* () {
+    const submitStartedAtMs = performance.now();
+    return yield* signedTx.submitProgram().pipe(
+      Effect.timeoutFail({
+        duration: `${timeoutMs} millis`,
+        onTimeout: () =>
+          new TxSubmitError({
+            message: `Timed out after ${timeoutMs}ms while submitting L1 commitment tx (header_hash=${headerHashHex})`,
+            cause: SUBMIT_STAGE_TIMEOUT_CAUSE,
+            txHash: "<unknown>",
+          }),
+      }),
+      Effect.ensuring(
+        Metric.update(
+          blockSubmissionMetrics.submitBlockSubmitDurationHistogram,
+          (performance.now() - submitStartedAtMs) / 1000,
+        ),
+      ),
+      Effect.tapErrorTag("TxSubmitError", (error) =>
+        error.cause === SUBMIT_STAGE_TIMEOUT_CAUSE
+          ? Metric.increment(
+              blockSubmissionMetrics.submitBlockSubmitTimeoutsCounter,
+            )
+          : Effect.void,
+      ),
+      Effect.mapError(
+        (error) =>
+          new TxSubmitError({
+            message: `Failed to submit previously built and signed tx: ${error.message}`,
+            cause: error,
+            txHash: "<unknown>",
+          }),
+      ),
+    );
+  });
+
+const completeSignedTxFromCborProgram = (
+  l1CborBytes: Buffer,
+): Effect.Effect<TxSigned, TxSignError | SDK.LucidError, Lucid> =>
   Effect.gen(function* () {
     const lucid = yield* Lucid;
-    const nodeConfig = yield* NodeConfig;
+    const mergeApi = lucid.mergeApi;
     const signedTxHex = SDK.bufferToHex(l1CborBytes);
-    const timeoutMs = Math.max(
-      SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS,
-      nodeConfig.SUBMIT_SIGNED_TX_TIMEOUT_MS,
-    );
-    // Some commitment txs require an additional operator witness (e.g. merge
-    // signer) beyond the witness already embedded by the commitment worker.
-    // Re-signing with the merge wallet preserves existing witnesses while
-    // appending the currently required one before submit.
-    return yield* Effect.gen(function* () {
-      yield* lucid.switchToOperatorsMergingWallet;
-      const signStartedAtMs = performance.now();
-      const signedTx = yield* lucid.api
-        .fromTx(signedTxHex)
-        .sign.withWallet()
-        .completeProgram()
-        .pipe(
-          Effect.timeoutFail({
-            duration: `${timeoutMs} millis`,
-            onTimeout: () =>
-              new TxSignError({
-                message: `Timed out after ${timeoutMs}ms while signing L1 commitment tx (header_hash=${headerHashHex})`,
-                cause: SIGN_STAGE_TIMEOUT_CAUSE,
-                txHash: "<unknown>",
-              }),
-          }),
-          Effect.ensuring(
-            Metric.update(
-              blockSubmissionMetrics.submitBlockSignDurationHistogram,
-              (performance.now() - signStartedAtMs) / 1000,
-            ),
-          ),
-          Effect.tapErrorTag("TxSignError", (error) =>
-            error.cause === SIGN_STAGE_TIMEOUT_CAUSE
-              ? Metric.increment(
-                  blockSubmissionMetrics.submitBlockSignTimeoutsCounter,
-                )
-              : Effect.void,
-          ),
-        );
-      const submitStartedAtMs = performance.now();
-      return yield* signedTx.submitProgram().pipe(
-        Effect.timeoutFail({
-          duration: `${timeoutMs} millis`,
-          onTimeout: () =>
-            new TxSubmitError({
-              message: `Timed out after ${timeoutMs}ms while submitting L1 commitment tx (header_hash=${headerHashHex})`,
-              cause: SUBMIT_STAGE_TIMEOUT_CAUSE,
-              txHash: "<unknown>",
-            }),
-        }),
-        Effect.ensuring(
-          Metric.update(
-            blockSubmissionMetrics.submitBlockSubmitDurationHistogram,
-            (performance.now() - submitStartedAtMs) / 1000,
-          ),
-        ),
-        Effect.tapErrorTag("TxSubmitError", (error) =>
-          error.cause === SUBMIT_STAGE_TIMEOUT_CAUSE
-            ? Metric.increment(
-                blockSubmissionMetrics.submitBlockSubmitTimeoutsCounter,
-              )
-            : Effect.void,
-        ),
-      );
-    });
+    return yield* mergeApi.fromTx(signedTxHex).completeProgram();
   }).pipe(
     Effect.mapError((e) => {
-      const commonMsg = "Failed to submit previously built and signed tx";
-      if (e._tag === "TxSubmitError") {
-        return new TxSubmitError({
-          message: `${commonMsg}: ${e.message}`,
-          cause: e,
-          txHash: "<unknown>",
-        });
-      } else if (e._tag === "TxSignerError") {
+      const commonMsg = "Failed to complete transaction from persisted CBOR";
+      if (e._tag === "TxSignerError") {
         return new TxSignError({
           message: `${commonMsg} due to a bad signature`,
-          cause: e,
-          txHash: "<unknown>",
-        });
-      } else if (e._tag === "TxSignError") {
-        return new TxSignError({
-          message: `${commonMsg}: ${e.message}`,
           cause: e,
           txHash: "<unknown>",
         });
@@ -328,6 +321,165 @@ const submitSignedTxCBOR = (
       }
     }),
   );
+
+const signTxFromCborSingleAttemptProgram = (
+  l1CborBytes: Buffer,
+  headerHashHex: string,
+): Effect.Effect<TxSigned, TxSignError | SDK.LucidError, Lucid | NodeConfig> =>
+  Effect.gen(function* () {
+    const lucid = yield* Lucid;
+    const nodeConfig = yield* NodeConfig;
+    const mergeApi = lucid.mergeApi;
+    const signedTxHex = SDK.bufferToHex(l1CborBytes);
+    const timeoutMs = Math.max(
+      SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS,
+      nodeConfig.SUBMIT_SIGNED_TX_TIMEOUT_MS,
+    );
+    const signStartedAtMs = performance.now();
+    // Some commitment txs require an additional operator witness (e.g. merge
+    // signer) beyond the witness already embedded by the commitment worker.
+    // Sign exactly once, persist the signed artifact, then retry submit without
+    // re-running the sign flow.
+    return yield* mergeApi
+      .fromTx(signedTxHex)
+      .sign.withWallet()
+      .completeProgram()
+      .pipe(
+        Effect.timeoutFail({
+          duration: `${timeoutMs} millis`,
+          onTimeout: () =>
+            new TxSignError({
+              message: `Timed out after ${timeoutMs}ms while signing L1 commitment tx (header_hash=${headerHashHex})`,
+              cause: SIGN_STAGE_TIMEOUT_CAUSE,
+              txHash: "<unknown>",
+            }),
+        }),
+        Effect.ensuring(
+          Metric.update(
+            blockSubmissionMetrics.submitBlockSignDurationHistogram,
+            (performance.now() - signStartedAtMs) / 1000,
+          ),
+        ),
+        Effect.tapErrorTag("TxSignError", (error) =>
+          error.cause === SIGN_STAGE_TIMEOUT_CAUSE
+            ? Metric.increment(
+                blockSubmissionMetrics.submitBlockSignTimeoutsCounter,
+              )
+            : Effect.void,
+        ),
+      );
+  }).pipe(
+    Effect.mapError((e) => {
+      const commonMsg = "Failed to sign commitment tx from CBOR";
+      if (e._tag === "TxSignerError") {
+        return new TxSignError({
+          message: `${commonMsg} due to a bad signature`,
+          cause: e,
+          txHash: "<unknown>",
+        });
+      } else if (e._tag === "RunTimeError") {
+        return new SDK.LucidError({
+          message: `${commonMsg} due to an unknown error`,
+          cause: e,
+        });
+      } else {
+        return e;
+      }
+    }),
+  );
+
+const reinitializeMergeSignerContextProgram: Effect.Effect<
+  void,
+  SDK.LucidError,
+  Lucid
+> = Effect.gen(function* () {
+  const lucid = yield* Lucid;
+  yield* lucid.reinitializeMergeApi.pipe(
+    Effect.mapError(
+      (error) =>
+        new SDK.LucidError({
+          message:
+            "Failed to reinitialize merge signer context after sign timeout",
+          cause: error,
+        }),
+    ),
+  );
+});
+
+const signTxFromCborProgram = (
+  l1CborBytes: Buffer,
+  headerHashHex: string,
+): Effect.Effect<TxSigned, TxSignError | SDK.LucidError, Lucid | NodeConfig> =>
+  Effect.gen(function* () {
+    const nodeConfig = yield* NodeConfig;
+    const maxRecoveryRetries =
+      nodeConfig.SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES;
+
+    const attempt = (
+      recoveryRetriesRemaining: number,
+    ): Effect.Effect<
+      TxSigned,
+      TxSignError | SDK.LucidError,
+      Lucid | NodeConfig
+    > =>
+      signTxFromCborSingleAttemptProgram(l1CborBytes, headerHashHex).pipe(
+        Effect.catchTag("TxSignError", (error) =>
+          Effect.gen(function* () {
+            if (
+              error.cause !== SIGN_STAGE_TIMEOUT_CAUSE ||
+              recoveryRetriesRemaining <= 0
+            ) {
+              return yield* Effect.fail(error);
+            }
+
+            yield* Effect.logWarning(
+              `🔗 ⚠️  Sign stage timed out for header_hash=${headerHashHex}; reinitializing merge signer context and retrying (remaining_retries=${recoveryRetriesRemaining}).`,
+            );
+            yield* Metric.increment(
+              blockSubmissionMetrics.submitBlockSignReinitCounter,
+            );
+            yield* reinitializeMergeSignerContextProgram;
+            const signedTx = yield* attempt(recoveryRetriesRemaining - 1);
+            yield* Metric.increment(
+              blockSubmissionMetrics.submitBlockSignRecoveredCounter,
+            );
+            return signedTx;
+          }),
+        ),
+      );
+
+    return yield* attempt(maxRecoveryRetries);
+  });
+
+const signedTxToCborBytesProgram = (
+  signedTx: TxSigned,
+): Effect.Effect<Buffer, SDK.LucidError, never> =>
+  Effect.try({
+    try: () => Buffer.from(signedTx.toCBOR(), "hex"),
+    catch: (cause) =>
+      new SDK.LucidError({
+        message: "Failed to serialize signed commitment tx to CBOR bytes",
+        cause,
+      }),
+  });
+
+const submitTxCborWithoutSigningProgram = (
+  l1CborBytes: Buffer,
+  headerHashHex: string,
+): Effect.Effect<
+  string,
+  TxSignError | TxSubmitError | SDK.LucidError,
+  Lucid | NodeConfig
+> =>
+  Effect.gen(function* () {
+    const nodeConfig = yield* NodeConfig;
+    const timeoutMs = Math.max(
+      SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS,
+      nodeConfig.SUBMIT_SIGNED_TX_TIMEOUT_MS,
+    );
+    const signedTx = yield* completeSignedTxFromCborProgram(l1CborBytes);
+    return yield* submitSignedTxProgram(signedTx, headerHashHex, timeoutMs);
+  });
 
 const extractL1CommitmentFeeLovelace = (
   l1CborBytes: Buffer,
@@ -578,12 +730,41 @@ export const submitEarliestBlock = Effect.gen(function* () {
           blockEntry[BlocksDB.Columns.PRODUCED_UTXOS],
           headerHashHex,
         );
+        let submissionTxCborBytes = blockEntry[BlocksDB.Columns.L1_CBOR];
 
         if (!txAlreadyOnL1) {
-          yield* submitSignedTxCBOR(
-            blockEntry[BlocksDB.Columns.L1_CBOR],
+          yield* submitTxCborWithoutSigningProgram(
+            submissionTxCborBytes,
             headerHashHex,
           ).pipe(
+            Effect.catchTag("TxSignError", (signError) =>
+              Effect.gen(function* () {
+                if (!isWrappedTxSignerError(signError)) {
+                  return yield* Effect.fail(signError);
+                }
+                yield* Effect.logInfo(
+                  `🔗 ✍️  Missing/invalid signatures for header_hash=${headerHashHex}; signing once and persisting signed artifact.`,
+                );
+                const signedTx = yield* signTxFromCborProgram(
+                  submissionTxCborBytes,
+                  headerHashHex,
+                );
+                const signedTxCborBytes =
+                  yield* signedTxToCborBytesProgram(signedTx);
+                yield* BlocksDB.setL1CborOfEntry(blockEntry, signedTxCborBytes);
+                submissionTxCborBytes = signedTxCborBytes;
+                const nodeConfig = yield* NodeConfig;
+                const timeoutMs = Math.max(
+                  SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS,
+                  nodeConfig.SUBMIT_SIGNED_TX_TIMEOUT_MS,
+                );
+                return yield* submitSignedTxProgram(
+                  signedTx,
+                  headerHashHex,
+                  timeoutMs,
+                );
+              }),
+            ),
             Effect.tap((txHash) =>
               Effect.logInfo(`🔗 🚀 Block commitment submitted: ${txHash}`),
             ),
@@ -611,9 +792,7 @@ export const submitEarliestBlock = Effect.gen(function* () {
             ),
           );
         }
-        yield* extractL1CommitmentFeeLovelace(
-          blockEntry[BlocksDB.Columns.L1_CBOR],
-        ).pipe(
+        yield* extractL1CommitmentFeeLovelace(submissionTxCborBytes).pipe(
           Effect.flatMap((l1CommitmentFeeLovelace) =>
             Effect.all([
               Metric.incrementBy(

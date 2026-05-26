@@ -68,6 +68,7 @@ const spendAndBurntAllUTxOs: Effect.Effect<
   Lucid | AlwaysSucceedsContract
 > = Effect.gen(function* () {
   const lucid = yield* Lucid;
+  const mainApi = lucid.mainApi;
   const midgardValidators = yield* AlwaysSucceedsContract;
   const allAuthVals = [
     midgardValidators.deposit,
@@ -80,17 +81,16 @@ const spendAndBurntAllUTxOs: Effect.Effect<
         return acc;
       }
       const completedTx = yield* acc.tx.completeProgram();
-      yield* lucid.switchToOperatorsMainWallet;
-      yield* handleSignSubmit(lucid.api, completedTx);
+      yield* handleSignSubmit(mainApi, completedTx);
       const resetAcc: InternalAccumulator = {
-        tx: lucid.api.newTx(),
+        tx: mainApi.newTx(),
         count: 0,
       };
       return resetAcc;
     });
 
   const initialAccumulator: InternalAccumulator = {
-    tx: lucid.api.newTx(),
+    tx: mainApi.newTx(),
     count: 0,
   };
   const finalAcc = yield* Effect.reduce(
@@ -99,7 +99,7 @@ const spendAndBurntAllUTxOs: Effect.Effect<
     (initialAcc, authVal) =>
       Effect.gen(function* () {
         const authValUTxOs = yield* SDK.utxosAtByNFTPolicyId(
-          lucid.api,
+          mainApi,
           authVal.spendingScriptAddress,
           authVal.policyId,
         );
@@ -133,8 +133,7 @@ const spendAndBurntAllUTxOs: Effect.Effect<
 
   if (finalAcc.count > 0) {
     const completedLastTx = yield* finalAcc.tx.completeProgram();
-    yield* lucid.switchToOperatorsMainWallet;
-    yield* handleSignSubmit(lucid.api, completedLastTx);
+    yield* handleSignSubmit(mainApi, completedLastTx);
   }
 }).pipe(
   Effect.mapError((e) =>
@@ -245,13 +244,14 @@ export const repairStateQueueRootUnitsProgram: Effect.Effect<
 
   yield* Effect.gen(function* () {
     const lucid = yield* Lucid;
+    const mainApi = lucid.mainApi;
     const validators = yield* AlwaysSucceedsContract;
     const stateQueueValidator = validators.stateQueue;
     const stateQueueAddress = stateQueueValidator.spendingScriptAddress;
     const rootUnit = stateQueueValidator.policyId + SDK.NODE_ASSET_NAME;
 
     const rootUtxos = yield* Effect.tryPromise({
-      try: () => lucid.api.utxosAtWithUnit(stateQueueAddress, rootUnit),
+      try: () => mainApi.utxosAtWithUnit(stateQueueAddress, rootUnit),
       catch: (e) =>
         new SDK.LucidError({
           message: `Failed to fetch state-queue root-unit UTxOs at ${stateQueueAddress}`,
@@ -272,7 +272,7 @@ export const repairStateQueueRootUnitsProgram: Effect.Effect<
     );
 
     const assetsToBurn: Assets = { [rootUnit]: -BigInt(rootUtxos.length) };
-    const completedTx = yield* lucid.api
+    const completedTx = yield* mainApi
       .newTx()
       .collectFrom(rootUtxos, Data.void())
       .mintAssets(assetsToBurn, Data.void())
@@ -289,13 +289,12 @@ export const repairStateQueueRootUnitsProgram: Effect.Effect<
         ),
       );
 
-    yield* lucid.switchToOperatorsMainWallet;
     yield* Effect.logInfo(`🚧 Root-unit repair submitting transaction...`);
-    yield* handleSignSubmit(lucid.api, completedTx);
+    yield* handleSignSubmit(mainApi, completedTx);
     yield* Effect.logInfo(`🚧 Root-unit repair transaction confirmed.`);
 
     const remaining = yield* Effect.tryPromise({
-      try: () => lucid.api.utxosAtWithUnit(stateQueueAddress, rootUnit),
+      try: () => mainApi.utxosAtWithUnit(stateQueueAddress, rootUnit),
       catch: (e) =>
         new SDK.LucidError({
           message: `Failed to verify root-unit repair at ${stateQueueAddress}`,
