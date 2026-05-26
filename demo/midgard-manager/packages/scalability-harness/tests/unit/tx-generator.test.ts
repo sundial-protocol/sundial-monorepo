@@ -92,13 +92,13 @@ function makeWriter() {
 // ---------------------------------------------------------------------------
 
 describe('computeSettings', () => {
-  // CLIENT_OVERSEND_RATIO = 1.3: the client targets 130% of scenario TPS to
+  // CLIENT_OVERSEND_RATIO = 1.05: the client targets 105% of scenario TPS to
   // absorb scheduling jitter without falling below the configured target.
-  // effectiveTps = targetTps * 1.3
+  // effectiveTps = targetTps * 1.05
   // concurrency  = ceil(effectiveTps * txCostSeconds * 12)
-  // interval     = concurrency / effectiveTps  (≈ 6 * txCostSeconds)
+  // interval     = concurrency / effectiveTps  (≈ HEADROOM * txCostSeconds)
   //
-  // Note: IEEE-754 floating-point means ceil(targetTps * 2 * cost * 12) may
+  // Note: IEEE-754 floating-point means ceil(targetTps * 1.05 * cost * 12) may
   // round up by 1 from the mathematical value.
 
   it('sets batchSize equal to concurrency', () => {
@@ -106,15 +106,15 @@ describe('computeSettings', () => {
     expect(s.batchSize).toBe(s.concurrency);
   });
 
-  it('sets concurrency proportional to effectiveTps (targetTps * 1.3)', () => {
-    // effectiveTps = 130; concurrency = ceil(130 * 0.2 * 12) = 312
+  it('sets concurrency proportional to effectiveTps (targetTps * 1.05)', () => {
+    // effectiveTps = 105; concurrency = ceil(105 * 0.2 * 12) = 252
     const s = computeSettings(100, 0.2);
-    expect(s.concurrency).toBe(312);
+    expect(s.concurrency).toBe(252);
   });
 
-  it('sets actualTpsEstimate to effectiveTps (targetTps * 1.3)', () => {
-    expect(computeSettings(100, 0.2).actualTpsEstimate).toBeCloseTo(130);
-    expect(computeSettings(800, 0.2).actualTpsEstimate).toBeCloseTo(1040);
+  it('sets actualTpsEstimate to effectiveTps (targetTps * 1.05)', () => {
+    expect(computeSettings(100, 0.2).actualTpsEstimate).toBeCloseTo(105);
+    expect(computeSettings(800, 0.2).actualTpsEstimate).toBeCloseTo(840);
   });
 
   it('preserves targetTps as the scenario-configured value, not the effective rate', () => {
@@ -129,8 +129,8 @@ describe('computeSettings', () => {
     expect(s800.concurrency / s200.concurrency).toBeCloseTo(4, 1);
   });
 
-  it('interval stays close to 6 * txCostSeconds regardless of targetTps', () => {
-    // interval = concurrency / effectiveTps ≈ 6 * txCostSeconds; FP ceiling may
+  it('interval stays close to HEADROOM * txCostSeconds (12 * 0.2 = 2.4) regardless of targetTps', () => {
+    // interval = concurrency / effectiveTps ≈ HEADROOM * txCostSeconds = 2.4; FP ceiling may
     // add at most 1 to concurrency, so allow ±5% tolerance.
     const s100 = computeSettings(100, 0.2);
     const s800 = computeSettings(800, 0.2);
@@ -141,13 +141,13 @@ describe('computeSettings', () => {
   });
 
   it('derives maxInFlight, generationConcurrency, and preparedQueueCapacity', () => {
-    // Standard mode: concurrency = ceil(1040 * 0.2 * 12) = 2496
-    // generationConcurrency = min(32, ceil(2496 * 0.25)) = min(32, 624) = 32
-    // preparedQueueCapacity = 2496 * 4 = 9984
+    // Standard mode: concurrency = ceil(840 * 0.2 * 12) = 2016
+    // generationConcurrency = min(32, ceil(2016 * 0.25)) = min(32, 504) = 32
+    // preparedQueueCapacity = 2016 * 4 = 8064
     const s = computeSettings(800, 0.2);
-    expect(s.maxInFlight).toBe(2496);
+    expect(s.maxInFlight).toBe(2016);
     expect(s.generationConcurrency).toBe(32);
-    expect(s.preparedQueueCapacity).toBe(9984);
+    expect(s.preparedQueueCapacity).toBe(8064);
   });
 
   it('clamps concurrency to at least 1', () => {
@@ -176,7 +176,7 @@ describe('computeSettings', () => {
     });
 
     it('fast-fail concurrency is substantially lower than standard for the same cost', () => {
-      // Standard for txCostSeconds=0.5: ceil(1600 * 0.5 * 12) = 9600
+      // Standard for txCostSeconds=0.5: ceil(840 * 0.5 * 12) = 5040
       // Fast-fail for submitTimeoutMs=500, retryAttempts=1: ceil(800 * 0.5 * 1.5) = 600
       const standard = computeSettings(800, 0.5);
       const opts: ComputeSettingsSubmitOptions = {
@@ -238,7 +238,7 @@ describe('computeSettings', () => {
       };
       const s = computeSettings(800, 0.2, opts);
       expect(s.targetTps).toBe(800);
-      expect(s.actualTpsEstimate).toBeCloseTo(1040);
+      expect(s.actualTpsEstimate).toBeCloseTo(840);
     });
   });
 });

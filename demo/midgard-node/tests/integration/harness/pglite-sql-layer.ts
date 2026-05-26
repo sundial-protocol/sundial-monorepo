@@ -33,6 +33,25 @@ const makeCompiler = () =>
     onCustom: () => ["", []],
   });
 
+// Normalize a single column value returned by PGlite.
+// PGlite returns Uint8Array for BYTEA columns and Uint8Array[] for BYTEA[].
+// The real PostgreSQL driver returns Buffer for both, so we normalize here
+// to keep the two data sources interchangeable in tests.
+const normalizeColumnValue = (value: unknown): unknown => {
+  if (value instanceof Uint8Array && !Buffer.isBuffer(value)) {
+    return Buffer.from(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(normalizeColumnValue);
+  }
+  return value;
+};
+
+const normalizeRow = (row: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k, normalizeColumnValue(v)]),
+  );
+
 // Connection implementation backed by a PGlite instance.
 class PGliteConnection {
   constructor(
@@ -46,7 +65,7 @@ class PGliteConnection {
         this.db.query<Record<string, unknown>>(sql, params as unknown[]),
       catch: (cause) =>
         new SqlError({ cause, message: "PGlite: Failed to execute statement" }),
-    }).pipe(Effect.map((r) => r.rows));
+    }).pipe(Effect.map((r) => r.rows.map(normalizeRow)));
   }
 
   execute(
@@ -74,7 +93,9 @@ class PGliteConnection {
       try: () =>
         this.db
           .query<Record<string, unknown>>(sql, params as unknown[])
-          .then((r) => r.rows.map((row) => Object.values(row))),
+          .then((r) =>
+            r.rows.map(normalizeRow).map((row) => Object.values(row)),
+          ),
       catch: (cause) =>
         new SqlError({ cause, message: "PGlite: Failed to execute values" }),
     });

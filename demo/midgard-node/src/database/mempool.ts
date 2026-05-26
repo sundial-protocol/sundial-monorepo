@@ -53,22 +53,6 @@ const chunkProcessedTxs = (processedTxs: ProcessedTx[]): ProcessedTx[][] => {
   return chunks;
 };
 
-const applyProcessedTxToMempoolProjection = (
-  processedTx: ProcessedTx,
-): Effect.Effect<void, DatabaseError, Database> =>
-  Effect.gen(function* () {
-    const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
-      yield* AddressHistoryDB.aggregateProcessedTxs(
-        MempoolLedgerDB.tableName,
-        [processedTx],
-        AddressHistoryDB.Status.SLATED,
-      );
-
-    yield* AddressHistoryDB.upsertEntries(addressHistoryEntries);
-    yield* MempoolLedgerDB.insert(collectiveProduced);
-    yield* MempoolLedgerDB.clearUTxOs(collectiveSpent);
-  });
-
 const toProducedColumns = (
   processedTx: ProcessedTx,
 ): {
@@ -231,13 +215,15 @@ export const insertMultiple = (
             return 0;
           }
 
-          // Apply projection changes in insertion order so a later tx can
-          // spend outputs produced by an earlier tx in the same stream chunk.
-          yield* Effect.forEach(
-            newlyInsertedProcessedTxs,
-            applyProcessedTxToMempoolProjection,
-            { discard: true },
-          );
+          const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
+            yield* AddressHistoryDB.aggregateProcessedTxs(
+              MempoolLedgerDB.tableName,
+              newlyInsertedProcessedTxs,
+              AddressHistoryDB.Status.SLATED,
+            );
+          yield* AddressHistoryDB.upsertEntries(addressHistoryEntries);
+          yield* MempoolLedgerDB.insert(collectiveProduced);
+          yield* MempoolLedgerDB.clearUTxOs(collectiveSpent);
 
           return insertedTxRows.length;
         }),

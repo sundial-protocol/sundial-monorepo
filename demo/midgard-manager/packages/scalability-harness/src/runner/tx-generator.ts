@@ -102,7 +102,7 @@ export interface SubmissionAggregate {
 // concurrency calculation in fast-fail mode.
 const SUBMISSION_PARALLELISM_HEADROOM = 12;
 const FAIL_FAST_CONCURRENCY_HEADROOM = 1.5;
-const CLIENT_OVERSEND_RATIO = 1.3;
+const CLIENT_OVERSEND_RATIO = 1.05;
 // Keep generation concurrency well below submission concurrency. Lucid's
 // WASM transaction-signing is synchronous-from-Node's-perspective and
 // saturates the event loop when too many workers run in parallel. At high
