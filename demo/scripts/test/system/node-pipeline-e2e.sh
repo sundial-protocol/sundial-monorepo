@@ -82,4 +82,4 @@ TX_QUEUE_DEAD_LETTER_STREAM="midgard:tx-submissions:pipeline-e2e:dead-letter" \
 REDIS_STREAM_CONSUMER_GROUP="midgard-tx-processors" \
 CORPUS_PATH="$CORPUS_PATH" \
 PIPELINE_TX_COUNT="${PIPELINE_TX_COUNT:-500}" \
-pnpm exec vitest run tests/e2e/tx-ingress-pipeline.e2e.test.ts
+pnpm exec vitest run --config vitest.e2e.config.ts tests/e2e/tx-ingress-pipeline.e2e.test.ts

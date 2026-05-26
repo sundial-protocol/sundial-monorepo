@@ -13,7 +13,7 @@
     "clean": "rm -rf dist",
     "test:unit": "vitest run --mode=test tests/unit",
     "test:integration": "vitest run --mode=test tests/integration",
-    "test": "npm run test:unit && npm run test:integration",
+    "test": "pnpm run test:unit && pnpm run test:integration",
     "test:watch": "vitest --mode=test"
   },
   "dependencies": {

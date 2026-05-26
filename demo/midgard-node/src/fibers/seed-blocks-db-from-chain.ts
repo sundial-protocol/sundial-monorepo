@@ -5,12 +5,17 @@ import {
   DatabaseError,
   serializeUTxOsForStorage,
 } from "@/database/utils/common.js";
-import { AlwaysSucceedsContract, Database, Lucid } from "@/services/index.js";
+import {
+  AlwaysSucceedsContract,
+  Database,
+  Lucid,
+  NodeConfig,
+} from "@/services/index.js";
 import { Effect, Metric, MetricBoundaries, Option } from "effect";
 import { performance } from "node:perf_hooks";
 
 const MAX_STATE_QUEUE_TRAVERSAL_HOPS = 100_000;
-const BLOCKS_DB_SEED_TIMEOUT_MS = 120_000;
+const BLOCKS_DB_SEED_TIMEOUT_FLOOR_MS = 120_000;
 
 const seedBlocksDbAttemptsCounter = Metric.counter(
   "blocks_db_seed_attempts_total",
@@ -175,7 +180,7 @@ const seedBlocksDBFromChain: Effect.Effect<
 export const ensureBlocksDBSeededFromChain: Effect.Effect<
   SeedResult,
   never,
-  AlwaysSucceedsContract | Database | Lucid
+  AlwaysSucceedsContract | Database | Lucid | NodeConfig
 > = Effect.gen(function* () {
   const optLatestBlockResult = yield* Effect.either(
     BlocksDB.retrieveLatestEntry,
@@ -193,15 +198,21 @@ export const ensureBlocksDBSeededFromChain: Effect.Effect<
     return "already-seeded";
   }
 
+  const nodeConfig = yield* NodeConfig;
+  const seedTimeoutMs = Math.max(
+    BLOCKS_DB_SEED_TIMEOUT_FLOOR_MS,
+    nodeConfig.COMMITMENT_WORKER_TIMEOUT_MS,
+  );
+
   yield* Metric.increment(seedBlocksDbAttemptsCounter);
   const seedStartMs = performance.now();
   const seedResult = yield* Effect.either(
     seedBlocksDBFromChain.pipe(
       Effect.timeoutFail({
-        duration: `${BLOCKS_DB_SEED_TIMEOUT_MS} millis`,
+        duration: `${seedTimeoutMs} millis`,
         onTimeout: () =>
           new SDK.LucidError({
-            message: `Timed out after ${BLOCKS_DB_SEED_TIMEOUT_MS}ms while seeding BlocksDB from chain`,
+            message: `Timed out after ${seedTimeoutMs}ms while seeding BlocksDB from chain`,
             cause: "Timed out waiting for provider/state-queue data",
           }),
       }),

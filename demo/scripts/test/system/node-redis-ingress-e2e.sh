@@ -61,4 +61,4 @@ REDIS_URL="redis://127.0.0.1:6379" \
 REDIS_STREAM_KEY="midgard:tx-submissions:e2e" \
 TX_QUEUE_DEAD_LETTER_STREAM="midgard:tx-submissions:e2e:dead-letter" \
 REDIS_STREAM_CONSUMER_GROUP="midgard-tx-processors" \
-pnpm exec vitest run tests/e2e/redis-stream-ingress.e2e.test.ts
+pnpm exec vitest run --config vitest.e2e.config.ts tests/e2e/redis-stream-ingress.e2e.test.ts

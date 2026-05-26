@@ -196,27 +196,23 @@ describe("RedisStreamsTxIngressQueue", () => {
     }).pipe(runWithQueue),
   );
 
-  it.effect(
-    "clear deletes both streams and recreates the consumer group",
-    () =>
-      Effect.gen(function* () {
-        const queue = yield* TxIngressQueue;
-        yield* queue.clear;
+  it.effect("clear deletes both streams and recreates the consumer group", () =>
+    Effect.gen(function* () {
+      const queue = yield* TxIngressQueue;
+      yield* queue.clear;
 
-        const delCalls = redisState.calls.filter((c) => c.method === "del");
-        const xgroupCalls = redisState.calls.filter(
-          (c) => c.method === "xgroup",
-        );
-        expect(delCalls.length).toBe(2);
-        expect(xgroupCalls.length).toBe(1);
-        expect(xgroupCalls[0].args).toEqual([
-          "CREATE",
-          "midgard:tx-submissions",
-          "midgard-tx-processors",
-          "0",
-          "MKSTREAM",
-        ]);
-      }).pipe(runWithQueue),
+      const delCalls = redisState.calls.filter((c) => c.method === "del");
+      const xgroupCalls = redisState.calls.filter((c) => c.method === "xgroup");
+      expect(delCalls.length).toBe(2);
+      expect(xgroupCalls.length).toBe(1);
+      expect(xgroupCalls[0].args).toEqual([
+        "CREATE",
+        "midgard:tx-submissions",
+        "midgard-tx-processors",
+        "0",
+        "MKSTREAM",
+      ]);
+    }).pipe(runWithQueue),
   );
 
   it.effect(
@@ -237,6 +233,29 @@ describe("RedisStreamsTxIngressQueue", () => {
 
         expect(snapshot.pendingCount).toBe(0);
         expect(snapshot.lagCount).toBe(10_000);
+      }).pipe(runWithQueue),
+  );
+
+  it.effect(
+    "snapshotMetrics returns zero when stream does not exist (XINFO_GROUPS no such key)",
+    () =>
+      Effect.gen(function* () {
+        redisState.xlenImpl = () => Promise.resolve(0);
+        redisState.xpendingImpl = () =>
+          Promise.reject(
+            new Error(
+              "NOGROUP No such consumer group 'midgard-tx-processors' for key name 'midgard:tx-submissions'",
+            ),
+          );
+        redisState.callImpl = () =>
+          Promise.reject(new Error("ERR no such key"));
+
+        const queue = yield* TxIngressQueue;
+        const snapshot = yield* queue.snapshotMetrics;
+
+        expect(snapshot.pendingCount).toBe(0);
+        expect(snapshot.lagCount).toBe(0);
+        expect(snapshot.streamDepth).toBe(0);
       }).pipe(runWithQueue),
   );
 });

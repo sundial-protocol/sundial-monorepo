@@ -109,7 +109,7 @@ it.effect("BlocksDB earliest unsubmitted block follows height order", () => {
     yield* BlocksDB.upsert(makeBlockEntry(hashA, T0, T1));
     yield* BlocksDB.upsert(makeBlockEntry(hashB, T1, T2));
 
-    const earliest = yield* BlocksDB.retrieveEarliestUnsubmittedEntry;
+    const earliest = yield* BlocksDB.retrieveEarliestPendingEntry;
 
     expect(Option.isSome(earliest)).toBe(true);
     expect(
@@ -157,13 +157,13 @@ it.effect("Submitted block status is persisted", () => {
 
     yield* BlocksDB.upsert(makeBlockEntry(hashA, T0, T1));
 
-    const unsubmitted = yield* BlocksDB.retrieveEarliestUnsubmittedEntry;
+    const unsubmitted = yield* BlocksDB.retrieveEarliestPendingEntry;
     expect(Option.isSome(unsubmitted)).toBe(true);
 
     const blockEntry = Option.getOrThrow(unsubmitted);
     yield* BlocksDB.setStatusOfEntry(blockEntry, BlocksDB.Status.SUBMITTED);
 
-    const afterUnsubmitted = yield* BlocksDB.retrieveEarliestUnsubmittedEntry;
+    const afterUnsubmitted = yield* BlocksDB.retrieveEarliestPendingEntry;
     expect(Option.isNone(afterUnsubmitted)).toBe(true);
 
     const allBlocks = yield* BlocksDB.retrieve;
@@ -257,7 +257,7 @@ it.effect("Submitted block updates latest ledger and address history", () => {
     yield* AddressHistoryDB.upsertEntries([ahEntry]);
 
     // Step 4: Set block status to SUBMITTED.
-    const unsubmitted = yield* BlocksDB.retrieveEarliestUnsubmittedEntry;
+    const unsubmitted = yield* BlocksDB.retrieveEarliestPendingEntry;
     yield* BlocksDB.setStatusOfEntry(
       Option.getOrThrow(unsubmitted),
       BlocksDB.Status.SUBMITTED,

@@ -63,7 +63,7 @@ sed -i 's|^L1_OGMIOS_KEY=.*|L1_OGMIOS_KEY=http://127.0.0.1:1337|' "$NODE_ENV_FIL
 sed -i 's|^L1_KUPO_KEY=.*|L1_KUPO_KEY=http://127.0.0.1:1442|' "$NODE_ENV_FILE"
 
 set +e
-npm run test:legacy:all
+pnpm run test:legacy:all
 TEST_EXIT_CODE=$?
 set -e
 

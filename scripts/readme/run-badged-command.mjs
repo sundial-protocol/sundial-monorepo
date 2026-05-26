@@ -1,8 +1,38 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import { closeSync, openSync, unlinkSync } from 'node:fs';
 import { constants as osConstants } from 'node:os';
+import { resolve } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { updateReadmeBadge } from './refresh-badges.mjs';
+
+const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '../../..');
+const LOCK_PATH = resolve(REPO_ROOT, 'README.md.lock');
+const LOCK_POLL_MS = 50;
+const LOCK_TIMEOUT_MS = 30_000;
+
+async function acquireLock() {
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      closeSync(openSync(LOCK_PATH, 'wx'));
+      return;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+    }
+    await new Promise((res) => setTimeout(res, LOCK_POLL_MS));
+  }
+  throw new Error(`Timed out waiting for README lock after ${LOCK_TIMEOUT_MS}ms`);
+}
+
+function releaseLock() {
+  try {
+    unlinkSync(LOCK_PATH);
+  } catch {
+    // already gone — nothing to do
+  }
+}
 
 function parseArgs(argv) {
   const [badgeName, ...commandParts] = argv;
@@ -52,6 +82,7 @@ async function main() {
   const commandStatus = await runShellCommand(command);
 
   let badgeStatus = 0;
+  await acquireLock();
   try {
     updateReadmeBadge(badgeName, commandStatus);
   } catch (error) {
@@ -59,6 +90,8 @@ async function main() {
       `${error instanceof Error ? error.message : String(error)}\n`,
     );
     badgeStatus = 1;
+  } finally {
+    releaseLock();
   }
 
   process.exit(commandStatus !== 0 ? commandStatus : badgeStatus);

@@ -2,6 +2,7 @@ import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Layer, Option } from "effect";
 import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
+import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
 import { Lucid } from "@/services/lucid.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 
@@ -87,6 +88,7 @@ const fakeAlwaysSucceedsLayer = Layer.succeed(AlwaysSucceedsContract, {
 
 const baseLayer = Layer.mergeAll(
   sqlHarness.layer,
+  makeTestNodeConfigLayer(),
   fakeLucidLayer,
   fakeAlwaysSucceedsLayer,
 );

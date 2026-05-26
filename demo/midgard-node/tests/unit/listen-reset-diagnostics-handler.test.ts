@@ -72,11 +72,17 @@ describe("state-queue root unit diagnostics handler", () => {
     );
 
     const webResponse = HttpServerResponse.toWeb(response);
-    const body = await webResponse.json();
+    const body = (await webResponse.json()) as {
+      status: string;
+      error: string;
+      cause: string;
+    };
 
     expect(webResponse.status).toBe(503);
     expect(body.status).toBe("error");
-    expect(body.error).toBe("Failed to query state-queue root-unit diagnostics");
+    expect(body.error).toBe(
+      "Failed to query state-queue root-unit diagnostics",
+    );
     expect(body.cause).toBe("boom");
   });
 });

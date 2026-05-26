@@ -253,7 +253,10 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     observedCommittedTps: deriveTps(committedTxDelta, loadDurationSeconds),
     peakQueueSize: queueGauge?.peak ?? null,
     finalQueueSizeAfterRecovery: queueGauge?.final ?? null,
-    finalQueueDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(metricWindow, 'tx_stream_depth'),
+    finalQueueDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(
+      metricWindow,
+      'tx_stream_depth'
+    ),
     peakMempoolSize: mempoolGauge?.peak ?? null,
     finalMempoolSizeAfterRecovery: mempoolGauge?.final ?? null,
     finalMempoolDeltaAfterRecovery: deriveFinalGaugeDeltaAfterRecovery(

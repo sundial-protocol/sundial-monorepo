@@ -194,6 +194,11 @@ function makeOptions(
     probeTimeoutMs: 100,
     tierDurationMs: 50,
     recoveryDurationMs: 50,
+    progressReporterFactory: () => ({
+      updatePhase: vi.fn(),
+      updateProbeStats: vi.fn(),
+      stop: vi.fn(),
+    }),
     collectWindowFn: vi.fn().mockResolvedValue(makeEmptyWindow()),
     hostResourceCollectorFactory: () => collector,
     runnerOptions: { spawner, sigintGraceMs: 50, sigTermGraceMs: 50 },
@@ -871,6 +876,8 @@ describe('runTier', () => {
   beforeEach(() => {
     writer = makeWriter();
     prometheusClient = makePrometheusClient();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {

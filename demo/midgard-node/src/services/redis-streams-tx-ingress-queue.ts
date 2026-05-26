@@ -139,6 +139,13 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
 
     const producerClient = new Redis(config.REDIS_URL);
     const consumerClient = producerClient.duplicate();
+    // Dedicated connection for XREADGROUP BLOCK. A blocking Redis command holds
+    // the connection open for its full timeout duration, which would delay every
+    // non-blocking command (XGROUP CREATE, XACK, XAUTOCLAIM) queued behind it
+    // on the same connection. Using a separate connection for XREADGROUP BLOCK
+    // keeps consumerClient free for low-latency operations used by the submit
+    // path (ensureGroup) and the processor's non-blocking calls.
+    const blockingConsumerClient = producerClient.duplicate();
     const statsClient = producerClient.duplicate();
 
     const readDeliveryCount = (messageId: string) =>
@@ -183,29 +190,9 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
         }),
       );
 
-    const queueService: TxIngressQueueService = {
-      enqueue: (txCbor: string) =>
-        tryRedis("XADD", () =>
-          producerClient.xadd(
-            config.REDIS_STREAM_KEY,
-            "*",
-            TX_STREAM_MESSAGE_CBOR_FIELD,
-            txCbor,
-          ),
-        ).pipe(
-          Effect.flatMap((id) =>
-            id === null
-              ? Effect.fail(
-                  new TxIngressQueueError({
-                    operation: "XADD",
-                    message: "Redis did not return a stream id for enqueued tx",
-                    cause: undefined,
-                  }),
-                )
-              : Effect.succeed(String(id)),
-          ),
-        ),
-      ensureConsumerGroup: tryRedis("XGROUP_CREATE", () =>
+    const ensureGroup: Effect.Effect<void, TxIngressQueueError> = tryRedis(
+      "XGROUP_CREATE",
+      () =>
         consumerClient.xgroup(
           "CREATE",
           config.REDIS_STREAM_KEY,
@@ -213,14 +200,47 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
           "0",
           "MKSTREAM",
         ),
-      ).pipe(
-        Effect.catchTag("TxIngressQueueError", (error) => {
-          const causeMessage = String(error.cause);
-          return causeMessage.includes("BUSYGROUP")
-            ? Effect.void
-            : Effect.fail(error);
-        }),
-      ),
+    ).pipe(
+      Effect.catchTag("TxIngressQueueError", (error) => {
+        const causeMessage = String(error.cause);
+        return causeMessage.includes("BUSYGROUP")
+          ? Effect.void
+          : Effect.fail(error);
+      }),
+    );
+
+    const queueService: TxIngressQueueService = {
+      enqueue: (txCbor: string) =>
+        // ensureGroup is idempotent (BUSYGROUP is swallowed). Calling it on
+        // every enqueue keeps the consumer group in sync if the stream was
+        // externally deleted, so the processor fiber can consume without a
+        // node restart.
+        ensureGroup.pipe(
+          Effect.flatMap(() =>
+            tryRedis("XADD", () =>
+              producerClient.xadd(
+                config.REDIS_STREAM_KEY,
+                "*",
+                TX_STREAM_MESSAGE_CBOR_FIELD,
+                txCbor,
+              ),
+            ).pipe(
+              Effect.flatMap((id) =>
+                id === null
+                  ? Effect.fail(
+                      new TxIngressQueueError({
+                        operation: "XADD",
+                        message:
+                          "Redis did not return a stream id for enqueued tx",
+                        cause: undefined,
+                      }),
+                    )
+                  : Effect.succeed(String(id)),
+              ),
+            ),
+          ),
+        ),
+      ensureConsumerGroup: ensureGroup,
       consumeBatch: (maxCount: number, blockMs: number) =>
         Effect.gen(function* () {
           const reclaimCount = Math.min(
@@ -255,7 +275,7 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
                   yield* tryRedis<readonly RedisReadResponse[] | null>(
                     "XREADGROUP",
                     () =>
-                      consumerClient.xreadgroup(
+                      blockingConsumerClient.xreadgroup(
                         "GROUP",
                         config.REDIS_STREAM_CONSUMER_GROUP,
                         config.REDIS_STREAM_CONSUMER_NAME,
@@ -327,32 +347,42 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
           return deadLetteredDisposition;
         }),
       snapshotMetrics: Effect.gen(function* () {
-        const [streamDepthRaw, pendingSummary, groupsInfoRaw] = yield* Effect.all(
-          [
-            tryRedis("XLEN", () => statsClient.xlen(config.REDIS_STREAM_KEY)),
-            tryRedis("XPENDING_SUMMARY", () =>
-              statsClient.xpending(
-                config.REDIS_STREAM_KEY,
-                config.REDIS_STREAM_CONSUMER_GROUP,
+        const [streamDepthRaw, pendingSummary, groupsInfoRaw] =
+          yield* Effect.all(
+            [
+              tryRedis("XLEN", () => statsClient.xlen(config.REDIS_STREAM_KEY)),
+              tryRedis("XPENDING_SUMMARY", () =>
+                statsClient.xpending(
+                  config.REDIS_STREAM_KEY,
+                  config.REDIS_STREAM_CONSUMER_GROUP,
+                ),
+              ).pipe(
+                Effect.catchTag("TxIngressQueueError", (e) => {
+                  const causeMessage = String(e.cause);
+                  return causeMessage.includes("NOGROUP")
+                    ? Effect.succeed([0, null, null, []] as unknown[])
+                    : Effect.fail(e);
+                }),
               ),
-            ).pipe(
-              Effect.catchTag("TxIngressQueueError", (e) => {
-                const causeMessage = String(e.cause);
-                return causeMessage.includes("NOGROUP")
-                  ? Effect.succeed([0, null, null, []] as unknown[])
-                  : Effect.fail(e);
-              }),
-            ),
-            tryRedis("XINFO_GROUPS", () =>
-              statsClient.call(
-                "XINFO",
-                "GROUPS",
-                config.REDIS_STREAM_KEY,
-              ) as Promise<unknown>,
-            ),
-          ],
-          { concurrency: "unbounded" },
-        );
+              tryRedis(
+                "XINFO_GROUPS",
+                () =>
+                  statsClient.call(
+                    "XINFO",
+                    "GROUPS",
+                    config.REDIS_STREAM_KEY,
+                  ) as Promise<unknown>,
+              ).pipe(
+                Effect.catchTag("TxIngressQueueError", (e) => {
+                  const causeMessage = String(e.cause);
+                  return causeMessage.includes("no such key")
+                    ? Effect.succeed([] as unknown[])
+                    : Effect.fail(e);
+                }),
+              ),
+            ],
+            { concurrency: "unbounded" },
+          );
 
         const pendingCount = normalizePendingSummaryCount(pendingSummary[0]);
         const lagFromGroup = normalizeConsumerGroupLag(
@@ -379,28 +409,18 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
         // DEL destroys consumer groups along with the stream. Recreate the
         // group immediately so the processor fiber and snapshotMetrics remain
         // functional without requiring a node restart.
-        yield* tryRedis("XGROUP_CREATE", () =>
-          consumerClient.xgroup(
-            "CREATE",
-            config.REDIS_STREAM_KEY,
-            config.REDIS_STREAM_CONSUMER_GROUP,
-            "0",
-            "MKSTREAM",
-          ),
-        ).pipe(
-          Effect.catchTag("TxIngressQueueError", (error) => {
-            const causeMessage = String(error.cause);
-            return causeMessage.includes("BUSYGROUP")
-              ? Effect.void
-              : Effect.fail(error);
-          }),
-        );
+        yield* ensureGroup;
       }),
     };
 
     return {
       queueService,
-      clients: [producerClient, consumerClient, statsClient] as const,
+      clients: [
+        producerClient,
+        consumerClient,
+        blockingConsumerClient,
+        statsClient,
+      ] as const,
     };
   }),
   ({ clients }) =>

@@ -228,6 +228,20 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
         ),
       expectedDelta: 0n,
     },
+    {
+      name: "does not increment on NoopCommitmentOutput",
+      setup: () =>
+        makeWorkerInstance.mockReturnValue(
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: {
+              type: "NoopCommitmentOutput",
+              reason: "no_events_in_window",
+            },
+          }),
+        ),
+      expectedDelta: 0n,
+    },
   ])("$name", ({ setup, expectedDelta }) =>
     Effect.gen(function* () {
       setup();
@@ -332,6 +346,19 @@ describe("buildAndSubmitCommitmentBlockAction — duration histogram", () => {
       setup: () =>
         makeWorkerInstance.mockReturnValue(
           makeEventWorker("error", new Error("thread crash")),
+        ),
+    },
+    {
+      name: "records observation on NoopCommitmentOutput",
+      setup: () =>
+        makeWorkerInstance.mockReturnValue(
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: {
+              type: "NoopCommitmentOutput",
+              reason: "no_events_in_window",
+            },
+          }),
         ),
     },
   ])("$name", ({ setup }) =>

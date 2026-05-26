@@ -217,7 +217,10 @@ export const insertMultiple = (
           const projectedTxIdsHex = new Set<string>();
           const newlyInsertedProcessedTxs = txChunk.filter((processedTx) => {
             const txIdHex = processedTx.txId.toString("hex");
-            if (!insertedTxIdsHex.has(txIdHex) || projectedTxIdsHex.has(txIdHex)) {
+            if (
+              !insertedTxIdsHex.has(txIdHex) ||
+              projectedTxIdsHex.has(txIdHex)
+            ) {
               return false;
             }
             projectedTxIdsHex.add(txIdHex);

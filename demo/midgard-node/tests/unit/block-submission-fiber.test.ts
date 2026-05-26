@@ -11,18 +11,29 @@ import { metricDelta } from "./harness/metric-snapshot.js";
 const retrieveFn = vi.hoisted(() => vi.fn());
 const setStatusFn = vi.hoisted(() => vi.fn());
 const countByStatusFn = vi.hoisted(() => vi.fn());
+const countPendingBlocksFn = vi.hoisted(() => vi.fn());
 const SUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 91_337);
+const SUBMITTING_STATUS_SENTINEL = vi.hoisted(() => 1);
 const UNSUBMITTED_STATUS_SENTINEL = vi.hoisted(() => 0);
 const fromCborBytesFn = vi.hoisted(() => vi.fn());
+const deserializeUTxOsFn = vi.hoisted(() => vi.fn());
+
+vi.mock("@/database/utils/common.js", () => ({
+  deserializeUTxOsFromStorage: (...args: unknown[]) =>
+    deserializeUTxOsFn(...args),
+}));
 
 vi.mock("@/database/index.js", () => ({
   BlocksDB: {
-    get retrieveEarliestUnsubmittedEntry() {
+    get retrieveEarliestPendingEntry() {
       return retrieveFn();
     },
     setStatusOfEntry: (...args: unknown[]) => setStatusFn(...args),
     countByStatus: (...args: unknown[]) => countByStatusFn(...args),
     countWithMinimumStatus: () => Effect.succeed(0n),
+    get countPendingBlocks() {
+      return countPendingBlocksFn();
+    },
     retrieveEvents: () =>
       Effect.succeed({
         withdrawals: [],
@@ -35,9 +46,11 @@ vi.mock("@/database/index.js", () => ({
       EVENT_START_TIME: "event_start_time",
       EVENT_END_TIME: "event_end_time",
       HEADER_HASH: "header_hash",
+      PRODUCED_UTXOS: "produced_utxos",
     },
     Status: {
       UNSUBMITTED: UNSUBMITTED_STATUS_SENTINEL,
+      SUBMITTING: SUBMITTING_STATUS_SENTINEL,
       SUBMITTED: SUBMITTED_STATUS_SENTINEL,
     },
   },
@@ -134,12 +147,13 @@ const fakeFromTx = vi.fn(() => ({
     }),
   },
 }));
+const fakeUtxosByOutRef = vi.fn(async () => [] as unknown[]);
 
 const fakeLucidLayer = Layer.succeed(
   Lucid,
   Lucid.of({
     _tag: "Lucid",
-    api: { fromTx: fakeFromTx } as never,
+    api: { fromTx: fakeFromTx, utxosByOutRef: fakeUtxosByOutRef } as never,
     switchToOperatorsMainWallet: Effect.void,
     switchToOperatorsBlockCommitmentWallet: Effect.void,
     switchToOperatorsMergingWallet: Effect.void,
@@ -169,6 +183,7 @@ const fakeBlockEntry = {
   event_start_time: new Date(0),
   event_end_time: new Date(1000),
   header_hash: Buffer.alloc(32),
+  produced_utxos: Buffer.from("[]", "utf8"),
 };
 
 beforeEach(() => {
@@ -177,6 +192,7 @@ beforeEach(() => {
   retrieveFn.mockReturnValue(Effect.succeed(Option.none()));
   setStatusFn.mockReturnValue(Effect.succeed(undefined));
   countByStatusFn.mockReturnValue(Effect.succeed(0n));
+  countPendingBlocksFn.mockReturnValue(Effect.succeed(0n));
   fakeSubmitProgram.mockReturnValue(Effect.succeed("faketxhash"));
   fakeCompleteProgram.mockReturnValue(
     Effect.succeed({ submitProgram: fakeSubmitProgram }),
@@ -186,6 +202,10 @@ beforeEach(() => {
       fee: () => 42n,
     }),
   });
+  // Default: produced UTxOs empty → pre-check short-circuits to false.
+  deserializeUTxOsFn.mockReturnValue(Effect.succeed([]));
+  // Default: provider returns no UTxOs → pre-check returns false.
+  fakeUtxosByOutRef.mockResolvedValue([]);
 });
 
 describe("submitEarliestBlock — submit_block_count counter", () => {
@@ -216,14 +236,21 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
       );
 
       expect(delta).toBe(1n);
-      expect(fakeFromTx).toHaveBeenCalledWith("deadbeef");
-      expect(fakeCompleteProgram).toHaveBeenCalledTimes(1);
-      expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
-      expect(setStatusFn).toHaveBeenCalledTimes(1);
-      expect(setStatusFn).toHaveBeenCalledWith(
+      // First call: SUBMITTING; second call (inside SQL tx): SUBMITTED.
+      expect(setStatusFn).toHaveBeenCalledTimes(2);
+      expect(setStatusFn).toHaveBeenNthCalledWith(
+        1,
+        fakeBlockEntry,
+        SUBMITTING_STATUS_SENTINEL,
+      );
+      expect(setStatusFn).toHaveBeenNthCalledWith(
+        2,
         fakeBlockEntry,
         SUBMITTED_STATUS_SENTINEL,
       );
+      expect(fakeFromTx).toHaveBeenCalledWith("deadbeef");
+      expect(fakeCompleteProgram).toHaveBeenCalledTimes(1);
+      expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
     }),
   );
 
@@ -264,7 +291,8 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
         )) as bigint;
 
         expect(feeDelta).toBe(0n);
-        expect(setStatusFn).toHaveBeenCalledTimes(1);
+        // SUBMITTING + SUBMITTED both called despite fee failure.
+        expect(setStatusFn).toHaveBeenCalledTimes(2);
       }),
   );
 
@@ -283,7 +311,75 @@ describe("submitEarliestBlock — submit_block_count counter", () => {
 
       expect(delta).toBe(0n);
       expect(fakeSubmitProgram).not.toHaveBeenCalled();
-      expect(setStatusFn).not.toHaveBeenCalled();
+      // SUBMITTING is written before the L1 call even when submission fails.
+      expect(setStatusFn).toHaveBeenCalledTimes(1);
+      expect(setStatusFn).toHaveBeenCalledWith(
+        fakeBlockEntry,
+        SUBMITTING_STATUS_SENTINEL,
+      );
     }),
+  );
+});
+
+describe("submitEarliestBlock — L1 pre-check (M-52)", () => {
+  it.effect("skips sign+submit and marks SUBMITTED when tx already on L1", () =>
+    Effect.gen(function* () {
+      retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+      // Pre-check finds UTxOs → tx is already on L1.
+      deserializeUTxOsFn.mockReturnValue(
+        Effect.succeed([{ txHash: "aabbcc", outputIndex: 0 }]),
+      );
+      fakeUtxosByOutRef.mockResolvedValue([
+        { txHash: "aabbcc", outputIndex: 0 },
+      ]);
+
+      const delta = yield* metricDelta(
+        readSubmitCounter,
+        runAction(),
+        (state) => state.count,
+      );
+
+      expect(delta).toBe(1n);
+      // sign+submit path skipped entirely.
+      expect(fakeFromTx).not.toHaveBeenCalled();
+      expect(fakeCompleteProgram).not.toHaveBeenCalled();
+      expect(fakeSubmitProgram).not.toHaveBeenCalled();
+      // SUBMITTING then SUBMITTED still called.
+      expect(setStatusFn).toHaveBeenCalledTimes(2);
+      expect(setStatusFn).toHaveBeenNthCalledWith(
+        1,
+        fakeBlockEntry,
+        SUBMITTING_STATUS_SENTINEL,
+      );
+      expect(setStatusFn).toHaveBeenNthCalledWith(
+        2,
+        fakeBlockEntry,
+        SUBMITTED_STATUS_SENTINEL,
+      );
+    }),
+  );
+
+  it.effect(
+    "falls back to normal submission when pre-check provider call fails",
+    () =>
+      Effect.gen(function* () {
+        retrieveFn.mockReturnValue(Effect.succeed(Option.some(fakeBlockEntry)));
+        // Pre-check has UTxOs to check but provider throws.
+        deserializeUTxOsFn.mockReturnValue(
+          Effect.succeed([{ txHash: "aabbcc", outputIndex: 0 }]),
+        );
+        fakeUtxosByOutRef.mockRejectedValue(new Error("provider unavailable"));
+
+        const delta = yield* metricDelta(
+          readSubmitCounter,
+          runAction(),
+          (state) => state.count,
+        );
+
+        // Submission proceeded normally after pre-check failure.
+        expect(delta).toBe(1n);
+        expect(fakeFromTx).toHaveBeenCalledWith("deadbeef");
+        expect(fakeSubmitProgram).toHaveBeenCalledTimes(1);
+      }),
   );
 });
