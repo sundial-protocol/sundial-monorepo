@@ -579,6 +579,23 @@ describe('detectCollapse — unsubmitted_backlog_growth', () => {
       )
     ).toBeNull();
   });
+
+  it('takes priority over mempool_not_recovered', () => {
+    const result = detectCollapse(
+      makeInputs({
+        beforeUnsubmittedBlockBacklog: 0,
+        recoveryUnsubmittedBlockBacklog: 4,
+        afterLoadMempoolSize: 500,
+        recoveryMempoolSize: 500,
+        stopConditions: {
+          ...BASE_STOP_CONDITIONS,
+          maxUnsubmittedBlockBacklogGrowth: 0,
+          maxRecoveryMempoolSize: 100,
+        },
+      })
+    );
+    expect(result?.reason).toBe('unsubmitted_backlog_growth');
+  });
 });
 
 // ---------------------------------------------------------------------------

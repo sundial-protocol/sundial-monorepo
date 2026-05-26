@@ -61,6 +61,7 @@ describe("NodeConfig", () => {
         expect(config.TX_QUEUE_MAX_PENDING).toBe(20_000);
         expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(250);
         expect(config.TX_QUEUE_OFFER_TIMEOUT_MS).toBe(100);
+        expect(config.SUBMIT_SIGNED_TX_TIMEOUT_MS).toBe(30_000);
         expect(config.COMMITMENT_WORKER_TIMEOUT_MS).toBe(300_000);
         expect(config.COMMITMENT_WINDOW_WARN_TX_REQUESTS).toBe(50_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS).toBe(60_000);

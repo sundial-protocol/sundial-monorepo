@@ -68,8 +68,8 @@ export interface CollapseInputs {
 // 3. commitment_failures           — L2 protocol failure (when enabled)
 // 4. merge_failures                — L2 protocol failure (when enabled)
 // 5. queue_not_recovered           — tx queue did not drain (when threshold set)
-// 6. mempool_not_recovered         — mempool did not drain (when threshold set)
-// 7. unsubmitted_backlog_growth    — DB-backed submission backlog grew during tier
+// 6. unsubmitted_backlog_growth    — DB-backed submission backlog grew during tier
+// 7. mempool_not_recovered         — mempool did not drain (when threshold set)
 // 8. tx_generator_failed           — load generation process crashed (unreliable data)
 // 9. commit_drain_below_threshold  — node committed fewer txs than it accepted (node-health)
 // 10. useful_throughput_below_threshold — load-driver delivered below ratio threshold (when set)
@@ -160,45 +160,6 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
     }
   }
 
-  if (stopConditions.maxRecoveryMempoolSize !== undefined) {
-    const beforeMempoolSize = inputs.beforeMempoolSize ?? null;
-    const recoveryMempoolSize = inputs.recoveryMempoolSize;
-    if (beforeMempoolSize !== null && recoveryMempoolSize !== null) {
-      const mempoolGrowth = recoveryMempoolSize - beforeMempoolSize;
-      if (mempoolGrowth > stopConditions.maxRecoveryMempoolSize) {
-        return {
-          reason: 'mempool_not_recovered',
-          values: {
-            beforeMempoolSize,
-            recoveryMempoolSize,
-            mempoolGrowth,
-            maxRecoveryMempoolGrowth: stopConditions.maxRecoveryMempoolSize,
-          },
-        };
-      }
-    }
-  }
-
-  // If mempool had backlog at the end of load, recovery must reduce it.
-  // A flat or increasing mempool during recovery is treated as non-recovery.
-  const afterLoadMempoolSize = inputs.afterLoadMempoolSize ?? null;
-  const recoveryMempoolSize = inputs.recoveryMempoolSize;
-  if (
-    afterLoadMempoolSize !== null &&
-    afterLoadMempoolSize > 0 &&
-    recoveryMempoolSize !== null &&
-    recoveryMempoolSize >= afterLoadMempoolSize
-  ) {
-    return {
-      reason: 'mempool_not_recovered',
-      values: {
-        afterLoadMempoolSize,
-        recoveryMempoolSize,
-        drainedMempoolTxCount: afterLoadMempoolSize - recoveryMempoolSize,
-      },
-    };
-  }
-
   {
     const maxUnsubmittedBlockBacklogGrowth =
       stopConditions.maxUnsubmittedBlockBacklogGrowth ??
@@ -243,6 +204,45 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
         };
       }
     }
+  }
+
+  if (stopConditions.maxRecoveryMempoolSize !== undefined) {
+    const beforeMempoolSize = inputs.beforeMempoolSize ?? null;
+    const recoveryMempoolSize = inputs.recoveryMempoolSize;
+    if (beforeMempoolSize !== null && recoveryMempoolSize !== null) {
+      const mempoolGrowth = recoveryMempoolSize - beforeMempoolSize;
+      if (mempoolGrowth > stopConditions.maxRecoveryMempoolSize) {
+        return {
+          reason: 'mempool_not_recovered',
+          values: {
+            beforeMempoolSize,
+            recoveryMempoolSize,
+            mempoolGrowth,
+            maxRecoveryMempoolGrowth: stopConditions.maxRecoveryMempoolSize,
+          },
+        };
+      }
+    }
+  }
+
+  // If mempool had backlog at the end of load, recovery must reduce it.
+  // A flat or increasing mempool during recovery is treated as non-recovery.
+  const afterLoadMempoolSize = inputs.afterLoadMempoolSize ?? null;
+  const recoveryMempoolSize = inputs.recoveryMempoolSize;
+  if (
+    afterLoadMempoolSize !== null &&
+    afterLoadMempoolSize > 0 &&
+    recoveryMempoolSize !== null &&
+    recoveryMempoolSize >= afterLoadMempoolSize
+  ) {
+    return {
+      reason: 'mempool_not_recovered',
+      values: {
+        afterLoadMempoolSize,
+        recoveryMempoolSize,
+        drainedMempoolTxCount: afterLoadMempoolSize - recoveryMempoolSize,
+      },
+    };
   }
 
   const exitCode = inputs.txGeneratorExitCode;

@@ -9,8 +9,16 @@ import {
   NodeConfig,
 } from "@/services/index.js";
 import { TxSignError, TxSubmitError } from "@/transactions/utils.js";
-import { Cause, Effect, Metric, Option, Schedule } from "effect";
+import {
+  Cause,
+  Effect,
+  Metric,
+  MetricBoundaries,
+  Option,
+  Schedule,
+} from "effect";
 import { deserializeUTxOsFromStorage } from "@/database/utils/common.js";
+import { performance } from "node:perf_hooks";
 import {
   DepositsDB,
   LatestLedgerDB,
@@ -32,6 +40,45 @@ const submitBlockCounter = Metric.counter("submit_block_count", {
   bigint: true,
   incremental: true,
 }).register();
+
+const submitBlockFailuresCounter = Metric.counter("submit_block_failures", {
+  description:
+    "A counter for block submission failures before a block is marked SUBMITTED",
+  bigint: true,
+  incremental: true,
+}).register();
+
+const submitBlockSignDurationHistogram = Metric.histogram(
+  "submit_block_sign_duration_seconds",
+  MetricBoundaries.exponential({ start: 0.05, factor: 2, count: 14 }),
+  "Histogram of L1 commitment sign stage duration in seconds",
+).register();
+
+const submitBlockSubmitDurationHistogram = Metric.histogram(
+  "submit_block_submit_duration_seconds",
+  MetricBoundaries.exponential({ start: 0.05, factor: 2, count: 14 }),
+  "Histogram of L1 commitment submit stage duration in seconds",
+).register();
+
+const submitBlockSignTimeoutsCounter = Metric.counter(
+  "submit_block_sign_timeouts",
+  {
+    description:
+      "A counter for sign-stage timeouts while preparing an L1 commitment transaction",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const submitBlockSubmitTimeoutsCounter = Metric.counter(
+  "submit_block_submit_timeouts",
+  {
+    description:
+      "A counter for submit-stage timeouts while submitting an L1 commitment transaction",
+    bigint: true,
+    incremental: true,
+  },
+).register();
 
 const l1CommitmentFeesLovelaceCounter = Metric.counter(
   "l1_commitment_fees_lovelace",
@@ -60,6 +107,11 @@ const unsubmittedBlockBacklogGauge = Metric.gauge("unsubmitted_block_backlog", {
 
 export const blockSubmissionMetrics = {
   submitBlockCounter,
+  submitBlockFailuresCounter,
+  submitBlockSignDurationHistogram,
+  submitBlockSubmitDurationHistogram,
+  submitBlockSignTimeoutsCounter,
+  submitBlockSubmitTimeoutsCounter,
   l1CommitmentFeesLovelaceCounter,
   l1CommitmentFeeLovelaceLastGauge,
   unsubmittedBlockBacklogGauge,
@@ -67,6 +119,14 @@ export const blockSubmissionMetrics = {
 
 export const initializeSubmissionMetrics = Effect.all([
   Metric.incrementBy(blockSubmissionMetrics.submitBlockCounter, 0n),
+  Metric.incrementBy(blockSubmissionMetrics.submitBlockFailuresCounter, 0n),
+  Metric.incrementBy(blockSubmissionMetrics.submitBlockSignTimeoutsCounter, 0n),
+  Metric.incrementBy(
+    blockSubmissionMetrics.submitBlockSubmitTimeoutsCounter,
+    0n,
+  ),
+  Metric.update(blockSubmissionMetrics.submitBlockSignDurationHistogram, 0),
+  Metric.update(blockSubmissionMetrics.submitBlockSubmitDurationHistogram, 0),
   Metric.incrementBy(
     blockSubmissionMetrics.l1CommitmentFeesLovelaceCounter,
     0n,
@@ -118,6 +178,40 @@ const MIN_SUBMISSION_BATCH_SIZE = 250;
 const DEFAULT_SUBMISSION_BATCH_SIZE = 1000;
 const MAX_SUBMISSION_BATCH_SIZE = 5000;
 const SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS = 30_000;
+const SIGN_STAGE_TIMEOUT_CAUSE = "Timed out waiting for sign flow";
+const SUBMIT_STAGE_TIMEOUT_CAUSE = "Timed out waiting for submit flow";
+const IDEMPOTENT_SUBMIT_ERROR_MARKERS = [
+  "all inputs are spent. transaction has probably already been included",
+  "all inputs are spent",
+  "badinputsutxo",
+] as const;
+
+const stringifyUnknownErrorCause = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value instanceof Error) {
+    return `${value.message} ${stringifyUnknownErrorCause((value as Error & { cause?: unknown }).cause)}`;
+  }
+  if (value === null || value === undefined) {
+    return "";
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+export const isIdempotentSubmitErrorCandidate = (
+  error: TxSubmitError,
+): boolean => {
+  const haystack =
+    `${error.message} ${stringifyUnknownErrorCause(error.cause)}`.toLowerCase();
+  return IDEMPOTENT_SUBMIT_ERROR_MARKERS.some((marker) =>
+    haystack.includes(marker),
+  );
+};
 
 export const resolveSubmissionBatchSize = (itemCount: number): number => {
   if (itemCount >= 20_000) return MAX_SUBMISSION_BATCH_SIZE;
@@ -140,7 +234,7 @@ const submitSignedTxCBOR = (
     const signedTxHex = SDK.bufferToHex(l1CborBytes);
     const timeoutMs = Math.max(
       SUBMIT_SIGNED_TX_TIMEOUT_FALLBACK_MS,
-      nodeConfig.WAIT_BETWEEN_BLOCK_SUBMISSIONS,
+      nodeConfig.SUBMIT_SIGNED_TX_TIMEOUT_MS,
     );
     // Some commitment txs require an additional operator witness (e.g. merge
     // signer) beyond the witness already embedded by the commitment worker.
@@ -148,22 +242,61 @@ const submitSignedTxCBOR = (
     // appending the currently required one before submit.
     return yield* Effect.gen(function* () {
       yield* lucid.switchToOperatorsMergingWallet;
+      const signStartedAtMs = performance.now();
       const signedTx = yield* lucid.api
         .fromTx(signedTxHex)
         .sign.withWallet()
-        .completeProgram();
-      return yield* signedTx.submitProgram();
-    }).pipe(
-      Effect.timeoutFail({
-        duration: `${timeoutMs} millis`,
-        onTimeout: () =>
-          new TxSubmitError({
-            message: `Timed out after ${timeoutMs}ms while signing/submitting L1 commitment tx (header_hash=${headerHashHex})`,
-            cause: "Timed out waiting for sign/submit flow",
-            txHash: "<unknown>",
+        .completeProgram()
+        .pipe(
+          Effect.timeoutFail({
+            duration: `${timeoutMs} millis`,
+            onTimeout: () =>
+              new TxSignError({
+                message: `Timed out after ${timeoutMs}ms while signing L1 commitment tx (header_hash=${headerHashHex})`,
+                cause: SIGN_STAGE_TIMEOUT_CAUSE,
+                txHash: "<unknown>",
+              }),
           }),
-      }),
-    );
+          Effect.ensuring(
+            Metric.update(
+              blockSubmissionMetrics.submitBlockSignDurationHistogram,
+              (performance.now() - signStartedAtMs) / 1000,
+            ),
+          ),
+          Effect.tapErrorTag("TxSignError", (error) =>
+            error.cause === SIGN_STAGE_TIMEOUT_CAUSE
+              ? Metric.increment(
+                  blockSubmissionMetrics.submitBlockSignTimeoutsCounter,
+                )
+              : Effect.void,
+          ),
+        );
+      const submitStartedAtMs = performance.now();
+      return yield* signedTx.submitProgram().pipe(
+        Effect.timeoutFail({
+          duration: `${timeoutMs} millis`,
+          onTimeout: () =>
+            new TxSubmitError({
+              message: `Timed out after ${timeoutMs}ms while submitting L1 commitment tx (header_hash=${headerHashHex})`,
+              cause: SUBMIT_STAGE_TIMEOUT_CAUSE,
+              txHash: "<unknown>",
+            }),
+        }),
+        Effect.ensuring(
+          Metric.update(
+            blockSubmissionMetrics.submitBlockSubmitDurationHistogram,
+            (performance.now() - submitStartedAtMs) / 1000,
+          ),
+        ),
+        Effect.tapErrorTag("TxSubmitError", (error) =>
+          error.cause === SUBMIT_STAGE_TIMEOUT_CAUSE
+            ? Metric.increment(
+                blockSubmissionMetrics.submitBlockSubmitTimeoutsCounter,
+              )
+            : Effect.void,
+        ),
+      );
+    });
   }).pipe(
     Effect.mapError((e) => {
       const commonMsg = "Failed to submit previously built and signed tx";
@@ -176,6 +309,12 @@ const submitSignedTxCBOR = (
       } else if (e._tag === "TxSignerError") {
         return new TxSignError({
           message: `${commonMsg} due to a bad signature`,
+          cause: e,
+          txHash: "<unknown>",
+        });
+      } else if (e._tag === "TxSignError") {
+        return new TxSignError({
+          message: `${commonMsg}: ${e.message}`,
           cause: e,
           txHash: "<unknown>",
         });
@@ -441,11 +580,36 @@ export const submitEarliestBlock = Effect.gen(function* () {
         );
 
         if (!txAlreadyOnL1) {
-          const txHash = yield* submitSignedTxCBOR(
+          yield* submitSignedTxCBOR(
             blockEntry[BlocksDB.Columns.L1_CBOR],
             headerHashHex,
+          ).pipe(
+            Effect.tap((txHash) =>
+              Effect.logInfo(`🔗 🚀 Block commitment submitted: ${txHash}`),
+            ),
+            Effect.asVoid,
+            Effect.catchTag("TxSubmitError", (submitError) =>
+              Effect.gen(function* () {
+                if (!isIdempotentSubmitErrorCandidate(submitError)) {
+                  return yield* Effect.fail(submitError);
+                }
+                yield* Effect.logWarning(
+                  `🔗 ⚠️  Submit failed with an idempotent-success candidate for header_hash=${headerHashHex}; re-checking L1 inclusion.`,
+                );
+                const confirmedOnL1 = yield* checkL1TxProgram(
+                  blockEntry[BlocksDB.Columns.PRODUCED_UTXOS],
+                  headerHashHex,
+                );
+                if (!confirmedOnL1) {
+                  return yield* Effect.fail(submitError);
+                }
+                yield* Effect.logInfo(
+                  `🔗 ✅ Idempotent submit recovery succeeded for header_hash=${headerHashHex}; continuing with DB apply and status transition.`,
+                );
+                return;
+              }),
+            ),
           );
-          yield* Effect.logInfo(`🔗 🚀 Block commitment submitted: ${txHash}`);
         }
         yield* extractL1CommitmentFeeLovelace(
           blockEntry[BlocksDB.Columns.L1_CBOR],
@@ -588,6 +752,9 @@ export const blockSubmissionFiber = (
     );
     const action = submitEarliestBlock.pipe(
       Effect.withSpan("submit-blocks-fiber"),
+      Effect.tapError(() =>
+        Metric.increment(blockSubmissionMetrics.submitBlockFailuresCounter),
+      ),
       Effect.ensuring(
         refreshUnsubmittedBacklogGaugeFromDb.pipe(
           Effect.catchAllCause(Effect.logWarning),

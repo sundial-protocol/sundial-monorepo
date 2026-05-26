@@ -100,6 +100,7 @@ REDIS_STREAM_CONSUMER_GROUP=midgard-tx-processors
 REDIS_STREAM_CONSUMER_NAME=midgard-node-1
 REDIS_STREAM_BLOCK_MS=1000
 COMMITMENT_WORKER_TIMEOUT_MS=300000
+SUBMIT_SIGNED_TX_TIMEOUT_MS=30000
 COMMITMENT_WINDOW_WARN_TX_REQUESTS=50000
 COMMITMENT_WINDOW_WARN_TOTAL_EVENTS=60000
 COMMITMENT_WINDOW_WARN_TOTAL_BYTES=20000000
@@ -208,3 +209,13 @@ Important tx ingress metrics:
 - `tx_stream_fail_total`
 - `tx_stream_retry_total`
 - `tx_stream_dead_letter_total`
+
+Important block submission reliability metrics:
+
+- `submit_block_failures_total`
+- `submit_block_sign_timeouts_total`
+- `submit_block_submit_timeouts_total`
+- `submit_block_sign_duration_seconds_sum`
+- `submit_block_sign_duration_seconds_count`
+- `submit_block_submit_duration_seconds_sum`
+- `submit_block_submit_duration_seconds_count`

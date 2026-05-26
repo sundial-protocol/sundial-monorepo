@@ -404,25 +404,6 @@ export function checkMetricStopConditions(
     }
   }
 
-  if (stopConditions.maxRecoveryMempoolSize !== undefined) {
-    const beforeMempoolSize = window.before['mempool_tx_count'] ?? null;
-    const afterRecoveryMempoolSize = window.afterRecovery['mempool_tx_count'] ?? null;
-    if (beforeMempoolSize !== null && afterRecoveryMempoolSize !== null) {
-      const mempoolGrowth = afterRecoveryMempoolSize - beforeMempoolSize;
-      if (mempoolGrowth > stopConditions.maxRecoveryMempoolSize) {
-        return {
-          reason: 'recovery_mempool_exceeded',
-          metricValues: {
-            beforeMempoolSize,
-            afterRecoveryMempoolSize,
-            mempoolGrowth,
-            maxRecoveryMempoolGrowth: stopConditions.maxRecoveryMempoolSize,
-          },
-        };
-      }
-    }
-  }
-
   {
     const maxUnsubmittedBlockBacklogGrowth =
       stopConditions.maxUnsubmittedBlockBacklogGrowth ??
@@ -444,6 +425,25 @@ export function checkMetricStopConditions(
             afterRecoveryUnsubmittedBlockBacklog: afterRecoveryBacklog,
             unsubmittedBacklogGrowth,
             maxUnsubmittedBlockBacklogGrowth,
+          },
+        };
+      }
+    }
+  }
+
+  if (stopConditions.maxRecoveryMempoolSize !== undefined) {
+    const beforeMempoolSize = window.before['mempool_tx_count'] ?? null;
+    const afterRecoveryMempoolSize = window.afterRecovery['mempool_tx_count'] ?? null;
+    if (beforeMempoolSize !== null && afterRecoveryMempoolSize !== null) {
+      const mempoolGrowth = afterRecoveryMempoolSize - beforeMempoolSize;
+      if (mempoolGrowth > stopConditions.maxRecoveryMempoolSize) {
+        return {
+          reason: 'recovery_mempool_exceeded',
+          metricValues: {
+            beforeMempoolSize,
+            afterRecoveryMempoolSize,
+            mempoolGrowth,
+            maxRecoveryMempoolGrowth: stopConditions.maxRecoveryMempoolSize,
           },
         };
       }
