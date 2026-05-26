@@ -1,22 +1,12 @@
 import { describe, expect, beforeAll } from "vitest";
 import { Effect } from "effect";
-import { Database } from "../src/services/database.js";
 import { it } from "@effect/vitest";
 import { deleteMpt, MidgardMpt, MptError } from "../src/workers/utils/mpt.js";
-import { NodeConfig } from "@/services/config.js";
-import { Lucid } from "@/services/lucid.js";
 import { fromHex } from "@lucid-evolution/lucid";
 import * as ETH_UTILS from "@ethereumjs/util";
-import { provideDatabaseLayers } from "./utils.js";
 
 beforeAll(async () => {
-  await Effect.runPromise(
-    provideDatabaseLayers(
-      Effect.gen(function* () {
-        yield* deleteMpt("test-mpt-db", "test-mpt");
-      }),
-    ),
-  );
+  await Effect.runPromise(deleteMpt("test-mpt-db", "test-mpt"));
 });
 
 describe("The levelDB mpt tests ", () => {
@@ -36,11 +26,7 @@ describe("The levelDB mpt tests ", () => {
         "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
       );
       expect(mptRootEmpty).toBe(true);
-    }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(Lucid.Default),
-      Effect.provide(NodeConfig.layer),
-    ),
+    }),
   );
 
   it.effect("Put", (_) =>
@@ -65,11 +51,7 @@ describe("The levelDB mpt tests ", () => {
         "9cf4055fd9458e7b1f96266162787abcf218598f3213bd65257e2d4d10b144f3",
       );
       expect(mptRootEmpty).toBe(false);
-    }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(Lucid.Default),
-      Effect.provide(NodeConfig.layer),
-    ),
+    }),
   );
 
   it.effect("Root persistence", (_) =>
@@ -88,11 +70,7 @@ describe("The levelDB mpt tests ", () => {
         "9cf4055fd9458e7b1f96266162787abcf218598f3213bd65257e2d4d10b144f3",
       );
       expect(mptRootEmpty).toBe(false);
-    }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(Lucid.Default),
-      Effect.provide(NodeConfig.layer),
-    ),
+    }),
   );
 
   it.effect("Delete", (_) =>
@@ -110,11 +88,7 @@ describe("The levelDB mpt tests ", () => {
         "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
       );
       expect(mptRootEmpty).toBe(true);
-    }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(Lucid.Default),
-      Effect.provide(NodeConfig.layer),
-    ),
+    }),
   );
 
   it.effect("Reverts checkpointed changes", (_) =>
@@ -135,11 +109,7 @@ describe("The levelDB mpt tests ", () => {
         "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
       );
       expect(mptRootEmpty).toBe(true);
-    }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(Lucid.Default),
-      Effect.provide(NodeConfig.layer),
-    ),
+    }),
   );
 
   it.effect("Commits checkpointed changes", (_) =>
@@ -160,11 +130,7 @@ describe("The levelDB mpt tests ", () => {
         "9cf4055fd9458e7b1f96266162787abcf218598f3213bd65257e2d4d10b144f3",
       );
       expect(mptRootEmpty).toBe(false);
-    }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(Lucid.Default),
-      Effect.provide(NodeConfig.layer),
-    ),
+    }),
   );
 });
 
@@ -201,11 +167,7 @@ describe("The in-memory db mpt tests ", () => {
       expect(root3).toStrictEqual(
         "9cf4055fd9458e7b1f96266162787abcf218598f3213bd65257e2d4d10b144f3",
       );
-    }).pipe(
-      Effect.provide(Database.layer),
-      Effect.provide(Lucid.Default),
-      Effect.provide(NodeConfig.layer),
-    ),
+    }),
   );
 });
 

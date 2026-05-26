@@ -1,9 +1,8 @@
-import { describe, expect, beforeAll } from "vitest";
+import { describe, expect } from "vitest";
 import { toHex } from "@lucid-evolution/lucid";
 import { it } from "@effect/vitest";
 import { Effect } from "effect";
 import { SqlClient } from "@effect/sql";
-import * as InitDB from "../src/database/init.js";
 import {
   // Block
   BlocksTxsDB,
@@ -24,7 +23,7 @@ import {
   Tx,
   Ledger,
 } from "../src/database/index.js";
-import { provideDatabaseLayers } from "./utils.js";
+import { provideDbOnlyLayers } from "./utils.js";
 
 const flushAll = Effect.gen(function* () {
   yield* Effect.all(
@@ -44,25 +43,9 @@ const flushAll = Effect.gen(function* () {
 const randomBytes = (n: number) =>
   Buffer.from(Array.from({ length: n }, () => Math.floor(Math.random() * 255)));
 
-beforeAll(async () => {
-  await Effect.runPromise(
-    provideDatabaseLayers(
-      Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient;
-        // Ensure a clean schema: drop tables (and thus indexes) if they exist
-        yield* sql`
-          DROP SCHEMA public CASCADE;
-          CREATE SCHEMA public;`;
-        yield* InitDB.program;
-        yield* flushAll;
-      }),
-    ),
-  );
-});
-
 describe("Database: initialization and basic operations", () => {
   it.effect("initialize and flush", (_) =>
-    provideDatabaseLayers(
+    provideDbOnlyLayers(
       Effect.gen(function* () {
         yield* flushAll;
         // Smoke select to ensure connection works
@@ -78,7 +61,7 @@ describe("BlocksTxsDB", () => {
   it.effect(
     "insert, retrieve all, retrieve by header, retrieve by tx, clear block, clear all",
     (_) =>
-      provideDatabaseLayers(
+      provideDbOnlyLayers(
         Effect.gen(function* () {
           yield* flushAll;
 
@@ -159,7 +142,7 @@ describe("ImmutableDB", () => {
   it.effect(
     "insert tx, insert txs, retrieve all, retrieve cbor by hash, retrieve cbor by hashes, clear all",
     (_) =>
-      provideDatabaseLayers(
+      provideDbOnlyLayers(
         Effect.gen(function* () {
           yield* flushAll;
 
@@ -224,7 +207,7 @@ describe("ImmutableDB", () => {
 
 describe("LatestLedgerDB", () => {
   it.effect("insert multiple, retrieve, clear UTxOs, clear all", () =>
-    provideDatabaseLayers(
+    provideDbOnlyLayers(
       Effect.gen(function* () {
         yield* flushAll;
 
@@ -257,7 +240,7 @@ describe("MempoolLedgerDB", () => {
   it.effect(
     "insert, retrieve by address, retrieve all, clearUTxOs, clearAll",
     () =>
-      provideDatabaseLayers(
+      provideDbOnlyLayers(
         Effect.gen(function* () {
           yield* flushAll;
 
@@ -296,7 +279,7 @@ describe("MempoolLedgerDB", () => {
 
 describe("ConfirmedLedgerDB", () => {
   it.effect("insert multiple, retrieve", () =>
-    provideDatabaseLayers(
+    provideDbOnlyLayers(
       Effect.gen(function* () {
         yield* flushAll;
 

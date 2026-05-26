@@ -195,6 +195,75 @@ it.effect("retrieveTxCount returns parsed bigint from SQL count row", () => {
   );
 });
 
+it.effect("insertMultiple skips duplicate txs in chunk for projection", () => {
+  const txs = Array.from({ length: 5 }, (_, i) => makeProcessedTx(i + 1));
+  const newlyInserted = [txs[0], txs[2], txs[4]];
+  sqlHarness.setRows(newlyInserted.map((tx) => ({ tx_id: tx.txId })));
+
+  vi.mocked(AddressHistoryDB.aggregateProcessedTxs).mockImplementation(
+    (_ledger, chunk) =>
+      Effect.succeed({
+        allTxEntries: chunk.map((tx) => ({
+          tx_id: tx.txId,
+          tx: tx.txCbor,
+        })),
+        addressHistoryEntries: [],
+        collectiveSpent: [],
+        collectiveProduced: [],
+      }),
+  );
+
+  return MempoolDB.insertMultiple(txs).pipe(
+    Effect.map((insertedCount) => {
+      expect(insertedCount).toBe(3);
+      expect(
+        vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
+      ).toHaveBeenCalledTimes(1);
+      const passedTxIds = vi
+        .mocked(AddressHistoryDB.aggregateProcessedTxs)
+        .mock.calls[0][1].map((tx) => tx.txId.toString("hex"));
+      expect(passedTxIds).toEqual(
+        newlyInserted.map((tx) => tx.txId.toString("hex")),
+      );
+    }),
+    Effect.provide(sqlHarness.layer),
+  );
+});
+
+it.effect(
+  "insertMultiple calls each projection collaborator once per chunk",
+  () => {
+    const manyProcessedTxs = Array.from({ length: 101 }, (_, index) =>
+      makeProcessedTx(index + 1),
+    );
+    sqlHarness.setRows(manyProcessedTxs.map((tx) => ({ tx_id: tx.txId })));
+
+    vi.mocked(AddressHistoryDB.aggregateProcessedTxs).mockImplementation(
+      (_ledger, chunk) =>
+        Effect.succeed({
+          allTxEntries: chunk.map((tx) => ({
+            tx_id: tx.txId,
+            tx: tx.txCbor,
+          })),
+          addressHistoryEntries: [],
+          collectiveSpent: [],
+          collectiveProduced: [],
+        }),
+    );
+
+    return MempoolDB.insertMultiple(manyProcessedTxs).pipe(
+      Effect.map(() => {
+        expect(vi.mocked(AddressHistoryDB.upsertEntries)).toHaveBeenCalledTimes(
+          2,
+        );
+        expect(vi.mocked(MempoolLedgerDB.insert)).toHaveBeenCalledTimes(2);
+        expect(vi.mocked(MempoolLedgerDB.clearUTxOs)).toHaveBeenCalledTimes(2);
+      }),
+      Effect.provide(sqlHarness.layer),
+    );
+  },
+);
+
 it.effect("insertMultiple chunks projection writes into transactions", () => {
   const manyProcessedTxs = Array.from({ length: 101 }, (_, index) =>
     makeProcessedTx(index + 1),
@@ -219,11 +288,11 @@ it.effect("insertMultiple chunks projection writes into transactions", () => {
       expect(sqlHarness.getTransactionCallCount()).toBe(2);
       expect(
         vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
-      ).toHaveBeenCalledTimes(101);
+      ).toHaveBeenCalledTimes(2);
       const txBatchSizes = vi
         .mocked(AddressHistoryDB.aggregateProcessedTxs)
         .mock.calls.map((call) => call[1].length);
-      expect(txBatchSizes.every((size) => size === 1)).toBe(true);
+      expect(txBatchSizes).toEqual([100, 1]);
     }),
     Effect.provide(sqlHarness.layer),
   );
