@@ -7,8 +7,9 @@ const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_PROGRESS_INTERVAL_MS = 5_000;
 const DEFAULT_COMMIT_RETRY_INTERVAL_MS = 15_000;
+const DEFAULT_COMMIT_TRIGGER_TIMEOUT_MS = 10 * 60_000;
+const ROOT_DIAGNOSTICS_TIMEOUT_MS = 5_000;
 const READY_STABLE_POLLS_REQUIRED = 2;
-const REQUEST_TIMEOUT_MS = 5_000;
 
 interface PrometheusClientLike {
   queryInstant(query: string, time?: Date): Promise<PrometheusVectorResult>;
@@ -96,12 +97,13 @@ const fetchJsonWithTimeout = async (
 
 const triggerCommit = async (
   nodeEndpoint: string,
+  requestTimeoutMs: number,
   fetcher: (url: string, init?: RequestInit) => Promise<Response>,
   log: (line: string) => void
 ): Promise<void> => {
   const commitUrl = `${nodeEndpoint.replace(/\/$/, '')}/${COMMIT_ENDPOINT}`;
   try {
-    const response = await fetchJsonWithTimeout(commitUrl, REQUEST_TIMEOUT_MS, fetcher);
+    const response = await fetchJsonWithTimeout(commitUrl, requestTimeoutMs, fetcher);
     if (!response.ok) {
       const body = (await response.text()).slice(0, 200);
       log(
@@ -120,7 +122,11 @@ const fetchRootUnitDiagnostics = async (
 ): Promise<RootUnitDiagnostics | null> => {
   const diagnosticsUrl = `${nodeEndpoint.replace(/\/$/, '')}/${STATE_QUEUE_ROOT_UNIT_DIAGNOSTICS_ENDPOINT}`;
   try {
-    const response = await fetchJsonWithTimeout(diagnosticsUrl, REQUEST_TIMEOUT_MS, fetcher);
+    const response = await fetchJsonWithTimeout(
+      diagnosticsUrl,
+      ROOT_DIAGNOSTICS_TIMEOUT_MS,
+      fetcher
+    );
     if (!response.ok) {
       return null;
     }
@@ -162,10 +168,30 @@ export async function ensureSeedReadiness(
   );
 
   const baseline = await readSeedCounters(prometheusClient);
+  const baselineSeedInFlight = baseline.attempts > baseline.success + baseline.failures;
   log(
     `  seed bootstrap: baseline counters attempts=${baseline.attempts} success=${baseline.success} failures=${baseline.failures}`
   );
-  await triggerCommit(nodeEndpoint, fetcher, log);
+  if (baselineSeedInFlight) {
+    log('  seed bootstrap: detected in-flight seed attempt at baseline; waiting for it to resolve.');
+  }
+
+  let inFlightCommitTrigger: Promise<void> | null = null;
+  const launchCommitTrigger = (): void => {
+    if (inFlightCommitTrigger !== null) {
+      return;
+    }
+    inFlightCommitTrigger = triggerCommit(
+      nodeEndpoint,
+      DEFAULT_COMMIT_TRIGGER_TIMEOUT_MS,
+      fetcher,
+      log
+    ).finally(() => {
+      inFlightCommitTrigger = null;
+    });
+  };
+
+  launchCommitTrigger();
 
   let lastProgressLogAt = startedAtMs;
   let lastCommitTriggerAt = startedAtMs;
@@ -213,6 +239,7 @@ export async function ensureSeedReadiness(
     const looksAlreadyReady =
       seedAttemptsDelta === 0 &&
       seedFailuresDelta === 0 &&
+      !baselineSeedInFlight &&
       diagnosticsStatus === 'ok' &&
       diagnosticsCount === 1;
 
@@ -245,7 +272,13 @@ export async function ensureSeedReadiness(
     }
 
     if (now() - lastCommitTriggerAt >= commitRetryIntervalMs) {
-      await triggerCommit(nodeEndpoint, fetcher, log);
+      if (inFlightCommitTrigger === null) {
+        launchCommitTrigger();
+      } else {
+        log(
+          '  seed bootstrap: trigger /commit skipped; previous trigger request still in-flight'
+        );
+      }
       lastCommitTriggerAt = now();
     }
   }

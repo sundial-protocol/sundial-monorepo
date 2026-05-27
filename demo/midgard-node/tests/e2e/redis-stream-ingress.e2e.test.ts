@@ -46,6 +46,21 @@ describe("redis stream ingress e2e", () => {
     );
 
     await redis.del(REDIS_STREAM_KEY, REDIS_DEAD_LETTER_STREAM);
+    // DEL removes stream consumer groups; recreate the expected group for this
+    // ingress-only E2E environment before assertions.
+    try {
+      await redis.xgroup(
+        "CREATE",
+        REDIS_STREAM_KEY,
+        REDIS_STREAM_CONSUMER_GROUP,
+        "$",
+        "MKSTREAM",
+      );
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes("BUSYGROUP")) {
+        throw error;
+      }
+    }
   });
 
   afterAll(async () => {

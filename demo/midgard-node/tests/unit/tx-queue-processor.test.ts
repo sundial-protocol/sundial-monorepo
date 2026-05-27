@@ -57,21 +57,26 @@ const makeQueueStub = (
   }[],
   snapshot = { streamDepth: 0, pendingCount: 0, lagCount: 0 },
 ): TxIngressQueueService & {
+  consumeBatchSpy: ReturnType<typeof vi.fn>;
   ackSpy: ReturnType<typeof vi.fn>;
   handleFailedSpy: ReturnType<typeof vi.fn>;
 } => {
+  const consumeBatchSpy = vi.fn((_maxCount: number, _blockMs: number) =>
+    Effect.succeed(messages),
+  );
   const ackSpy = vi.fn((ids: readonly string[]) => Effect.succeed(ids.length));
   const handleFailedSpy = vi.fn(() => Effect.succeed("retry" as const));
 
   return {
     enqueue: (_txCbor: string) => Effect.succeed("1-0"),
     ensureConsumerGroup: Effect.void,
-    consumeBatch: (_maxCount: number, _blockMs: number) =>
-      Effect.succeed(messages),
+    consumeBatch: consumeBatchSpy,
     ack: ackSpy,
     handleFailedMessage: handleFailedSpy,
+    refreshSnapshotMetrics: Effect.succeed(snapshot),
     snapshotMetrics: Effect.succeed(snapshot),
     clear: Effect.void,
+    consumeBatchSpy,
     ackSpy,
     handleFailedSpy,
   };
@@ -87,6 +92,24 @@ beforeEach(() => {
 });
 
 describe("txQueueProcessorAction", () => {
+  it.effect(
+    "passes configured drain batch size and block timeout to ingress queue",
+    () =>
+      Effect.gen(function* () {
+        const queue = makeQueueStub([
+          { id: "1-0", txCbor: "aa", deliveryCount: 1 },
+        ]);
+
+        yield* txQueueProcessorAction(500, 8, 1000, true).pipe(
+          Effect.provideService(TxIngressQueue, queue),
+        );
+
+        expect(queue.consumeBatchSpy).toHaveBeenCalledWith(500, 1000);
+        expect(mempoolInsertFn).toHaveBeenCalledOnce();
+        expect(queue.ackSpy).toHaveBeenCalledWith(["1-0"]);
+      }).pipe(Effect.provide(sqlHarness.layer)),
+  );
+
   it.effect("acks successfully persisted stream messages", () =>
     Effect.gen(function* () {
       const queue = makeQueueStub([

@@ -133,6 +133,30 @@ const registerFailedMessage = (
     }
   });
 
+const refreshTxIngressSnapshotAction = (
+  withMonitoring?: boolean,
+  peakRef?: Ref.Ref<bigint>,
+): Effect.Effect<void, TxIngressQueueError, TxIngressQueue> =>
+  Effect.gen(function* () {
+    const txIngressQueue = yield* TxIngressQueue;
+    const snapshot = yield* txIngressQueue.refreshSnapshotMetrics;
+    if (!withMonitoring) {
+      return;
+    }
+
+    yield* Metric.set(txStreamDepthGauge, BigInt(snapshot.streamDepth));
+    yield* Metric.set(txStreamPendingGauge, BigInt(snapshot.pendingCount));
+    yield* Metric.set(txStreamConsumerLagGauge, BigInt(snapshot.lagCount));
+    if (peakRef !== undefined) {
+      const newPeak = yield* Ref.updateAndGet(peakRef, (prev) =>
+        prev >= BigInt(snapshot.streamDepth)
+          ? prev
+          : BigInt(snapshot.streamDepth),
+      );
+      yield* Metric.set(txStreamPeakDepthGauge, newPeak);
+    }
+  });
+
 export const txQueueProcessorAction = (
   txQueueDrainBatchSize: number,
   txParseConcurrency: number,
@@ -149,21 +173,7 @@ export const txQueueProcessorAction = (
 > =>
   Effect.gen(function* () {
     const txIngressQueue = yield* TxIngressQueue;
-
-    const snapshot = yield* txIngressQueue.snapshotMetrics;
-    if (withMonitoring) {
-      yield* Metric.set(txStreamDepthGauge, BigInt(snapshot.streamDepth));
-      yield* Metric.set(txStreamPendingGauge, BigInt(snapshot.pendingCount));
-      yield* Metric.set(txStreamConsumerLagGauge, BigInt(snapshot.lagCount));
-      if (peakRef !== undefined) {
-        const newPeak = yield* Ref.updateAndGet(peakRef, (prev) =>
-          prev >= BigInt(snapshot.streamDepth)
-            ? prev
-            : BigInt(snapshot.streamDepth),
-        );
-        yield* Metric.set(txStreamPeakDepthGauge, newPeak);
-      }
-    }
+    yield* refreshTxIngressSnapshotAction(withMonitoring, peakRef);
 
     const messages = yield* txIngressQueue.consumeBatch(
       txQueueDrainBatchSize,
@@ -248,6 +258,33 @@ export const txQueueProcessorAction = (
       }
     }
   });
+
+export const txQueueMetricsRefreshFiber = (
+  schedule: Schedule.Schedule<number>,
+  withMonitoring?: boolean,
+): Effect.Effect<void, never, TxIngressQueue> =>
+  pipe(
+    Effect.gen(function* () {
+      const txIngressQueue = yield* TxIngressQueue;
+      yield* txIngressQueue.ensureConsumerGroup;
+      yield* Effect.logInfo("🔶 Tx queue metrics refresh fiber started.");
+      const peakRef = withMonitoring ? yield* Ref.make(0n) : undefined;
+
+      if (withMonitoring) {
+        yield* Metric.set(txStreamDepthGauge, 0n);
+        yield* Metric.set(txStreamPeakDepthGauge, 0n);
+        yield* Metric.set(txStreamPendingGauge, 0n);
+        yield* Metric.set(txStreamConsumerLagGauge, 0n);
+      }
+
+      yield* Effect.repeat(
+        refreshTxIngressSnapshotAction(withMonitoring, peakRef).pipe(
+          Effect.catchAllCause(Effect.logWarning),
+        ),
+        schedule,
+      );
+    }),
+  ).pipe(Effect.catchAllCause(Effect.logWarning));
 
 export const txQueueProcessorFiber = (
   schedule: Schedule.Schedule<number>,

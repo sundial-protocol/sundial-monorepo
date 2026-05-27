@@ -1,5 +1,5 @@
 import * as SDK from "@al-ft/midgard-sdk";
-import { LucidEvolution, fromHex } from "@lucid-evolution/lucid";
+import { fromHex } from "@lucid-evolution/lucid";
 import { BlocksDB } from "@/database/index.js";
 import {
   DatabaseError,
@@ -68,26 +68,20 @@ export const blocksDbSeedingMetrics = {
 
 type SeedResult = "already-seeded" | "seeded" | "retry-later";
 
-const fetchTailByTraversal = (
-  lucid: LucidEvolution,
-  config: SDK.StateQueueFetchConfig,
-): Effect.Effect<
-  { tail: SDK.StateQueueUTxO; traversedHops: number },
-  | SDK.LucidError
-  | SDK.DataCoercionError
-  | SDK.MissingDatumError
-  | SDK.UnauthenticUtxoError
-> =>
+const followRootLinkedTailFromSnapshot = (
+  firstLinkedNode: SDK.StateQueueUTxO,
+  snapshot: readonly SDK.StateQueueUTxO[],
+): Effect.Effect<{ tail: SDK.StateQueueUTxO; traversedHops: number }, SDK.LucidError> =>
   Effect.gen(function* () {
-    const { confirmed, link } =
-      yield* SDK.fetchConfirmedStateAndItsLinkByUnitProgram(lucid, config);
-    if (link === undefined) {
-      return { tail: confirmed, traversedHops: 0 };
+    const byKey = new Map<string, SDK.StateQueueUTxO>();
+    for (const stateQueueUTxO of snapshot) {
+      if (stateQueueUTxO.datum.key !== "Empty") {
+        byKey.set(stateQueueUTxO.datum.key.Key.key, stateQueueUTxO);
+      }
     }
 
     let traversedHops = 1;
-    let current = link;
-
+    let current = firstLinkedNode;
     while (current.datum.next !== "Empty") {
       if (traversedHops > MAX_STATE_QUEUE_TRAVERSAL_HOPS) {
         return yield* Effect.fail(
@@ -98,16 +92,18 @@ const fetchTailByTraversal = (
           }),
         );
       }
-
-      const nextUnit =
-        config.stateQueuePolicyId +
-        SDK.NODE_ASSET_NAME +
-        current.datum.next.Key.key;
-      current = yield* SDK.fetchLatestCommittedBlockByUnitProgram(
-        lucid,
-        config,
-        nextUnit,
-      );
+      const nextKey = current.datum.next.Key.key;
+      const next = byKey.get(nextKey);
+      if (next === undefined) {
+        return yield* Effect.fail(
+          new SDK.LucidError({
+            message:
+              "Failed to follow root-linked state-queue path while seeding BlocksDB",
+            cause: `missing_link_key=${nextKey}`,
+          }),
+        );
+      }
+      current = next;
       traversedHops += 1;
     }
 
@@ -135,21 +131,25 @@ const seedBlocksDBFromChain: Effect.Effect<
     stateQueueAddress: stateQueue.spendingScriptAddress,
     stateQueuePolicyId: stateQueue.policyId,
   };
-
+  const { confirmed, link } =
+    yield* SDK.fetchConfirmedStateAndItsLinkByUnitProgram(
+      blockCommitmentApi,
+      fetchConfig,
+    );
   const { tail: latestStateQueueUTxO, traversedHops } =
-    yield* fetchTailByTraversal(blockCommitmentApi, fetchConfig);
+    link === undefined
+      ? { tail: confirmed, traversedHops: 0 }
+      : yield* Effect.gen(function* () {
+          // Snapshot once and walk the root-linked chain in memory.
+          const snapshot = yield* SDK.fetchUnsortedStateQueueUTxOsProgram(
+            blockCommitmentApi,
+            fetchConfig,
+          );
+          return yield* followRootLinkedTailFromSnapshot(link, snapshot);
+        });
   const headerHashHex =
     yield* SDK.headerHashFromStateQueueUTxO(latestStateQueueUTxO);
-
-  const walletUTxOs = yield* Effect.tryPromise({
-    try: () => blockCommitmentApi.wallet().getUtxos(),
-    catch: (e) =>
-      new SDK.LucidError({
-        message: "Failed to fetch wallet UTxOs for BlocksDB seeding",
-        cause: e,
-      }),
-  });
-  const serializedWalletUTxOs = yield* serializeUTxOsForStorage(walletUTxOs);
+  const serializedWalletUTxOs = yield* serializeUTxOsForStorage([]);
   const serializedProducedUTxOs = yield* serializeUTxOsForStorage([
     latestStateQueueUTxO.utxo,
   ]);

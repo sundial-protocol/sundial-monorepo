@@ -151,4 +151,44 @@ describe('ensureSeedReadiness', () => {
       )
     ).rejects.toThrow(/timed out/i);
   });
+
+  it('does not return already_ready when a seed attempt is already in-flight at baseline', async () => {
+    const prometheusClient = makePrometheusClient({
+      blocks_db_seed_attempts_total: [5, 5, 5, 6, 6],
+      blocks_db_seed_success_total: [4, 4, 4, 5, 5],
+      blocks_db_seed_failures_total: [0, 0, 0, 0, 0],
+    });
+
+    let nowMs = 0;
+
+    const result = await ensureSeedReadiness(
+      {
+        nodeEndpoint: 'http://localhost:3000',
+        prometheusClient,
+        timeoutMs: 10_000,
+        pollIntervalMs: 1_000,
+        progressIntervalMs: 1_000,
+        commitRetryIntervalMs: 1_000,
+      },
+      {
+        now: () => nowMs,
+        sleep: async (ms) => {
+          nowMs += ms;
+        },
+        fetcher: async (url) => {
+          if (url.endsWith('/commit')) {
+            return new Response(JSON.stringify({ message: 'ok' }), { status: 200 });
+          }
+          if (url.endsWith('/stateQueue/root-unit-diagnostics')) {
+            return new Response(JSON.stringify({ status: 'ok', count: 1 }), { status: 200 });
+          }
+          throw new Error(`unexpected url: ${url}`);
+        },
+      }
+    );
+
+    expect(result.outcome).toBe('seeded');
+    expect(result.seedAttemptsDelta).toBe(1);
+    expect(result.seedSuccessDelta).toBe(1);
+  });
 });

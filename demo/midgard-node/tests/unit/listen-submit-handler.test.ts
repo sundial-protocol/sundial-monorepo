@@ -29,6 +29,11 @@ const makeQueueStub = (
   consumeBatch: (_maxCount: number, _blockMs: number) => Effect.succeed([]),
   ack: (_messageIds: readonly string[]) => Effect.succeed(0),
   handleFailedMessage: (_message, _reason) => Effect.succeed("retry"),
+  refreshSnapshotMetrics: Effect.succeed({
+    streamDepth: 0,
+    pendingCount: 0,
+    lagCount: 0,
+  }),
   snapshotMetrics: Effect.succeed({
     streamDepth: 0,
     pendingCount: 0,

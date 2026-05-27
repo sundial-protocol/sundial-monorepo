@@ -59,8 +59,10 @@ describe("NodeConfig", () => {
         expect(config.NODE_ROLE).toBe("all");
         expect(config.TX_QUEUE_CAPACITY).toBe(250_000);
         expect(config.TX_QUEUE_MAX_PENDING).toBe(20_000);
-        expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(250);
-        expect(config.TX_QUEUE_OFFER_TIMEOUT_MS).toBe(100);
+        expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(500);
+        expect(config.TX_QUEUE_PROCESSOR_INTERVAL_MS).toBe(250);
+        expect(config.TX_QUEUE_OFFER_TIMEOUT_MS).toBe(1000);
+        expect(config.TX_PARSE_CONCURRENCY).toBe(8);
         expect(config.SUBMIT_SIGNED_TX_TIMEOUT_MS).toBe(30_000);
         expect(config.SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES).toBe(1);
         expect(config.COMMITMENT_WORKER_TIMEOUT_MS).toBe(300_000);
@@ -69,6 +71,46 @@ describe("NodeConfig", () => {
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS).toBe(60_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_BYTES).toBe(20_000_000);
       }).pipe(Effect.provide(configLayer)),
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "resolves explicit high-throughput tx queue processor settings",
+    () => {
+      const highThroughputProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["TX_QUEUE_DRAIN_BATCH_SIZE", "500"],
+          ["TX_QUEUE_PROCESSOR_INTERVAL_MS", "100"],
+          ["TX_PARSE_CONCURRENCY", "8"],
+        ]),
+      );
+      const highThroughputLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(highThroughputProvider)),
+      );
+
+      return Effect.gen(function* () {
+        const config = yield* NodeConfig;
+
+        expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(500);
+        expect(config.TX_QUEUE_PROCESSOR_INTERVAL_MS).toBe(100);
+        expect(config.TX_PARSE_CONCURRENCY).toBe(8);
+      }).pipe(Effect.provide(highThroughputLayer));
+    },
     { timeout: 10000 },
   );
 
@@ -228,6 +270,50 @@ describe("NodeConfig", () => {
         if (result._tag === "Left") {
           expect(result.left).toBeInstanceOf(ConfigError);
           expect(result.left.message).toContain("TX_QUEUE_DRAIN_BATCH_SIZE");
+        }
+      });
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "fails when TX_QUEUE_PROCESSOR_INTERVAL_MS is not positive",
+    () => {
+      const invalidProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["TX_QUEUE_PROCESSOR_INTERVAL_MS", "0"],
+        ]),
+      );
+      const invalidLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(invalidProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(invalidLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain(
+            "TX_QUEUE_PROCESSOR_INTERVAL_MS",
+          );
         }
       });
     },

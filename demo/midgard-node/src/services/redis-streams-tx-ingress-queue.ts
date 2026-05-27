@@ -147,6 +147,12 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
     // path (ensureGroup) and the processor's non-blocking calls.
     const blockingConsumerClient = producerClient.duplicate();
     const statsClient = producerClient.duplicate();
+    const emptySnapshot: TxIngressMetricsSnapshot = {
+      streamDepth: 0,
+      pendingCount: 0,
+      lagCount: 0,
+    };
+    let cachedMetricsSnapshot: TxIngressMetricsSnapshot = emptySnapshot;
 
     const readDeliveryCount = (messageId: string) =>
       tryRedis<readonly RedisPendingEntry[]>("XPENDING_RANGE", () =>
@@ -209,35 +215,79 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
       }),
     );
 
+    const fetchSnapshotMetrics = Effect.gen(function* () {
+      const [streamDepthRaw, pendingSummary, groupsInfoRaw] = yield* Effect.all(
+        [
+          tryRedis("XLEN", () => statsClient.xlen(config.REDIS_STREAM_KEY)),
+          tryRedis("XPENDING_SUMMARY", () =>
+            statsClient.xpending(
+              config.REDIS_STREAM_KEY,
+              config.REDIS_STREAM_CONSUMER_GROUP,
+            ),
+          ).pipe(
+            Effect.catchTag("TxIngressQueueError", (e) => {
+              const causeMessage = String(e.cause);
+              return causeMessage.includes("NOGROUP")
+                ? Effect.succeed([0, null, null, []] as unknown[])
+                : Effect.fail(e);
+            }),
+          ),
+          tryRedis(
+            "XINFO_GROUPS",
+            () =>
+              statsClient.call(
+                "XINFO",
+                "GROUPS",
+                config.REDIS_STREAM_KEY,
+              ) as Promise<unknown>,
+          ).pipe(
+            Effect.catchTag("TxIngressQueueError", (e) => {
+              const causeMessage = String(e.cause);
+              return causeMessage.includes("no such key")
+                ? Effect.succeed([] as unknown[])
+                : Effect.fail(e);
+            }),
+          ),
+        ],
+        { concurrency: "unbounded" },
+      );
+
+      const pendingCount = normalizePendingSummaryCount(pendingSummary[0]);
+      const lagFromGroup = normalizeConsumerGroupLag(
+        groupsInfoRaw,
+        config.REDIS_STREAM_CONSUMER_GROUP,
+      );
+      const lagCount =
+        lagFromGroup ?? Math.max(0, streamDepthRaw - pendingCount);
+      const streamDepth = lagCount;
+      const snapshot: TxIngressMetricsSnapshot = {
+        streamDepth,
+        pendingCount,
+        lagCount,
+      };
+      return snapshot;
+    });
+
     const queueService: TxIngressQueueService = {
       enqueue: (txCbor: string) =>
-        // ensureGroup is idempotent (BUSYGROUP is swallowed). Calling it on
-        // every enqueue keeps the consumer group in sync if the stream was
-        // externally deleted, so the processor fiber can consume without a
-        // node restart.
-        ensureGroup.pipe(
-          Effect.flatMap(() =>
-            tryRedis("XADD", () =>
-              producerClient.xadd(
-                config.REDIS_STREAM_KEY,
-                "*",
-                TX_STREAM_MESSAGE_CBOR_FIELD,
-                txCbor,
-              ),
-            ).pipe(
-              Effect.flatMap((id) =>
-                id === null
-                  ? Effect.fail(
-                      new TxIngressQueueError({
-                        operation: "XADD",
-                        message:
-                          "Redis did not return a stream id for enqueued tx",
-                        cause: undefined,
-                      }),
-                    )
-                  : Effect.succeed(String(id)),
-              ),
-            ),
+        tryRedis("XADD", () =>
+          producerClient.xadd(
+            config.REDIS_STREAM_KEY,
+            "*",
+            TX_STREAM_MESSAGE_CBOR_FIELD,
+            txCbor,
+          ),
+        ).pipe(
+          Effect.flatMap((id) =>
+            id === null
+              ? Effect.fail(
+                  new TxIngressQueueError({
+                    operation: "XADD",
+                    message: "Redis did not return a stream id for enqueued tx",
+                    cause: undefined,
+                  }),
+                )
+              : Effect.succeed(String(id)),
           ),
         ),
       ensureConsumerGroup: ensureGroup,
@@ -296,7 +346,18 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
           ];
 
           return yield* toIngressMessages(combinedEntries);
-        }),
+        }).pipe(
+          Effect.catchTag("TxIngressQueueError", (error) => {
+            const causeMessage = String(error.cause);
+            return causeMessage.includes("NOGROUP")
+              ? ensureGroup.pipe(
+                  Effect.zipRight(
+                    Effect.succeed([] as readonly TxIngressMessage[]),
+                  ),
+                )
+              : Effect.fail(error);
+          }),
+        ),
       ack: (messageIds: readonly string[]) =>
         messageIds.length === 0
           ? Effect.succeed(0)
@@ -346,59 +407,14 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
             "dead_lettered";
           return deadLetteredDisposition;
         }),
-      snapshotMetrics: Effect.gen(function* () {
-        const [streamDepthRaw, pendingSummary, groupsInfoRaw] =
-          yield* Effect.all(
-            [
-              tryRedis("XLEN", () => statsClient.xlen(config.REDIS_STREAM_KEY)),
-              tryRedis("XPENDING_SUMMARY", () =>
-                statsClient.xpending(
-                  config.REDIS_STREAM_KEY,
-                  config.REDIS_STREAM_CONSUMER_GROUP,
-                ),
-              ).pipe(
-                Effect.catchTag("TxIngressQueueError", (e) => {
-                  const causeMessage = String(e.cause);
-                  return causeMessage.includes("NOGROUP")
-                    ? Effect.succeed([0, null, null, []] as unknown[])
-                    : Effect.fail(e);
-                }),
-              ),
-              tryRedis(
-                "XINFO_GROUPS",
-                () =>
-                  statsClient.call(
-                    "XINFO",
-                    "GROUPS",
-                    config.REDIS_STREAM_KEY,
-                  ) as Promise<unknown>,
-              ).pipe(
-                Effect.catchTag("TxIngressQueueError", (e) => {
-                  const causeMessage = String(e.cause);
-                  return causeMessage.includes("no such key")
-                    ? Effect.succeed([] as unknown[])
-                    : Effect.fail(e);
-                }),
-              ),
-            ],
-            { concurrency: "unbounded" },
-          );
-
-        const pendingCount = normalizePendingSummaryCount(pendingSummary[0]);
-        const lagFromGroup = normalizeConsumerGroupLag(
-          groupsInfoRaw,
-          config.REDIS_STREAM_CONSUMER_GROUP,
-        );
-        const lagCount =
-          lagFromGroup ?? Math.max(0, streamDepthRaw - pendingCount);
-        const streamDepth = lagCount;
-        const snapshot: TxIngressMetricsSnapshot = {
-          streamDepth,
-          pendingCount,
-          lagCount,
-        };
-        return snapshot;
-      }),
+      refreshSnapshotMetrics: fetchSnapshotMetrics.pipe(
+        Effect.tap((snapshot) =>
+          Effect.sync(() => {
+            cachedMetricsSnapshot = snapshot;
+          }),
+        ),
+      ),
+      snapshotMetrics: Effect.sync(() => cachedMetricsSnapshot),
       clear: Effect.gen(function* () {
         yield* tryRedis("DEL_STREAM", () =>
           producerClient.del(config.REDIS_STREAM_KEY),
@@ -410,6 +426,7 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
         // group immediately so the processor fiber and snapshotMetrics remain
         // functional without requiring a node restart.
         yield* ensureGroup;
+        cachedMetricsSnapshot = emptySnapshot;
       }),
     };
 

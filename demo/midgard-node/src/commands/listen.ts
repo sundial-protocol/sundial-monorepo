@@ -63,7 +63,7 @@ import {
   monitorMempoolFiber,
   blockSubmissionFiber,
   txQueueProcessorFiber,
-  txQueueProcessorMetrics,
+  txQueueMetricsRefreshFiber,
 } from "@/fibers/index.js";
 
 const TX_ENDPOINT: string = "tx";
@@ -84,6 +84,7 @@ const COMMITMENT_WALLET_BALANCE_ENDPOINT: string = "commitment-wallet/balance";
 const HEALTH_LIVE_ENDPOINT: string = "health/live";
 const HEALTH_READY_ENDPOINT: string = "health/ready";
 const COMMITMENT_WALLET_BALANCE_QUERY_TIMEOUT_MS = 4_000;
+const BACKPRESSURE_REJECTION_LOG_INTERVAL_MS = 1_000;
 
 const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
@@ -129,6 +130,26 @@ const failWith500 = (
   error: HttpBodyError | string | any,
   msgOverride?: string,
 ) => failWith500Helper(`${method} /${endpoint}`, "failure", error, msgOverride);
+
+const createRateLimitedInfoLogger = (intervalMs: number) => {
+  let nextAllowedLogAtMs = 0;
+  let suppressedCount = 0;
+
+  return (message: string) =>
+    Effect.gen(function* () {
+      const nowMs = Date.now();
+      if (nowMs < nextAllowedLogAtMs) {
+        suppressedCount += 1;
+        return;
+      }
+
+      const suppressedSuffix =
+        suppressedCount > 0 ? ` suppressed=${suppressedCount}` : "";
+      suppressedCount = 0;
+      nextAllowedLogAtMs = nowMs + intervalMs;
+      yield* Effect.logInfo(`${message}${suppressedSuffix}`);
+    });
+};
 
 const handleDBGetFailure = (endpoint: string, e: DatabaseError) =>
   failWith500("GET", endpoint, e.cause, `db failure with table ${e.table}`);
@@ -726,8 +747,15 @@ type SubmitIngressConfig = {
   readonly txQueueMaxPending: number;
 };
 
-const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
-  Effect.gen(function* () {
+const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) => {
+  const logEnqueueTimeoutRejection = createRateLimitedInfoLogger(
+    BACKPRESSURE_REJECTION_LOG_INTERVAL_MS,
+  );
+  const logStreamBackpressureRejection = createRateLimitedInfoLogger(
+    BACKPRESSURE_REJECTION_LOG_INTERVAL_MS,
+  );
+
+  return Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const txString = yield* request.text;
     if (!isHexString(txString)) {
@@ -740,24 +768,12 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
     } else {
       const snapshot =
         yield* submitIngressConfig.txIngressQueue.snapshotMetrics;
-      yield* Metric.set(
-        txQueueProcessorMetrics.txStreamDepthGauge,
-        BigInt(snapshot.streamDepth),
-      );
-      yield* Metric.set(
-        txQueueProcessorMetrics.txStreamPendingGauge,
-        BigInt(snapshot.pendingCount),
-      );
-      yield* Metric.set(
-        txQueueProcessorMetrics.txStreamConsumerLagGauge,
-        BigInt(snapshot.lagCount),
-      );
 
       if (
         snapshot.lagCount >= submitIngressConfig.txQueueCapacity ||
         snapshot.pendingCount >= submitIngressConfig.txQueueMaxPending
       ) {
-        yield* Effect.logInfo(
+        yield* logStreamBackpressureRejection(
           `POST /${SUBMIT_ENDPOINT} - stream backpressure rejection: lag=${snapshot.lagCount} pending=${snapshot.pendingCount} max_lag=${submitIngressConfig.txQueueCapacity} max_pending=${submitIngressConfig.txQueueMaxPending}`,
         );
         yield* Metric.increment(txQueueBackpressureRejectedCounter);
@@ -776,7 +792,7 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
         ).pipe(Effect.as(false)),
       );
       if (!offered) {
-        yield* Effect.logInfo(
+        yield* logEnqueueTimeoutRejection(
           `POST /${SUBMIT_ENDPOINT} - enqueue timeout rejection: timeout_ms=${submitIngressConfig.txQueueOfferTimeoutMs}`,
         );
         yield* Metric.increment(txQueueBackpressureRejectedCounter);
@@ -803,6 +819,7 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
       ),
     ),
   );
+};
 
 export const postSubmitHandlerForTesting = postSubmitHandler;
 export const createResetHandlerForTesting = createResetHandler;
@@ -1031,10 +1048,16 @@ export const runNode = (withMonitoring?: boolean) =>
           : Effect.void,
         shouldRunTxProcessorRole
           ? txQueueProcessorFiber(
-              mkSchedule(500),
+              mkSchedule(nodeConfig.TX_QUEUE_PROCESSOR_INTERVAL_MS),
               nodeConfig.TX_QUEUE_DRAIN_BATCH_SIZE,
               nodeConfig.TX_PARSE_CONCURRENCY,
               nodeConfig.REDIS_STREAM_BLOCK_MS,
+              withMonitoring,
+            )
+          : Effect.void,
+        shouldRunApiRole && !shouldRunTxProcessorRole
+          ? txQueueMetricsRefreshFiber(
+              mkSchedule(nodeConfig.TX_QUEUE_PROCESSOR_INTERVAL_MS),
               withMonitoring,
             )
           : Effect.void,
