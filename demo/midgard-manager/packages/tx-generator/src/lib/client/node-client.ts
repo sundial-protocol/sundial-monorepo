@@ -201,8 +201,13 @@ export class MidgardNodeClient {
         if (!response.ok) {
           let errorMessage = `Unexpected status: ${response.status}`;
           try {
-            const payload = await response.json();
-            if (payload && typeof payload.message === 'string') {
+            const payload = (await response.json()) as {
+              message?: string;
+              error?: string;
+            };
+            if (payload.error !== undefined) {
+              errorMessage = payload.error;
+            } else if (payload.message !== undefined) {
               errorMessage = payload.message;
             }
           } catch {

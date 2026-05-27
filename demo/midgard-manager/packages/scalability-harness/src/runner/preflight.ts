@@ -26,6 +26,8 @@ const COMMIT_PIPELINE_RECHECK_DELAY_MS = 2_000;
 const MEMPOOL_BACKLOG_RECHECK_ATTEMPTS = 3;
 const MEMPOOL_BACKLOG_RECHECK_DELAY_MS = 200;
 const MAX_PREFLIGHT_MEMPOOL_TX_COUNT = 0;
+const TX_PROCESSOR_ROLE_SELECTOR = '{job="sundial_nodes",role=~"tx-processor|all"}';
+const SEQUENCER_ROLE_SELECTOR = '{job="sundial_nodes",role=~"sequencer|all"}';
 const STREAM_BACKLOG_RECHECK_ATTEMPTS = 3;
 const STREAM_BACKLOG_RECHECK_DELAY_MS = 200;
 const FALLBACK_FEE_PER_BLOCK_LOVELACE = 300_000n;
@@ -300,9 +302,9 @@ async function checkNoUnsubmittedBlockBacklog(
       | { ok: false; reason: string; actionableReason: string }
     > => {
       const [backlogSeries, commitSeries, submitSeries] = await Promise.all([
-        client.queryInstant('unsubmitted_block_backlog'),
-        client.queryInstant('commit_block_count_total'),
-        client.queryInstant('submit_block_count_total'),
+        client.queryInstant(`unsubmitted_block_backlog${SEQUENCER_ROLE_SELECTOR}`),
+        client.queryInstant(`commit_block_count_total${SEQUENCER_ROLE_SELECTOR}`),
+        client.queryInstant(`submit_block_count_total${SEQUENCER_ROLE_SELECTOR}`),
       ]);
       if (backlogSeries.length === 0) {
         return {
@@ -422,7 +424,7 @@ async function checkNoPreexistingMempoolBacklog(
     const queryMempoolSize = async (): Promise<
       { ok: true; mempoolSize: number } | { ok: false; reason: string; actionableReason: string }
     > => {
-      const series = await client.queryInstant('mempool_tx_count');
+      const series = await client.queryInstant(`mempool_tx_count${TX_PROCESSOR_ROLE_SELECTOR}`);
       if (series.length === 0) {
         return {
           ok: false,
@@ -502,8 +504,8 @@ async function checkNoPreexistingStreamBacklog(
       | { ok: false; reason: string; actionableReason: string }
     > => {
       const [streamDepthSeries, pendingSeries] = await Promise.all([
-        client.queryInstant('tx_stream_depth'),
-        client.queryInstant('tx_stream_pending'),
+        client.queryInstant(`tx_stream_depth${TX_PROCESSOR_ROLE_SELECTOR}`),
+        client.queryInstant(`tx_stream_pending${TX_PROCESSOR_ROLE_SELECTOR}`),
       ]);
 
       if (streamDepthSeries.length === 0 || pendingSeries.length === 0) {
@@ -613,8 +615,8 @@ async function checkCommitPipelineReady(
       | { ok: false; reason: string; actionableReason: string }
     > => {
       const [commitSeries, submitSeries] = await Promise.all([
-        client.queryInstant('commit_block_count_total'),
-        client.queryInstant('submit_block_count_total'),
+        client.queryInstant(`commit_block_count_total${SEQUENCER_ROLE_SELECTOR}`),
+        client.queryInstant(`submit_block_count_total${SEQUENCER_ROLE_SELECTOR}`),
       ]);
 
       if (commitSeries.length === 0 || submitSeries.length === 0) {

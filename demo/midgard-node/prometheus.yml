@@ -34,8 +34,22 @@ scrape_configs:
     # scheme defaults to 'http'.
 
     static_configs:
-      - targets: 
+      - targets:
           - "node:9464"
+        labels:
+          role: "all"
+      - targets:
+          - "node-api:9464"
+        labels:
+          role: "api"
+      - targets:
+          - "node-tx-processor:9464"
+        labels:
+          role: "tx-processor"
+      - targets:
+          - "node-sequencer:9464"
+        labels:
+          role: "sequencer"
 
   - job_name: "cadvisor"
     static_configs:

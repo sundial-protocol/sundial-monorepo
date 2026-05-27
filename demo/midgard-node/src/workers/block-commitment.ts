@@ -41,6 +41,15 @@ type NoopCommitmentResult = {
   noOpReason: "no_events_in_window";
 };
 
+type SuccessfulCommitmentResult = {
+  stats: BlocksDB.Stats;
+  commitmentWindow: {
+    txRequestsTotalInWindow: number;
+    txRequestsSelected: number;
+    txRequestsDeferredInWindow: number;
+  };
+};
+
 const NOOP_COMMITMENT_RESULT: NoopCommitmentResult = {
   noOpReason: "no_events_in_window",
 };
@@ -65,7 +74,7 @@ const buildPreflightWindowStats = (events: BlocksDB.Events): BlocksDB.Stats => {
 const mainProgram = (
   ledgerTrie: MidgardMpt,
 ): Effect.Effect<
-  string | BlocksDB.Stats | NoopCommitmentResult,
+  string | SuccessfulCommitmentResult | NoopCommitmentResult,
   | SDK.CborDeserializationError
   | SDK.CborSerializationError
   | SDK.CmlDeserializationError
@@ -94,14 +103,47 @@ const mainProgram = (
           const events = yield* BlocksDB.retrieveEventsForCommitment(
             latestBlock,
             currentDate,
+            nodeConfig.COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK,
           );
-          const { withdrawals, txOrders, txRequests, deposits } = events;
-          const processedTxRequests = yield* Effect.forEach(
+          const {
+            withdrawals,
+            txOrders,
             txRequests,
+            deposits,
+            txRequestsTotalInWindow,
+            txRequestsDeferredInWindow,
+          } = events;
+          const selectedTxRequests = txRequests.slice(
+            0,
+            nodeConfig.COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK,
+          );
+          const deferredTxRequestCount = Math.max(
+            txRequestsDeferredInWindow,
+            txRequests.length - selectedTxRequests.length,
+          );
+          if (deferredTxRequestCount > 0) {
+            yield* Effect.logWarning(
+              `Commitment window tx cap applied: selected_tx_requests=${selectedTxRequests.length} deferred_tx_requests=${deferredTxRequestCount} max_tx_requests_per_block=${nodeConfig.COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK}`,
+            );
+          }
+          const commitmentEvents: BlocksDB.Events = {
+            withdrawals,
+            txOrders,
+            txRequests: selectedTxRequests,
+            deposits,
+          };
+          const processedTxRequests = yield* Effect.forEach(
+            selectedTxRequests,
             (entry) => MempoolDB.toProcessedTx(entry),
             { concurrency: nodeConfig.TX_PARSE_CONCURRENCY },
           );
-          const preflightStats = buildPreflightWindowStats(events);
+          const preflightStats = buildPreflightWindowStats(commitmentEvents);
+          const preflightTxRequestCount = Math.max(
+            txRequestsTotalInWindow,
+            preflightStats[BlocksDB.Columns.TX_REQUESTS_COUNT],
+          );
+          preflightStats[BlocksDB.Columns.TX_REQUESTS_COUNT] =
+            preflightTxRequestCount;
           const thresholdBreaches =
             BlocksDB.getCommitmentWindowWarningThresholdBreaches(
               preflightStats,
@@ -201,7 +243,14 @@ const mainProgram = (
                 ),
               );
             yield* ledgerTrie.commit();
-            return stats;
+            return {
+              stats,
+              commitmentWindow: {
+                txRequestsTotalInWindow,
+                txRequestsSelected: selectedTxRequests.length,
+                txRequestsDeferredInWindow: deferredTxRequestCount,
+              },
+            };
           }).pipe(Effect.tapError((_) => ledgerTrie.revert()));
         }),
     });
@@ -227,7 +276,8 @@ const wrapper = (ledgerTrie: MidgardMpt) =>
     }
     const output: WorkerOutput = {
       type: "SuccessfulCommitmentOutput",
-      stats: result,
+      stats: result.stats,
+      commitmentWindow: result.commitmentWindow,
     };
     return output;
   });

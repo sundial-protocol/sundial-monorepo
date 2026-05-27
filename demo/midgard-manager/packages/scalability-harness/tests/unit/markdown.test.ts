@@ -67,10 +67,14 @@ function makeTier(overrides: Partial<TierSummary> = {}): TierSummary {
     startedAt: '2025-01-01T00:00:00.000Z',
     stoppedAt: '2025-01-01T00:01:00.000Z',
     durationSeconds: 60,
+    loadDurationSeconds: 60,
     result: 'completed',
     collapseReason: undefined,
     enqueuedDelta: 6000,
     rejectedDelta: 10,
+    queueBackpressureRejectedDelta: 7,
+    streamBackpressureRejectedDelta: 6,
+    offerTimeoutRejectedDelta: 1,
     mempoolAcceptedDelta: 5800,
     processingFailedDelta: 0,
     committedTxDelta: 5600,
@@ -87,8 +91,12 @@ function makeTier(overrides: Partial<TierSummary> = {}): TierSummary {
     observedCommittedTps: 93.33,
     peakQueueSize: 50,
     finalQueueSizeAfterRecovery: 0,
+    finalQueueDeltaAfterRecovery: 0,
     peakMempoolSize: 200,
     finalMempoolSizeAfterRecovery: 0,
+    finalMempoolDeltaAfterRecovery: 0,
+    commitmentWindowDeferredPeak: 80,
+    commitmentWindowDeferredFinal: 0,
     clientSubmittedCount: 5800,
     clientRejectedCount: 10,
     clientNodeUnavailableCount: 0,
@@ -318,6 +326,11 @@ describe('renderReport — required wording', () => {
   it('includes Merged Blocks Δ in Commit/Submit/Merge progress table', () => {
     const out = renderReport(makeInput());
     expect(out).toContain('Merged Blocks Δ');
+  });
+
+  it('includes Queue Backpressure Rejected Δ in Failure Signals', () => {
+    const out = renderReport(makeInput());
+    expect(out).toContain('Queue Backpressure Rejected Δ');
   });
 });
 

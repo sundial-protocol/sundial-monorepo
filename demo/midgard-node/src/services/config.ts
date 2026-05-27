@@ -28,6 +28,7 @@ type NodeConfigDep = {
   COMMITMENT_WINDOW_WARN_TX_REQUESTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_BYTES: number;
+  COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: number;
   TX_QUEUE_CAPACITY: number;
   TX_QUEUE_MAX_PENDING: number;
   TX_QUEUE_DRAIN_BATCH_SIZE: number;
@@ -116,10 +117,10 @@ const makeConfig = Effect.gen(function* () {
   const port = yield* Config.integer("PORT").pipe(Config.withDefault(3000));
   const waitBetweenBlockCommitments = yield* Config.integer(
     "WAIT_BETWEEN_BLOCK_COMMITMENTS",
-  ).pipe(Config.withDefault(1000));
+  ).pipe(Config.withDefault(500));
   const waitBetweenBlockSubmissions = yield* Config.integer(
     "WAIT_BETWEEN_BLOCK_SUBMISSIONS",
-  ).pipe(Config.withDefault(10000));
+  ).pipe(Config.withDefault(1000));
   const submitSignedTxTimeoutMs = yield* Config.integer(
     "SUBMIT_SIGNED_TX_TIMEOUT_MS",
   ).pipe(Config.withDefault(30_000));
@@ -144,6 +145,9 @@ const makeConfig = Effect.gen(function* () {
   const commitmentWindowWarnTotalBytes = yield* Config.integer(
     "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
   ).pipe(Config.withDefault(20_000_000));
+  const commitmentMaxTxRequestsPerBlock = yield* Config.integer(
+    "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+  ).pipe(Config.withDefault(2_000));
   const txQueueCapacity = yield* Config.integer("TX_QUEUE_CAPACITY").pipe(
     Config.withDefault(250_000),
   );
@@ -350,6 +354,10 @@ const makeConfig = Effect.gen(function* () {
     "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
     commitmentWindowWarnTotalBytes,
   );
+  yield* assertPositiveInteger(
+    "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+    commitmentMaxTxRequestsPerBlock,
+  );
   yield* assertNonNegativeInteger(
     "COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG",
     commitmentMaxUnsubmittedBlockBacklog,
@@ -389,6 +397,7 @@ const makeConfig = Effect.gen(function* () {
     COMMITMENT_WINDOW_WARN_TX_REQUESTS: commitmentWindowWarnTxRequests,
     COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: commitmentWindowWarnTotalEvents,
     COMMITMENT_WINDOW_WARN_TOTAL_BYTES: commitmentWindowWarnTotalBytes,
+    COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: commitmentMaxTxRequestsPerBlock,
     TX_QUEUE_CAPACITY: txQueueCapacity,
     TX_QUEUE_MAX_PENDING: txQueueMaxPending,
     TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,

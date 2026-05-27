@@ -115,6 +115,11 @@ export type Events = {
   deposits: readonly UserEvents.Entry[];
 };
 
+export type CommitmentEvents = Events & {
+  txRequestsTotalInWindow: number;
+  txRequestsDeferredInWindow: number;
+};
+
 export type LatestUnsubmittedBlockWithTxs = Omit<
   Entry,
   Columns.NEW_WALLET_UTXOS | Columns.PRODUCED_UTXOS
@@ -227,19 +232,27 @@ export const retrieveEvents = (
 export const retrieveEventsForCommitment = (
   latestBlock: Entry,
   endDate: Date,
-): Effect.Effect<Events, DatabaseError, Database> =>
+  maxTxRequests: number,
+): Effect.Effect<CommitmentEvents, DatabaseError, Database> =>
   Effect.gen(function* () {
     const startDate = latestBlock[Columns.EVENT_END_TIME];
-    const [withdrawals, txOrders, deposits, txRequestsInWindow] =
+    let effectiveTxRequestsTotalInWindow = 0;
+    const [withdrawals, txOrders, deposits, txRequestsInWindow, txCountInWindow] =
       yield* Effect.all(
         [
           WithdrawalsDB.retrieveTimeBoundEntries(startDate, endDate),
           TxOrdersDB.retrieveTimeBoundEntries(startDate, endDate),
           DepositsDB.retrieveTimeBoundEntries(startDate, endDate),
-          MempoolDB.retrieveTimeBoundEntries(startDate, endDate),
+          MempoolDB.retrieveTimeBoundEntriesLimited(
+            startDate,
+            endDate,
+            maxTxRequests,
+          ),
+          MempoolDB.countTimeBoundEntries(startDate, endDate),
         ],
         { concurrency: "unbounded" },
       );
+    effectiveTxRequestsTotalInWindow = txCountInWindow;
 
     // When no mempool entries are in the current interval, stale rows may
     // exist with timestamps older than the moving startDate. Re-timestamping
@@ -250,8 +263,17 @@ export const retrieveEventsForCommitment = (
       latestBlock[Columns.STATUS] < Status.SUBMITTED
         ? txRequestsInWindow
         : yield* Effect.gen(function* () {
-            const staleTxRequests =
-              yield* MempoolDB.retrieveEntriesBeforeTime(startDate);
+            const [staleTxRequests, staleCount] = yield* Effect.all(
+              [
+                MempoolDB.retrieveEntriesBeforeTimeLimited(
+                  startDate,
+                  maxTxRequests,
+                ),
+                MempoolDB.countEntriesBeforeTime(startDate),
+              ],
+              { concurrency: "unbounded" },
+            );
+            effectiveTxRequestsTotalInWindow = staleCount;
             if (staleTxRequests.length === 0) {
               return txRequestsInWindow;
             }
@@ -260,16 +282,33 @@ export const retrieveEventsForCommitment = (
             );
             yield* MempoolDB.touchTxs(staleTxHashes, startDate);
             yield* Effect.logInfo(
-              `Recovered ${staleTxRequests.length} stale mempool tx(s) by retimestamping them into current commitment window.`,
+              `Recovered ${staleTxRequests.length} stale mempool tx(s) by retimestamping them into current commitment window (stale_total=${staleCount}, recovery_limit=${maxTxRequests}).`,
             );
             return staleTxRequests;
           });
+
+    const txRequestsTotalInWindow = Math.max(
+      effectiveTxRequestsTotalInWindow,
+      txRequests.length,
+    );
+    const txRequestsDeferredInWindow = Math.max(
+      0,
+      txRequestsTotalInWindow - txRequests.length,
+    );
+
+    if (txRequestsDeferredInWindow > 0) {
+      yield* Effect.logWarning(
+        `Commitment window mempool query capped: selected_tx_requests=${txRequests.length} deferred_tx_requests=${txRequestsDeferredInWindow} max_tx_requests_per_block=${maxTxRequests}`,
+      );
+    }
 
     return {
       withdrawals,
       txOrders,
       txRequests,
       deposits,
+      txRequestsTotalInWindow,
+      txRequestsDeferredInWindow,
     };
   });
 

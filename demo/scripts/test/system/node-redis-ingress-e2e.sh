@@ -21,6 +21,12 @@ upsert_env() {
   fi
 }
 
+E2E_COMPOSE_PROJECT="sundial-test"
+E2E_NODE_API_PORT=3010
+E2E_NODE_PROM_PORT=9465
+E2E_POSTGRES_PORT=5434
+E2E_REDIS_PORT=6380
+
 upsert_env NODE_ROLE api
 upsert_env L1_PROVIDER Blockfrost
 upsert_env L1_BLOCKFROST_API_URL http://127.0.0.1:1
@@ -34,30 +40,34 @@ upsert_env TX_QUEUE_DEAD_LETTER_STREAM midgard:tx-submissions:e2e:dead-letter
 upsert_env TX_QUEUE_CAPACITY 10000
 upsert_env TX_QUEUE_MAX_PENDING 20000
 upsert_env LUCID_INIT_MAX_RETRIES 0
+upsert_env NODE_API_HOST_PORT "$E2E_NODE_API_PORT"
+upsert_env NODE_PROM_HOST_PORT "$E2E_NODE_PROM_PORT"
+upsert_env POSTGRES_HOST_PORT "$E2E_POSTGRES_PORT"
+upsert_env REDIS_HOST_PORT "$E2E_REDIS_PORT"
 
 cleanup() {
   set +e
   cd "$NODE_DIR" || exit 0
-  docker compose --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans
+  docker compose -p "$E2E_COMPOSE_PROJECT" --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans
   rm -f "$RUNTIME_ENV_FILE"
 }
 trap cleanup EXIT
 
 cd "$NODE_DIR"
 export NODE_ENV_FILE="$RUNTIME_ENV_FILE"
-docker compose --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml up -d --build node postgres redis
+docker compose -p "$E2E_COMPOSE_PROJECT" --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml up -d --build node postgres redis
 
 for _ in $(seq 1 60); do
-  if curl -fsS "http://127.0.0.1:3000/health/live" >/dev/null 2>&1; then
+  if curl -fsS "http://127.0.0.1:${E2E_NODE_API_PORT}/health/live" >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-curl -fsS "http://127.0.0.1:3000/health/live" >/dev/null
+curl -fsS "http://127.0.0.1:${E2E_NODE_API_PORT}/health/live" >/dev/null
 
-API_BASE_URL="http://127.0.0.1:3000" \
-REDIS_URL="redis://127.0.0.1:6379" \
+API_BASE_URL="http://127.0.0.1:${E2E_NODE_API_PORT}" \
+REDIS_URL="redis://127.0.0.1:${E2E_REDIS_PORT}" \
 REDIS_STREAM_KEY="midgard:tx-submissions:e2e" \
 TX_QUEUE_DEAD_LETTER_STREAM="midgard:tx-submissions:e2e:dead-letter" \
 REDIS_STREAM_CONSUMER_GROUP="midgard-tx-processors" \

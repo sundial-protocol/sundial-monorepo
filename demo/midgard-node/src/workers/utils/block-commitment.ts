@@ -38,6 +38,11 @@ export type WorkerInput = {
 export type SuccessfulCommitmentOutput = {
   type: "SuccessfulCommitmentOutput";
   stats: BlocksDB.Stats;
+  commitmentWindow?: {
+    txRequestsTotalInWindow: number;
+    txRequestsSelected: number;
+    txRequestsDeferredInWindow: number;
+  };
 };
 
 export type FailureOutput = {

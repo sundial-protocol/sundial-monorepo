@@ -115,4 +115,28 @@ describe('MidgardNodeClient', () => {
     expect(result.error).toContain('Network error');
     expect(result.attempts).toBe(1);
   });
+
+  it('should surface queue backpressure payload errors from 503 responses', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        status: 404,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({ error: 'Transaction queue is saturated; retry later' }),
+      });
+
+    const client = new MidgardNodeClient({
+      baseUrl: 'http://localhost:3000',
+      retryAttempts: 1,
+      retryDelay: 10,
+    });
+
+    const result = await client.submitTransaction('test_cbor_hex');
+    expect(result.status).toBe('ERROR');
+    expect(result.responseClass).toBe('http_error');
+    expect(result.httpStatusCode).toBe(503);
+    expect(result.error).toBe('Transaction queue is saturated; retry later');
+  });
 });

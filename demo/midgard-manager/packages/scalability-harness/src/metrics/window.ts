@@ -7,6 +7,11 @@ export const RANGE_STEP_SECONDS = 15;
 // PrometheusSeries is a range query result row — same shape as MatrixSample.
 export type PrometheusSeries = MatrixSample;
 
+function normalizeMetricQueryKey(query: string): string {
+  const withoutLabels = stripLabelSelectors(query);
+  return withoutLabels.replace(/^rate\(([^[]+)\[.*\]\)$/, '$1').trim();
+}
+
 export interface TierMetricWindow {
   tierIndex: number;
   targetTps: number;
@@ -47,7 +52,7 @@ export interface TierWindowSummary {
 // not apply. Check rate() first before inspecting the metric name suffix.
 export function isCounter(query: string): boolean {
   if (/^rate\(/.test(query)) return false;
-  return stripLabelSelectors(query).trim().endsWith('_total');
+  return normalizeMetricQueryKey(query).endsWith('_total');
 }
 
 // ---------------------------------------------------------------------------
@@ -127,9 +132,10 @@ export function summarizeTierWindow(
   const gaugeSummaries: GaugeSummary[] = [];
 
   for (const q of queries) {
+    const normalizedQuery = normalizeMetricQueryKey(q);
     if (isCounter(q)) {
       counterDeltas.push({
-        query: q,
+        query: normalizedQuery,
         deltaLoad: computeCounterDelta(window.afterLoad[q] ?? null, window.before[q] ?? null),
         deltaRecovery: computeCounterDelta(
           window.afterRecovery[q] ?? null,
@@ -139,7 +145,7 @@ export function summarizeTierWindow(
     } else {
       const series = window.ranges[q] ?? [];
       gaugeSummaries.push({
-        query: q,
+        query: normalizedQuery,
         peak: computeGaugePeak(series),
         final: computeGaugeFinal(series),
       });
@@ -211,10 +217,17 @@ export async function collectTierWindow(
 
   for (let i = 0; i < queries.length; i++) {
     const q = queries[i];
+    const normalizedQuery = normalizeMetricQueryKey(q);
     before[q] = beforeValues[i];
     afterLoad[q] = afterLoadValues[i];
     afterRecovery[q] = afterRecoveryValues[i];
     ranges[q] = rangeValues[i];
+    if (normalizedQuery !== q) {
+      before[normalizedQuery] = beforeValues[i];
+      afterLoad[normalizedQuery] = afterLoadValues[i];
+      afterRecovery[normalizedQuery] = afterRecoveryValues[i];
+      ranges[normalizedQuery] = rangeValues[i];
+    }
   }
 
   return {

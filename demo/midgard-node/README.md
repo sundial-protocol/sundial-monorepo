@@ -65,6 +65,22 @@ You can view logs of the `node` service with `docker`:
 docker compose logs -f node
 ```
 
+Split-role deployment is also supported with separate containers (same image):
+
+```sh
+docker compose --profile split up -d --build \
+  node-api node-tx-processor node-sequencer postgres redis prometheus grafana
+```
+
+Split role mapping:
+
+- `node-api`: `NODE_ROLE=api` (submit ingress + health API)
+- `node-tx-processor`: `NODE_ROLE=tx-processor` (Redis consumer-group processing)
+- `node-sequencer`: `NODE_ROLE=sequencer` (commit/submit/merge/event sync)
+
+In split mode, Prometheus scrapes all role targets under `job="sundial_nodes"`
+and labels them with `role=api`, `role=tx-processor`, or `role=sequencer`.
+
 If you made any changes to `midgard-node` and had an image running, restart it
 with the 3 steps:
 
@@ -85,7 +101,7 @@ POSTGRES_DB=midgard
 POSTGRES_HOST=localhost
 LEDGER_MPT_DB_PATH=midgard-ledger-mpt-db
 MEMPOOL_MPT_DB_PATH=midgard-mempool-mpt-db
-TX_QUEUE_CAPACITY=10000
+TX_QUEUE_CAPACITY=250000
 TX_QUEUE_MAX_PENDING=20000
 TX_QUEUE_DRAIN_BATCH_SIZE=500
 TX_QUEUE_PROCESSOR_INTERVAL_MS=250
@@ -107,6 +123,8 @@ SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES=1
 COMMITMENT_WINDOW_WARN_TX_REQUESTS=50000
 COMMITMENT_WINDOW_WARN_TOTAL_EVENTS=60000
 COMMITMENT_WINDOW_WARN_TOTAL_BYTES=20000000
+COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK=2000
+TX_PARSE_CONCURRENCY=8
 ```
 
 Role notes:
@@ -212,6 +230,16 @@ Important tx ingress metrics:
 - `tx_stream_fail_total`
 - `tx_stream_retry_total`
 - `tx_stream_dead_letter_total`
+- `tx_submissions_rejected_queue_backpressure_total`
+- `tx_submissions_rejected_stream_backpressure_total`
+- `tx_submissions_rejected_offer_timeout_total`
+
+Important commitment window choke metrics:
+
+- `commitment_window_tx_requests_total`
+- `commitment_window_tx_requests_selected`
+- `commitment_window_tx_requests_deferred`
+- `commitment_window_tx_requests_deferred_total`
 
 Important block submission reliability metrics:
 

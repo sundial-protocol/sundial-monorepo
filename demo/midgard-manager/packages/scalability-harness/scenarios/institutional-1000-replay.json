@@ -27,5 +27,6 @@
     "stopOnMergeFailure": true,
     "maxRecoveryQueueSize": 40000,
     "maxRecoveryMempoolSize": 25000
-  }
+  },
+  "submitTimeoutMs": 500
 }

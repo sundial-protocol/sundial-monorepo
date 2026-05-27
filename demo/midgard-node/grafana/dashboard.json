@@ -109,7 +109,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "tx_stream_depth{instance=\"node:9464\"}",
+          "expr": "tx_stream_depth{job=\"sundial_nodes\",role=~\"tx-processor|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -212,7 +212,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "tx_submissions_enqueued_total{instance=\"node:9464\"}",
+          "expr": "tx_submissions_enqueued_total{job=\"sundial_nodes\",role=~\"api|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -311,7 +311,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by(instance) (rate(tx_submissions_enqueued_total{instance=\"node:9464\"}[$__rate_interval]))",
+          "expr": "sum by(instance) (rate(tx_submissions_enqueued_total{job=\"sundial_nodes\",role=~\"api|all\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -411,7 +411,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "mempool_tx_count{instance=\"node:9464\"}",
+          "expr": "mempool_tx_count{job=\"sundial_nodes\",role=~\"tx-processor|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -515,7 +515,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(commit_block_tx_count_total{instance=\"node:9464\"}[$__rate_interval])",
+          "expr": "rate(commit_block_tx_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "committed tx/s",
@@ -613,7 +613,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(commit_block_count_total{instance=\"node:9464\"}[$__rate_interval]))",
+          "expr": "sum(rate(commit_block_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -713,7 +713,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_tx_count_total{instance=\"node:9464\"}",
+          "expr": "commit_block_tx_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -813,7 +813,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_count_total{instance=\"node:9464\"}",
+          "expr": "commit_block_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -912,7 +912,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_txs_per_block{instance=\"node:9464\"}",
+          "expr": "commit_block_txs_per_block{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1015,7 +1015,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "merge_block_count_total{instance=\"node:9464\"} ",
+          "expr": "merge_block_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"} ",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -1114,7 +1114,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(merge_block_count_total{instance=\"node:9464\"}[$__rate_interval]))",
+          "expr": "sum(rate(merge_block_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1209,7 +1209,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(submit_block_count_total{instance=\"node:9464\"}[$__rate_interval]))",
+          "expr": "sum(rate(submit_block_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1305,7 +1305,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "submit_block_count_total{instance=\"node:9464\"}",
+          "expr": "submit_block_count_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1404,7 +1404,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_events_size_bytes{instance=\"node:9464\"}",
+          "expr": "commit_block_events_size_bytes{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1503,7 +1503,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_l1_user_events{instance=\"node:9464\"}",
+          "expr": "commit_block_l1_user_events{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1606,7 +1606,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(commit_block_duration_seconds_sum{instance=\"node:9464\"}[$__rate_interval]) / rate(commit_block_duration_seconds_count{instance=\"node:9464\"}[$__rate_interval])",
+          "expr": "rate(commit_block_duration_seconds_sum{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval]) / rate(commit_block_duration_seconds_count{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "avg duration",
@@ -1710,7 +1710,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_commitment_failures_total{instance=\"node:9464\"}",
+          "expr": "commit_block_commitment_failures_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1814,7 +1814,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "tx_submissions_rejected_total{instance=\"node:9464\"}",
+          "expr": "tx_submissions_rejected_total{job=\"sundial_nodes\",role=~\"api|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1918,7 +1918,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "merge_block_failures_total{instance=\"node:9464\"}",
+          "expr": "merge_block_failures_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1928,6 +1928,229 @@
         }
       ],
       "title": "Merge Failures",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "P1809F7CD0C75ACF3"
+      },
+      "description": "Tx requests deferred in the most recent commitment cycle because the per-cycle commitment window was capped.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "left",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 48
+      },
+      "id": 27,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "P1809F7CD0C75ACF3"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "commitment_window_tx_requests_deferred{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Commitment Deferred Tx Requests",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "P1809F7CD0C75ACF3"
+      },
+      "description": "Submit 503 rejection rates split by cause: stream backpressure threshold and enqueue offer timeout.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "left",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 48
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "P1809F7CD0C75ACF3"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "rate(tx_submissions_rejected_stream_backpressure_total{job=\"sundial_nodes\",role=~\"api|all\"}[1m])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "stream_backpressure",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "P1809F7CD0C75ACF3"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "rate(tx_submissions_rejected_offer_timeout_total{job=\"sundial_nodes\",role=~\"api|all\"}[1m])",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "offer_timeout",
+          "range": true,
+          "refId": "B",
+          "useBackend": false
+        }
+      ],
+      "title": "Submit 503 Cause Rate",
       "type": "timeseries"
     },
     {
