@@ -424,7 +424,7 @@ export const blockCommitmentFiber = (
       0,
     );
     const action = blockCommitmentAction.pipe(
-      Effect.withSpan("block-commitment-fiber"),
+      Effect.withSpan("block-commitment-fiber", { root: true }),
       Effect.catchAllCause(Effect.logWarning),
     );
     yield* Effect.repeat(action, schedule);

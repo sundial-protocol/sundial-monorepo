@@ -71,7 +71,10 @@ type SeedResult = "already-seeded" | "seeded" | "retry-later";
 const followRootLinkedTailFromSnapshot = (
   firstLinkedNode: SDK.StateQueueUTxO,
   snapshot: readonly SDK.StateQueueUTxO[],
-): Effect.Effect<{ tail: SDK.StateQueueUTxO; traversedHops: number }, SDK.LucidError> =>
+): Effect.Effect<
+  { tail: SDK.StateQueueUTxO; traversedHops: number },
+  SDK.LucidError
+> =>
   Effect.gen(function* () {
     const byKey = new Map<string, SDK.StateQueueUTxO>();
     for (const stateQueueUTxO of snapshot) {

@@ -57,7 +57,7 @@ export const mergeFiber = (
       // Initialize merge metrics so dashboards show a baseline series.
       yield* StateQueueTx.initializeMergeMetrics;
       const action = mergeAction.pipe(
-        Effect.withSpan("merge-confirmed-state-fiber"),
+        Effect.withSpan("merge-confirmed-state-fiber", { root: true }),
         Effect.tapErrorCause((cause) =>
           Effect.gen(function* () {
             yield* StateQueueTx.incrementMergeFailure;

@@ -111,6 +111,37 @@ describe('TempoClient.searchTraces', () => {
     expect(e.serviceName).toBe('my-service');
   });
 
+  it('uses 500 as the default limit in the search URL', async () => {
+    let capturedUrl: string | undefined;
+    const capturingFetcher = async (url: string): Promise<Response> => {
+      capturedUrl = url;
+      return new Response(JSON.stringify({ traces: [], metrics: {} }), { status: 200 });
+    };
+
+    const client = new TempoClient(ENDPOINT, capturingFetcher as Parameters<typeof TempoClient>[1]);
+    await client.searchTraces('midgard-node', START, END);
+
+    expect(capturedUrl).toContain('limit=500');
+  });
+
+  it('sets truncated=true when trace count equals the default limit of 500', async () => {
+    const traces = Array.from({ length: 500 }, (_, i) => ({
+      traceID: `trace${i}`,
+      rootName: 'block-commitment-fiber',
+      rootServiceName: 'midgard-node',
+      startTimeUnixNano: '1746748800000000000',
+      durationMs: 10,
+    }));
+    const client = new TempoClient(
+      ENDPOINT,
+      makeFetcher(200, { traces, metrics: { inspectedTraces: 500 } })
+    );
+    const result = await client.searchTraces('midgard-node', START, END);
+
+    expect(result.traces).toHaveLength(500);
+    expect(result.truncated).toBe(true);
+  });
+
   it('uses Unix second timestamps in the query URL', async () => {
     let capturedUrl: string | undefined;
     const capturingFetcher = async (url: string): Promise<Response> => {

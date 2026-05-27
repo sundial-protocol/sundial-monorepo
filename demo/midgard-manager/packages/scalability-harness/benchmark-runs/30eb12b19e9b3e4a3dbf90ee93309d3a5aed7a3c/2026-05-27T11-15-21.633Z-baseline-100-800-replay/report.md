@@ -6,55 +6,55 @@
 
 ## 📌 Run Metadata
 
-| Field | Value |
-| --- | --- |
-| Run ID | baseline-100-800-replay |
-| Started At | 2026-05-27T11:15:21.633Z |
-| Git SHA | 30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c |
-| Node Endpoint | http://localhost:3000 |
-| Prometheus Endpoint | http://localhost:9090 |
-| L1 Provider Mode | emulator |
-| Wallet Mode | test-wallet |
+| Field                    | Value                                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Run ID                   | baseline-100-800-replay                                                                                                                |
+| Started At               | 2026-05-27T11:15:21.633Z                                                                                                               |
+| Git SHA                  | 30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c                                                                                               |
+| Node Endpoint            | http://localhost:3000                                                                                                                  |
+| Prometheus Endpoint      | http://localhost:9090                                                                                                                  |
+| L1 Provider Mode         | emulator                                                                                                                               |
+| Wallet Mode              | test-wallet                                                                                                                            |
 | Wallet Provisioning Note | external-key mode — set WALLET_PRIVATE_KEY to a pre-funded key whose UTxOs are initialized on the node before running replay scenarios |
-| Harness Version | 0.1.0 |
-| Replay Corpus Path | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
-| Replay Corpus SHA256 | 4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80 |
-| Host | dev3 (linux/x64, 6 CPUs, 31.0 GB) |
+| Harness Version          | 0.1.0                                                                                                                                  |
+| Replay Corpus Path       | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl                     |
+| Replay Corpus SHA256     | 4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80                                                                       |
+| Host                     | dev3 (linux/x64, 6 CPUs, 31.0 GB)                                                                                                      |
 
 ## 🔬 Scenario
 
-| Parameter | Value |
-| --- | --- |
-| Transaction Type | one-to-one |
-| L1 Provider Mode | emulator |
-| Wallet Mode | test-wallet |
-| Wallet Provisioning Note | external-key mode — set WALLET_PRIVATE_KEY to a pre-funded key whose UTxOs are initialized on the node before running replay scenarios |
-| Start TPS | 100 |
-| Max TPS | 800 |
-| Step Multiplier | 2 |
-| Tier Duration | 180 s |
-| Recovery Duration | 90 s |
-| Tx Cost (s) | 0.2 |
-| Retry Attempts | 1 |
-| Retry Delay | 0 ms |
-| Request Events Mode | off |
-| Seed | baseline-2026-05-18 |
-| Replay Corpus Path | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
-| Max Consecutive Probe Failures | 8 |
-| Stop On Prometheus Down | false |
-| Stop On Commitment Failure | true |
-| Stop On Merge Failure | false |
-| Max Recovery Queue Size | 10000 |
-| Max Recovery Mempool Size | 5000 |
+| Parameter                      | Value                                                                                                                                  |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Transaction Type               | one-to-one                                                                                                                             |
+| L1 Provider Mode               | emulator                                                                                                                               |
+| Wallet Mode                    | test-wallet                                                                                                                            |
+| Wallet Provisioning Note       | external-key mode — set WALLET_PRIVATE_KEY to a pre-funded key whose UTxOs are initialized on the node before running replay scenarios |
+| Start TPS                      | 100                                                                                                                                    |
+| Max TPS                        | 800                                                                                                                                    |
+| Step Multiplier                | 2                                                                                                                                      |
+| Tier Duration                  | 180 s                                                                                                                                  |
+| Recovery Duration              | 90 s                                                                                                                                   |
+| Tx Cost (s)                    | 0.2                                                                                                                                    |
+| Retry Attempts                 | 1                                                                                                                                      |
+| Retry Delay                    | 0 ms                                                                                                                                   |
+| Request Events Mode            | off                                                                                                                                    |
+| Seed                           | baseline-2026-05-18                                                                                                                    |
+| Replay Corpus Path             | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl                     |
+| Max Consecutive Probe Failures | 8                                                                                                                                      |
+| Stop On Prometheus Down        | false                                                                                                                                  |
+| Stop On Commitment Failure     | true                                                                                                                                   |
+| Stop On Merge Failure          | false                                                                                                                                  |
+| Max Recovery Queue Size        | 10000                                                                                                                                  |
+| Max Recovery Mempool Size      | 5000                                                                                                                                   |
 
 ## 🏃 Tier Results
 
-| Tier | Target TPS | Result | Enqueued Δ | Mempool Accepted Δ | Committed Tx Δ | Submitted Blocks Δ | Peak Queue | Peak Mempool | Commit Failures Δ | Merge Failures Δ | Collapse Reason |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | completed ✅ | 18517 | 18510 | 0 | 0 | 32 | 18747 | 0 | 0 | n/a |
-| 1 | 200 | completed ✅ | 37006 | 36988 | 35546 | 25 | 67 | 2255 | 0 | 0 | n/a |
-| 2 | 400 | completed ✅ | 73929 | 73897 | 67499 | 19 | 130 | 6886 | 0 | 1 | n/a |
-| 3 | 800 | completed ✅ | 147705 | 146323 | 93893 | 7 | 1962 | 51600 | 0 | 1 | n/a |
+| Tier | Target TPS | Result       | Enqueued Δ | Mempool Accepted Δ | Committed Tx Δ | Submitted Blocks Δ | Peak Queue | Peak Mempool | Commit Failures Δ | Merge Failures Δ | Collapse Reason |
+| ---- | ---------- | ------------ | ---------- | ------------------ | -------------- | ------------------ | ---------- | ------------ | ----------------- | ---------------- | --------------- |
+| 0    | 100        | completed ✅ | 18517      | 18510              | 0              | 0                  | 32         | 18747        | 0                 | 0                | n/a             |
+| 1    | 200        | completed ✅ | 37006      | 36988              | 35546          | 25                 | 67         | 2255         | 0                 | 0                | n/a             |
+| 2    | 400        | completed ✅ | 73929      | 73897              | 67499          | 19                 | 130        | 6886         | 0                 | 1                | n/a             |
+| 3    | 800        | completed ✅ | 147705     | 146323             | 93893          | 7                  | 1962       | 51600        | 0                 | 1                | n/a             |
 
 ## 🚦 Formal Run Classification
 
@@ -96,11 +96,11 @@ The columns below reflect three distinct pipeline stages:
 Gaps between adjacent columns identify where the pipeline loses throughput.
 
 | Tier | Target TPS | Enqueued TPS | Mempool Accepted TPS | Committed TPS |
-| --- | --- | --- | --- | --- |
-| 0 | 100 | 102.85 | 102.81 | 0.00 |
-| 1 | 200 | 205.58 | 205.48 | 197.47 |
-| 2 | 400 | 410.70 | 410.52 | 374.98 |
-| 3 | 800 | 820.55 | 812.87 | 521.60 |
+| ---- | ---------- | ------------ | -------------------- | ------------- |
+| 0    | 100        | 102.85       | 102.81               | 0.00          |
+| 1    | 200        | 205.58       | 205.48               | 197.47        |
+| 2    | 400        | 410.70       | 410.52               | 374.98        |
+| 3    | 800        | 820.55       | 812.87               | 521.60        |
 
 ![Received Transactions Per Second](charts/received-tps.svg)
 
@@ -120,11 +120,11 @@ require per-request JSONL.
 - Submitted-latency p95 is derived from bounded histogram buckets.
 
 | Tier | Target TPS | Submitted | Rejected | Node Unavailable | Error | Total Retries | Retried Submissions | Submitted Latency p95 (ms) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 18696 | 0 | 0 | 0 | 0 | 0 | 50 |
-| 1 | 200 | 37415 | 0 | 0 | 0 | 0 | 0 | 50 |
-| 2 | 400 | 74927 | 0 | 0 | 0 | 0 | 0 | 50 |
-| 3 | 800 | 148993 | 0 | 0 | 0 | 0 | 0 | 1000 |
+| ---- | ---------- | --------- | -------- | ---------------- | ----- | ------------- | ------------------- | -------------------------- |
+| 0    | 100        | 18696     | 0        | 0                | 0     | 0             | 0                   | 50                         |
+| 1    | 200        | 37415     | 0        | 0                | 0     | 0             | 0                   | 50                         |
+| 2    | 400        | 74927     | 0        | 0                | 0     | 0             | 0                   | 50                         |
+| 3    | 800        | 148993    | 0        | 0                | 0     | 0             | 0                   | 1000                       |
 
 ## ⏱️ Accepted-to-Committed Latency Evidence
 
@@ -140,12 +140,12 @@ cohort alignment (`cohort_counter_alignment_v1`):
 Confidence notes indicate scrape-resolution limits and unresolved cohorts
 (right-censoring at tier window end).
 
-| Tier | Target TPS | Method | Confidence | Resolved Tx Ratio | Accepted→Committed p50 (ms) | Accepted→Committed p95 (ms) | Accepted→Committed p99 (ms) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | cohort_counter_alignment_v1 | high | 100.0% | 165000 | 255000 | 255000 |
-| 1 | 200 | cohort_counter_alignment_v1 | high | 100.0% | 15000 | 15000 | 15000 |
-| 2 | 400 | cohort_counter_alignment_v1 | high | 98.5% | 15000 | 30000 | 30000 |
-| 3 | 800 | cohort_counter_alignment_v1 | high | 97.6% | 45000 | 75000 | 75000 |
+| Tier | Target TPS | Method                      | Confidence | Resolved Tx Ratio | Accepted→Committed p50 (ms) | Accepted→Committed p95 (ms) | Accepted→Committed p99 (ms) |
+| ---- | ---------- | --------------------------- | ---------- | ----------------- | --------------------------- | --------------------------- | --------------------------- |
+| 0    | 100        | cohort_counter_alignment_v1 | high       | 100.0%            | 165000                      | 255000                      | 255000                      |
+| 1    | 200        | cohort_counter_alignment_v1 | high       | 100.0%            | 15000                       | 15000                       | 15000                       |
+| 2    | 400        | cohort_counter_alignment_v1 | high       | 98.5%             | 15000                       | 30000                       | 30000                       |
+| 3    | 800        | cohort_counter_alignment_v1 | high       | 97.6%             | 45000                       | 75000                       | 75000                       |
 
 **Confidence Notes:**
 
@@ -157,11 +157,11 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 ## 📦 Queue and Mempool Behavior
 
 | Tier | Target TPS | Peak Queue | Final Queue (after recovery) | Peak Mempool | Final Mempool (after recovery) |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 32 | 0 | 18747 | 0 |
-| 1 | 200 | 67 | 0 | 2255 | 0 |
-| 2 | 400 | 130 | 0 | 6886 | 0 |
-| 3 | 800 | 1962 | 0 | 51600 | 0 |
+| ---- | ---------- | ---------- | ---------------------------- | ------------ | ------------------------------ |
+| 0    | 100        | 32         | 0                            | 18747        | 0                              |
+| 1    | 200        | 67         | 0                            | 2255         | 0                              |
+| 2    | 400        | 130        | 0                            | 6886         | 0                              |
+| 3    | 800        | 1962       | 0                            | 51600        | 0                              |
 
 ![Midgard Transactions in Queue](charts/tx-queue.svg)
 
@@ -170,16 +170,17 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 ## 🔗 Commit/Submit/Merge Progress
 
 L1 commitment fee fields are derived as follows:
+
 - `L1 Fees Δ` from `l1_commitment_fees_lovelace_total` counter delta over load phase.
 - `Last L1 Fee` from `l1_commitment_fee_lovelace_last` instant value at load stop.
 - `L1 Fee / Committed L2 Tx` = `L1 Fees Δ / Committed Tx Δ` when `Committed Tx Δ > 0`.
 
 | Tier | Target TPS | Committed Blocks Δ | Submitted Blocks Δ | Merged Blocks Δ | Merge Failures Δ | Commit Failures Δ | L1 Fees Δ (lovelace) | Last L1 Fee (lovelace) | L1 Fee / Committed L2 Tx (lovelace) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | n/a |
-| 1 | 200 | 25 | 25 | 0 | 0 | 0 | 5610075 | 224403 | 157.83 |
-| 2 | 400 | 19 | 19 | 0 | 1 | 0 | 4263657 | 224403 | 63.17 |
-| 3 | 800 | 7 | 7 | 0 | 1 | 0 | 1570821 | 224403 | 16.73 |
+| ---- | ---------- | ------------------ | ------------------ | --------------- | ---------------- | ----------------- | -------------------- | ---------------------- | ----------------------------------- |
+| 0    | 100        | 0                  | 0                  | 0               | 0                | 0                 | 0                    | 0                      | n/a                                 |
+| 1    | 200        | 25                 | 25                 | 0               | 0                | 0                 | 5610075              | 224403                 | 157.83                              |
+| 2    | 400        | 19                 | 19                 | 0               | 1                | 0                 | 4263657              | 224403                 | 63.17                               |
+| 3    | 800        | 7                  | 7                  | 0               | 1                | 0                 | 1570821              | 224403                 | 16.73                               |
 
 ![Built Blocks](charts/built-blocks.svg)
 
@@ -200,11 +201,11 @@ L1 commitment fee fields are derived as follows:
 ## 🚨 Failure Signals
 
 | Tier | Target TPS | Commit Failures Δ | Merge Failures Δ | Rejected Δ | Processing Failed Δ |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 0 | 0 | 0 | 0 |
-| 1 | 200 | 0 | 0 | 0 | 0 |
-| 2 | 400 | 0 | 1 | 0 | 0 |
-| 3 | 800 | 0 | 1 | 0 | 0 |
+| ---- | ---------- | ----------------- | ---------------- | ---------- | ------------------- |
+| 0    | 100        | 0                 | 0                | 0          | 0                   |
+| 1    | 200        | 0                 | 0                | 0          | 0                   |
+| 2    | 400        | 0                 | 1                | 0          | 0                   |
+| 3    | 800        | 0                 | 1                | 0          | 0                   |
 
 ![Block Commitment Failures](charts/commit-failures.svg)
 
@@ -235,24 +236,24 @@ L1 commitment fee fields are derived as follows:
 Per-tier log capture from Loki over the tier window plus a short post-window tail.
 Full log streams are in `loki-captures.json`.
 
-| Tier | Target TPS | Tier Window | Capture Range | Query | Streams | Entries | Truncated | Error |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 2026-05-27T11:18:01Z → 2026-05-27T11:22:31Z | 2026-05-27T11:18:01Z → 2026-05-27T11:23:31Z | `{job="containerlogs"}` | 2 | 744 | false |  |
-| 1 | 200 | 2026-05-27T11:22:31Z → 2026-05-27T11:27:01Z | 2026-05-27T11:22:31Z → 2026-05-27T11:28:01Z | `{job="containerlogs"}` | 2 | 1245 | false |  |
-| 2 | 400 | 2026-05-27T11:27:01Z → 2026-05-27T11:31:31Z | 2026-05-27T11:27:01Z → 2026-05-27T11:32:31Z | `{job="containerlogs"}` | 2 | 1684 | false |  |
-| 3 | 800 | 2026-05-27T11:31:31Z → 2026-05-27T11:36:01Z | 2026-05-27T11:31:31Z → 2026-05-27T11:37:01Z | `{job="containerlogs"}` | 2 | 2016 | false |  |
+| Tier | Target TPS | Tier Window                                 | Capture Range                               | Query                   | Streams | Entries | Truncated | Error |
+| ---- | ---------- | ------------------------------------------- | ------------------------------------------- | ----------------------- | ------- | ------- | --------- | ----- |
+| 0    | 100        | 2026-05-27T11:18:01Z → 2026-05-27T11:22:31Z | 2026-05-27T11:18:01Z → 2026-05-27T11:23:31Z | `{job="containerlogs"}` | 2       | 744     | false     |       |
+| 1    | 200        | 2026-05-27T11:22:31Z → 2026-05-27T11:27:01Z | 2026-05-27T11:22:31Z → 2026-05-27T11:28:01Z | `{job="containerlogs"}` | 2       | 1245    | false     |       |
+| 2    | 400        | 2026-05-27T11:27:01Z → 2026-05-27T11:31:31Z | 2026-05-27T11:27:01Z → 2026-05-27T11:32:31Z | `{job="containerlogs"}` | 2       | 1684    | false     |       |
+| 3    | 800        | 2026-05-27T11:31:31Z → 2026-05-27T11:36:01Z | 2026-05-27T11:31:31Z → 2026-05-27T11:37:01Z | `{job="containerlogs"}` | 2       | 2016    | false     |       |
 
 ## 🔍 Trace Evidence (Tempo)
 
 Per-tier trace capture from Tempo over the full tier window (load phase + recovery).
 Full trace summaries are in `tempo-captures.json`.
 
-| Tier | Target TPS | Window | Service | Traces | Inspected | Truncated | Error |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 2026-05-27T11:18:01Z → 2026-05-27T11:22:31Z | midgard-node | 1 | 1 | false |  |
-| 1 | 200 | 2026-05-27T11:22:31Z → 2026-05-27T11:27:01Z | midgard-node | 0 | n/a | false |  |
-| 2 | 400 | 2026-05-27T11:27:01Z → 2026-05-27T11:31:31Z | midgard-node | 0 | n/a | false |  |
-| 3 | 800 | 2026-05-27T11:31:31Z → 2026-05-27T11:36:01Z | midgard-node | 0 | n/a | false |  |
+| Tier | Target TPS | Window                                      | Service      | Traces | Inspected | Truncated | Error |
+| ---- | ---------- | ------------------------------------------- | ------------ | ------ | --------- | --------- | ----- |
+| 0    | 100        | 2026-05-27T11:18:01Z → 2026-05-27T11:22:31Z | midgard-node | 1      | 1         | false     |       |
+| 1    | 200        | 2026-05-27T11:22:31Z → 2026-05-27T11:27:01Z | midgard-node | 0      | n/a       | false     |       |
+| 2    | 400        | 2026-05-27T11:27:01Z → 2026-05-27T11:31:31Z | midgard-node | 0      | n/a       | false     |       |
+| 3    | 800        | 2026-05-27T11:31:31Z → 2026-05-27T11:36:01Z | midgard-node | 0      | n/a       | false     |       |
 
 ## 📂 Artifact Index
 
