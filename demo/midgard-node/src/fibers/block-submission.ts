@@ -930,7 +930,7 @@ export const blockSubmissionFiber = (
       Effect.catchAllCause(Effect.logWarning),
     );
     const action = submitEarliestBlock.pipe(
-      Effect.withSpan("submit-blocks-fiber"),
+      Effect.withSpan("submit-blocks-fiber", { root: true }),
       Effect.tapError(() =>
         Metric.increment(blockSubmissionMetrics.submitBlockFailuresCounter),
       ),

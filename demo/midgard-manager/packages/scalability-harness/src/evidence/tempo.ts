@@ -39,7 +39,7 @@ export interface TempoTierCapture {
 }
 
 export const DEFAULT_TEMPO_SERVICE_NAME = 'midgard-node';
-const DEFAULT_LIMIT = 100;
+const DEFAULT_LIMIT = 500;
 
 // Tempo search HTTP API wire shapes
 interface RawTempoTrace {

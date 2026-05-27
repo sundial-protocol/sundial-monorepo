@@ -133,7 +133,7 @@ export const syncUserEventsFiber = (
   Effect.gen(function* () {
     yield* Effect.logInfo("🏦 Sync user events to db");
     const action = syncUserEvents.pipe(
-      Effect.withSpan("sync-user-events-fiber"),
+      Effect.withSpan("sync-user-events-fiber", { root: true }),
       Effect.catchAllCause(Effect.logWarning),
     );
     yield* Effect.repeat(action, schedule);

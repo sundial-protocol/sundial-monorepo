@@ -173,7 +173,9 @@ export async function ensureSeedReadiness(
     `  seed bootstrap: baseline counters attempts=${baseline.attempts} success=${baseline.success} failures=${baseline.failures}`
   );
   if (baselineSeedInFlight) {
-    log('  seed bootstrap: detected in-flight seed attempt at baseline; waiting for it to resolve.');
+    log(
+      '  seed bootstrap: detected in-flight seed attempt at baseline; waiting for it to resolve.'
+    );
   }
 
   let inFlightCommitTrigger: Promise<void> | null = null;
@@ -275,9 +277,7 @@ export async function ensureSeedReadiness(
       if (inFlightCommitTrigger === null) {
         launchCommitTrigger();
       } else {
-        log(
-          '  seed bootstrap: trigger /commit skipped; previous trigger request still in-flight'
-        );
+        log('  seed bootstrap: trigger /commit skipped; previous trigger request still in-flight');
       }
       lastCommitTriggerAt = now();
     }
