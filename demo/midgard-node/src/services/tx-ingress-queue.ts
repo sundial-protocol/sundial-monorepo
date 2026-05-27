@@ -33,6 +33,10 @@ export type TxIngressQueueService = {
     message: TxIngressMessage,
     reason: string,
   ) => Effect.Effect<TxIngressFailureDisposition, TxIngressQueueError>;
+  readonly refreshSnapshotMetrics: Effect.Effect<
+    TxIngressMetricsSnapshot,
+    TxIngressQueueError
+  >;
   readonly snapshotMetrics: Effect.Effect<
     TxIngressMetricsSnapshot,
     TxIngressQueueError

@@ -18,10 +18,10 @@
   "maxTps": 10000,
   "stepMultiplier": 2,
   "txGeneratorTaskCostSeconds": 0.2,
-  "retryAttempts": 2,
-  "retryDelayMs": 250,
+  "retryAttempts": 1,
+  "retryDelayMs": 0,
   "stopConditions": {
-    "maxConsecutiveNodeProbeFailures": 5,
+    "maxConsecutiveNodeProbeFailures": 8,
     "stopOnPrometheusDown": true,
     "stopOnCommitmentFailure": true,
     "stopOnMergeFailure": true,

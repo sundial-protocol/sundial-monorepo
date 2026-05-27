@@ -28,6 +28,11 @@ const makeQueueStub = (
       Effect.succeed(messages),
     ack: ackSpy,
     handleFailedMessage: failedSpy,
+    refreshSnapshotMetrics: Effect.succeed({
+      streamDepth: messages.length,
+      pendingCount: 0,
+      lagCount: messages.length,
+    }),
     snapshotMetrics: Effect.succeed({
       streamDepth: messages.length,
       pendingCount: 0,

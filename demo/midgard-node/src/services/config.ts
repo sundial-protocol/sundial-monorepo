@@ -31,6 +31,7 @@ type NodeConfigDep = {
   TX_QUEUE_CAPACITY: number;
   TX_QUEUE_MAX_PENDING: number;
   TX_QUEUE_DRAIN_BATCH_SIZE: number;
+  TX_QUEUE_PROCESSOR_INTERVAL_MS: number;
   TX_QUEUE_OFFER_TIMEOUT_MS: number;
   TX_QUEUE_CLAIM_IDLE_MS: number;
   TX_QUEUE_CLAIM_BATCH_SIZE: number;
@@ -151,10 +152,13 @@ const makeConfig = Effect.gen(function* () {
   );
   const txQueueDrainBatchSize = yield* Config.integer(
     "TX_QUEUE_DRAIN_BATCH_SIZE",
+  ).pipe(Config.withDefault(500));
+  const txQueueProcessorIntervalMs = yield* Config.integer(
+    "TX_QUEUE_PROCESSOR_INTERVAL_MS",
   ).pipe(Config.withDefault(250));
   const txQueueOfferTimeoutMs = yield* Config.integer(
     "TX_QUEUE_OFFER_TIMEOUT_MS",
-  ).pipe(Config.withDefault(100));
+  ).pipe(Config.withDefault(1_000));
   const txQueueClaimIdleMs = yield* Config.integer(
     "TX_QUEUE_CLAIM_IDLE_MS",
   ).pipe(Config.withDefault(30_000));
@@ -168,7 +172,7 @@ const makeConfig = Effect.gen(function* () {
     "TX_QUEUE_DEAD_LETTER_STREAM",
   ).pipe(Config.withDefault("midgard:tx-submissions:dead-letter"));
   const txParseConcurrency = yield* Config.integer("TX_PARSE_CONCURRENCY").pipe(
-    Config.withDefault(4),
+    Config.withDefault(8),
   );
   const nodeRole = yield* Config.literal(
     "all",
@@ -316,6 +320,10 @@ const makeConfig = Effect.gen(function* () {
     txQueueDrainBatchSize,
   );
   yield* assertPositiveInteger(
+    "TX_QUEUE_PROCESSOR_INTERVAL_MS",
+    txQueueProcessorIntervalMs,
+  );
+  yield* assertPositiveInteger(
     "TX_QUEUE_OFFER_TIMEOUT_MS",
     txQueueOfferTimeoutMs,
   );
@@ -384,6 +392,7 @@ const makeConfig = Effect.gen(function* () {
     TX_QUEUE_CAPACITY: txQueueCapacity,
     TX_QUEUE_MAX_PENDING: txQueueMaxPending,
     TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,
+    TX_QUEUE_PROCESSOR_INTERVAL_MS: txQueueProcessorIntervalMs,
     TX_QUEUE_OFFER_TIMEOUT_MS: txQueueOfferTimeoutMs,
     TX_QUEUE_CLAIM_IDLE_MS: txQueueClaimIdleMs,
     TX_QUEUE_CLAIM_BATCH_SIZE: txQueueClaimBatchSize,

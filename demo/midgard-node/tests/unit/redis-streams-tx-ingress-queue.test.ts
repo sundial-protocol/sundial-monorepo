@@ -186,7 +186,7 @@ describe("RedisStreamsTxIngressQueue", () => {
         ]);
 
       const queue = yield* TxIngressQueue;
-      const snapshot = yield* queue.snapshotMetrics;
+      const snapshot = yield* queue.refreshSnapshotMetrics;
 
       expect(snapshot).toEqual({
         streamDepth: 0,
@@ -229,7 +229,7 @@ describe("RedisStreamsTxIngressQueue", () => {
         redisState.callImpl = () => Promise.resolve([]);
 
         const queue = yield* TxIngressQueue;
-        const snapshot = yield* queue.snapshotMetrics;
+        const snapshot = yield* queue.refreshSnapshotMetrics;
 
         expect(snapshot.pendingCount).toBe(0);
         expect(snapshot.lagCount).toBe(10_000);
@@ -251,11 +251,102 @@ describe("RedisStreamsTxIngressQueue", () => {
           Promise.reject(new Error("ERR no such key"));
 
         const queue = yield* TxIngressQueue;
-        const snapshot = yield* queue.snapshotMetrics;
+        const snapshot = yield* queue.refreshSnapshotMetrics;
 
         expect(snapshot.pendingCount).toBe(0);
         expect(snapshot.lagCount).toBe(0);
         expect(snapshot.streamDepth).toBe(0);
+      }).pipe(runWithQueue),
+  );
+
+  it.effect("enqueue avoids XGROUP_CREATE on hot path", () =>
+    Effect.gen(function* () {
+      const queue = yield* TxIngressQueue;
+
+      const id = yield* queue.enqueue("aa");
+
+      expect(id).toBe("1-0");
+      const xgroupCalls = redisState.calls.filter((c) => c.method === "xgroup");
+      const xaddCalls = redisState.calls.filter((c) => c.method === "xadd");
+      expect(xgroupCalls.length).toBe(0);
+      expect(xaddCalls.length).toBe(1);
+    }).pipe(runWithQueue),
+  );
+
+  it.effect("snapshotMetrics returns cached values without Redis calls", () =>
+    Effect.gen(function* () {
+      redisState.xlenImpl = () => Promise.resolve(10);
+      redisState.xpendingImpl = () => Promise.resolve([2, "0-0", "0-0", []]);
+      redisState.callImpl = () =>
+        Promise.resolve([
+          [
+            "name",
+            "midgard-tx-processors",
+            "consumers",
+            1,
+            "pending",
+            2,
+            "last-delivered-id",
+            "1779703559252-0",
+            "entries-read",
+            8,
+            "lag",
+            8,
+          ],
+        ]);
+
+      const queue = yield* TxIngressQueue;
+      const beforeCalls = redisState.calls.length;
+      const defaultSnapshot = yield* queue.snapshotMetrics;
+      const afterDefaultCalls = redisState.calls.length;
+
+      expect(defaultSnapshot).toEqual({
+        streamDepth: 0,
+        pendingCount: 0,
+        lagCount: 0,
+      });
+      expect(afterDefaultCalls).toBe(beforeCalls);
+
+      const refreshed = yield* queue.refreshSnapshotMetrics;
+      const cached = yield* queue.snapshotMetrics;
+      const afterCachedCalls = redisState.calls.length;
+
+      expect(refreshed).toEqual({
+        streamDepth: 8,
+        pendingCount: 2,
+        lagCount: 8,
+      });
+      expect(cached).toEqual(refreshed);
+      expect(afterCachedCalls).toBeGreaterThan(afterDefaultCalls);
+    }).pipe(runWithQueue),
+  );
+
+  it.effect(
+    "consumeBatch recreates consumer group on NOGROUP and returns empty batch",
+    () =>
+      Effect.gen(function* () {
+        redisState.xautoclaimImpl = () =>
+          Promise.reject(
+            new Error(
+              "NOGROUP No such consumer group 'midgard-tx-processors' for key name 'midgard:tx-submissions'",
+            ),
+          );
+
+        const queue = yield* TxIngressQueue;
+        const messages = yield* queue.consumeBatch(10, 1000);
+
+        expect(messages).toEqual([]);
+        const xgroupCalls = redisState.calls.filter(
+          (c) => c.method === "xgroup",
+        );
+        expect(xgroupCalls.length).toBe(1);
+        expect(xgroupCalls[0].args).toEqual([
+          "CREATE",
+          "midgard:tx-submissions",
+          "midgard-tx-processors",
+          "0",
+          "MKSTREAM",
+        ]);
       }).pipe(runWithQueue),
   );
 });

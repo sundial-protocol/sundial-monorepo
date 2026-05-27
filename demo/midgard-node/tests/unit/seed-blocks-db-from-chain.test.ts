@@ -10,7 +10,7 @@ const retrieveLatestEntryFn = vi.hoisted(() => vi.fn());
 const upsertFn = vi.hoisted(() => vi.fn());
 const serializeUTxOsForStorageFn = vi.hoisted(() => vi.fn());
 const fetchConfirmedStateAndItsLinkByUnitProgramFn = vi.hoisted(() => vi.fn());
-const fetchLatestCommittedBlockByUnitProgramFn = vi.hoisted(() => vi.fn());
+const fetchUnsortedStateQueueUTxOsProgramFn = vi.hoisted(() => vi.fn());
 const headerHashFromStateQueueUTxOFn = vi.hoisted(() => vi.fn());
 
 vi.mock("@/database/index.js", () => ({
@@ -54,8 +54,8 @@ vi.mock("@al-ft/midgard-sdk", () => ({
   },
   fetchConfirmedStateAndItsLinkByUnitProgram: (...args: unknown[]) =>
     fetchConfirmedStateAndItsLinkByUnitProgramFn(...args),
-  fetchLatestCommittedBlockByUnitProgram: (...args: unknown[]) =>
-    fetchLatestCommittedBlockByUnitProgramFn(...args),
+  fetchUnsortedStateQueueUTxOsProgram: (...args: unknown[]) =>
+    fetchUnsortedStateQueueUTxOsProgramFn(...args),
   headerHashFromStateQueueUTxO: (...args: unknown[]) =>
     headerHashFromStateQueueUTxOFn(...args),
 }));
@@ -159,8 +159,8 @@ describe("ensureBlocksDBSeededFromChain", () => {
     fetchConfirmedStateAndItsLinkByUnitProgramFn.mockReturnValue(
       Effect.succeed({ confirmed: rootNode, link: firstBlockNode }),
     );
-    fetchLatestCommittedBlockByUnitProgramFn.mockReturnValue(
-      Effect.succeed(tailBlockNode),
+    fetchUnsortedStateQueueUTxOsProgramFn.mockReturnValue(
+      Effect.succeed([rootNode, firstBlockNode, tailBlockNode]),
     );
   });
 
@@ -192,9 +192,7 @@ describe("ensureBlocksDBSeededFromChain", () => {
         expect(
           fetchConfirmedStateAndItsLinkByUnitProgramFn,
         ).toHaveBeenCalledTimes(1);
-        expect(fetchLatestCommittedBlockByUnitProgramFn).toHaveBeenCalledTimes(
-          1,
-        );
+        expect(fetchUnsortedStateQueueUTxOsProgramFn).toHaveBeenCalledTimes(1);
         expect(upsertFn).toHaveBeenCalledTimes(1);
       }),
   );
