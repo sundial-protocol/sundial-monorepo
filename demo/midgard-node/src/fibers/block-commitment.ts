@@ -241,6 +241,43 @@ const commitBlockBackpressureSkipsCounter = Metric.counter(
   },
 ).register();
 
+const commitmentWindowTxRequestsTotalGauge = Metric.gauge(
+  "commitment_window_tx_requests_total",
+  {
+    description:
+      "Total tx requests observed in the commitment window before per-block capping",
+    bigint: true,
+  },
+).register();
+
+const commitmentWindowTxRequestsSelectedGauge = Metric.gauge(
+  "commitment_window_tx_requests_selected",
+  {
+    description:
+      "Tx requests selected for processing in the latest commitment cycle",
+    bigint: true,
+  },
+).register();
+
+const commitmentWindowTxRequestsDeferredGauge = Metric.gauge(
+  "commitment_window_tx_requests_deferred",
+  {
+    description:
+      "Tx requests deferred from the latest commitment cycle due to commitment window capping",
+    bigint: true,
+  },
+).register();
+
+const commitmentWindowTxRequestsDeferredCounter = Metric.counter(
+  "commitment_window_tx_requests_deferred_total",
+  {
+    description:
+      "Total tx requests deferred across commitment cycles due to commitment window capping",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
 export const commitBlockDurationHistogramBoundaries =
   MetricBoundaries.exponential({ start: 0.1, factor: 2, count: 13 });
 
@@ -258,6 +295,10 @@ export const blockCommitmentMetrics = {
   commitBlockL1UserEventsGauge,
   commitBlockCommitmentFailuresCounter,
   commitBlockBackpressureSkipsCounter,
+  commitmentWindowTxRequestsTotalGauge,
+  commitmentWindowTxRequestsSelectedGauge,
+  commitmentWindowTxRequestsDeferredGauge,
+  commitmentWindowTxRequestsDeferredCounter,
   commitBlockDurationHistogram,
   ...blocksDbSeedingMetrics,
 } as const;
@@ -320,6 +361,15 @@ export const buildAndSubmitCommitmentBlockAction = () =>
       case "SuccessfulCommitmentOutput": {
         yield* Ref.update(globals.BLOCKS_IN_QUEUE, (n) => n + 1);
         const stats = workerOutput.stats;
+        const commitmentWindow = workerOutput.commitmentWindow;
+        const txRequestsTotalInWindow =
+          commitmentWindow?.txRequestsTotalInWindow ??
+          stats[BlocksDB.Columns.TX_REQUESTS_COUNT];
+        const txRequestsSelected =
+          commitmentWindow?.txRequestsSelected ??
+          stats[BlocksDB.Columns.TX_REQUESTS_COUNT];
+        const txRequestsDeferredInWindow =
+          commitmentWindow?.txRequestsDeferredInWindow ?? 0;
         const totalEventsCount = BlocksDB.getTotalEventsCount(stats);
         const thresholdBreaches =
           BlocksDB.getCommitmentWindowWarningThresholdBreaches(stats, {
@@ -337,6 +387,22 @@ export const buildAndSubmitCommitmentBlockAction = () =>
         yield* Metric.set(
           commitBlockNumTxGauge,
           BigInt(stats[BlocksDB.Columns.TX_REQUESTS_COUNT]),
+        );
+        yield* Metric.set(
+          commitmentWindowTxRequestsTotalGauge,
+          BigInt(txRequestsTotalInWindow),
+        );
+        yield* Metric.set(
+          commitmentWindowTxRequestsSelectedGauge,
+          BigInt(txRequestsSelected),
+        );
+        yield* Metric.set(
+          commitmentWindowTxRequestsDeferredGauge,
+          BigInt(txRequestsDeferredInWindow),
+        );
+        yield* Metric.incrementBy(
+          commitmentWindowTxRequestsDeferredCounter,
+          BigInt(txRequestsDeferredInWindow),
         );
         yield* Metric.set(
           commitBlockEventsSizeGauge,
@@ -358,6 +424,9 @@ export const buildAndSubmitCommitmentBlockAction = () =>
       case "NoopCommitmentOutput": {
         yield* Metric.set(commitBlockL1UserEventsGauge, 0);
         yield* Metric.set(commitBlockNumTxGauge, 0n);
+        yield* Metric.set(commitmentWindowTxRequestsTotalGauge, 0n);
+        yield* Metric.set(commitmentWindowTxRequestsSelectedGauge, 0n);
+        yield* Metric.set(commitmentWindowTxRequestsDeferredGauge, 0n);
         yield* Metric.set(commitBlockEventsSizeGauge, 0);
         yield* Effect.logInfo(
           "🔹 No-op commitment cycle: skipped empty window (no events).",
@@ -401,11 +470,15 @@ export const blockCommitmentFiber = (
     yield* Metric.set(commitBlockNumTxGauge, 0n);
     yield* Metric.set(commitBlockEventsSizeGauge, 0);
     yield* Metric.set(commitBlockL1UserEventsGauge, 0);
+    yield* Metric.set(commitmentWindowTxRequestsTotalGauge, 0n);
+    yield* Metric.set(commitmentWindowTxRequestsSelectedGauge, 0n);
+    yield* Metric.set(commitmentWindowTxRequestsDeferredGauge, 0n);
     yield* Metric.update(commitBlockDurationHistogram, 0);
     yield* Metric.incrementBy(commitBlockCounter, 0n);
     yield* Metric.incrementBy(commitBlockTxCounter, 0n);
     yield* Metric.incrementBy(commitBlockCommitmentFailuresCounter, 0n);
     yield* Metric.incrementBy(commitBlockBackpressureSkipsCounter, 0n);
+    yield* Metric.incrementBy(commitmentWindowTxRequestsDeferredCounter, 0n);
     yield* Metric.incrementBy(
       blocksDbSeedingMetrics.seedBlocksDbAttemptsCounter,
       0n,

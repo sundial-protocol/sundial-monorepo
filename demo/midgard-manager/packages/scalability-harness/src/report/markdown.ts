@@ -506,6 +506,10 @@ function renderFailureSignals(tiers: TierSummary[], chartRecords?: ChartRecord[]
     'Commit Failures Δ',
     'Merge Failures Δ',
     'Rejected Δ',
+    'Queue Backpressure Rejected Δ',
+    'Stream Backpressure Rejected Δ',
+    'Offer Timeout Rejected Δ',
+    'Deferred Tx Requests Peak',
     'Processing Failed Δ',
   ];
 
@@ -515,6 +519,10 @@ function renderFailureSignals(tiers: TierSummary[], chartRecords?: ChartRecord[]
     n(t.commitmentFailureDelta),
     n(t.mergeFailureDelta),
     n(t.rejectedDelta),
+    n(t.queueBackpressureRejectedDelta),
+    n(t.streamBackpressureRejectedDelta),
+    n(t.offerTimeoutRejectedDelta),
+    n(t.commitmentWindowDeferredPeak),
     n(t.processingFailedDelta),
   ]);
 

@@ -26,6 +26,9 @@ function makeWindowSummary(
   overrides: Partial<{
     enqueuedDelta: number | null;
     rejectedDelta: number | null;
+    queueBackpressureRejectedDelta: number | null;
+    streamBackpressureRejectedDelta: number | null;
+    offerTimeoutRejectedDelta: number | null;
     mempoolAcceptedDelta: number | null;
     processingFailedDelta: number | null;
     committedTxDelta: number | null;
@@ -38,11 +41,16 @@ function makeWindowSummary(
     queueFinal: number | null;
     mempoolPeak: number | null;
     mempoolFinal: number | null;
+    commitmentWindowDeferredPeak: number | null;
+    commitmentWindowDeferredFinal: number | null;
   }> = {}
 ): TierWindowSummary {
   const o = {
     enqueuedDelta: 600,
     rejectedDelta: 6,
+    queueBackpressureRejectedDelta: 5,
+    streamBackpressureRejectedDelta: 4,
+    offerTimeoutRejectedDelta: 1,
     mempoolAcceptedDelta: 540,
     processingFailedDelta: 0,
     committedTxDelta: 480,
@@ -55,6 +63,8 @@ function makeWindowSummary(
     queueFinal: 2,
     mempoolPeak: 120,
     mempoolFinal: 10,
+    commitmentWindowDeferredPeak: 42,
+    commitmentWindowDeferredFinal: 3,
     ...overrides,
   };
 
@@ -62,6 +72,18 @@ function makeWindowSummary(
     counterDeltas: [
       makeCounterDelta('tx_submissions_enqueued_total', o.enqueuedDelta),
       makeCounterDelta('tx_submissions_rejected_total', o.rejectedDelta),
+      makeCounterDelta(
+        'tx_submissions_rejected_queue_backpressure_total',
+        o.queueBackpressureRejectedDelta
+      ),
+      makeCounterDelta(
+        'tx_submissions_rejected_stream_backpressure_total',
+        o.streamBackpressureRejectedDelta
+      ),
+      makeCounterDelta(
+        'tx_submissions_rejected_offer_timeout_total',
+        o.offerTimeoutRejectedDelta
+      ),
       makeCounterDelta('tx_submissions_mempool_accepted_total', o.mempoolAcceptedDelta),
       makeCounterDelta('tx_stream_fail_total', o.processingFailedDelta),
       makeCounterDelta('commit_block_tx_count_total', o.committedTxDelta),
@@ -74,6 +96,11 @@ function makeWindowSummary(
     gaugeSummaries: [
       makeGaugeSummary('tx_stream_depth', o.queuePeak, o.queueFinal),
       makeGaugeSummary('mempool_tx_count', o.mempoolPeak, o.mempoolFinal),
+      makeGaugeSummary(
+        'commitment_window_tx_requests_deferred',
+        o.commitmentWindowDeferredPeak,
+        o.commitmentWindowDeferredFinal
+      ),
     ],
   };
 }
@@ -361,6 +388,33 @@ describe('buildTierSummary — normal tier', () => {
       makeInput({ windowSummary: makeWindowSummary({ rejectedDelta: 6 }) })
     );
     expect(s.rejectedDelta).toBe(6);
+  });
+
+  it('extracts queueBackpressureRejectedDelta from tx_submissions_rejected_queue_backpressure_total', () => {
+    const s = buildTierSummary(
+      makeInput({
+        windowSummary: makeWindowSummary({ queueBackpressureRejectedDelta: 7 }),
+      })
+    );
+    expect(s.queueBackpressureRejectedDelta).toBe(7);
+  });
+
+  it('extracts streamBackpressureRejectedDelta from tx_submissions_rejected_stream_backpressure_total', () => {
+    const s = buildTierSummary(
+      makeInput({
+        windowSummary: makeWindowSummary({ streamBackpressureRejectedDelta: 9 }),
+      })
+    );
+    expect(s.streamBackpressureRejectedDelta).toBe(9);
+  });
+
+  it('extracts offerTimeoutRejectedDelta from tx_submissions_rejected_offer_timeout_total', () => {
+    const s = buildTierSummary(
+      makeInput({
+        windowSummary: makeWindowSummary({ offerTimeoutRejectedDelta: 4 }),
+      })
+    );
+    expect(s.offerTimeoutRejectedDelta).toBe(4);
   });
 
   it('extracts mempoolAcceptedDelta from tx_submissions_mempool_accepted_total', () => {
@@ -734,6 +788,9 @@ describe('buildTierSummary — missing metrics', () => {
     const s = buildTierSummary(makeInput({ windowSummary: null }));
     expect(s.enqueuedDelta).toBeNull();
     expect(s.rejectedDelta).toBeNull();
+    expect(s.queueBackpressureRejectedDelta).toBeNull();
+    expect(s.streamBackpressureRejectedDelta).toBeNull();
+    expect(s.offerTimeoutRejectedDelta).toBeNull();
     expect(s.mempoolAcceptedDelta).toBeNull();
     expect(s.processingFailedDelta).toBeNull();
     expect(s.committedTxDelta).toBeNull();
@@ -751,6 +808,8 @@ describe('buildTierSummary — missing metrics', () => {
     expect(s.finalQueueSizeAfterRecovery).toBeNull();
     expect(s.peakMempoolSize).toBeNull();
     expect(s.finalMempoolSizeAfterRecovery).toBeNull();
+    expect(s.commitmentWindowDeferredPeak).toBeNull();
+    expect(s.commitmentWindowDeferredFinal).toBeNull();
     expect(s.acceptedToCommittedLatencyP50Ms).toBeNull();
     expect(s.acceptedToCommittedLatencyP95Ms).toBeNull();
     expect(s.acceptedToCommittedLatencyP99Ms).toBeNull();

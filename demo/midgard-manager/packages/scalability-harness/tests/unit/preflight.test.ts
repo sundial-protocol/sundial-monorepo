@@ -43,16 +43,20 @@ function makePromFactory(overrides?: Partial<Record<string, Array<{ value: [numb
   const defaultStreamPendingSeries: Array<{ value: [number, string] }> = [{ value: [1, '0'] }];
   return () => ({
     queryInstant: async (query: string) => {
+      const canonicalQuery = query.replace(/\{[^}]*\}/g, '');
       if (overrides && query in overrides) {
         return overrides[query] ?? [];
       }
-      if (query === 'mempool_tx_count') {
+      if (overrides && canonicalQuery in overrides) {
+        return overrides[canonicalQuery] ?? [];
+      }
+      if (canonicalQuery === 'mempool_tx_count') {
         return defaultMempoolSeries;
       }
-      if (query === 'tx_stream_depth') {
+      if (canonicalQuery === 'tx_stream_depth') {
         return defaultStreamDepthSeries;
       }
-      if (query === 'tx_stream_pending') {
+      if (canonicalQuery === 'tx_stream_pending') {
         return defaultStreamPendingSeries;
       }
       return defaultSeries;
@@ -240,25 +244,26 @@ describe('runExecutionReadinessPreflight', () => {
         probeNodeFn: async () => ({ ok: true, statusCode: 404, latencyMs: 5 }),
         prometheusClientFactory: () => ({
           queryInstant: async (query: string) => {
-            if (query === 'commit_block_count_total') {
+            const canonicalQuery = query.replace(/\{[^}]*\}/g, '');
+            if (canonicalQuery === 'commit_block_count_total') {
               // initial + 5 rechecks: commit grows once
               const values = ['100', '100', '100', '101', '101', '101'];
               const value = values[Math.min(commitCalls, values.length - 1)];
               commitCalls += 1;
               return [{ value: [1, value] as [number, string] }];
             }
-            if (query === 'submit_block_count_total') {
+            if (canonicalQuery === 'submit_block_count_total') {
               // submit stays flat
               submitCalls += 1;
               return [{ value: [1, '99'] as [number, string] }];
             }
-            if (query === 'tx_stream_depth') {
+            if (canonicalQuery === 'tx_stream_depth') {
               return [{ value: [1, '0'] as [number, string] }];
             }
-            if (query === 'tx_stream_pending') {
+            if (canonicalQuery === 'tx_stream_pending') {
               return [{ value: [1, '0'] as [number, string] }];
             }
-            if (query === 'mempool_tx_count') {
+            if (canonicalQuery === 'mempool_tx_count') {
               return [{ value: [1, '0'] as [number, string] }];
             }
             return [{ value: [1, '1'] as [number, string] }];

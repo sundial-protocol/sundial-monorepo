@@ -278,8 +278,17 @@ export const retrieveTimeBoundEntries = (
   startTime: Date,
   endTime: Date,
 ): Effect.Effect<readonly EntryWithEffects[], DatabaseError, Database> =>
+  retrieveTimeBoundEntriesLimited(startTime, endTime);
+
+export const retrieveTimeBoundEntriesLimited = (
+  startTime: Date,
+  endTime: Date,
+  limit?: number,
+): Effect.Effect<readonly EntryWithEffects[], DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
+    const limitClause =
+      limit !== undefined ? sql`LIMIT ${sql.literal(String(limit))}` : sql``;
     return yield* sql<EntryWithEffects>`SELECT
       ${sql(Tx.Columns.TX_ID)},
       ${sql(Tx.Columns.TX)},
@@ -292,9 +301,10 @@ export const retrieveTimeBoundEntries = (
       FROM ${sql(tableName)}
       WHERE ${startTime} <= ${sql(Tx.Columns.TIMESTAMPTZ)}
       AND ${sql(Tx.Columns.TIMESTAMPTZ)} < ${endTime}
-      ORDER BY ${sql(Tx.Columns.TIMESTAMPTZ)} ASC, ${sql(Tx.Columns.TX_ID)} ASC`;
+      ORDER BY ${sql(Tx.Columns.TIMESTAMPTZ)} ASC, ${sql(Tx.Columns.TX_ID)} ASC
+      ${limitClause}`;
   }).pipe(
-    Effect.withLogSpan(`retrieveTimeBoundEntries ${tableName}`),
+    Effect.withLogSpan(`retrieveTimeBoundEntriesLimited ${tableName}`),
     sqlErrorToDatabaseError(
       tableName,
       "Failed to retrieve time-bound mempool transactions",
@@ -302,8 +312,16 @@ export const retrieveTimeBoundEntries = (
   );
 
 export const retrieveEntriesBeforeTime = (endTime: Date) =>
+  retrieveEntriesBeforeTimeLimited(endTime);
+
+export const retrieveEntriesBeforeTimeLimited = (
+  endTime: Date,
+  limit?: number,
+) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
+    const limitClause =
+      limit !== undefined ? sql`LIMIT ${sql.literal(String(limit))}` : sql``;
     return yield* sql<EntryWithEffects>`SELECT
       ${sql(Tx.Columns.TX_ID)},
       ${sql(Tx.Columns.TX)},
@@ -315,12 +333,52 @@ export const retrieveEntriesBeforeTime = (endTime: Date) =>
       ${sql(Columns.PRODUCED_ADDRESSES)}
       FROM ${sql(tableName)}
       WHERE ${sql(Tx.Columns.TIMESTAMPTZ)} < ${endTime}
-      ORDER BY ${sql(Tx.Columns.TIMESTAMPTZ)} ASC, ${sql(Tx.Columns.TX_ID)} ASC`;
+      ORDER BY ${sql(Tx.Columns.TIMESTAMPTZ)} ASC, ${sql(Tx.Columns.TX_ID)} ASC
+      ${limitClause}`;
   }).pipe(
-    Effect.withLogSpan(`retrieveEntriesBeforeTime ${tableName}`),
+    Effect.withLogSpan(`retrieveEntriesBeforeTimeLimited ${tableName}`),
     sqlErrorToDatabaseError(
       tableName,
       "Failed to retrieve mempool transactions before the given time",
+    ),
+  );
+
+export const countTimeBoundEntries = (startTime: Date, endTime: Date) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{ count: bigint | string }>`SELECT COUNT(*)::bigint AS count
+      FROM ${sql(tableName)}
+      WHERE ${startTime} <= ${sql(Tx.Columns.TIMESTAMPTZ)}
+      AND ${sql(Tx.Columns.TIMESTAMPTZ)} < ${endTime}`;
+    if (rows.length === 0) {
+      return 0;
+    }
+    const raw = rows[0].count;
+    return typeof raw === "bigint" ? Number(raw) : Number(raw);
+  }).pipe(
+    Effect.withLogSpan(`countTimeBoundEntries ${tableName}`),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to count time-bound mempool transactions",
+    ),
+  );
+
+export const countEntriesBeforeTime = (endTime: Date) =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{ count: bigint | string }>`SELECT COUNT(*)::bigint AS count
+      FROM ${sql(tableName)}
+      WHERE ${sql(Tx.Columns.TIMESTAMPTZ)} < ${endTime}`;
+    if (rows.length === 0) {
+      return 0;
+    }
+    const raw = rows[0].count;
+    return typeof raw === "bigint" ? Number(raw) : Number(raw);
+  }).pipe(
+    Effect.withLogSpan(`countEntriesBeforeTime ${tableName}`),
+    sqlErrorToDatabaseError(
+      tableName,
+      "Failed to count mempool transactions before the given time",
     ),
   );
 

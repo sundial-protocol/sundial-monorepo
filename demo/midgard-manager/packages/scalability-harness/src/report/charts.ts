@@ -168,6 +168,15 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     unit: 'txs',
     formatY: 'default',
   },
+  {
+    slug: 'commitment-window-deferred',
+    title: 'Commitment Deferred Tx Requests',
+    section: 'Queue and Mempool',
+    metric: 'commitment_window_tx_requests_deferred',
+    rate: false,
+    unit: 'txs',
+    formatY: 'default',
+  },
 
   // --- Block Pipeline ---
   {
@@ -273,6 +282,24 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     title: 'Rejected Submissions',
     section: 'Failure Signals',
     metric: 'tx_submissions_rejected_total',
+    rate: true,
+    unit: 'rejects/s',
+    formatY: 'default',
+  },
+  {
+    slug: 'rejected-stream-backpressure',
+    title: 'Stream Backpressure Rejections',
+    section: 'Failure Signals',
+    metric: 'tx_submissions_rejected_stream_backpressure_total',
+    rate: true,
+    unit: 'rejects/s',
+    formatY: 'default',
+  },
+  {
+    slug: 'rejected-offer-timeout',
+    title: 'Offer Timeout Rejections',
+    section: 'Failure Signals',
+    metric: 'tx_submissions_rejected_offer_timeout_total',
     rate: true,
     unit: 'rejects/s',
     formatY: 'default',

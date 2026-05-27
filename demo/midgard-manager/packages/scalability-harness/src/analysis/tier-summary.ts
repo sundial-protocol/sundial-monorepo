@@ -23,6 +23,9 @@ export interface TierSummary {
   // HTTP boundary acceptance into the in-memory tx queue.
   enqueuedDelta: number | null;
   rejectedDelta: number | null;
+  queueBackpressureRejectedDelta: number | null;
+  streamBackpressureRejectedDelta: number | null;
+  offerTimeoutRejectedDelta: number | null;
   // Durable acceptance into MempoolDB — distinct from enqueued.
   mempoolAcceptedDelta: number | null;
   processingFailedDelta: number | null;
@@ -48,6 +51,8 @@ export interface TierSummary {
   peakMempoolSize: number | null;
   finalMempoolSizeAfterRecovery: number | null;
   finalMempoolDeltaAfterRecovery: number | null;
+  commitmentWindowDeferredPeak: number | null;
+  commitmentWindowDeferredFinal: number | null;
   clientSubmittedCount: number | null;
   clientRejectedCount: number | null;
   clientNodeUnavailableCount: number | null;
@@ -193,6 +198,10 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
 
   const queueGauge = lookupGauge(gaugeSummaries, 'tx_stream_depth');
   const mempoolGauge = lookupGauge(gaugeSummaries, 'mempool_tx_count');
+  const commitmentWindowDeferredGauge = lookupGauge(
+    gaugeSummaries,
+    'commitment_window_tx_requests_deferred'
+  );
   const acceptedToCommitted = estimateAcceptedToCommittedLatency(metricWindow);
 
   return {
@@ -209,6 +218,21 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
       counterDeltas,
       metricWindow,
       'tx_submissions_rejected_total'
+    ),
+    queueBackpressureRejectedDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'tx_submissions_rejected_queue_backpressure_total'
+    ),
+    streamBackpressureRejectedDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'tx_submissions_rejected_stream_backpressure_total'
+    ),
+    offerTimeoutRejectedDelta: lookupCounterDeltaWithZeroBaselineFallback(
+      counterDeltas,
+      metricWindow,
+      'tx_submissions_rejected_offer_timeout_total'
     ),
     mempoolAcceptedDelta,
     processingFailedDelta: lookupCounterDeltaWithZeroBaselineFallback(
@@ -263,6 +287,8 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
       metricWindow,
       'mempool_tx_count'
     ),
+    commitmentWindowDeferredPeak: commitmentWindowDeferredGauge?.peak ?? null,
+    commitmentWindowDeferredFinal: commitmentWindowDeferredGauge?.final ?? null,
     clientSubmittedCount: submissionAggregate?.counters.submitted ?? null,
     clientRejectedCount: submissionAggregate?.counters.rejected ?? null,
     clientNodeUnavailableCount: submissionAggregate?.counters.node_unavailable ?? null,

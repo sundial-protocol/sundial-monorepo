@@ -70,6 +70,7 @@ describe("NodeConfig", () => {
         expect(config.COMMITMENT_WINDOW_WARN_TX_REQUESTS).toBe(50_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS).toBe(60_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_BYTES).toBe(20_000_000);
+        expect(config.COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK).toBe(2_000);
       }).pipe(Effect.provide(configLayer)),
     { timeout: 10000 },
   );

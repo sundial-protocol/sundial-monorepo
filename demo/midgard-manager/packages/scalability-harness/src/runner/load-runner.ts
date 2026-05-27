@@ -33,6 +33,8 @@ const PROGRESS_LOG_EVERY_N_TICKS = 5;
 const PROGRESS_BAR_WIDTH = 24;
 const DEFAULT_LOKI_POST_WINDOW_TAIL_SECONDS = 60;
 const DEFAULT_MAX_UNSUBMITTED_BLOCK_BACKLOG_GROWTH = 0;
+const TX_PROCESSOR_ROLE_SELECTOR = '{job="sundial_nodes",role=~"tx-processor|all"}';
+const SEQUENCER_ROLE_SELECTOR = '{job="sundial_nodes",role=~"sequencer|all"}';
 
 type SnapshotCapture = PrometheusSnapshotEvent['capture'];
 export type TierExecutionPhase = 'load' | 'recovery';
@@ -527,14 +529,23 @@ async function captureLiveMetricBaseline(
   try {
     const [commitmentFailuresTotal, mergeFailuresTotal, mempoolAcceptedTotal] = await Promise.all([
       stopConditions.stopOnCommitmentFailure
-        ? queryInstantScalar(prometheusClient, 'commit_block_commitment_failures_total')
+        ? queryInstantScalar(
+            prometheusClient,
+            `commit_block_commitment_failures_total${SEQUENCER_ROLE_SELECTOR}`
+          )
         : Promise.resolve(null),
       stopConditions.stopOnMergeFailure
-        ? queryInstantScalar(prometheusClient, 'merge_block_failures_total')
+        ? queryInstantScalar(
+            prometheusClient,
+            `merge_block_failures_total${SEQUENCER_ROLE_SELECTOR}`
+          )
         : Promise.resolve(null),
       stopConditions.stopOnCommitmentFailure &&
       stopConditions.maxCommitmentFailureRatio !== undefined
-        ? queryInstantScalar(prometheusClient, 'tx_submissions_mempool_accepted_total')
+        ? queryInstantScalar(
+            prometheusClient,
+            `tx_submissions_mempool_accepted_total${TX_PROCESSOR_ROLE_SELECTOR}`
+          )
         : Promise.resolve(null),
     ]);
     return { commitmentFailuresTotal, mergeFailuresTotal, mempoolAcceptedTotal };
@@ -571,9 +582,15 @@ async function checkLiveMetricStopCondition(
 
     if (stopConditions.stopOnCommitmentFailure) {
       const [currentFailures, currentMempoolAccepted] = await Promise.all([
-        queryInstantScalar(prometheusClient, 'commit_block_commitment_failures_total'),
+        queryInstantScalar(
+          prometheusClient,
+          `commit_block_commitment_failures_total${SEQUENCER_ROLE_SELECTOR}`
+        ),
         stopConditions.maxCommitmentFailureRatio !== undefined
-          ? queryInstantScalar(prometheusClient, 'tx_submissions_mempool_accepted_total')
+          ? queryInstantScalar(
+              prometheusClient,
+              `tx_submissions_mempool_accepted_total${TX_PROCESSOR_ROLE_SELECTOR}`
+            )
           : Promise.resolve(null),
       ]);
       if (
@@ -617,7 +634,7 @@ async function checkLiveMetricStopCondition(
     if (stopConditions.stopOnMergeFailure) {
       const currentFailures = await queryInstantScalar(
         prometheusClient,
-        'merge_block_failures_total'
+        `merge_block_failures_total${SEQUENCER_ROLE_SELECTOR}`
       );
       if (
         currentFailures !== null &&

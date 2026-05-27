@@ -161,20 +161,18 @@ saturation-discovery → saturation-ramp-25pct
 
 Scenario files live in `scenarios/`. Each file is a JSON object conforming to `ScalabilityScenario`.
 
-| File                               | runId                         | Target TPS | Test plan section              |
-| ---------------------------------- | ----------------------------- | ---------- | ------------------------------ |
-| `warmup.json`                      | `warmup`                      | 100        | §8.1 warm-up                   |
-| `initial-800.json`                 | `initial-800`                 | 800        | §8.1 initial TPS validation    |
-| `institutional-1000.json`          | `institutional-1000`          | 1,000      | §8.1 institutional baseline    |
-| `institutional-5000.json`          | `institutional-5000`          | 5,000      | §8.1 institutional load        |
-| `stress-10000.json`                | `stress-10000`                | 10,000     | §8.1 institutional stress      |
-| `practical-24985.json`             | `practical-24985`             | 24,985     | §8.1 practical estimate target |
-| `spike.json`                       | `spike`                       | 49,970     | §8.1 peak spike                |
-| `baseline-100-800.json`            | `baseline-100-800`            | 800        | §13 step-ramp baseline         |
-| `baseline-100-800-replay.json`     | `baseline-100-800-replay`     | 800        | §13 replay variant             |
-| `saturation-discovery.json`        | `saturation-discovery`        | 1,600      | §8.3 saturation discovery      |
-| `saturation-discovery-replay.json` | `saturation-discovery-replay` | 1,600      | §8.3 replay variant            |
-| `saturation-ramp-25pct.json`       | `saturation-ramp-25pct`       | varies     | §8.3 25% increment ramp        |
+| Order | File                            | runId                         | Target TPS | Test plan section                  |
+| ----- | ------------------------------- | ----------------------------- | ---------- | ---------------------------------- |
+| 0     | `baseline-100-800-replay.json`  | `baseline-100-800-replay`     | 100→800    | §13 step-ramp baseline (optional)  |
+| 1     | `warmup-replay.json`            | `warmup-replay`               | 100        | §8.1 warm-up                       |
+| 2     | `initial-800-replay.json`       | `initial-800-replay`          | 800        | §8.1 initial TPS validation        |
+| 3     | `institutional-1000-replay.json`| `institutional-1000-replay`   | 1,000      | §8.1 institutional baseline        |
+| 4     | `institutional-5000-replay.json`| `institutional-5000-replay`   | 5,000      | §8.1 institutional load            |
+| 5     | `stress-10000-replay.json`      | `stress-10000-replay`         | 10,000     | §8.1 institutional stress          |
+| 6     | `practical-24985-replay.json`   | `practical-24985-replay`      | 24,985     | §8.1 practical estimate target     |
+| 7     | `spike-replay.json`             | `spike-replay`                | 49,970     | §8.1 peak spike                    |
+| 8     | `saturation-discovery-replay.json` | `saturation-discovery-replay` | 50→1,600 | §8.3 saturation discovery          |
+| 9     | `saturation-ramp-25pct-replay.json` | `saturation-ramp-25pct-replay` | varies  | §8.3 25% increment ramp            |
 
 Tiers are generated from `startTps` to `maxTps` using `stepMultiplier` (multiply) or `ramp.percentIncrement` (percent increment). When `startTps === maxTps` the scenario has a single tier.
 

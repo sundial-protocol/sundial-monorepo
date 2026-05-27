@@ -24,8 +24,8 @@ services:
       - listen
       - --with-monitoring
     ports:
-      - "3000:3000" # api server
-      - "9464:9464" # prometheus exporter
+      - "${NODE_API_HOST_PORT:-3000}:3000" # api server
+      - "${NODE_PROM_HOST_PORT:-9464}:9464" # prometheus exporter
       # - "4318:4318" # opentelemetry
     volumes:
       - ./db:/app/db
@@ -36,6 +36,109 @@ services:
         condition: service_healthy
     logging: *default-logging
     restart: always
+    networks:
+      net:
+
+  node-tx-processor:
+    image: sundial-node
+    build:
+      context: ..
+      dockerfile: ./midgard-node/Dockerfile
+    env_file:
+      - ${NODE_ENV_FILE:-.env}
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
+    command:
+      - node
+      - ./dist/index.js
+      - listen
+      - --with-monitoring
+    ports:
+      - "${NODE_TX_PROCESSOR_PROM_HOST_PORT:-9466}:9464" # prometheus exporter
+    environment:
+      NODE_ROLE: tx-processor
+      REDIS_STREAM_CONSUMER_NAME: ${REDIS_STREAM_CONSUMER_NAME_TX_PROCESSOR:-midgard-node-tx-processor}
+    volumes:
+      - ./db:/app/db
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    restart: always
+    profiles:
+      - split
+    networks:
+      net:
+
+  node-sequencer:
+    image: sundial-node
+    build:
+      context: ..
+      dockerfile: ./midgard-node/Dockerfile
+    env_file:
+      - ${NODE_ENV_FILE:-.env}
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
+    command:
+      - node
+      - ./dist/index.js
+      - listen
+      - --with-monitoring
+    ports:
+      - "${NODE_SEQUENCER_PROM_HOST_PORT:-9467}:9464" # prometheus exporter
+    environment:
+      NODE_ROLE: sequencer
+      REDIS_STREAM_CONSUMER_NAME: ${REDIS_STREAM_CONSUMER_NAME_SEQUENCER:-midgard-node-sequencer}
+    volumes:
+      - ./db:/app/db
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    restart: always
+    profiles:
+      - split
+    networks:
+      net:
+
+  node-api:
+    image: sundial-node
+    build:
+      context: ..
+      dockerfile: ./midgard-node/Dockerfile
+    env_file:
+      - ${NODE_ENV_FILE:-.env}
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
+    command:
+      - node
+      - ./dist/index.js
+      - listen
+      - --with-monitoring
+    ports:
+      - "${NODE_API_HOST_PORT:-3000}:3000" # api server
+      - "${NODE_PROM_HOST_PORT:-9464}:9464" # prometheus exporter
+    environment:
+      NODE_ROLE: api
+      REDIS_STREAM_CONSUMER_NAME: ${REDIS_STREAM_CONSUMER_NAME_API:-midgard-node-api}
+    volumes:
+      - ./db:/app/db
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    restart: always
+    profiles:
+      - split
     networks:
       net:
 
@@ -50,7 +153,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data/pgdata
     ports:
-      - "5433:5432"
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     networks:
       net:
     healthcheck:
@@ -90,7 +193,7 @@ services:
       - "60"
       - "1"
     ports:
-      - "6379:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s

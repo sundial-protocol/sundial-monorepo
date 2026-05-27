@@ -110,6 +110,26 @@ const txQueueBackpressureRejectedCounter = Metric.counter(
   },
 ).register();
 
+const txStreamBackpressureRejectedCounter = Metric.counter(
+  "tx_submissions_rejected_stream_backpressure",
+  {
+    description:
+      "A counter for tracking submissions rejected before enqueue because stream lag/pending thresholds were exceeded",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const txOfferTimeoutRejectedCounter = Metric.counter(
+  "tx_submissions_rejected_offer_timeout",
+  {
+    description:
+      "A counter for tracking submissions rejected because enqueue offer timed out",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
 const failWith500Helper = (
   logLabel: string,
   logMsg: string,
@@ -777,6 +797,7 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) => {
           `POST /${SUBMIT_ENDPOINT} - stream backpressure rejection: lag=${snapshot.lagCount} pending=${snapshot.pendingCount} max_lag=${submitIngressConfig.txQueueCapacity} max_pending=${submitIngressConfig.txQueueMaxPending}`,
         );
         yield* Metric.increment(txQueueBackpressureRejectedCounter);
+        yield* Metric.increment(txStreamBackpressureRejectedCounter);
         return yield* HttpServerResponse.json(
           { error: `Transaction queue is saturated; retry later` },
           { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
@@ -796,6 +817,7 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) => {
           `POST /${SUBMIT_ENDPOINT} - enqueue timeout rejection: timeout_ms=${submitIngressConfig.txQueueOfferTimeoutMs}`,
         );
         yield* Metric.increment(txQueueBackpressureRejectedCounter);
+        yield* Metric.increment(txOfferTimeoutRejectedCounter);
         return yield* HttpServerResponse.json(
           { error: `Transaction queue is saturated; retry later` },
           { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },

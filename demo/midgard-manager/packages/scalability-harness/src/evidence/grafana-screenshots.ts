@@ -22,6 +22,9 @@ const PEAK_METRICS = [
   'tx_stream_depth',
   'mempool_tx_count',
   'commit_block_duration_seconds',
+  'commitment_window_tx_requests_deferred',
+  'tx_submissions_rejected_stream_backpressure_total',
+  'tx_submissions_rejected_offer_timeout_total',
 ] as const;
 
 interface DashboardPanelLayout {
