@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { closeSync, openSync, unlinkSync } from 'node:fs';
+import { closeSync, openSync, readFileSync, unlinkSync, writeSync } from 'node:fs';
 import { constants as osConstants } from 'node:os';
 import { resolve } from 'node:path';
 import process from 'node:process';
@@ -12,14 +12,35 @@ const LOCK_PATH = resolve(REPO_ROOT, 'README.md.lock');
 const LOCK_POLL_MS = 50;
 const LOCK_TIMEOUT_MS = 30_000;
 
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function acquireLock() {
   const deadline = Date.now() + LOCK_TIMEOUT_MS;
   while (Date.now() < deadline) {
     try {
-      closeSync(openSync(LOCK_PATH, 'wx'));
+      const fd = openSync(LOCK_PATH, 'wx');
+      writeSync(fd, String(process.pid));
+      closeSync(fd);
       return;
     } catch (err) {
       if (err.code !== 'EEXIST') throw err;
+      // Check if the owning process is still alive; reclaim stale locks.
+      try {
+        const ownerPid = parseInt(readFileSync(LOCK_PATH, 'utf8'), 10);
+        if (!isNaN(ownerPid) && !isProcessAlive(ownerPid)) {
+          unlinkSync(LOCK_PATH);
+          continue;
+        }
+      } catch {
+        // lock disappeared between checks — retry naturally
+      }
     }
     await new Promise((res) => setTimeout(res, LOCK_POLL_MS));
   }
@@ -78,6 +99,13 @@ function runShellCommand(command) {
 }
 
 async function main() {
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    process.once(sig, () => {
+      releaseLock();
+      process.kill(process.pid, sig);
+    });
+  }
+
   const { badgeName, command } = parseArgs(process.argv.slice(2));
   const commandStatus = await runShellCommand(command);
 
