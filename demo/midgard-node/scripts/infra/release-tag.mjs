@@ -12,8 +12,8 @@ const environment = args.get("--environment") || "testnet";
 const branch = args.get("--branch") || environment;
 const service = args.get("--service") || "sundial-node";
 
-if (!["testnet", "mainnet"].includes(environment)) {
-  throw new Error("environment must be one of: testnet, mainnet.");
+if (environment !== "testnet") {
+  throw new Error("environment must be testnet.");
 }
 
 if (service !== "sundial-node") {

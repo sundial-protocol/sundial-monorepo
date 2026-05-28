@@ -22,6 +22,8 @@ enable_https_listener      = true
 sundial_node_image         = "000000000000.dkr.ecr.us-west-2.amazonaws.com/sundial/sundial-node:testnet-latest"
 sundial_node_desired_count = 1
 
+redis_node_type = "cache.t3.micro"
+
 rds_instance_class            = "db.t4g.micro"
 rds_multi_az                  = false
 rds_backup_retention_days     = 1

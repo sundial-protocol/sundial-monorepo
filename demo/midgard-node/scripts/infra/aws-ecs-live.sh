@@ -32,7 +32,7 @@ for arg in "$@"; do
     --region=*) REGION="${arg#*=}" ;;
     --service=*) SERVICE="${arg#*=}" ;;
     --help|-h)
-      echo "Usage: ./scripts/infra/aws-ecs-live.sh --environment=<testnet|mainnet> [--service=name|all]" >&2
+      echo "Usage: ./scripts/infra/aws-ecs-live.sh --environment=testnet [--service=name|all]" >&2
       exit 0
       ;;
     *) fail "unknown argument: ${arg}" ;;
@@ -41,8 +41,7 @@ done
 
 case "${ENVIRONMENT}" in
   testnet) REGION="${REGION:-us-west-2}" ;;
-  mainnet) REGION="${REGION:-us-west-1}" ;;
-  *) fail "--environment must be one of: testnet mainnet" ;;
+  *) fail "--environment must be testnet" ;;
 esac
 CLUSTER_NAME="sundial-node-${ENVIRONMENT}"
 

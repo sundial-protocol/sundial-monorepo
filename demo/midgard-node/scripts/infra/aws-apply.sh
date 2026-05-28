@@ -9,8 +9,7 @@ usage() {
 Usage: ./scripts/infra/aws-apply.sh <plan|apply|output|validate> [options]
 
 Options:
-  --environment=<testnet|mainnet>
-                                 Deployment environment (default: testnet)
+  --environment=testnet          Deployment environment (default: testnet)
   --service=<shared|sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|rds>
                                  Service selector for targeted apply
   --image-tag <tag>             Optional image tag for sundial-node
@@ -107,9 +106,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${ENVIRONMENT}" in
-  testnet|mainnet) ;;
+  testnet) ;;
   *)
-    fail "--environment must be one of: testnet mainnet"
+    fail "--environment must be testnet"
     ;;
 esac
 
@@ -135,7 +134,6 @@ resolve_platform_region() {
 
   case "${ENVIRONMENT}" in
     testnet) printf '%s' "us-west-2" ;;
-    mainnet) printf '%s' "us-west-1" ;;
     *) fail "unsupported environment for region mapping: ${ENVIRONMENT}" ;;
   esac
 }

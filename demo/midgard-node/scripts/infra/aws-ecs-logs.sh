@@ -16,9 +16,8 @@ usage() {
 Usage: ./scripts/infra/aws-ecs-logs.sh [options]
 
 Options:
-  --environment=<testnet|mainnet>
-                             Deployment environment (default: testnet)
-  --region=<aws-region>     AWS region (default: us-west-2 for testnet, us-west-1 for mainnet)
+  --environment=testnet      Deployment environment (default: testnet)
+  --region=<aws-region>     AWS region (default: us-west-2)
   --service=<name|all>      sundial-node,prometheus,loki,alloy,grafana,postgres-exporter,all
   --since=<duration>        CloudWatch tail window (default: 30m)
   --follow                  Follow log output (single service only)
@@ -82,8 +81,7 @@ done
 
 case "${ENVIRONMENT}" in
   testnet) REGION="${REGION:-us-west-2}" ;;
-  mainnet) REGION="${REGION:-us-west-1}" ;;
-  *) fail "--environment must be one of: testnet mainnet" ;;
+  *) fail "--environment must be testnet" ;;
 esac
 CLUSTER_NAME="sundial-node-${ENVIRONMENT}"
 LOG_GROUP="/ecs/${CLUSTER_NAME}"

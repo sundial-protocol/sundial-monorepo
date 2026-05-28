@@ -44,6 +44,12 @@ resource "aws_security_group" "sg_efs" {
   vpc_id      = aws_vpc.main.id
 }
 
+resource "aws_security_group" "sg_redis" {
+  name        = "${local.name_prefix}-sg-redis"
+  description = "ElastiCache Redis"
+  vpc_id      = aws_vpc.main.id
+}
+
 resource "aws_vpc_security_group_ingress_rule" "sg_alb_ingress_https" {
   security_group_id = aws_security_group.sg_alb.id
   cidr_ipv4         = "0.0.0.0/0"
@@ -125,6 +131,15 @@ resource "aws_vpc_security_group_egress_rule" "sg_ecs_egress_rds" {
   description                  = "PostgreSQL"
 }
 
+resource "aws_vpc_security_group_egress_rule" "sg_ecs_egress_redis" {
+  security_group_id            = aws_security_group.sg_ecs.id
+  referenced_security_group_id = aws_security_group.sg_redis.id
+  from_port                    = 6379
+  to_port                      = 6379
+  ip_protocol                  = "tcp"
+  description                  = "Redis"
+}
+
 resource "aws_vpc_security_group_egress_rule" "sg_ecs_egress_efs" {
   security_group_id            = aws_security_group.sg_ecs.id
   referenced_security_group_id = aws_security_group.sg_efs.id
@@ -177,6 +192,15 @@ resource "aws_vpc_security_group_ingress_rule" "sg_rds_ingress_from_ecs" {
   to_port                      = 5432
   ip_protocol                  = "tcp"
   description                  = "PostgreSQL from ECS"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "sg_redis_ingress_from_ecs" {
+  security_group_id            = aws_security_group.sg_redis.id
+  referenced_security_group_id = aws_security_group.sg_ecs.id
+  from_port                    = 6379
+  to_port                      = 6379
+  ip_protocol                  = "tcp"
+  description                  = "Redis from ECS"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "sg_efs_ingress_from_ecs" {
