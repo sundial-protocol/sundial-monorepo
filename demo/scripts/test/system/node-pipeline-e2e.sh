@@ -48,8 +48,6 @@ upsert_env REDIS_STREAM_KEY "midgard:tx-submissions:pipeline-e2e"
 upsert_env REDIS_STREAM_CONSUMER_GROUP "midgard-tx-processors"
 upsert_env REDIS_STREAM_CONSUMER_NAME "midgard-node-pipeline-e2e"
 upsert_env TX_QUEUE_DEAD_LETTER_STREAM "midgard:tx-submissions:pipeline-e2e:dead-letter"
-upsert_env TX_QUEUE_CAPACITY 50000
-upsert_env TX_QUEUE_MAX_PENDING 100000
 upsert_env TX_QUEUE_DRAIN_BATCH_SIZE 250
 upsert_env REDIS_STREAM_BLOCK_MS 500
 upsert_env LUCID_INIT_MAX_RETRIES 0

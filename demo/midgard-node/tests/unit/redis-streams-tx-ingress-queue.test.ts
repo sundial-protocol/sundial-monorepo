@@ -273,6 +273,40 @@ describe("RedisStreamsTxIngressQueue", () => {
     }).pipe(runWithQueue),
   );
 
+  it.effect("rawXadd invokes callback with stream id on success", () =>
+    Effect.gen(function* () {
+      redisState.xaddImpl = () => Promise.resolve("7-0");
+      const queue = yield* TxIngressQueue;
+
+      const id = yield* Effect.async<string | null, Error>((resume) => {
+        queue.rawXadd("deadbeef", (err, result) => {
+          resume(err ? Effect.fail(err) : Effect.succeed(result));
+        });
+      });
+
+      expect(id).toBe("7-0");
+      const xaddCalls = redisState.calls.filter((c) => c.method === "xadd");
+      expect(xaddCalls.length).toBe(1);
+    }).pipe(runWithQueue),
+  );
+
+  it.effect("rawXadd invokes callback with error when xadd rejects", () =>
+    Effect.gen(function* () {
+      redisState.xaddImpl = () => Promise.reject(new Error("stream full"));
+      const queue = yield* TxIngressQueue;
+
+      const caught = yield* Effect.async<Error>((resume) => {
+        queue.rawXadd("ff", (err, _id) => {
+          if (err) {
+            resume(Effect.succeed(err));
+          }
+        });
+      });
+
+      expect(caught.message).toBe("stream full");
+    }).pipe(runWithQueue),
+  );
+
   it.effect("snapshotMetrics returns cached values without Redis calls", () =>
     Effect.gen(function* () {
       redisState.xlenImpl = () => Promise.resolve(10);

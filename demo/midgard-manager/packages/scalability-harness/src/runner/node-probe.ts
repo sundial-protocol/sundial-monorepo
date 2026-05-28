@@ -4,8 +4,7 @@ import { makeEvent } from '../evidence/load-events.js';
 
 export const PROBE_INTERVAL_MS = 5_000;
 export const PROBE_TIMEOUT_MS = 5_000;
-// Matches MidgardNodeClient.isAvailable() — 404 means the node answered, not that the tx exists.
-const PROBE_TX_HASH = '0'.repeat(64);
+const HEALTH_LIVE_PATH = '/health/live';
 
 export interface ProbeResult {
   ok: boolean;
@@ -44,7 +43,7 @@ export async function probeNode(
   timeoutMs: number,
   fetcher: Fetcher = (url, init) => fetch(url, init)
 ): Promise<ProbeResult> {
-  const url = `${nodeEndpoint}/tx?tx_hash=${PROBE_TX_HASH}`;
+  const url = `${nodeEndpoint.replace(/\/$/, '')}${HEALTH_LIVE_PATH}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const start = Date.now();
@@ -54,8 +53,7 @@ export async function probeNode(
     clearTimeout(timer);
     const latencyMs = Date.now() - start;
 
-    // 404 is the expected "node is alive" response — same rule as MidgardNodeClient.isAvailable().
-    const ok = response.status === 404;
+    const ok = response.status === 200;
     return { ok, statusCode: response.status, latencyMs };
   } catch (err) {
     clearTimeout(timer);

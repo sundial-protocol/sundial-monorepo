@@ -189,7 +189,7 @@ function makeOptions(
   const { spawner } = makeMockSpawner();
   const collector = makeHostCollector();
   return {
-    probeFetcher: vi.fn().mockResolvedValue({ status: 404 } as Response),
+    probeFetcher: vi.fn().mockResolvedValue({ status: 200 } as Response),
     probeIntervalMs: 10,
     probeTimeoutMs: 100,
     tierDurationMs: 50,
@@ -979,7 +979,7 @@ describe('runTier', () => {
   });
 
   it('runs probe loop during load phase', async () => {
-    const probeFetcher = vi.fn().mockResolvedValue({ status: 404 } as Response);
+    const probeFetcher = vi.fn().mockResolvedValue({ status: 200 } as Response);
     const opts = makeOptions({ probeFetcher });
 
     await runTier(BASE_SCENARIO, BASE_TIER, writer, prometheusClient, opts);
@@ -991,7 +991,7 @@ describe('runTier', () => {
 
   it('runs recovery probe loop after the load phase', async () => {
     // Probe is healthy — load phase completes normally, then recovery runs
-    const probeFetcher = vi.fn().mockResolvedValue({ status: 404 } as Response);
+    const probeFetcher = vi.fn().mockResolvedValue({ status: 200 } as Response);
     const opts = makeOptions({ probeFetcher, tierDurationMs: 30, recoveryDurationMs: 50 });
 
     await runTier(BASE_SCENARIO, BASE_TIER, writer, prometheusClient, opts);
@@ -1129,7 +1129,7 @@ describe('runTier', () => {
     const probeFetcher = vi.fn().mockImplementation(async () => {
       calls++;
       // First few calls are during load phase (healthy), rest fail
-      if (calls <= 3) return { status: 404 } as Response;
+      if (calls <= 3) return { status: 200 } as Response;
       return { status: 503 } as Response;
     });
 

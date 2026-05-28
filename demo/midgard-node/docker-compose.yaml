@@ -36,6 +36,8 @@ services:
         condition: service_healthy
     logging: *default-logging
     restart: always
+    profiles:
+      - monolith
     networks:
       net:
 
@@ -265,14 +267,13 @@ services:
 
   grafana:
     image: grafana/grafana:12.3.2
+    user: root
     ports:
       - "3001:3000"
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
-      - DS_PROMETHEUS=prometheus
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor metricsSummary
     volumes:
       - "grafana-data:/var/lib/grafana"
       - "./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml"

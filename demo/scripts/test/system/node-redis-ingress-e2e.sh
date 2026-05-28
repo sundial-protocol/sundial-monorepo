@@ -37,8 +37,6 @@ upsert_env REDIS_STREAM_KEY midgard:tx-submissions:e2e
 upsert_env REDIS_STREAM_CONSUMER_GROUP midgard-tx-processors
 upsert_env REDIS_STREAM_CONSUMER_NAME midgard-node-e2e
 upsert_env TX_QUEUE_DEAD_LETTER_STREAM midgard:tx-submissions:e2e:dead-letter
-upsert_env TX_QUEUE_CAPACITY 10000
-upsert_env TX_QUEUE_MAX_PENDING 20000
 upsert_env LUCID_INIT_MAX_RETRIES 0
 upsert_env NODE_API_HOST_PORT "$E2E_NODE_API_PORT"
 upsert_env NODE_PROM_HOST_PORT "$E2E_NODE_PROM_PORT"

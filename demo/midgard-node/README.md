@@ -51,7 +51,7 @@ quite easily.
 6. Run the application stack:
 
    ```sh
-   docker compose up -d
+   docker compose --profile monolith up -d
 
    # or this for development:
    docker compose -f docker-compose.dev.yaml up -d
@@ -68,8 +68,7 @@ docker compose logs -f node
 Split-role deployment is also supported with separate containers (same image):
 
 ```sh
-docker compose --profile split up -d --build \
-  node-api node-tx-processor node-sequencer postgres redis prometheus grafana
+docker compose --profile split up -d --build
 ```
 
 Split role mapping:
@@ -86,7 +85,7 @@ with the 3 steps:
 
 ```sh
 docker compose down -v
-docker compose up -d --build
+docker compose --profile monolith up -d --build
 ```
 
 ### Without Docker (No Monitoring)
@@ -101,11 +100,8 @@ POSTGRES_DB=midgard
 POSTGRES_HOST=localhost
 LEDGER_MPT_DB_PATH=midgard-ledger-mpt-db
 MEMPOOL_MPT_DB_PATH=midgard-mempool-mpt-db
-TX_QUEUE_CAPACITY=250000
-TX_QUEUE_MAX_PENDING=20000
-TX_QUEUE_DRAIN_BATCH_SIZE=500
+TX_QUEUE_DRAIN_BATCH_SIZE=100
 TX_QUEUE_PROCESSOR_INTERVAL_MS=250
-TX_QUEUE_OFFER_TIMEOUT_MS=1000
 TX_QUEUE_CLAIM_IDLE_MS=30000
 TX_QUEUE_CLAIM_BATCH_SIZE=100
 TX_QUEUE_MAX_DELIVERY_ATTEMPTS=5

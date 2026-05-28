@@ -29,11 +29,9 @@ type NodeConfigDep = {
   COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_BYTES: number;
   COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: number;
-  TX_QUEUE_CAPACITY: number;
-  TX_QUEUE_MAX_PENDING: number;
   TX_QUEUE_DRAIN_BATCH_SIZE: number;
+  TX_QUEUE_CONSUMER_WORKER_COUNT: number;
   TX_QUEUE_PROCESSOR_INTERVAL_MS: number;
-  TX_QUEUE_OFFER_TIMEOUT_MS: number;
   TX_QUEUE_CLAIM_IDLE_MS: number;
   TX_QUEUE_CLAIM_BATCH_SIZE: number;
   TX_QUEUE_MAX_DELIVERY_ATTEMPTS: number;
@@ -148,21 +146,15 @@ const makeConfig = Effect.gen(function* () {
   const commitmentMaxTxRequestsPerBlock = yield* Config.integer(
     "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
   ).pipe(Config.withDefault(2_000));
-  const txQueueCapacity = yield* Config.integer("TX_QUEUE_CAPACITY").pipe(
-    Config.withDefault(250_000),
-  );
-  const txQueueMaxPending = yield* Config.integer("TX_QUEUE_MAX_PENDING").pipe(
-    Config.withDefault(20_000),
-  );
   const txQueueDrainBatchSize = yield* Config.integer(
     "TX_QUEUE_DRAIN_BATCH_SIZE",
-  ).pipe(Config.withDefault(500));
+  ).pipe(Config.withDefault(100));
+  const txQueueConsumerWorkerCount = yield* Config.integer(
+    "TX_QUEUE_CONSUMER_WORKER_COUNT",
+  ).pipe(Config.withDefault(1));
   const txQueueProcessorIntervalMs = yield* Config.integer(
     "TX_QUEUE_PROCESSOR_INTERVAL_MS",
   ).pipe(Config.withDefault(250));
-  const txQueueOfferTimeoutMs = yield* Config.integer(
-    "TX_QUEUE_OFFER_TIMEOUT_MS",
-  ).pipe(Config.withDefault(1_000));
   const txQueueClaimIdleMs = yield* Config.integer(
     "TX_QUEUE_CLAIM_IDLE_MS",
   ).pipe(Config.withDefault(30_000));
@@ -317,19 +309,17 @@ const makeConfig = Effect.gen(function* () {
           }),
         );
 
-  yield* assertPositiveInteger("TX_QUEUE_CAPACITY", txQueueCapacity);
-  yield* assertPositiveInteger("TX_QUEUE_MAX_PENDING", txQueueMaxPending);
   yield* assertPositiveInteger(
     "TX_QUEUE_DRAIN_BATCH_SIZE",
     txQueueDrainBatchSize,
   );
   yield* assertPositiveInteger(
-    "TX_QUEUE_PROCESSOR_INTERVAL_MS",
-    txQueueProcessorIntervalMs,
+    "TX_QUEUE_CONSUMER_WORKER_COUNT",
+    txQueueConsumerWorkerCount,
   );
   yield* assertPositiveInteger(
-    "TX_QUEUE_OFFER_TIMEOUT_MS",
-    txQueueOfferTimeoutMs,
+    "TX_QUEUE_PROCESSOR_INTERVAL_MS",
+    txQueueProcessorIntervalMs,
   );
   yield* assertPositiveInteger("TX_QUEUE_CLAIM_IDLE_MS", txQueueClaimIdleMs);
   yield* assertPositiveInteger(
@@ -398,11 +388,9 @@ const makeConfig = Effect.gen(function* () {
     COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: commitmentWindowWarnTotalEvents,
     COMMITMENT_WINDOW_WARN_TOTAL_BYTES: commitmentWindowWarnTotalBytes,
     COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: commitmentMaxTxRequestsPerBlock,
-    TX_QUEUE_CAPACITY: txQueueCapacity,
-    TX_QUEUE_MAX_PENDING: txQueueMaxPending,
     TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,
+    TX_QUEUE_CONSUMER_WORKER_COUNT: txQueueConsumerWorkerCount,
     TX_QUEUE_PROCESSOR_INTERVAL_MS: txQueueProcessorIntervalMs,
-    TX_QUEUE_OFFER_TIMEOUT_MS: txQueueOfferTimeoutMs,
     TX_QUEUE_CLAIM_IDLE_MS: txQueueClaimIdleMs,
     TX_QUEUE_CLAIM_BATCH_SIZE: txQueueClaimBatchSize,
     TX_QUEUE_MAX_DELIVERY_ATTEMPTS: txQueueMaxDeliveryAttempts,

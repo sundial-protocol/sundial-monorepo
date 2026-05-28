@@ -39,6 +39,7 @@ import {
   MempoolLedgerDB,
 } from "@/database/index.js";
 import { isHexString } from "@/utils.js";
+import { createRawSubmitInterceptor } from "@/services/raw-submit-interceptor.js";
 import {
   HttpRouter,
   HttpServer,
@@ -84,8 +85,6 @@ const COMMITMENT_WALLET_BALANCE_ENDPOINT: string = "commitment-wallet/balance";
 const HEALTH_LIVE_ENDPOINT: string = "health/live";
 const HEALTH_READY_ENDPOINT: string = "health/ready";
 const COMMITMENT_WALLET_BALANCE_QUERY_TIMEOUT_MS = 4_000;
-const BACKPRESSURE_REJECTION_LOG_INTERVAL_MS = 1_000;
-
 const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
     "A counter for tracking L2 transaction submissions that passed hex validation and were enqueued to the durable ingress stream",
@@ -99,36 +98,6 @@ const txRejectedCounter = Metric.counter("tx_submissions_rejected", {
   bigint: true,
   incremental: true,
 }).register();
-
-const txQueueBackpressureRejectedCounter = Metric.counter(
-  "tx_submissions_rejected_queue_backpressure",
-  {
-    description:
-      "A counter for tracking L2 transaction submissions rejected because the durable ingress stream exceeded configured backpressure thresholds",
-    bigint: true,
-    incremental: true,
-  },
-).register();
-
-const txStreamBackpressureRejectedCounter = Metric.counter(
-  "tx_submissions_rejected_stream_backpressure",
-  {
-    description:
-      "A counter for tracking submissions rejected before enqueue because stream lag/pending thresholds were exceeded",
-    bigint: true,
-    incremental: true,
-  },
-).register();
-
-const txOfferTimeoutRejectedCounter = Metric.counter(
-  "tx_submissions_rejected_offer_timeout",
-  {
-    description:
-      "A counter for tracking submissions rejected because enqueue offer timed out",
-    bigint: true,
-    incremental: true,
-  },
-).register();
 
 const failWith500Helper = (
   logLabel: string,
@@ -150,26 +119,6 @@ const failWith500 = (
   error: HttpBodyError | string | any,
   msgOverride?: string,
 ) => failWith500Helper(`${method} /${endpoint}`, "failure", error, msgOverride);
-
-const createRateLimitedInfoLogger = (intervalMs: number) => {
-  let nextAllowedLogAtMs = 0;
-  let suppressedCount = 0;
-
-  return (message: string) =>
-    Effect.gen(function* () {
-      const nowMs = Date.now();
-      if (nowMs < nextAllowedLogAtMs) {
-        suppressedCount += 1;
-        return;
-      }
-
-      const suppressedSuffix =
-        suppressedCount > 0 ? ` suppressed=${suppressedCount}` : "";
-      suppressedCount = 0;
-      nextAllowedLogAtMs = nowMs + intervalMs;
-      yield* Effect.logInfo(`${message}${suppressedSuffix}`);
-    });
-};
 
 const handleDBGetFailure = (endpoint: string, e: DatabaseError) =>
   failWith500("GET", endpoint, e.cause, `db failure with table ${e.table}`);
@@ -762,20 +711,10 @@ const getLogGlobalsHandler = Effect.gen(function* () {
 
 type SubmitIngressConfig = {
   readonly txIngressQueue: TxIngressQueueService;
-  readonly txQueueOfferTimeoutMs: number;
-  readonly txQueueCapacity: number;
-  readonly txQueueMaxPending: number;
 };
 
-const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) => {
-  const logEnqueueTimeoutRejection = createRateLimitedInfoLogger(
-    BACKPRESSURE_REJECTION_LOG_INTERVAL_MS,
-  );
-  const logStreamBackpressureRejection = createRateLimitedInfoLogger(
-    BACKPRESSURE_REJECTION_LOG_INTERVAL_MS,
-  );
-
-  return Effect.gen(function* () {
+const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
+  Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const txString = yield* request.text;
     if (!isHexString(txString)) {
@@ -785,49 +724,14 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) => {
         { error: `Invalid CBOR provided` },
         { status: 400 },
       );
-    } else {
-      const snapshot =
-        yield* submitIngressConfig.txIngressQueue.snapshotMetrics;
-
-      if (
-        snapshot.lagCount >= submitIngressConfig.txQueueCapacity ||
-        snapshot.pendingCount >= submitIngressConfig.txQueueMaxPending
-      ) {
-        yield* logStreamBackpressureRejection(
-          `POST /${SUBMIT_ENDPOINT} - stream backpressure rejection: lag=${snapshot.lagCount} pending=${snapshot.pendingCount} max_lag=${submitIngressConfig.txQueueCapacity} max_pending=${submitIngressConfig.txQueueMaxPending}`,
-        );
-        yield* Metric.increment(txQueueBackpressureRejectedCounter);
-        yield* Metric.increment(txStreamBackpressureRejectedCounter);
-        return yield* HttpServerResponse.json(
-          { error: `Transaction queue is saturated; retry later` },
-          { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
-        );
-      }
-
-      const offered = yield* Effect.raceFirst(
-        submitIngressConfig.txIngressQueue
-          .enqueue(txString)
-          .pipe(Effect.as(true)),
-        Effect.sleep(
-          Duration.millis(submitIngressConfig.txQueueOfferTimeoutMs),
-        ).pipe(Effect.as(false)),
-      );
-      if (!offered) {
-        yield* logEnqueueTimeoutRejection(
-          `POST /${SUBMIT_ENDPOINT} - enqueue timeout rejection: timeout_ms=${submitIngressConfig.txQueueOfferTimeoutMs}`,
-        );
-        yield* Metric.increment(txQueueBackpressureRejectedCounter);
-        yield* Metric.increment(txOfferTimeoutRejectedCounter);
-        return yield* HttpServerResponse.json(
-          { error: `Transaction queue is saturated; retry later` },
-          { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
-        );
-      }
-      yield* Metric.increment(txAcceptedCounter);
-      return yield* HttpServerResponse.json({
-        message: `Successfully added the transaction to the queue`,
-      });
     }
+    const messageId =
+      yield* submitIngressConfig.txIngressQueue.enqueue(txString);
+    yield* Metric.increment(txAcceptedCounter);
+    return yield* HttpServerResponse.json({
+      message: `Successfully added the transaction to the queue`,
+      id: messageId,
+    });
   }).pipe(
     Effect.catchTag("HttpBodyError", (e) =>
       failWith500("POST", "submit", e, "▫️ L2 transaction failed"),
@@ -841,7 +745,6 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) => {
       ),
     ),
   );
-};
 
 export const postSubmitHandlerForTesting = postSubmitHandler;
 export const createResetHandlerForTesting = createResetHandler;
@@ -966,12 +869,27 @@ const apiIngressRouter = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   HttpBodyError,
-  Database | HttpServerRequest.HttpServerRequest
+  | Database
+  | Lucid
+  | NodeConfig
+  | AlwaysSucceedsContract
+  | HttpServerRequest.HttpServerRequest
+  | Globals
+  | TxIngressQueue
 > =>
   HttpRouter.empty
     .pipe(
       HttpRouter.get(`/${HEALTH_LIVE_ENDPOINT}`, getHealthLiveHandler),
       HttpRouter.get(`/${HEALTH_READY_ENDPOINT}`, getHealthReadyHandler),
+      HttpRouter.get(`/${COMMIT_ENDPOINT}`, getCommitEndpoint),
+      HttpRouter.get(
+        `/${STATE_QUEUE_ROOT_UNIT_DIAGNOSTICS_ENDPOINT}`,
+        getStateQueueRootUnitDiagnosticsHandler,
+      ),
+      HttpRouter.get(
+        `/${COMMITMENT_WALLET_BALANCE_ENDPOINT}`,
+        getCommitmentWalletBalanceHandler,
+      ),
       HttpRouter.post(
         `/${SUBMIT_ENDPOINT}`,
         postSubmitHandler(submitIngressConfig),
@@ -1013,31 +931,35 @@ export const runNode = (withMonitoring?: boolean) =>
       yield* Genesis.program.pipe(Effect.provide(Database.Sequencer.layer));
     }
 
-    const appThread =
-      shouldRunApiRole && txIngressQueue !== null
-        ? Layer.launch(
-            Layer.provide(
-              HttpServer.serve(
-                nodeConfig.NODE_ROLE === "api"
-                  ? apiIngressRouter({
-                      txIngressQueue,
-                      txQueueOfferTimeoutMs:
-                        nodeConfig.TX_QUEUE_OFFER_TIMEOUT_MS,
-                      txQueueCapacity: nodeConfig.TX_QUEUE_CAPACITY,
-                      txQueueMaxPending: nodeConfig.TX_QUEUE_MAX_PENDING,
-                    })
-                  : router({
-                      txIngressQueue,
-                      txQueueOfferTimeoutMs:
-                        nodeConfig.TX_QUEUE_OFFER_TIMEOUT_MS,
-                      txQueueCapacity: nodeConfig.TX_QUEUE_CAPACITY,
-                      txQueueMaxPending: nodeConfig.TX_QUEUE_MAX_PENDING,
-                    }),
-              ),
-              NodeHttpServer.layer(createServer, { port: nodeConfig.PORT }),
-            ),
-          )
-        : Effect.void;
+    // Pre-create the HTTP server so the raw submit interceptor can be attached
+    // before Effect registers its 'request' listener via NodeHttpServer.layer.
+    const httpServer =
+      shouldRunApiRole && txIngressQueue !== null ? createServer() : null;
+
+    if (httpServer !== null && txIngressQueue !== null) {
+      createRawSubmitInterceptor({
+        xadd: txIngressQueue.rawXadd,
+        onEnqueued: () => Effect.runSync(Metric.increment(txAcceptedCounter)),
+        onRejected: () => Effect.runSync(Metric.increment(txRejectedCounter)),
+      }).attachToServer(httpServer);
+    }
+
+    const appThread = (() => {
+      if (!shouldRunApiRole || txIngressQueue === null || httpServer === null) {
+        return Effect.void;
+      }
+      const srv = httpServer;
+      return Layer.launch(
+        Layer.provide(
+          HttpServer.serve(
+            nodeConfig.NODE_ROLE === "api"
+              ? apiIngressRouter({ txIngressQueue })
+              : router({ txIngressQueue }),
+          ),
+          NodeHttpServer.layer(() => srv, { port: nodeConfig.PORT }),
+        ),
+      );
+    })();
 
     const mkSchedule = (millisBetweenRuns: number) =>
       Schedule.spaced(Duration.millis(millisBetweenRuns));
@@ -1074,6 +996,8 @@ export const runNode = (withMonitoring?: boolean) =>
               nodeConfig.TX_QUEUE_DRAIN_BATCH_SIZE,
               nodeConfig.TX_PARSE_CONCURRENCY,
               nodeConfig.REDIS_STREAM_BLOCK_MS,
+              nodeConfig.TX_QUEUE_CONSUMER_WORKER_COUNT,
+              nodeConfig.REDIS_STREAM_CONSUMER_NAME,
               withMonitoring,
             )
           : Effect.void,

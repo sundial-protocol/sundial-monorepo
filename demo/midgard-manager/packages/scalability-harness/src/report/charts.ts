@@ -74,12 +74,16 @@ export type ChartSection =
   | 'Failure Signals'
   | 'Infrastructure';
 
+type DerivedSeriesKind = 'direct' | 'net_mempool_drain' | 'mempool_count_derivative';
+
 export interface PanelSpec {
   slug: string;
   title: string;
   section: ChartSection;
   /** Key into TierMetricWindow.ranges */
   metric: string;
+  /** How this panel's series should be computed */
+  derivedKind?: DerivedSeriesKind;
   /** Compute per-second rate from raw counter values */
   rate: boolean;
   unit: string;
@@ -129,6 +133,16 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     formatY: 'default',
   },
   {
+    slug: 'net-mempool-drain-rate',
+    title: 'Net Mempool Drain Rate (committed - accepted tx/s)',
+    section: 'Throughput',
+    metric: '__derived__net_mempool_drain',
+    derivedKind: 'net_mempool_drain',
+    rate: false,
+    unit: 'tx/s',
+    formatY: 'default',
+  },
+  {
     slug: 'received-cumulative',
     title: 'Received Transactions',
     section: 'Throughput',
@@ -166,6 +180,16 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'mempool_tx_count',
     rate: false,
     unit: 'txs',
+    formatY: 'default',
+  },
+  {
+    slug: 'mempool-growth-rate',
+    title: 'Mempool Growth Rate (d/dt mempool tx count)',
+    section: 'Queue and Mempool',
+    metric: '__derived__mempool_count_derivative',
+    derivedKind: 'mempool_count_derivative',
+    rate: false,
+    unit: 'tx/s',
     formatY: 'default',
   },
   {
@@ -420,7 +444,57 @@ function computeRate(values: Array<[number, number]>): Array<[number, number]> {
   return result;
 }
 
+function aggregateMetricSeries(
+  windows: TierMetricWindow[],
+  metricQuery: string
+): Array<[number, number]> {
+  const series = windows.flatMap((w) => w.ranges[metricQuery] ?? []);
+  const byTimestamp = new Map<number, number>();
+
+  for (const metricSeries of series) {
+    for (const [ts, raw] of metricSeries.values) {
+      const numeric = parseFloat(raw);
+      if (!isFinite(numeric)) continue;
+      byTimestamp.set(ts, (byTimestamp.get(ts) ?? 0) + numeric);
+    }
+  }
+
+  return [...byTimestamp.entries()].sort((a, b) => a[0] - b[0]);
+}
+
+function dataRowsFromSeries(values: Array<[number, number]>, series: string): DataRow[] {
+  return values.map(([ts, value]) => ({
+    ts: new Date(ts * 1000).toISOString(),
+    value,
+    series,
+  }));
+}
+
 export function buildDataRows(windows: TierMetricWindow[], spec: PanelSpec): DataRow[] {
+  const derivedKind = spec.derivedKind ?? 'direct';
+  if (derivedKind === 'net_mempool_drain') {
+    const committedRates = computeRate(
+      aggregateMetricSeries(windows, 'commit_block_tx_count_total')
+    );
+    const acceptedRates = computeRate(
+      aggregateMetricSeries(windows, 'tx_submissions_mempool_accepted_total')
+    );
+    const committedByTimestamp = new Map<number, number>(committedRates);
+    const acceptedByTimestamp = new Map<number, number>(acceptedRates);
+    const timestamps = [...new Set([...committedByTimestamp.keys(), ...acceptedByTimestamp.keys()])]
+      .sort((a, b) => a - b);
+    const netSeries = timestamps.map(
+      (ts): [number, number] =>
+        [ts, (committedByTimestamp.get(ts) ?? 0) - (acceptedByTimestamp.get(ts) ?? 0)]
+    );
+    return dataRowsFromSeries(netSeries, '');
+  }
+
+  if (derivedKind === 'mempool_count_derivative') {
+    const mempoolGrowthRate = computeRate(aggregateMetricSeries(windows, 'mempool_tx_count'));
+    return dataRowsFromSeries(mempoolGrowthRate, '');
+  }
+
   const allRawSeries = windows.flatMap((w) => w.ranges[spec.metric] ?? []);
   const merged = mergeSeriesByMetric(allRawSeries);
   const rows: DataRow[] = [];

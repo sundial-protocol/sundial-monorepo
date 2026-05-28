@@ -21,10 +21,15 @@ export type TxIngressQueueService = {
   readonly enqueue: (
     txCbor: string,
   ) => Effect.Effect<string, TxIngressQueueError>;
+  readonly rawXadd: (
+    txCbor: string,
+    callback: (err: Error | null | undefined, id: string | null) => void,
+  ) => void;
   readonly ensureConsumerGroup: Effect.Effect<void, TxIngressQueueError>;
   readonly consumeBatch: (
     maxCount: number,
     blockMs: number,
+    consumerName?: string,
   ) => Effect.Effect<readonly TxIngressMessage[], TxIngressQueueError>;
   readonly ack: (
     messageIds: readonly string[],

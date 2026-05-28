@@ -7,11 +7,14 @@ MIDGARD_NODE_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${MIDGARD_NODE_DIR}"
 
 PROJECT_LABEL="com.docker.compose.project=sundial"
-SERVICE_LABEL="com.docker.compose.service=node"
+SPLIT_SERVICES=(node-api node-tx-processor node-sequencer)
+MONOLITH_SERVICE="node"
+SERVICES_TO_REMOVE=("${SPLIT_SERVICES[@]}" "${MONOLITH_SERVICE}")
 
-# Drop existing node container so its image becomes prune-eligible.
-EXISTING_NODE_IDS="$(docker compose ps -q node || true)"
-docker compose rm -sf node || true
+# Drop existing split-role and monolith containers so their images become
+# prune-eligible and host ports are released before split startup.
+EXISTING_NODE_IDS="$(docker compose ps -q "${SERVICES_TO_REMOVE[@]}" || true)"
+docker compose rm -sf "${SERVICES_TO_REMOVE[@]}" || true
 
 # Docker can report "removal ... is already in progress" for a short window.
 # Wait until previously known node container IDs are fully removed.
@@ -26,15 +29,13 @@ if [[ -n "${EXISTING_NODE_IDS}" ]]; then
   done
 fi
 
-# Remove any unused previously built node images from this compose project.
-docker image prune -af \
-  --filter "label=${PROJECT_LABEL}" \
-  --filter "label=${SERVICE_LABEL}"
+# Remove any unused previously built images from this compose project.
+docker image prune -af --filter "label=${PROJECT_LABEL}"
 
-# Rebuild and recreate node from scratch.
+# Rebuild and recreate split-role node services from scratch.
 for attempt in 1 2 3; do
   ATTEMPT_LOG_FILE="$(mktemp)"
-  if docker compose up -d --no-deps --build --force-recreate node 2>&1 | tee "${ATTEMPT_LOG_FILE}"; then
+  if docker compose --profile split up -d --no-deps --build --force-recreate "${SPLIT_SERVICES[@]}" 2>&1 | tee "${ATTEMPT_LOG_FILE}"; then
     rm -f "${ATTEMPT_LOG_FILE}"
     exit 0
   fi
