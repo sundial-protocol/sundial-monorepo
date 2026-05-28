@@ -91,7 +91,9 @@ const spawnWorker = (): WorkerSlot => {
       );
       return;
     }
-    pendingRequest.complete(Effect.succeed(deserializeProcessedTx(message.parsed)));
+    pendingRequest.complete(
+      Effect.succeed(deserializeProcessedTx(message.parsed)),
+    );
   });
 
   worker.on("error", (error: Error) => {
@@ -166,14 +168,19 @@ export const parseTxCborInWorkerPool = (
   workerPoolSize: number,
 ): Effect.Effect<ProcessedTx, SDK.CmlDeserializationError | WorkerError> =>
   existsSync(TX_PARSE_WORKER_FILE)
-    ? txParseWorkerPoolSemaphore.withPermits(1)(
-        Effect.sync(() => getOrSpawnWorkerPool(Math.max(1, workerPoolSize))),
-      ).pipe(
-        Effect.flatMap((state) =>
-          Effect.async<ProcessedTx, SDK.CmlDeserializationError | WorkerError>(
-            (resume) => {
+    ? txParseWorkerPoolSemaphore
+        .withPermits(1)(
+          Effect.sync(() => getOrSpawnWorkerPool(Math.max(1, workerPoolSize))),
+        )
+        .pipe(
+          Effect.flatMap((state) =>
+            Effect.async<
+              ProcessedTx,
+              SDK.CmlDeserializationError | WorkerError
+            >((resume) => {
               const requestId = state.nextRequestId++;
-              const workerIndex = state.nextWorkerIndex++ % state.workers.length;
+              const workerIndex =
+                state.nextWorkerIndex++ % state.workers.length;
               const workerSlot = state.workers[workerIndex];
 
               let done = false;
@@ -205,10 +212,9 @@ export const parseTxCborInWorkerPool = (
                 }
                 workerSlot.pending.delete(requestId);
               });
-            },
+            }),
           ),
-        ),
-      )
+        )
     : breakDownTx(fromHex(txCborHex));
 
 export const unsafeResetTxParseWorkerPoolForTesting = () => {

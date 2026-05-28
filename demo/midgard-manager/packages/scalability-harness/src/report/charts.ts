@@ -481,12 +481,13 @@ export function buildDataRows(windows: TierMetricWindow[], spec: PanelSpec): Dat
     );
     const committedByTimestamp = new Map<number, number>(committedRates);
     const acceptedByTimestamp = new Map<number, number>(acceptedRates);
-    const timestamps = [...new Set([...committedByTimestamp.keys(), ...acceptedByTimestamp.keys()])]
-      .sort((a, b) => a - b);
-    const netSeries = timestamps.map(
-      (ts): [number, number] =>
-        [ts, (committedByTimestamp.get(ts) ?? 0) - (acceptedByTimestamp.get(ts) ?? 0)]
-    );
+    const timestamps = [
+      ...new Set([...committedByTimestamp.keys(), ...acceptedByTimestamp.keys()]),
+    ].sort((a, b) => a - b);
+    const netSeries = timestamps.map((ts): [number, number] => [
+      ts,
+      (committedByTimestamp.get(ts) ?? 0) - (acceptedByTimestamp.get(ts) ?? 0),
+    ]);
     return dataRowsFromSeries(netSeries, '');
   }
 

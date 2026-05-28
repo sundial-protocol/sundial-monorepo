@@ -16,12 +16,12 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:security:start -->
-<img alt="Security" src="https://img.shields.io/badge/security-passing-brightgreen?style=flat-square" />
+<img alt="Security" src="https://img.shields.io/badge/security-failing-red?style=flat-square" />
 <!-- badge:security:end -->
     </td>
     <td>
       <!-- badge:infra:start -->
-<img alt="Infra" src="https://img.shields.io/badge/infra-passing-brightgreen?style=flat-square" />
+<img alt="Infra" src="https://img.shields.io/badge/infra-failing-red?style=flat-square" />
 <!-- badge:infra:end -->
     </td>
   </tr>
@@ -45,7 +45,7 @@ Submodules are listed below.
   <tr>
     <td>
       <!-- badge:node-coverage:start -->
-<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-78.5%25-orange?style=flat-square" />
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-74.8%25-orange?style=flat-square" />
 <!-- badge:node-coverage:end -->
     </td>
     <td>
