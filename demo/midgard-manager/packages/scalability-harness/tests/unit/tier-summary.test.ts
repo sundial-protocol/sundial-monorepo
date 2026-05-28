@@ -80,10 +80,7 @@ function makeWindowSummary(
         'tx_submissions_rejected_stream_backpressure_total',
         o.streamBackpressureRejectedDelta
       ),
-      makeCounterDelta(
-        'tx_submissions_rejected_offer_timeout_total',
-        o.offerTimeoutRejectedDelta
-      ),
+      makeCounterDelta('tx_submissions_rejected_offer_timeout_total', o.offerTimeoutRejectedDelta),
       makeCounterDelta('tx_submissions_mempool_accepted_total', o.mempoolAcceptedDelta),
       makeCounterDelta('tx_stream_fail_total', o.processingFailedDelta),
       makeCounterDelta('commit_block_tx_count_total', o.committedTxDelta),

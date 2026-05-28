@@ -290,8 +290,25 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
               : Effect.succeed(String(id)),
           ),
         ),
+      rawXadd: (txCbor, callback) => {
+        producerClient
+          .xadd(
+            config.REDIS_STREAM_KEY,
+            "*",
+            TX_STREAM_MESSAGE_CBOR_FIELD,
+            txCbor,
+          )
+          .then((id) => callback(null, id))
+          .catch((err: unknown) => {
+            callback(err instanceof Error ? err : new Error(String(err)), null);
+          });
+      },
       ensureConsumerGroup: ensureGroup,
-      consumeBatch: (maxCount: number, blockMs: number) =>
+      consumeBatch: (
+        maxCount: number,
+        blockMs: number,
+        consumerName: string = config.REDIS_STREAM_CONSUMER_NAME,
+      ) =>
         Effect.gen(function* () {
           const reclaimCount = Math.min(
             maxCount,
@@ -304,7 +321,7 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
                 .xautoclaim(
                   config.REDIS_STREAM_KEY,
                   config.REDIS_STREAM_CONSUMER_GROUP,
-                  config.REDIS_STREAM_CONSUMER_NAME,
+                  consumerName,
                   config.TX_QUEUE_CLAIM_IDLE_MS,
                   "0-0",
                   "COUNT",
@@ -328,7 +345,7 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
                       blockingConsumerClient.xreadgroup(
                         "GROUP",
                         config.REDIS_STREAM_CONSUMER_GROUP,
-                        config.REDIS_STREAM_CONSUMER_NAME,
+                        consumerName,
                         "COUNT",
                         remainingCount,
                         "BLOCK",

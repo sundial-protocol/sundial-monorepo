@@ -237,21 +237,26 @@ export const retrieveEventsForCommitment = (
   Effect.gen(function* () {
     const startDate = latestBlock[Columns.EVENT_END_TIME];
     let effectiveTxRequestsTotalInWindow = 0;
-    const [withdrawals, txOrders, deposits, txRequestsInWindow, txCountInWindow] =
-      yield* Effect.all(
-        [
-          WithdrawalsDB.retrieveTimeBoundEntries(startDate, endDate),
-          TxOrdersDB.retrieveTimeBoundEntries(startDate, endDate),
-          DepositsDB.retrieveTimeBoundEntries(startDate, endDate),
-          MempoolDB.retrieveTimeBoundEntriesLimited(
-            startDate,
-            endDate,
-            maxTxRequests,
-          ),
-          MempoolDB.countTimeBoundEntries(startDate, endDate),
-        ],
-        { concurrency: "unbounded" },
-      );
+    const [
+      withdrawals,
+      txOrders,
+      deposits,
+      txRequestsInWindow,
+      txCountInWindow,
+    ] = yield* Effect.all(
+      [
+        WithdrawalsDB.retrieveTimeBoundEntries(startDate, endDate),
+        TxOrdersDB.retrieveTimeBoundEntries(startDate, endDate),
+        DepositsDB.retrieveTimeBoundEntries(startDate, endDate),
+        MempoolDB.retrieveTimeBoundEntriesLimited(
+          startDate,
+          endDate,
+          maxTxRequests,
+        ),
+        MempoolDB.countTimeBoundEntries(startDate, endDate),
+      ],
+      { concurrency: "unbounded" },
+    );
     effectiveTxRequestsTotalInWindow = txCountInWindow;
 
     // When no mempool entries are in the current interval, stale rows may

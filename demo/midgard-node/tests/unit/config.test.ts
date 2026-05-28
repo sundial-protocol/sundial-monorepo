@@ -57,11 +57,8 @@ describe("NodeConfig", () => {
         expect(config.REDIS_URL).toBe("redis://redis:6379");
         expect(config.REDIS_STREAM_KEY).toBe("midgard:tx-submissions");
         expect(config.NODE_ROLE).toBe("all");
-        expect(config.TX_QUEUE_CAPACITY).toBe(250_000);
-        expect(config.TX_QUEUE_MAX_PENDING).toBe(20_000);
-        expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(500);
+        expect(config.TX_QUEUE_DRAIN_BATCH_SIZE).toBe(100);
         expect(config.TX_QUEUE_PROCESSOR_INTERVAL_MS).toBe(250);
-        expect(config.TX_QUEUE_OFFER_TIMEOUT_MS).toBe(1000);
         expect(config.TX_PARSE_CONCURRENCY).toBe(8);
         expect(config.SUBMIT_SIGNED_TX_TIMEOUT_MS).toBe(30_000);
         expect(config.SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES).toBe(1);

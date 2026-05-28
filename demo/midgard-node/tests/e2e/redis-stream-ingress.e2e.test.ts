@@ -85,7 +85,7 @@ describe("redis stream ingress e2e", () => {
     });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       message: "Successfully added the transaction to the queue",
     });
 

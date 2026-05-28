@@ -346,7 +346,9 @@ export const retrieveEntriesBeforeTimeLimited = (
 export const countTimeBoundEntries = (startTime: Date, endTime: Date) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<{ count: bigint | string }>`SELECT COUNT(*)::bigint AS count
+    const rows = yield* sql<{
+      count: bigint | string;
+    }>`SELECT COUNT(*)::bigint AS count
       FROM ${sql(tableName)}
       WHERE ${startTime} <= ${sql(Tx.Columns.TIMESTAMPTZ)}
       AND ${sql(Tx.Columns.TIMESTAMPTZ)} < ${endTime}`;
@@ -366,7 +368,9 @@ export const countTimeBoundEntries = (startTime: Date, endTime: Date) =>
 export const countEntriesBeforeTime = (endTime: Date) =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql<{ count: bigint | string }>`SELECT COUNT(*)::bigint AS count
+    const rows = yield* sql<{
+      count: bigint | string;
+    }>`SELECT COUNT(*)::bigint AS count
       FROM ${sql(tableName)}
       WHERE ${sql(Tx.Columns.TIMESTAMPTZ)} < ${endTime}`;
     if (rows.length === 0) {

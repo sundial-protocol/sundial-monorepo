@@ -1,20 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { Duration, Effect } from "effect";
+import { Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "@effect/platform";
 import { postSubmitHandlerForTesting } from "@/commands/listen.js";
 import { TxIngressQueueService } from "@/services/tx-ingress-queue.js";
 
 const runSubmitHandler = (
   txIngressQueue: TxIngressQueueService,
-  txQueueOfferTimeoutMs: number,
   request: Request,
 ) =>
-  postSubmitHandlerForTesting({
-    txIngressQueue,
-    txQueueOfferTimeoutMs,
-    txQueueCapacity: 10,
-    txQueueMaxPending: 10,
-  }).pipe(
+  postSubmitHandlerForTesting({ txIngressQueue }).pipe(
     Effect.provideService(
       HttpServerRequest.HttpServerRequest,
       HttpServerRequest.fromWeb(request),
@@ -25,6 +19,7 @@ const makeQueueStub = (
   overrides?: Partial<TxIngressQueueService>,
 ): TxIngressQueueService => ({
   enqueue: (_txCbor: string) => Effect.succeed("1-0"),
+  rawXadd: (_txCbor, callback) => callback(null, "1-0"),
   ensureConsumerGroup: Effect.void,
   consumeBatch: (_maxCount: number, _blockMs: number) => Effect.succeed([]),
   ack: (_messageIds: readonly string[]) => Effect.succeed(0),
@@ -51,7 +46,7 @@ describe("postSubmitHandler", () => {
     });
 
     const response = await Effect.runPromise(
-      runSubmitHandler(makeQueueStub(), 10, request),
+      runSubmitHandler(makeQueueStub(), request),
     );
     const webResponse = HttpServerResponse.toWeb(response);
     const body = await webResponse.json();
@@ -60,10 +55,9 @@ describe("postSubmitHandler", () => {
     expect(body).toEqual({ error: "Invalid CBOR provided" });
   });
 
-  it("returns 503 when enqueue times out", async () => {
+  it("returns 200 with message id on successful enqueue", async () => {
     const queue = makeQueueStub({
-      enqueue: (_value: string) =>
-        Effect.sleep(Duration.seconds(60)).pipe(Effect.as("1-0")),
+      enqueue: (_value: string) => Effect.succeed("42-0"),
     });
 
     const request = new Request("http://localhost/submit", {
@@ -71,52 +65,14 @@ describe("postSubmitHandler", () => {
       body: "bb",
     });
 
-    const response = await Effect.runPromise(
-      runSubmitHandler(queue, 1, request),
-    );
+    const response = await Effect.runPromise(runSubmitHandler(queue, request));
     const webResponse = HttpServerResponse.toWeb(response);
     const body = await webResponse.json();
 
-    expect(webResponse.status).toBe(503);
-    expect(body).toEqual({
-      error: "Transaction queue is saturated; retry later",
-    });
-  });
-
-  it("returns 503 when stream depth exceeds configured capacity", async () => {
-    const queue = makeQueueStub({
-      snapshotMetrics: Effect.succeed({
-        streamDepth: 50,
-        pendingCount: 0,
-        lagCount: 50,
-      }),
-    });
-
-    const request = new Request("http://localhost/submit", {
-      method: "POST",
-      body: "bb",
-    });
-
-    const response = await Effect.runPromise(
-      postSubmitHandlerForTesting({
-        txIngressQueue: queue,
-        txQueueOfferTimeoutMs: 50,
-        txQueueCapacity: 10,
-        txQueueMaxPending: 10,
-      }).pipe(
-        Effect.provideService(
-          HttpServerRequest.HttpServerRequest,
-          HttpServerRequest.fromWeb(request),
-        ),
-      ),
-    );
-
-    const webResponse = HttpServerResponse.toWeb(response);
-    const body = await webResponse.json();
-
-    expect(webResponse.status).toBe(503);
-    expect(body).toEqual({
-      error: "Transaction queue is saturated; retry later",
+    expect(webResponse.status).toBe(200);
+    expect(body).toMatchObject({
+      message: "Successfully added the transaction to the queue",
+      id: "42-0",
     });
   });
 });

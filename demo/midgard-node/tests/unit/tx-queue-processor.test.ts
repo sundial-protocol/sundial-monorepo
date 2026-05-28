@@ -1,14 +1,15 @@
 import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
 import { Effect, Metric, Ref } from "effect";
+import * as SDK from "@al-ft/midgard-sdk";
 import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 import { metricDelta } from "./harness/metric-snapshot.js";
 
-const breakDownTxFn = vi.hoisted(() => vi.fn());
+const parseTxCborInWorkerPoolFn = vi.hoisted(() => vi.fn());
 const mempoolInsertFn = vi.hoisted(() => vi.fn());
 
-vi.mock("@/utils.js", () => ({
-  breakDownTx: breakDownTxFn,
+vi.mock("@/fibers/tx-parse-worker-pool.js", () => ({
+  parseTxCborInWorkerPool: parseTxCborInWorkerPoolFn,
 }));
 
 vi.mock("@/database/index.js", () => ({
@@ -61,14 +62,16 @@ const makeQueueStub = (
   ackSpy: ReturnType<typeof vi.fn>;
   handleFailedSpy: ReturnType<typeof vi.fn>;
 } => {
-  const consumeBatchSpy = vi.fn((_maxCount: number, _blockMs: number) =>
-    Effect.succeed(messages),
+  const consumeBatchSpy = vi.fn(
+    (_maxCount: number, _blockMs: number, _consumerName?: string) =>
+      Effect.succeed(messages),
   );
   const ackSpy = vi.fn((ids: readonly string[]) => Effect.succeed(ids.length));
   const handleFailedSpy = vi.fn(() => Effect.succeed("retry" as const));
 
   return {
     enqueue: (_txCbor: string) => Effect.succeed("1-0"),
+    rawXadd: (_txCbor, callback) => callback(null, "1-0"),
     ensureConsumerGroup: Effect.void,
     consumeBatch: consumeBatchSpy,
     ack: ackSpy,
@@ -85,7 +88,7 @@ const makeQueueStub = (
 beforeEach(() => {
   vi.clearAllMocks();
   sqlHarness.reset();
-  breakDownTxFn.mockReturnValue(Effect.succeed(fakeProcessedTx));
+  parseTxCborInWorkerPoolFn.mockReturnValue(Effect.succeed(fakeProcessedTx));
   mempoolInsertFn.mockImplementation((processedTxs: unknown[]) =>
     Effect.succeed(processedTxs.length),
   );
@@ -104,7 +107,11 @@ describe("txQueueProcessorAction", () => {
           Effect.provideService(TxIngressQueue, queue),
         );
 
-        expect(queue.consumeBatchSpy).toHaveBeenCalledWith(500, 1000);
+        expect(queue.consumeBatchSpy).toHaveBeenCalledWith(
+          500,
+          1000,
+          "midgard-tx-processor",
+        );
         expect(mempoolInsertFn).toHaveBeenCalledOnce();
         expect(queue.ackSpy).toHaveBeenCalledWith(["1-0"]);
       }).pipe(Effect.provide(sqlHarness.layer)),
@@ -134,8 +141,13 @@ describe("txQueueProcessorAction", () => {
 
   it.effect("marks malformed txs as failed and retries", () =>
     Effect.gen(function* () {
-      breakDownTxFn.mockReturnValue(
-        Effect.fail(new Error("deserialization error")),
+      parseTxCborInWorkerPoolFn.mockReturnValue(
+        Effect.fail(
+          new SDK.CmlDeserializationError({
+            message: "deserialization error",
+            cause: "invalid tx cbor",
+          }),
+        ),
       );
       const queue = makeQueueStub([
         { id: "1-0", txCbor: "aa", deliveryCount: 1 },
@@ -162,8 +174,13 @@ describe("txQueueProcessorAction", () => {
 
   it.effect("dead-letters failed messages when queue adapter says so", () =>
     Effect.gen(function* () {
-      breakDownTxFn.mockReturnValue(
-        Effect.fail(new Error("deserialization error")),
+      parseTxCborInWorkerPoolFn.mockReturnValue(
+        Effect.fail(
+          new SDK.CmlDeserializationError({
+            message: "deserialization error",
+            cause: "invalid tx cbor",
+          }),
+        ),
       );
       const queue = makeQueueStub([
         { id: "1-0", txCbor: "aa", deliveryCount: 10 },

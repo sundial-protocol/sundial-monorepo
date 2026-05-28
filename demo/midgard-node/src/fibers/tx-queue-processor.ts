@@ -1,8 +1,7 @@
-import { fromHex } from "@lucid-evolution/lucid";
-import { Effect, Metric, pipe, Ref, Schedule } from "effect";
+import { Effect, Either, Metric, pipe, Ref, Schedule } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { MempoolDB } from "@/database/index.js";
-import { breakDownTx, ProcessedTx } from "@/utils.js";
+import type { ProcessedTx } from "@/utils.js";
 import { DatabaseError } from "@/database/utils/common.js";
 import {
   Database,
@@ -10,6 +9,8 @@ import {
   TxIngressQueue,
   TxIngressQueueError,
 } from "@/services/index.js";
+import { WorkerError } from "@/workers/utils/common.js";
+import { parseTxCborInWorkerPool } from "@/fibers/tx-parse-worker-pool.js";
 
 const TX_QUEUE_PERSIST_CHUNK_SIZE = 100;
 
@@ -163,11 +164,13 @@ export const txQueueProcessorAction = (
   streamBlockMs: number,
   withMonitoring?: boolean,
   peakRef?: Ref.Ref<bigint>,
+  consumerName: string = "midgard-tx-processor",
 ): Effect.Effect<
   void,
   | DatabaseError
   | SDK.CmlDeserializationError
   | SDK.DataCoercionError
+  | WorkerError
   | TxIngressQueueError,
   Database | TxIngressQueue
 > =>
@@ -178,6 +181,7 @@ export const txQueueProcessorAction = (
     const messages = yield* txIngressQueue.consumeBatch(
       txQueueDrainBatchSize,
       streamBlockMs,
+      consumerName,
     );
 
     if (messages.length === 0) {
@@ -193,14 +197,37 @@ export const txQueueProcessorAction = (
       const parsedOutcomes = yield* Effect.forEach(
         messageChunk,
         (message) =>
-          breakDownTx(fromHex(message.txCbor)).pipe(
-            Effect.either,
-            Effect.map((parsed) => ({ message, parsed })),
+          parseTxCborInWorkerPool(message.txCbor, txParseConcurrency).pipe(
+            Effect.map((parsed) => ({ message, parsed: Either.right(parsed) })),
+            Effect.catchAll((error) =>
+              error instanceof SDK.CmlDeserializationError
+                ? Effect.succeed({
+                    message,
+                    parsed: Either.left(error),
+                  })
+                : Effect.fail(error),
+            ),
           ),
         {
           concurrency: txParseConcurrency,
         },
       );
+
+      let malformedCount = 0;
+      let malformedSampleError: string | null = null;
+      for (const outcome of parsedOutcomes) {
+        if (outcome.parsed._tag === "Left") {
+          malformedCount += 1;
+          if (malformedSampleError === null) {
+            malformedSampleError = outcome.parsed.left.message;
+          }
+        }
+      }
+      if (malformedCount > 0) {
+        yield* Effect.logWarning(
+          `Dropping ${malformedCount} malformed tx(s) for consumer=${consumerName}; sample_error=${malformedSampleError ?? "unknown"}`,
+        );
+      }
 
       const validMessages: TxIngressMessage[] = [];
       const processedTxs: ProcessedTx[] = [];
@@ -208,9 +235,6 @@ export const txQueueProcessorAction = (
       for (const outcome of parsedOutcomes) {
         if (outcome.parsed._tag === "Left") {
           const error = outcome.parsed.left;
-          yield* Effect.logWarning(
-            `Dropping malformed tx for stream message ${outcome.message.id}; CBOR deserialization failed: ${error.message}`,
-          );
           yield* registerFailedMessage(
             outcome.message,
             `malformed_cbor:${error.message}`,
@@ -291,13 +315,17 @@ export const txQueueProcessorFiber = (
   txQueueDrainBatchSize: number,
   txParseConcurrency: number,
   streamBlockMs: number,
+  txQueueConsumerWorkerCount: number,
+  consumerNamePrefix: string,
   withMonitoring?: boolean,
 ): Effect.Effect<void, never, Database | TxIngressQueue> =>
   pipe(
     Effect.gen(function* () {
       const txIngressQueue = yield* TxIngressQueue;
       yield* txIngressQueue.ensureConsumerGroup;
-      yield* Effect.logInfo("🔶 Tx queue processor fiber started.");
+      yield* Effect.logInfo(
+        `🔶 Tx queue processor fiber started. workers=${txQueueConsumerWorkerCount}`,
+      );
       const peakRef = yield* Ref.make(0n);
 
       if (withMonitoring) {
@@ -312,15 +340,25 @@ export const txQueueProcessorFiber = (
         yield* Metric.incrementBy(txMempoolAcceptedCounter, 0n);
       }
 
-      yield* Effect.repeat(
-        txQueueProcessorAction(
-          txQueueDrainBatchSize,
-          txParseConcurrency,
-          streamBlockMs,
-          withMonitoring,
-          withMonitoring ? peakRef : undefined,
-        ).pipe(Effect.catchAllCause(Effect.logWarning)),
-        schedule,
+      const workerIndices = Array.from(
+        { length: txQueueConsumerWorkerCount },
+        (_, i) => i,
+      );
+      yield* Effect.forEach(
+        workerIndices,
+        (workerIndex) =>
+          Effect.repeat(
+            txQueueProcessorAction(
+              txQueueDrainBatchSize,
+              txParseConcurrency,
+              streamBlockMs,
+              withMonitoring,
+              withMonitoring ? peakRef : undefined,
+              `${consumerNamePrefix}-w${workerIndex + 1}`,
+            ).pipe(Effect.catchAllCause(Effect.logWarning)),
+            schedule,
+          ),
+        { concurrency: "unbounded", discard: true },
       );
     }),
   ).pipe(Effect.catchAllCause(Effect.logWarning));
