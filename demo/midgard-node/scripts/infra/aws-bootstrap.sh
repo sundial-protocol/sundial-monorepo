@@ -39,8 +39,7 @@ Commands:
   secrets    Ensure bootstrap Secrets Manager entries exist
 
 Options:
-  --environment=<testnet|mainnet>
-                                Deployment environment (default: testnet)
+  --environment=testnet         Deployment environment (default: testnet)
   --dry-run                     Print commands without running them
   --update-existing-secrets     Update values for secrets that already exist
   --image-tag <tag>             Override image tag (default: <environment>-<utc-timestamp>)
@@ -48,7 +47,7 @@ Options:
 
 Environment overrides:
   DEPLOY_ENV_FILE               Deployment env source (default .env.deploy.<environment>)
-  AWS_PLATFORM_REGION           App infra region (default us-west-2 for testnet, us-west-1 for mainnet)
+  AWS_PLATFORM_REGION           App infra region (default us-west-2)
   AWS_STATE_REGION              Terraform backend region (default us-east-1)
   AWS_TF_STATE_BUCKET           State bucket name (default sndl-sundial-node-tf-state)
   AWS_TF_LOCK_TABLE             Lock table name (default sndl-sundial-node-tf-locks)
@@ -60,7 +59,6 @@ USAGE
 default_platform_region_for_environment() {
   case "$1" in
     testnet) printf '%s' "us-west-2" ;;
-    mainnet) printf '%s' "us-west-1" ;;
     *) die "unsupported environment for region mapping: $1" ;;
   esac
 }
@@ -490,9 +488,9 @@ case "${ACTION}" in
 esac
 
 case "${ENVIRONMENT}" in
-  testnet|mainnet) ;;
+  testnet) ;;
   *)
-    die "--environment must be one of: testnet mainnet"
+    die "--environment must be testnet"
     ;;
 esac
 

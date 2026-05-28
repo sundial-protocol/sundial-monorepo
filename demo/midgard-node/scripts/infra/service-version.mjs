@@ -10,16 +10,11 @@ const options = new Map(
 
 const environment = options.get("--environment") || "testnet";
 const service = options.get("--service") || "sundial-node";
-const defaultRegion =
-  environment === "mainnet"
-    ? "us-west-1"
-    : environment === "testnet"
-      ? "us-west-2"
-      : null;
+const defaultRegion = environment === "testnet" ? "us-west-2" : null;
 const region = options.get("--region") || defaultRegion;
 
-if (!["testnet", "mainnet"].includes(environment)) {
-  throw new Error("environment must be one of: testnet, mainnet.");
+if (environment !== "testnet") {
+  throw new Error("environment must be testnet.");
 }
 
 const cluster = `sundial-node-${environment}`;

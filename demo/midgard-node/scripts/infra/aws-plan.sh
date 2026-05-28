@@ -9,7 +9,7 @@ usage() {
 Usage: ./scripts/infra/aws-plan.sh [options]
 
 Options:
-  --environment=<testnet|mainnet> Deployment environment (default: testnet)
+  --environment=testnet          Deployment environment (default: testnet)
   --service=<sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|shared|rds>
                        Optional targeted service selector
   --help               Show this message
@@ -58,9 +58,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${ENVIRONMENT}" in
-  testnet|mainnet) ;;
+  testnet) ;;
   *)
-    fail "--environment must be one of: testnet mainnet"
+    fail "--environment must be testnet"
     ;;
 esac
 

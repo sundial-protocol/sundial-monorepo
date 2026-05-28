@@ -28,7 +28,7 @@ usage() {
 Usage: ./scripts/infra/aws-destroy.sh --service=<name> [options]
 
 Options:
-  --environment=<testnet|mainnet> Deployment environment (default: testnet)
+  --environment=testnet          Deployment environment (default: testnet)
   --service=<sundial-node|prometheus|loki|alloy|grafana|postgres-exporter>
                          Service to destroy (required)
 USAGE
@@ -59,9 +59,9 @@ done
 
 [[ -n "${SERVICE}" ]] || fail "destroy requires explicit --service"
 case "${ENVIRONMENT}" in
-  testnet|mainnet) ;;
+  testnet) ;;
   *)
-    fail "--environment must be one of: testnet mainnet"
+    fail "--environment must be testnet"
     ;;
 esac
 [[ "${IS_NOT_DRY_RUN:-}" == "true" ]] || DRY_RUN=true

@@ -3,8 +3,8 @@ variable "environment" {
   type        = string
 
   validation {
-    condition     = contains(["testnet", "mainnet"], var.environment)
-    error_message = "environment must be testnet or mainnet."
+    condition     = var.environment == "testnet"
+    error_message = "environment must be testnet."
   }
 }
 
@@ -124,6 +124,11 @@ variable "sundial_node_metrics_port" {
   description = "Sundial node Prometheus metrics port."
   type        = number
   default     = 9464
+}
+
+variable "redis_node_type" {
+  description = "ElastiCache Redis node type."
+  type        = string
 }
 
 variable "rds_instance_class" {
