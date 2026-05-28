@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 NODE_DIR="$ROOT_DIR/demo/midgard-node"
-CORPUS_PATH="$ROOT_DIR/demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-1500000.jsonl"
+CORPUS_PATH="${CORPUS_PATH:-$ROOT_DIR/demo/midgard-node/tests/e2e/fixtures/corpus-ci-n500.jsonl}"
 
 if [[ ! -f "$CORPUS_PATH" ]]; then
   echo "ERROR: corpus file not found at: $CORPUS_PATH" >&2
