@@ -135,14 +135,10 @@ failing_count=0
 # service health endpoints simultaneously. This avoids one round-trip per
 # service and keeps the check fast.
 
-declare -A SERVICE_HEALTH_URL=(
-  [sundial-node]="http://sundial-node.${NAMESPACE}:3000/health/ready"
-  [prometheus]="http://prometheus.${NAMESPACE}:9090/-/healthy"
-  [loki]="http://loki.${NAMESPACE}:3100/ready"
-  [alloy]="http://alloy.${NAMESPACE}:12345/-/ready"
-  [grafana]="http://grafana.${NAMESPACE}:3000/api/health"
-  [postgres-exporter]="http://postgres-exporter.${NAMESPACE}:9187/metrics"
-)
+# Cloud Map with routing_policy=MULTIVALUE creates only SRV records (no A records),
+# so curl cannot resolve these hostnames. Internal services are validated by ECS
+# running count only (http=skipped). sundial-node is validated via ALB target group.
+declare -A SERVICE_HEALTH_URL=()
 
 ECS_HOST_INSTANCE_ID=""
 SSM_BATCH_CMD_ID=""
@@ -226,7 +222,7 @@ poll_ssm_health_batch() {
 
 # ─── check functions ──────────────────────────────────────────────────────────
 
-check_ecs_service() {
+check_ecs_service_counts() {
   local service_name="$1"
 
   local raw
@@ -265,6 +261,17 @@ check_ecs_service() {
     reason="running_lt_desired"
   fi
 
+  printf '%s %s %s %s %s %s' \
+    "${ecs_state}" "${reason}" "${running_count}" "${desired_count}" "${pending_count}" "${failure_reason:-}"
+}
+
+check_ecs_service() {
+  local service_name="$1"
+
+  local ecs_state reason running_count desired_count pending_count _fr
+  read -r ecs_state reason running_count desired_count pending_count _fr \
+    <<<"$(check_ecs_service_counts "${service_name}")"
+
   # SSM health probe result (populated by poll_ssm_health_batch)
   local http_state="skipped"
   local http_result="${SSM_HEALTH_RESULT[${service_name}]:-}"
@@ -284,6 +291,60 @@ check_ecs_service() {
 
   printf '%-22s %-8s running=%-3s desired=%-3s pending=%-3s http=%-15s kind=ecs reason=%s\n' \
     "${service_name}:" "${state}" "${running_count}" "${desired_count}" "${pending_count}" "${http_state}" "${reason}"
+
+  [[ "${state}" == "live" ]]
+}
+
+check_ecs_service_with_alb() {
+  local service_name="$1"
+  local tg_name="$2"
+
+  local ecs_state reason running_count desired_count pending_count _fr
+  read -r ecs_state reason running_count desired_count pending_count _fr \
+    <<<"$(check_ecs_service_counts "${service_name}")"
+
+  # ALB target group health — resolves TG ARN by name
+  local alb_state="unknown"
+  local tg_arn
+  tg_arn="$(
+    aws elbv2 describe-target-groups \
+      --region "${REGION}" \
+      --names "${tg_name}" \
+      --query 'TargetGroups[0].TargetGroupArn' \
+      --output text 2>/dev/null
+  )" || true
+
+  if [[ -n "${tg_arn}" && "${tg_arn}" != "None" ]]; then
+    local health_raw
+    health_raw="$(
+      aws elbv2 describe-target-health \
+        --region "${REGION}" \
+        --target-group-arn "${tg_arn}" \
+        --query 'TargetHealthDescriptions[*].TargetHealth.State' \
+        --output text 2>/dev/null
+    )" || true
+
+    if [[ -z "${health_raw}" || "${health_raw}" == "None" ]]; then
+      alb_state="no_targets"
+    elif echo "${health_raw}" | grep -qw "healthy"; then
+      alb_state="healthy"
+    else
+      alb_state="${health_raw// /_}"
+    fi
+  else
+    alb_state="tg_not_found"
+  fi
+
+  local state="live"
+  if [[ "${ecs_state}" != "live" ]]; then
+    state="failing"
+  elif [[ "${alb_state}" != "healthy" ]]; then
+    state="failing"
+    reason="alb_${alb_state}"
+  fi
+
+  printf '%-22s %-8s running=%-3s desired=%-3s pending=%-3s alb=%-15s kind=ecs reason=%s\n' \
+    "${service_name}:" "${state}" "${running_count}" "${desired_count}" "${pending_count}" "${alb_state}" "${reason}"
 
   [[ "${state}" == "live" ]]
 }
@@ -468,7 +529,10 @@ fi
 for service_name in "${SERVICES_TO_CHECK[@]}"; do
   ok=1
   case "${service_name}" in
-    sundial-node|prometheus|loki|alloy|grafana|postgres-exporter)
+    sundial-node)
+      check_ecs_service_with_alb "sundial-node" "${NAME_PREFIX}-node" || ok=0
+      ;;
+    prometheus|loki|alloy|grafana|postgres-exporter)
       check_ecs_service "${service_name}" || ok=0
       ;;
     ecs-host)
