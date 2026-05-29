@@ -20,10 +20,10 @@ import { ArtifactWriter } from '../evidence/artifacts.js';
 import { GrafanaScreenshotService } from '../evidence/grafana-screenshots.js';
 import { PlanArtifactWriter } from '../evidence/plan-artifacts.js';
 import { sanitizePathLikeText } from '../path-sanitization.js';
-import type { ScenarioRunRecord } from '../report/plan-markdown.js';
-import { buildPlanConclusion, renderPlanReport } from '../report/plan-markdown.js';
 import { generateCharts } from '../report/charts.js';
 import { renderReport } from '../report/markdown.js';
+import type { ScenarioRunRecord } from '../report/plan-markdown.js';
+import { buildPlanConclusion, renderPlanReport } from '../report/plan-markdown.js';
 import { runExecutionReadinessPreflight } from '../runner/preflight.js';
 import { runScenario } from '../runner/scenario-runner.js';
 
