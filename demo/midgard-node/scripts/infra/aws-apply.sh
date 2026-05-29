@@ -12,11 +12,15 @@ Options:
   --environment=testnet          Deployment environment (default: testnet)
   --service=<shared|sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|rds>
                                  Service selector for targeted apply
-  --image-tag <tag>             Optional image tag for sundial-node
+  --image-tag <tag>             Explicit sundial-node release tag (default: resolved from HEAD);
+                                 must match sundial-node-YYYYMMDDTHHMMSSZ-<shortsha>
   --image-latest-tag <tag>      Also push mutable alias tag, or "none"
   --help                        Show this message
 
 Apply mode is a dry run unless IS_NOT_DRY_RUN=true is set.
+sundial-node deploys require the current branch to be the target environment
+branch (e.g. testnet) and a release tag on HEAD. Run
+infra:testnet:release:tag:node first if needed.
 USAGE
 }
 
@@ -52,6 +56,8 @@ DRY_RUN=false
 IMAGE_TAG_OVERRIDE=""
 ECR_ARGS=()
 APP_IMAGE=""
+APP_IMAGE_TAG=""
+PASSTHROUGH_ARGS=()
 
 case "${ACTION}" in
   plan|apply|output|validate) ;;
@@ -98,6 +104,11 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    --)
+      shift
+      PASSTHROUGH_ARGS+=("$@")
+      break
+      ;;
     *)
       fail "unknown argument: $1"
       ;;
@@ -114,9 +125,9 @@ esac
 
 if [[ -n "${SERVICE}" ]]; then
   case "${SERVICE}" in
-    shared|sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|rds) ;;
+    shared|sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|rds|data-tier) ;;
     *)
-      fail "--service must be one of: shared sundial-node prometheus loki alloy grafana postgres-exporter obs rds"
+      fail "--service must be one of: shared sundial-node prometheus loki alloy grafana postgres-exporter obs rds data-tier"
       ;;
   esac
 fi
@@ -152,28 +163,90 @@ resolve_repository_name() {
   printf '%s' "${AWS_ECR_SUNDIAL_NODE_REPOSITORY:-sundial/sundial-node}"
 }
 
-resolve_image_tag() {
-  if [[ -n "${IMAGE_TAG_OVERRIDE}" ]]; then
-    printf '%s' "${IMAGE_TAG_OVERRIDE}"
-    return 0
+ensure_deploy_source_branch() {
+  local current_branch="" local_head_sha="" remote_head_sha=""
+
+  current_branch="$(git rev-parse --abbrev-ref HEAD)"
+  if [[ "${current_branch}" != "${ENVIRONMENT}" ]]; then
+    fail "sundial-node deploys must run from branch=${ENVIRONMENT}; current_branch=${current_branch}"
   fi
-  printf '%s' "${ENVIRONMENT}-latest"
+
+  git fetch --quiet origin "${ENVIRONMENT}"
+  local_head_sha="$(git rev-parse HEAD)"
+  remote_head_sha="$(git rev-parse "origin/${ENVIRONMENT}")"
+  if [[ "${local_head_sha}" != "${remote_head_sha}" ]]; then
+    fail "local HEAD (${local_head_sha}) must match origin/${ENVIRONMENT} (${remote_head_sha}) before deploy"
+  fi
+
+  git fetch --quiet --tags origin
 }
 
-resolve_image_ref() {
-  local region=""
-  local account_id=""
-  local repository=""
-  local image_tag=""
-  local digest=""
+is_service_release_tag() {
+  [[ "$1" =~ ^sundial-node-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$ ]]
+}
+
+resolve_release_tag_from_head() {
+  local selected_tag="" tag=""
+
+  while IFS= read -r tag; do
+    if [[ "${tag}" =~ ^sundial-node-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$ ]]; then
+      if [[ -z "${selected_tag}" || "${tag}" > "${selected_tag}" ]]; then
+        selected_tag="${tag}"
+      fi
+    fi
+  done < <(git tag --points-at HEAD --list "sundial-node-*" || true)
+
+  [[ -n "${selected_tag}" ]] || return 1
+  printf '%s' "${selected_tag}"
+}
+
+ensure_remote_release_tag_points_at_head() {
+  local tag="$1" head_sha="" remote_tag_sha=""
+
+  head_sha="$(git rev-parse HEAD)"
+  remote_tag_sha="$(git ls-remote --tags origin "refs/tags/${tag}^{}" | awk 'NR==1 { print $1 }')"
+  if [[ -z "${remote_tag_sha}" ]]; then
+    remote_tag_sha="$(git ls-remote --tags --refs origin "refs/tags/${tag}" | awk 'NR==1 { print $1 }')"
+  fi
+
+  if [[ -z "${remote_tag_sha}" ]]; then
+    fail "release tag ${tag} not found on origin; run pnpm run infra:${ENVIRONMENT}:release:tag:node"
+  fi
+  if [[ "${remote_tag_sha}" != "${head_sha}" ]]; then
+    fail "release tag ${tag} points to ${remote_tag_sha}, expected HEAD ${head_sha}"
+  fi
+}
+
+ensure_app_image_tag() {
+  local tag_points_at_head=""
+
+  if [[ -n "${IMAGE_TAG_OVERRIDE}" ]]; then
+    if ! is_service_release_tag "${IMAGE_TAG_OVERRIDE}"; then
+      fail "--image-tag must match sundial-node-YYYYMMDDTHHMMSSZ-<shortsha>"
+    fi
+    tag_points_at_head="$(git tag --points-at HEAD --list "${IMAGE_TAG_OVERRIDE}" || true)"
+    if [[ "${tag_points_at_head}" != "${IMAGE_TAG_OVERRIDE}" ]]; then
+      fail "--image-tag ${IMAGE_TAG_OVERRIDE} is not on HEAD; refusing deploy drift"
+    fi
+    APP_IMAGE_TAG="${IMAGE_TAG_OVERRIDE}"
+  else
+    APP_IMAGE_TAG="$(resolve_release_tag_from_head || true)"
+    if [[ -z "${APP_IMAGE_TAG}" ]]; then
+      fail "no release tag found on HEAD for sundial-node; run pnpm run infra:${ENVIRONMENT}:release:tag:node"
+    fi
+  fi
+
+  ensure_remote_release_tag_points_at_head "${APP_IMAGE_TAG}"
+}
+
+resolve_app_image_digest() {
+  local image_tag="$1" region="" repository="" digest=""
 
   region="$(resolve_platform_region)"
-  account_id="$(resolve_account_id)"
   repository="$(resolve_repository_name)"
-  image_tag="$(resolve_image_tag)"
 
   if [[ "${DRY_RUN}" == "true" ]]; then
-    printf '%s.dkr.ecr.%s.amazonaws.com/%s:%s' "${account_id}" "${region}" "${repository}" "${image_tag}"
+    printf '%s' "sha256:0000000000000000000000000000000000000000000000000000000000000000"
     return 0
   fi
 
@@ -184,7 +257,11 @@ resolve_image_ref() {
     --query 'imageDetails[0].imageDigest' \
     --output text)"
 
-  printf '%s.dkr.ecr.%s.amazonaws.com/%s@%s' "${account_id}" "${region}" "${repository}" "${digest}"
+  if [[ -z "${digest}" || "${digest}" == "None" || "${digest}" == "null" ]]; then
+    fail "unable to resolve image digest for tag=${image_tag}"
+  fi
+
+  printf '%s' "${digest}"
 }
 
 terraform_targets_for_service() {
@@ -231,6 +308,14 @@ terraform_targets_for_service() {
         "aws_db_parameter_group.main" \
         "aws_db_instance.main"
       ;;
+    data-tier)
+      printf '%s\n' \
+        "aws_db_subnet_group.main" \
+        "aws_db_parameter_group.main" \
+        "aws_db_instance.main" \
+        "aws_elasticache_subnet_group.redis" \
+        "aws_elasticache_cluster.redis"
+      ;;
     shared)
       return 0
       ;;
@@ -242,10 +327,10 @@ terraform_targets_for_service() {
 
 case "${ACTION}" in
   output)
-    exec bash ./scripts/infra/aws.sh output --module=platform --backend-config=backends/${ENVIRONMENT}.hcl
+    exec bash ./scripts/infra/aws.sh output --module=platform --backend-config=backends/${ENVIRONMENT}.hcl "${PASSTHROUGH_ARGS[@]}"
     ;;
   validate)
-    exec bash ./scripts/infra/aws.sh validate --module=platform
+    exec bash ./scripts/infra/aws.sh validate --module=platform "${PASSTHROUGH_ARGS[@]}"
     ;;
   plan)
     plan_args=("--environment=${ENVIRONMENT}")
@@ -257,11 +342,12 @@ case "${ACTION}" in
 esac
 
 if [[ "${SERVICE}" == "sundial-node" ]]; then
-  if [[ -n "${IMAGE_TAG_OVERRIDE}" ]]; then
-    ECR_ARGS+=("--image-tag" "${IMAGE_TAG_OVERRIDE}")
-  fi
+  ensure_deploy_source_branch
+  ensure_app_image_tag
+  ECR_ARGS+=("--image-tag" "${APP_IMAGE_TAG}")
   run_cmd bash ./scripts/infra/aws-bootstrap.sh ecr --environment="${ENVIRONMENT}" "${ECR_ARGS[@]}"
-  APP_IMAGE="$(resolve_image_ref)"
+  _digest="$(resolve_app_image_digest "${APP_IMAGE_TAG}")"
+  APP_IMAGE="$(resolve_account_id).dkr.ecr.$(resolve_platform_region).amazonaws.com/$(resolve_repository_name)@${_digest}"
 fi
 
 args=("-var-file=envs/${ENVIRONMENT}.tfvars")
@@ -275,6 +361,6 @@ if [[ -n "${SERVICE}" ]]; then
   done < <(terraform_targets_for_service "${SERVICE}")
 fi
 
-log "action=apply environment=${ENVIRONMENT} service=${SERVICE:-platform} dry_run=${DRY_RUN}"
-run_cmd bash ./scripts/infra/aws.sh apply --module=platform --backend-config=backends/${ENVIRONMENT}.hcl "${args[@]}"
+log "action=apply environment=${ENVIRONMENT} service=${SERVICE:-platform} image_tag=${APP_IMAGE_TAG:-n/a} dry_run=${DRY_RUN}"
+run_cmd bash ./scripts/infra/aws.sh apply --module=platform --backend-config=backends/${ENVIRONMENT}.hcl -auto-approve "${args[@]}"
 log "completed action=apply environment=${ENVIRONMENT} service=${SERVICE:-platform}"

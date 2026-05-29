@@ -23,5 +23,7 @@ locals {
     { name = "WAIT_BETWEEN_MERGE_TXS", value = tostring(var.wait_between_merge_txs_ms) },
     { name = "COMMITMENT_WORKER_TIMEOUT_MS", value = tostring(var.commitment_worker_timeout_ms) },
     { name = "OLTP_EXPORTER_URL", value = "http://alloy.${var.private_dns_namespace_name}:4318/v1/traces" },
+    { name = "REDIS_URL", value = "redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:${aws_elasticache_cluster.redis.port}" },
+    { name = "PGSSLMODE", value = "disable" },
   ]
 }

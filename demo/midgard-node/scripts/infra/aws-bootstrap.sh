@@ -472,6 +472,10 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    --)
+      shift
+      break
+      ;;
     *)
       die "unknown argument: $1"
       ;;

@@ -39,7 +39,7 @@ ensure_init() {
   local infra_dir="$2"
   local backend_config="$3"
 
-  if [[ -d "${infra_dir}/.terraform/providers" && -f "${infra_dir}/.terraform.lock.hcl" ]]; then
+  if [[ -d "${infra_dir}/.terraform/providers" && -f "${infra_dir}/.terraform.lock.hcl" && -f "${infra_dir}/.terraform/terraform.tfstate" ]]; then
     return 0
   fi
 

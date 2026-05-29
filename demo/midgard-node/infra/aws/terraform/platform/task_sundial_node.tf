@@ -46,7 +46,7 @@ resource "aws_ecs_task_definition" "sundial_node" {
       portMappings = [
         {
           containerPort = var.sundial_node_container_port
-          hostPort      = 0
+          hostPort      = var.sundial_node_container_port
           protocol      = "tcp"
         },
         {

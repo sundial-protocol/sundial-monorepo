@@ -246,7 +246,7 @@ resource "aws_ecs_task_definition" "alloy" {
           otelcol.exporter.debug "default" {}
           CFG
 
-          exec /bin/alloy run --server.http.listen-addr=0.0.0.0:12345 /tmp/config.alloy
+          exec /bin/alloy run --server.http.listen-addr=0.0.0.0:12345 --stability.level=experimental /tmp/config.alloy
         CMD
       ]
       portMappings = [{ containerPort = 4318, hostPort = 0, protocol = "tcp" }]
