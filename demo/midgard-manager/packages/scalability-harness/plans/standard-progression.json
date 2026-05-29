@@ -1,14 +1,13 @@
 {
   "planId": "standard-progression",
-  "description": "Full §8.1 benchmark sequence: warm-up → initial TPS validation → institutional baseline → institutional load → institutional stress → practical estimate target. Runs scenarios in order and stops on the first failure.",
+  "description": "Full §8.1 benchmark sequence: warm-up → testnet TPS validation → testnet industrial → mainnet baseline → practical mainnet target. Runs scenarios in order and stops on the first failure.",
   "outputDir": "benchmark-plans",
   "stopOnFailure": true,
   "scenarios": [
-    "../scenarios/warmup.json",
-    "../scenarios/initial-800.json",
-    "../scenarios/institutional-1000.json",
-    "../scenarios/institutional-5000.json",
-    "../scenarios/stress-10000.json",
-    "../scenarios/practical-24985.json"
+    "../scenarios/warmup-replay.json",
+    "../scenarios/initial-800-replay.json",
+    "../scenarios/institutional-1000-replay.json",
+    "../scenarios/mainnet-2000-replay.json",
+    "../scenarios/practical-5000-replay.json"
   ]
 }

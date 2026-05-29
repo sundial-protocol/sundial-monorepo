@@ -108,6 +108,27 @@ export const ALWAYS_PRESENT_NODE_METRICS = [
   'unsubmitted_block_backlog{job="sundial_nodes",role=~"sequencer|all"}',
 ] as const;
 
+// The minimal set of metrics that must be present for a tier to be classified
+// as "completed" rather than "evidence_incomplete". These are the core pipeline
+// stage signals — HTTP acceptance, durable mempool acceptance, block commitment,
+// and node health. Histogram, per-block gauge, and fee metrics are supplemental
+// and must not gate the tier outcome.
+export const EVIDENCE_REQUIRED_NODE_METRICS = [
+  'up{job="sundial_nodes"}',
+  'tx_submissions_enqueued_total{job="sundial_nodes",role=~"api|all"}',
+  'tx_submissions_rejected_total{job="sundial_nodes",role=~"api|all"}',
+  'tx_submissions_mempool_accepted_total{job="sundial_nodes",role=~"tx-processor|all"}',
+  'tx_stream_depth{job="sundial_nodes",role=~"tx-processor|all"}',
+  'mempool_tx_count{job="sundial_nodes",role=~"tx-processor|all"}',
+  'unsubmitted_block_backlog{job="sundial_nodes",role=~"sequencer|all"}',
+  'commit_block_count_total{job="sundial_nodes",role=~"sequencer|all"}',
+  'commit_block_tx_count_total{job="sundial_nodes",role=~"sequencer|all"}',
+  'submit_block_count_total{job="sundial_nodes",role=~"sequencer|all"}',
+  'merge_block_count_total{job="sundial_nodes",role=~"sequencer|all"}',
+] as const;
+
+export type EvidenceRequiredNodeMetric = (typeof EVIDENCE_REQUIRED_NODE_METRICS)[number];
+
 export type AlwaysPresentNodeMetric = (typeof ALWAYS_PRESENT_NODE_METRICS)[number];
 
 // Counter metrics that only appear in Prometheus after the first matching event.

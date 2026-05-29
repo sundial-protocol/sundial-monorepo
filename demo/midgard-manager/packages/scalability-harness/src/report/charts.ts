@@ -65,7 +65,11 @@ const DARK_CONFIG = {
 // Panel types
 // ---------------------------------------------------------------------------
 
-export type FormatY = 'default' | 'bytes' | 'bytes/s' | 'percent';
+// 'count_rate': fixed decimal notation for rates < 1 (e.g. blocks/s).
+// D3's default SI format renders 0.068 as "68m" (milli), which readers
+// misread as "68 million". Use '.4~g' (4 sig-fig general notation) instead,
+// which shows "0.068" for sub-1 values and "1.23" or "12.3" for larger ones.
+export type FormatY = 'default' | 'bytes' | 'bytes/s' | 'percent' | 'count_rate';
 
 export type ChartSection =
   | 'Throughput'
@@ -221,7 +225,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'commit_block_count_total',
     rate: true,
     unit: 'blocks/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
   {
     slug: 'submitted-blocks',
@@ -241,7 +245,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'submit_block_count_total',
     rate: true,
     unit: 'blocks/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
   {
     slug: 'merged-blocks',
@@ -261,7 +265,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'merge_block_count_total',
     rate: true,
     unit: 'blocks/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
   {
     slug: 'txs-per-block',
@@ -290,7 +294,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'commit_block_commitment_failures_total',
     rate: true,
     unit: 'failures/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
   {
     slug: 'merge-failures',
@@ -299,7 +303,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'merge_block_failures_total',
     rate: true,
     unit: 'failures/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
   {
     slug: 'rejected-submissions',
@@ -308,7 +312,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'tx_submissions_rejected_total',
     rate: true,
     unit: 'rejects/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
   {
     slug: 'rejected-stream-backpressure',
@@ -317,7 +321,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'tx_submissions_rejected_stream_backpressure_total',
     rate: true,
     unit: 'rejects/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
   {
     slug: 'rejected-offer-timeout',
@@ -326,7 +330,7 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     metric: 'tx_submissions_rejected_offer_timeout_total',
     rate: true,
     unit: 'rejects/s',
-    formatY: 'default',
+    formatY: 'count_rate',
   },
 
   // --- Infrastructure ---
@@ -481,12 +485,16 @@ export function buildDataRows(windows: TierMetricWindow[], spec: PanelSpec): Dat
     );
     const committedByTimestamp = new Map<number, number>(committedRates);
     const acceptedByTimestamp = new Map<number, number>(acceptedRates);
-    const timestamps = [
-      ...new Set([...committedByTimestamp.keys(), ...acceptedByTimestamp.keys()]),
-    ].sort((a, b) => a - b);
+    // Inner-join: only emit points where both rates have data at the same timestamp.
+    // An outer-join with 0-fallback creates false large spikes whenever only one
+    // series has a scrape at a given timestamp (e.g. immediately after a block
+    // commit, committed rate is >0 but accepted rate has no sample yet).
+    const timestamps = [...committedByTimestamp.keys()]
+      .filter((ts) => acceptedByTimestamp.has(ts))
+      .sort((a, b) => a - b);
     const netSeries = timestamps.map((ts): [number, number] => [
       ts,
-      (committedByTimestamp.get(ts) ?? 0) - (acceptedByTimestamp.get(ts) ?? 0),
+      (committedByTimestamp.get(ts) as number) - (acceptedByTimestamp.get(ts) as number),
     ]);
     return dataRowsFromSeries(netSeries, '');
   }
@@ -538,6 +546,10 @@ function yAxisConfig(formatY: FormatY, unit: string): Record<string, unknown> {
     case 'percent':
       // Input values are fractions (e.g. 0.1 = 10%); format multiplies by 100
       return { ...base, format: '.1%' };
+    case 'count_rate':
+      // General notation with 4 sig-figs, no SI milli/micro prefix.
+      // Avoids D3 rendering 0.068 blocks/s as "68m" (looks like "68 million").
+      return { ...base, format: '.4~g' };
     default:
       return { ...base, format: '~s' };
   }

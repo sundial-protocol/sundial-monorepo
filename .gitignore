@@ -14,6 +14,7 @@ utils.log
 .temp
 .tmp
 tmp
+sim-node
 audits
 .terraform/
 *.tfstate

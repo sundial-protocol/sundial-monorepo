@@ -16,7 +16,12 @@ import type {
 import { makeEvent } from '../evidence/load-events.js';
 import type { LokiClient, LokiTierCapture } from '../evidence/loki.js';
 import type { TempoClient, TempoTierCapture } from '../evidence/tempo.js';
-import { CADVISOR_METRICS, NODE_METRICS, PrometheusClient } from '../metrics/prometheus.js';
+import {
+  CADVISOR_METRICS,
+  EVIDENCE_REQUIRED_NODE_METRICS,
+  NODE_METRICS,
+  PrometheusClient,
+} from '../metrics/prometheus.js';
 import type { TierMetricWindow, TierWindowSummary } from '../metrics/window.js';
 import { collectTierWindow, RANGE_STEP_SECONDS, summarizeTierWindow } from '../metrics/window.js';
 import type { HostResourceCollector, LoadDriverResourceEvidence } from './host-resources.js';
@@ -128,7 +133,7 @@ function createTimedController(ms: number): { controller: AbortController; cance
 }
 
 function computeEvidenceIncomplete(window: TierMetricWindow): boolean {
-  for (const q of NODE_METRICS) {
+  for (const q of EVIDENCE_REQUIRED_NODE_METRICS) {
     if ((window.afterLoad[q] ?? null) === null) {
       return true;
     }

@@ -1,10 +1,10 @@
 {
   "planId": "saturation",
-  "description": "Post-formal-tier saturation sequence (§8.3): step-ramp discovery from 50–1,600 TPS followed by the 25% increment ramp starting from the practical estimate ceiling. Run only after standard-progression has passed.",
+  "description": "Post-formal-tier saturation sequence (§8.3): step-ramp discovery from 50–1,600 TPS followed by the 25% increment ramp. Run only after standard-progression has passed. Targets beyond 5,000 TPS approach the current practical mainnet ceiling; higher ceilings require L1 protocol enhancements.",
   "outputDir": "benchmark-plans",
   "stopOnFailure": false,
   "scenarios": [
-    "../scenarios/saturation-discovery.json",
-    "../scenarios/saturation-ramp-25pct.json"
+    "../scenarios/saturation-discovery-replay.json",
+    "../scenarios/saturation-ramp-25pct-replay.json"
   ]
 }

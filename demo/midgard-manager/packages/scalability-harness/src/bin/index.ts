@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,6 +22,8 @@ import { PlanArtifactWriter } from '../evidence/plan-artifacts.js';
 import { sanitizePathLikeText } from '../path-sanitization.js';
 import type { ScenarioRunRecord } from '../report/plan-markdown.js';
 import { buildPlanConclusion, renderPlanReport } from '../report/plan-markdown.js';
+import { generateCharts } from '../report/charts.js';
+import { renderReport } from '../report/markdown.js';
 import { runExecutionReadinessPreflight } from '../runner/preflight.js';
 import { runScenario } from '../runner/scenario-runner.js';
 
@@ -774,6 +776,121 @@ program
         )
       );
     }
+  });
+
+// ---------------------------------------------------------------------------
+// regen-report
+// ---------------------------------------------------------------------------
+
+program
+  .command('regen-report <run-dir>')
+  .description('Regenerate report.md and charts/ from an existing benchmark run directory')
+  .action(async (runDirArg: string) => {
+    const runDir = path.resolve(runDirArg);
+
+    async function readJson(filePath: string): Promise<unknown> {
+      return JSON.parse(await readFile(filePath, 'utf8'));
+    }
+
+    async function tryReadJson(filePath: string): Promise<unknown> {
+      try {
+        return await readJson(filePath);
+      } catch {
+        return null;
+      }
+    }
+
+    console.log(chalk.blue(`\nRegen Report — ${redactPathLike(runDir)}`));
+
+    let manifest: unknown;
+    let scenario: unknown;
+    let summary: unknown;
+    let promSamples: unknown;
+
+    try {
+      [manifest, scenario, summary, promSamples] = await Promise.all([
+        readJson(path.join(runDir, 'run-manifest.json')),
+        readJson(path.join(runDir, 'scenario.json')),
+        readJson(path.join(runDir, 'summary.json')),
+        readJson(path.join(runDir, 'prometheus-samples.json')),
+      ]);
+    } catch (err) {
+      console.error(chalk.red(`Failed to read required run artifacts: ${String(err)}`));
+      process.exit(1);
+    }
+
+    const [lokiRaw, tempoRaw] = await Promise.all([
+      tryReadJson(path.join(runDir, 'loki-captures.json')),
+      tryReadJson(path.join(runDir, 'tempo-captures.json')),
+    ]);
+
+    const prometheusWindows = Array.isArray((promSamples as Record<string, unknown>)?.tiers)
+      ? ((promSamples as Record<string, unknown>).tiers as unknown[])
+      : [];
+
+    let chartRecords: Awaited<ReturnType<typeof generateCharts>> | undefined;
+    if (prometheusWindows.length > 0) {
+      console.log(
+        chalk.gray(`Generating charts from ${prometheusWindows.length} tier window(s)...`)
+      );
+      try {
+        chartRecords = await generateCharts(
+          prometheusWindows as Parameters<typeof generateCharts>[0],
+          runDir
+        );
+        console.log(chalk.gray(`  ${chartRecords.length} charts written`));
+      } catch (err) {
+        console.error(chalk.yellow(`  Chart generation failed (continuing): ${String(err)}`));
+      }
+    }
+
+    let artifactFiles: string[];
+    try {
+      const entries = await readdir(runDir, { withFileTypes: true });
+      artifactFiles = entries
+        .filter((e) => e.isFile())
+        .map((e) => e.name)
+        .sort();
+    } catch {
+      artifactFiles = [];
+    }
+    if (!artifactFiles.includes('report.md')) {
+      artifactFiles = [...artifactFiles, 'report.md'].sort();
+    }
+
+    const lokiCaptures =
+      Array.isArray(lokiRaw) && lokiRaw.length > 0
+        ? (lokiRaw as Parameters<typeof renderReport>[0]['lokiCaptures'])
+        : undefined;
+    const tempoCaptures =
+      Array.isArray(tempoRaw) && tempoRaw.length > 0
+        ? (tempoRaw as Parameters<typeof renderReport>[0]['tempoCaptures'])
+        : undefined;
+
+    const reportSummary = summary as Record<string, unknown>;
+
+    let markdown: string;
+    try {
+      markdown = renderReport({
+        manifest: manifest as Parameters<typeof renderReport>[0]['manifest'],
+        scenario: scenario as Parameters<typeof renderReport>[0]['scenario'],
+        tierSummaries: Array.isArray(reportSummary?.tierSummaries)
+          ? (reportSummary.tierSummaries as Parameters<typeof renderReport>[0]['tierSummaries'])
+          : [],
+        conclusion: reportSummary?.conclusion as Parameters<typeof renderReport>[0]['conclusion'],
+        artifactFiles,
+        lokiCaptures,
+        tempoCaptures,
+        chartRecords,
+      });
+    } catch (err) {
+      console.error(chalk.red(`Report rendering failed: ${String(err)}`));
+      process.exit(1);
+    }
+
+    const reportPath = path.join(runDir, 'report.md');
+    await writeFile(reportPath, markdown, 'utf8');
+    console.log(chalk.green(`Report written: ${redactPathLike(reportPath)}`));
   });
 
 program.parse();
