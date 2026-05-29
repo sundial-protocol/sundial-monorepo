@@ -44,21 +44,21 @@ Paths passed to `--scenario` and `--plan` are resolved from the current working 
 If you are already in `demo/midgard-manager/packages/scalability-harness`, use paths like `scenarios/...` and `plans/...` (do not prefix with `demo/midgard-manager/packages/scalability-harness/...`).
 
 ```bash
-npm run start -- run --scenario scenarios/warmup.json
-npm run start -- run --scenario scenarios/warmup.json --dry-run
-npm run start -- run --scenario scenarios/stress-10000.json --max-tier 2
-npm run start -- run --scenario scenarios/initial-800.json --run-id initial-800-v2
+npm run start -- run --scenario scenarios/warmup-replay.json
+npm run start -- run --scenario scenarios/warmup-replay.json --dry-run
+npm run start -- run --scenario scenarios/practical-5000-replay.json --max-tier 2
+npm run start -- run --scenario scenarios/initial-800-replay.json --run-id initial-800-v2
 ```
 
 ### Other commands
 
 ```bash
 # Run preflight checks against a scenario's endpoints
-npm run start -- preflight --scenario scenarios/warmup.json
+npm run start -- preflight --scenario scenarios/warmup-replay.json
 
 # Print load tiers for a scenario without running
-npm run start -- tiers --scenario scenarios/practical-24985.json
-npm run start -- tiers --scenario scenarios/saturation-ramp-25pct.json --max-tier 4
+npm run start -- tiers --scenario scenarios/practical-5000-replay.json
+npm run start -- tiers --scenario scenarios/saturation-ramp-25pct-replay.json --max-tier 4
 ```
 
 ### Collateral top-up (block commitment wallet)
@@ -133,8 +133,8 @@ A plan file encodes an ordered sequence of scenarios to run. Plan files live in 
   "outputDir": "benchmark-plans",
   "stopOnFailure": true, // abort on Failed/Blocked; continue on Passed with Observations
   "scenarios": [
-    "../scenarios/warmup.json", // paths relative to the plan file
-    "../scenarios/initial-800.json",
+    "../scenarios/warmup-replay.json", // paths relative to the plan file
+    "../scenarios/initial-800-replay.json",
   ],
 }
 ```
@@ -146,7 +146,7 @@ A plan file encodes an ordered sequence of scenarios to run. Plan files live in 
 Full §8.1 benchmark sequence; stops on first failure:
 
 ```
-warmup → initial-800 → institutional-1000 → institutional-5000 → stress-10000 → practical-24985
+warmup → initial-800 → institutional-1000 → mainnet-2000 → practical-5000
 ```
 
 ### `plans/saturation.json`
@@ -161,18 +161,30 @@ saturation-discovery → saturation-ramp-25pct
 
 Scenario files live in `scenarios/`. Each file is a JSON object conforming to `ScalabilityScenario`.
 
-| Order | File                                | runId                          | Target TPS | Test plan section                 |
-| ----- | ----------------------------------- | ------------------------------ | ---------- | --------------------------------- |
-| 0     | `baseline-100-800-replay.json`      | `baseline-100-800-replay`      | 100→800    | §13 step-ramp baseline (optional) |
-| 1     | `warmup-replay.json`                | `warmup-replay`                | 100        | §8.1 warm-up                      |
-| 2     | `initial-800-replay.json`           | `initial-800-replay`           | 800        | §8.1 initial TPS validation       |
-| 3     | `institutional-1000-replay.json`    | `institutional-1000-replay`    | 1,000      | §8.1 institutional baseline       |
-| 4     | `institutional-5000-replay.json`    | `institutional-5000-replay`    | 5,000      | §8.1 institutional load           |
-| 5     | `stress-10000-replay.json`          | `stress-10000-replay`          | 10,000     | §8.1 institutional stress         |
-| 6     | `practical-24985-replay.json`       | `practical-24985-replay`       | 24,985     | §8.1 practical estimate target    |
-| 7     | `spike-replay.json`                 | `spike-replay`                 | 49,970     | §8.1 peak spike                   |
-| 8     | `saturation-discovery-replay.json`  | `saturation-discovery-replay`  | 50→1,600   | §8.3 saturation discovery         |
-| 9     | `saturation-ramp-25pct-replay.json` | `saturation-ramp-25pct-replay` | varies     | §8.3 25% increment ramp           |
+### Testnet vs Mainnet
+
+Keep testnet runs to the minimum required to validate that the architecture is sound. Defer higher-throughput tiers to mainnet where the L1 provider, block timing, and infrastructure are production-grade.
+
+| Environment | Scenarios                                                         | Purpose                                                                               |
+| ----------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Testnet     | `baseline-100-800`, `warmup`, `initial-800`, `institutional-1000` | Confirm architecture correctness and baseline throughput under controlled conditions  |
+| Mainnet     | `mainnet-2000`, `practical-5000`, `spike`, saturation             | Validate production-grade throughput, recovery behaviour, and practical TPS estimates |
+
+The `standard-progression` plan covers both environments in sequence. Run it end-to-end on mainnet once testnet tiers have passed, or run `--plan` up to `--max-tier` to stop after the testnet portion.
+
+### Scenario reference
+
+| Order | File                                | runId                          | Env     | Target TPS | Test plan section             |
+| ----- | ----------------------------------- | ------------------------------ | ------- | ---------- | ----------------------------- |
+| 0     | `baseline-100-800-replay.json`      | `baseline-100-800-replay`      | Testnet | 100→800    | §13 step-ramp baseline        |
+| 1     | `warmup-replay.json`                | `warmup-replay`                | Both    | 100        | §8.1 warm-up                  |
+| 2     | `initial-800-replay.json`           | `initial-800-replay`           | Testnet | 800        | §8.1 testnet TPS validation   |
+| 3     | `institutional-1000-replay.json`    | `institutional-1000-replay`    | Testnet | 1,000      | §8.1 testnet industrial       |
+| 4     | `mainnet-2000-replay.json`          | `mainnet-2000-replay`          | Mainnet | 2,000      | §8.1 mainnet baseline         |
+| 5     | `practical-5000-replay.json`        | `practical-5000-replay`        | Mainnet | 5,000      | §8.1 practical mainnet target |
+| 6     | `spike-replay.json`                 | `spike-replay`                 | Mainnet | 10,000     | §8.1 peak spike               |
+| 7     | `saturation-discovery-replay.json`  | `saturation-discovery-replay`  | Mainnet | 50→1,600   | §8.3 saturation discovery     |
+| 8     | `saturation-ramp-25pct-replay.json` | `saturation-ramp-25pct-replay` | Mainnet | varies     | §8.3 25% increment ramp       |
 
 Tiers are generated from `startTps` to `maxTps` using `stepMultiplier` (multiply) or `ramp.percentIncrement` (percent increment). When `startTps === maxTps` the scenario has a single tier.
 

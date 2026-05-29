@@ -1,6 +1,6 @@
 {
   "runId": "initial-800-replay",
-  "description": "Initial TPS validation tier (§8.1): demonstrates the architecture's stated initial L2 throughput target. Sustains 800 TPS one-to-one for 30 minutes and must pass before any higher institutional targets are claimed.",
+  "description": "Testnet TPS validation tier (§8.1): demonstrates the initial L2 testnet throughput target. Sustains 800 TPS one-to-one for 30 minutes and must pass before mainnet-grade targets are claimed.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",
   "lokiEndpoint": "http://localhost:3100",

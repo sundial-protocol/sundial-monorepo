@@ -1,21 +1,21 @@
 {
-  "runId": "practical-24985-replay",
-  "description": "Practical estimate target tier (§8.1): validates or falsifies the architecture's estimated practical TPS ceiling of ~24,985 TPS derived from internal-docs/architecture/scaling.md. Runs one-to-one for 20 minutes; either sustains the target or produces clear bottleneck evidence.",
+  "runId": "practical-5000-replay",
+  "description": "Practical mainnet target tier (§8.1): validates or falsifies the architecture's practical mainnet TPS estimate of 5,000 TPS. Runs one-to-one for 30 minutes; either sustains the target or produces clear bottleneck evidence. See internal-docs/architecture/scaling.md for the throughput model and mainnet targets.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",
   "lokiEndpoint": "http://localhost:3100",
   "tempoEndpoint": "http://localhost:3200",
   "outputDir": "benchmark-runs/tmp",
-  "seed": "practical-24985-2026-05-18",
+  "seed": "practical-5000-2026-05-18",
   "l1ProviderMode": "emulator",
   "walletMode": "external-key",
   "walletProvisioningNote": "external-key mode — set WALLET_PRIVATE_KEY to a pre-funded key whose UTxOs are initialized on the node before running replay scenarios",
   "replayCorpusPath": "../corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl",
   "transactionType": "one-to-one",
-  "tierDurationSeconds": 1200,
+  "tierDurationSeconds": 1800,
   "recoverySeconds": 300,
-  "startTps": 24985,
-  "maxTps": 24985,
+  "startTps": 5000,
+  "maxTps": 5000,
   "stepMultiplier": 2,
   "txGeneratorTaskCostSeconds": 0.2,
   "retryAttempts": 1,
@@ -25,8 +25,8 @@
     "stopOnPrometheusDown": true,
     "stopOnCommitmentFailure": true,
     "stopOnMergeFailure": true,
-    "maxRecoveryQueueSize": 800000,
-    "maxRecoveryMempoolSize": 500000
+    "maxRecoveryQueueSize": 200000,
+    "maxRecoveryMempoolSize": 120000
   },
   "submitTimeoutMs": 500
 }

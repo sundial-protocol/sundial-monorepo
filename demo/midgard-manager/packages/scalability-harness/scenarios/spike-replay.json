@@ -1,6 +1,6 @@
 {
   "runId": "spike-replay",
-  "description": "Peak spike tier (§8.1): simulates short burst demand at 2x the practical estimate target (49,970 TPS) for 5 minutes. Mixed payload (70% one-to-one, 30% multi-output). Measures recovery behaviour and service stability after burst load.",
+  "description": "Peak spike tier (§8.1): simulates short burst demand at 2x the practical mainnet target (10,000 TPS) for 5 minutes. Mixed payload (70% one-to-one, 30% multi-output). Measures recovery behaviour and service stability after burst load.",
   "nodeEndpoint": "http://localhost:3000",
   "prometheusEndpoint": "http://localhost:9090",
   "lokiEndpoint": "http://localhost:3100",
@@ -14,8 +14,8 @@
   "oneToOneRatio": 70,
   "tierDurationSeconds": 300,
   "recoverySeconds": 300,
-  "startTps": 49970,
-  "maxTps": 49970,
+  "startTps": 10000,
+  "maxTps": 10000,
   "stepMultiplier": 2,
   "txGeneratorTaskCostSeconds": 0.2,
   "retryAttempts": 1,
@@ -25,8 +25,8 @@
     "stopOnPrometheusDown": true,
     "stopOnCommitmentFailure": true,
     "stopOnMergeFailure": true,
-    "maxRecoveryQueueSize": 1200000,
-    "maxRecoveryMempoolSize": 800000
+    "maxRecoveryQueueSize": 400000,
+    "maxRecoveryMempoolSize": 250000
   },
   "submitTimeoutMs": 500
 }
