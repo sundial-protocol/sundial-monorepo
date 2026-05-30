@@ -159,6 +159,9 @@ resource "aws_ecs_service" "prometheus" {
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
 
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
+
   service_registries {
     registry_arn   = aws_service_discovery_service.prometheus.arn
     container_name = "prometheus"
@@ -210,6 +213,9 @@ resource "aws_ecs_service" "loki" {
   task_definition = aws_ecs_task_definition.loki.arn
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
+
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
 
   service_registries {
     registry_arn   = aws_service_discovery_service.loki.arn
@@ -280,6 +286,9 @@ resource "aws_ecs_service" "alloy" {
   task_definition = aws_ecs_task_definition.alloy.arn
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
+
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
 
   service_registries {
     registry_arn   = aws_service_discovery_service.alloy.arn
@@ -476,6 +485,9 @@ resource "aws_ecs_service" "postgres_exporter" {
   task_definition = aws_ecs_task_definition.postgres_exporter.arn
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
+
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
 
   service_registries {
     registry_arn   = aws_service_discovery_service.postgres_exporter.arn
