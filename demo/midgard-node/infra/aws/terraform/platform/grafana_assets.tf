@@ -38,3 +38,20 @@ resource "aws_iam_role_policy" "ecs_task_grafana_s3" {
     }]
   })
 }
+
+# Allows Grafana init script to resolve Prometheus IP via Cloud Map API
+# (Cloud Map SRV targets are instance-id subdomains with no A records,
+# so discover-instances is the only reliable way to get the actual host IP).
+resource "aws_iam_role_policy" "ecs_task_grafana_servicediscovery" {
+  name = "${local.name_prefix}-grafana-servicediscovery"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["servicediscovery:DiscoverInstances"]
+      Resource = "*"
+    }]
+  })
+}

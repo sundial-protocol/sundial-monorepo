@@ -304,24 +304,30 @@ resource "aws_ecs_task_definition" "grafana" {
       entryPoint = ["/bin/sh", "-ec"]
       command = [
         <<-CMD
-          # Install aws-cli and DNS tools (Alpine and Debian/Ubuntu Grafana base images).
+          # Install aws-cli (Alpine and Debian/Ubuntu Grafana base images).
           if command -v apk >/dev/null 2>&1; then
-            apk add -q --no-cache bind-tools aws-cli 2>/dev/null || true
+            apk add -q --no-cache aws-cli 2>/dev/null || true
           elif command -v apt-get >/dev/null 2>&1; then
             apt-get update -qq 2>/dev/null
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dnsutils awscli 2>/dev/null || true
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq awscli 2>/dev/null || true
           fi
 
-          # Resolve Prometheus URL via Cloud Map SRV record.
-          # Cloud Map MULTIVALUE routing registers SRV records; the SRV target is the
-          # EC2 instance private hostname, which IS resolvable via A records in the VPC.
+          # Resolve Prometheus URL via Cloud Map DiscoverInstances API.
+          # Cloud Map SRV records use instance-id subdomains as targets (no A records),
+          # so DNS-based resolution does not work. DiscoverInstances returns the actual
+          # EC2 private IP and host port directly.
           PROMETHEUS_URL=""
-          if command -v dig >/dev/null 2>&1; then
-            PROM_SRV=$(dig +short SRV prometheus.${var.private_dns_namespace_name} 2>/dev/null | head -1)
-            if [ -n "$PROM_SRV" ]; then
-              PROM_PORT=$(printf '%s' "$PROM_SRV" | awk '{print $3}')
-              PROM_HOST=$(printf '%s' "$PROM_SRV" | awk '{print $4}' | sed 's/\.$//')
-              PROMETHEUS_URL="http://$PROM_HOST:$PROM_PORT"
+          if command -v aws >/dev/null 2>&1; then
+            PROM_DATA=$(aws servicediscovery discover-instances \
+              --namespace-name ${var.private_dns_namespace_name} \
+              --service-name prometheus \
+              --region ${var.aws_region} \
+              --query 'Instances[0].[Attributes.AWS_INSTANCE_IPV4, Attributes.AWS_INSTANCE_PORT]' \
+              --output text 2>/dev/null)
+            PROM_IP=$(printf '%s' "$PROM_DATA" | awk '{print $1}')
+            PROM_PORT=$(printf '%s' "$PROM_DATA" | awk '{print $2}')
+            if [ -n "$PROM_IP" ] && [ "$PROM_IP" != "None" ]; then
+              PROMETHEUS_URL="http://$PROM_IP:$PROM_PORT"
             fi
           fi
           PROMETHEUS_URL="$${PROMETHEUS_URL:-http://localhost:9090}"

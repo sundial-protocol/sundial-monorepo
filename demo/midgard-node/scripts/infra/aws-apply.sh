@@ -283,6 +283,7 @@ terraform_targets_for_service() {
         "aws_s3_bucket_server_side_encryption_configuration.grafana_assets" \
         "aws_s3_bucket_public_access_block.grafana_assets" \
         "aws_iam_role_policy.ecs_task_grafana_s3" \
+        "aws_iam_role_policy.ecs_task_grafana_servicediscovery" \
         "aws_ecs_task_definition.grafana" \
         "aws_ecs_service.grafana"
       ;;
@@ -304,6 +305,7 @@ terraform_targets_for_service() {
         "aws_s3_bucket_server_side_encryption_configuration.grafana_assets" \
         "aws_s3_bucket_public_access_block.grafana_assets" \
         "aws_iam_role_policy.ecs_task_grafana_s3" \
+        "aws_iam_role_policy.ecs_task_grafana_servicediscovery" \
         "aws_ecs_service.prometheus" \
         "aws_ecs_service.loki" \
         "aws_ecs_service.alloy" \
