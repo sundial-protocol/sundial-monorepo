@@ -136,7 +136,7 @@ resource "aws_ecs_task_definition" "prometheus" {
             --storage.tsdb.retention.time=${var.prometheus_retention}
         CMD
       ]
-      portMappings = [{ containerPort = 9090, hostPort = 0, protocol = "tcp" }]
+      portMappings = [{ containerPort = 9090, hostPort = 9090, protocol = "tcp" }]
       mountPoints  = [{ sourceVolume = "prometheus-data", containerPath = "/prometheus", readOnly = false }]
       logConfiguration = {
         logDriver = "awslogs"
@@ -419,11 +419,15 @@ resource "aws_ecs_task_definition" "grafana" {
 resource "aws_ecs_service" "grafana" {
   count = var.enable_ecs_services ? 1 : 0
 
-  name            = "grafana"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.grafana.arn
-  desired_count   = var.observability_desired_count
-  launch_type     = "EC2"
+  name                 = "grafana"
+  cluster              = aws_ecs_cluster.main.id
+  task_definition      = aws_ecs_task_definition.grafana.arn
+  desired_count        = var.observability_desired_count
+  launch_type          = "EC2"
+  force_new_deployment = true
+
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
 
   load_balancer {
     target_group_arn = aws_lb_target_group.grafana.arn

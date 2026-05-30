@@ -104,6 +104,15 @@ resource "aws_vpc_security_group_ingress_rule" "sg_ecs_ingress_from_alb_node_por
   description                  = "ALB forwarded requests and health checks (sundial-node fixed port)"
 }
 
+resource "aws_vpc_security_group_ingress_rule" "sg_ecs_ingress_prometheus_from_ecs" {
+  security_group_id            = aws_security_group.sg_ecs.id
+  referenced_security_group_id = aws_security_group.sg_ecs.id
+  from_port                    = 9090
+  to_port                      = 9090
+  ip_protocol                  = "tcp"
+  description                  = "Inter-task Prometheus access (fixed port)"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "sg_ecs_ingress_metrics_from_ecs" {
   security_group_id            = aws_security_group.sg_ecs.id
   referenced_security_group_id = aws_security_group.sg_ecs.id
