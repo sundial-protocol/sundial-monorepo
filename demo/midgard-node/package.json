@@ -58,6 +58,7 @@
     "infra:testnet:bootstrap": "pnpm run infra:testnet:bootstrap:state && pnpm run infra:testnet:bootstrap:secrets && pnpm run infra:testnet:images:push",
     "infra:testnet:bootstrap:state": "bash ./scripts/infra/aws-bootstrap.sh state --environment=testnet",
     "infra:testnet:bootstrap:secrets": "bash ./scripts/infra/aws-bootstrap.sh secrets --environment=testnet",
+    "infra:testnet:bootstrap:grafana-assets": "bash ./scripts/infra/aws-bootstrap.sh grafana-assets --environment=testnet",
     "infra:testnet:images:push": "bash ./scripts/infra/aws-bootstrap.sh ecr --environment=testnet",
     "infra:testnet:apply": "pnpm run infra:testnet:apply:shared && pnpm run infra:testnet:apply:node && pnpm run infra:testnet:apply:obs",
     "infra:testnet:apply:dry-run": "pnpm run infra:testnet:apply",

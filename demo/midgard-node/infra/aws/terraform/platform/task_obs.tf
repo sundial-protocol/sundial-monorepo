@@ -299,6 +299,75 @@ resource "aws_ecs_task_definition" "grafana" {
       name      = "grafana"
       image     = var.grafana_image
       essential = true
+      user      = "root"
+
+      entryPoint = ["/bin/sh", "-ec"]
+      command = [
+        <<-CMD
+          # Install aws-cli and DNS tools (Alpine and Debian/Ubuntu Grafana base images).
+          if command -v apk >/dev/null 2>&1; then
+            apk add -q --no-cache bind-tools aws-cli 2>/dev/null || true
+          elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq 2>/dev/null
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dnsutils awscli 2>/dev/null || true
+          fi
+
+          # Resolve Prometheus URL via Cloud Map SRV record.
+          # Cloud Map MULTIVALUE routing registers SRV records; the SRV target is the
+          # EC2 instance private hostname, which IS resolvable via A records in the VPC.
+          PROMETHEUS_URL=""
+          if command -v dig >/dev/null 2>&1; then
+            PROM_SRV=$(dig +short SRV prometheus.${var.private_dns_namespace_name} 2>/dev/null | head -1)
+            if [ -n "$PROM_SRV" ]; then
+              PROM_PORT=$(printf '%s' "$PROM_SRV" | awk '{print $3}')
+              PROM_HOST=$(printf '%s' "$PROM_SRV" | awk '{print $4}' | sed 's/\.$//')
+              PROMETHEUS_URL="http://$PROM_HOST:$PROM_PORT"
+            fi
+          fi
+          PROMETHEUS_URL="$${PROMETHEUS_URL:-http://localhost:9090}"
+          echo "[grafana-init] Prometheus URL: $PROMETHEUS_URL"
+
+          # Write datasource provisioning
+          mkdir -p /etc/grafana/provisioning/datasources
+          printf '%s\n' \
+            'apiVersion: 1' \
+            'datasources:' \
+            '  - name: Prometheus' \
+            '    type: prometheus' \
+            '    uid: prometheus' \
+            "    url: $PROMETHEUS_URL" \
+            '    access: proxy' \
+            '    isDefault: true' \
+            >/etc/grafana/provisioning/datasources/prometheus.yaml
+
+          # Write dashboard provider provisioning
+          mkdir -p /etc/grafana/provisioning/dashboards /var/lib/grafana/dashboards
+          printf '%s\n' \
+            'apiVersion: 1' \
+            'providers:' \
+            '  - name: Default' \
+            '    folder: Sundial' \
+            '    type: file' \
+            '    options:' \
+            '      path: /var/lib/grafana/dashboards' \
+            >/etc/grafana/provisioning/dashboards/default.yaml
+
+          # Download dashboard JSON from S3 (uses ECS task role credentials)
+          if command -v aws >/dev/null 2>&1; then
+            aws s3 cp "s3://${aws_s3_bucket.grafana_assets.bucket}/dashboard.json" \
+              /var/lib/grafana/dashboards/dashboard.json \
+              --region ${var.aws_region} 2>/dev/null \
+              && echo "[grafana-init] dashboard downloaded from S3" \
+              || echo "[grafana-init] warning: dashboard download failed; starting without it"
+          fi
+
+          # Fix ownership so grafana user (UID 472) can read provisioning files
+          chown -R 472:472 /etc/grafana/provisioning /var/lib/grafana 2>/dev/null || true
+
+          exec /run.sh
+        CMD
+      ]
+
       environment = [
         { name = "GF_SECURITY_ADMIN_USER", value = "admin" },
         { name = "GF_AUTH_ANONYMOUS_ENABLED", value = "true" },
