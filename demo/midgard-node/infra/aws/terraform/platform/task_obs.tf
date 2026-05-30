@@ -105,17 +105,27 @@ resource "aws_ecs_task_definition" "prometheus" {
               static_configs:
                 - targets: ["localhost:9090"]
 
-            - job_name: sundial-node
+            - job_name: sundial_nodes
               metrics_path: /metrics
               dns_sd_configs:
                 - names: ["sundial-node.${var.private_dns_namespace_name}"]
                   type: SRV
                   refresh_interval: 30s
+              relabel_configs:
+                - target_label: role
+                  replacement: all
 
             - job_name: postgres-exporter
               metrics_path: /metrics
               dns_sd_configs:
                 - names: ["postgres-exporter.${var.private_dns_namespace_name}"]
+                  type: SRV
+                  refresh_interval: 30s
+
+            - job_name: cadvisor
+              metrics_path: /metrics
+              dns_sd_configs:
+                - names: ["cadvisor.${var.private_dns_namespace_name}"]
                   type: SRV
                   refresh_interval: 30s
           CFG
@@ -471,6 +481,97 @@ resource "aws_ecs_service" "postgres_exporter" {
     registry_arn   = aws_service_discovery_service.postgres_exporter.arn
     container_name = "postgres-exporter"
     container_port = 9187
+  }
+
+  depends_on = [aws_ecs_cluster_capacity_providers.main]
+}
+
+# ─── cAdvisor ─────────────────────────────────────────────────────────────────
+
+resource "aws_service_discovery_service" "cadvisor" {
+  name = "cadvisor"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.internal.id
+
+    dns_records {
+      type = "SRV"
+      ttl  = 10
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+}
+
+resource "aws_ecs_task_definition" "cadvisor" {
+  family                   = "${local.name_prefix}-cadvisor"
+  requires_compatibilities = ["EC2"]
+  network_mode             = "bridge"
+  cpu                      = "256"
+  memory                   = "256"
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  volume {
+    name      = "rootfs"
+    host_path = "/"
+  }
+  volume {
+    name      = "var-run"
+    host_path = "/var/run"
+  }
+  volume {
+    name      = "sys"
+    host_path = "/sys"
+  }
+  volume {
+    name      = "var-lib-docker"
+    host_path = "/var/lib/docker"
+  }
+  volume {
+    name      = "dev-disk"
+    host_path = "/dev/disk"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name       = "cadvisor"
+      image      = var.cadvisor_image
+      essential  = true
+      privileged = true
+      portMappings = [{ containerPort = 8080, hostPort = 0, protocol = "tcp" }]
+      mountPoints = [
+        { sourceVolume = "rootfs", containerPath = "/rootfs", readOnly = true },
+        { sourceVolume = "var-run", containerPath = "/var/run", readOnly = false },
+        { sourceVolume = "sys", containerPath = "/sys", readOnly = true },
+        { sourceVolume = "var-lib-docker", containerPath = "/var/lib/docker", readOnly = true },
+        { sourceVolume = "dev-disk", containerPath = "/dev/disk", readOnly = true },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "cadvisor"
+        }
+      }
+    }
+  ])
+}
+
+resource "aws_ecs_service" "cadvisor" {
+  count = var.enable_ecs_services ? 1 : 0
+
+  name                = "cadvisor"
+  cluster             = aws_ecs_cluster.main.id
+  task_definition     = aws_ecs_task_definition.cadvisor.arn
+  scheduling_strategy = "DAEMON"
+  launch_type         = "EC2"
+
+  service_registries {
+    registry_arn   = aws_service_discovery_service.cadvisor.arn
+    container_name = "cadvisor"
+    container_port = 8080
   }
 
   depends_on = [aws_ecs_cluster_capacity_providers.main]

@@ -242,6 +242,11 @@ variable "grafana_image" {
   default = "grafana/grafana:12.3.2"
 }
 
+variable "cadvisor_image" {
+  type    = string
+  default = "ghcr.io/google/cadvisor:0.56.2"
+}
+
 variable "postgres_exporter_image" {
   type    = string
   default = "prometheuscommunity/postgres-exporter:v0.17.1"

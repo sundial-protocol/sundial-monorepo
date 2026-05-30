@@ -12,7 +12,7 @@ Options:
   --environment=<testnet>   Deployment environment (default: testnet)
   --region=<aws-region>     AWS region (default: us-west-2 for testnet)
   --service=<name|all>      Service name or "all"
-                            ECS:          sundial-node, prometheus, loki, alloy, grafana, postgres-exporter
+                            ECS:          sundial-node, prometheus, loki, alloy, grafana, postgres-exporter, cadvisor
                             ASG:          ecs-host
                             EC2:          nat
                             ElastiCache:  redis
@@ -100,7 +100,7 @@ if [[ -z "${REGION}" ]]; then
   REGION="us-west-2"
 fi
 
-VALID_SERVICES=(sundial-node prometheus loki alloy grafana postgres-exporter ecs-host nat redis all)
+VALID_SERVICES=(sundial-node prometheus loki alloy grafana postgres-exporter cadvisor ecs-host nat redis all)
 is_valid_service=0
 for candidate in "${VALID_SERVICES[@]}"; do
   if [[ "${candidate}" == "${SERVICE}" ]]; then
@@ -110,7 +110,7 @@ for candidate in "${VALID_SERVICES[@]}"; do
 done
 [[ "${is_valid_service}" -eq 1 ]] || fail "--service must be one of: ${VALID_SERVICES[*]}"
 
-ALL_SERVICES=(sundial-node prometheus loki alloy grafana postgres-exporter ecs-host nat redis)
+ALL_SERVICES=(sundial-node prometheus loki alloy grafana postgres-exporter cadvisor ecs-host nat redis)
 
 SERVICES_TO_CHECK=()
 if [[ "${SERVICE}" == "all" ]]; then
@@ -514,7 +514,7 @@ fi
 ecs_services_checked=()
 for service_name in "${SERVICES_TO_CHECK[@]}"; do
   case "${service_name}" in
-    sundial-node|prometheus|loki|alloy|grafana|postgres-exporter)
+    sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|cadvisor)
       ecs_services_checked+=("${service_name}")
       ;;
   esac
@@ -532,7 +532,7 @@ for service_name in "${SERVICES_TO_CHECK[@]}"; do
     sundial-node)
       check_ecs_service_with_alb "sundial-node" "${NAME_PREFIX}-node" || ok=0
       ;;
-    prometheus|loki|alloy|grafana|postgres-exporter)
+    prometheus|loki|alloy|grafana|postgres-exporter|cadvisor)
       check_ecs_service "${service_name}" || ok=0
       ;;
     ecs-host)

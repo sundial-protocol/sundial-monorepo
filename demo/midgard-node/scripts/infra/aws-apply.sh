@@ -125,9 +125,9 @@ esac
 
 if [[ -n "${SERVICE}" ]]; then
   case "${SERVICE}" in
-    shared|sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|rds|data-tier) ;;
+    shared|sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|cadvisor|obs|rds|data-tier) ;;
     *)
-      fail "--service must be one of: shared sundial-node prometheus loki alloy grafana postgres-exporter obs rds data-tier"
+      fail "--service must be one of: shared sundial-node prometheus loki alloy grafana postgres-exporter cadvisor obs rds data-tier"
       ;;
   esac
 fi
@@ -299,6 +299,12 @@ terraform_targets_for_service() {
         "aws_ecs_task_definition.postgres_exporter" \
         "aws_ecs_service.postgres_exporter"
       ;;
+    cadvisor)
+      printf '%s\n' \
+        "aws_service_discovery_service.cadvisor" \
+        "aws_ecs_task_definition.cadvisor" \
+        "aws_ecs_service.cadvisor"
+      ;;
     obs)
       printf '%s\n' \
         "aws_s3_bucket.grafana_assets" \
@@ -306,6 +312,9 @@ terraform_targets_for_service() {
         "aws_s3_bucket_public_access_block.grafana_assets" \
         "aws_iam_role_policy.ecs_task_grafana_s3" \
         "aws_iam_role_policy.ecs_task_grafana_servicediscovery" \
+        "aws_service_discovery_service.cadvisor" \
+        "aws_ecs_task_definition.cadvisor" \
+        "aws_ecs_service.cadvisor" \
         "aws_ecs_service.prometheus" \
         "aws_ecs_service.loki" \
         "aws_ecs_service.alloy" \
