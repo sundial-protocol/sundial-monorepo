@@ -12,7 +12,7 @@ use aiken_design_patterns/validity_range_normalization as vrn
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, Value, tokens}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose, Spend,
+  InlineDatum, Input, Output, Redeemer, ScriptPurpose, Spend,
 }
 use env
 use midgard/common/types.{H28, H32, MerkleRoot, PosixTime, Proof, ValuePairs}
@@ -91,18 +91,14 @@ pub fn quantity_of_policy_id(value: Value, policyId: PolicyId) {
   dict.foldr(tokens(value, policyId), 0, fn(_k, v, result) { v + result })
 }
 
-pub fn get_own_hash(output_reference: OutputReference, txInputs: List<Input>) {
-  expect Some(input) =
-    list.find(txInputs, fn(x) { x.output_reference == output_reference })
-
+pub fn get_own_hash(input_index: Int, txInputs: List<Input>) {
+  expect Some(input) = list.at(txInputs, input_index)
   expect Script(hash) = input.output.address.payment_credential
   hash
 }
 
-pub fn get_own_address(output_reference: OutputReference, txInputs: List<Input>) {
-  expect Some(input) =
-    list.find(txInputs, fn(x) { x.output_reference == output_reference })
-
+pub fn get_own_address(input_index: Int, txInputs: List<Input>) {
+  expect Some(input) = list.at(txInputs, input_index)
   input.output.address
 }
 
