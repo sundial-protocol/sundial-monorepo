@@ -2,7 +2,7 @@
 
 ## 📋 Executive Summary
 
-This report summarizes four scalability benchmark executions for Sundial/Midgard at Git commit `30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c`. The runs were executed with the scalability harness under `demo/midgard-manager/packages/scalability-harness/benchmark-runs` and evaluated against the execution model, metrics, and acceptance criteria defined in [`internal-docs/scalability-stress-test-report.md`](https://github.com/sundial-protocol/internal-docs/blob/main/scalability-stress-test-report.md).
+This report summarizes four scalability benchmark executions for Sundial/Sundial at Git commit `30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c`. The runs were executed with the scalability harness under `midgard-manager/packages/scalability-harness/benchmark-runs` and evaluated against the execution model, metrics, and acceptance criteria defined in [`internal-docs/scalability-stress-test-report.md`](https://github.com/sundial-protocol/internal-docs/blob/main/scalability-stress-test-report.md).
 
 All four runs passed their formal classification checks. The critical result is the `initial-800-replay`: the node sustained `800 TPS` for a 30-minute load window, committed `1,292,478` transactions at `718.03` committed tx/s, and fully recovered the mempool to zero within the extended 600-second recovery window with `0` commitment failures and `0` merge failures. This satisfies the plan's sustained initial `800 TPS` validation requirement. An additional `institutional-1000-replay` run further validated sustained operation at `1,000 TPS`, committing `1,571,744` transactions at `873.17` committed tx/s with full mempool recovery and zero failures.
 
@@ -25,7 +25,7 @@ The plan explicitly distinguishes enqueued submissions, durable mempool acceptan
 
 | Field               | Value                                                                                                       |
 | :------------------ | :---------------------------------------------------------------------------------------------------------- |
-| System under test   | Sundial/Midgard node through the scalability harness                                                        |
+| System under test   | Sundial/Sundial node through the scalability harness                                                        |
 | Commit under test   | `30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c`                                                                  |
 | Transaction profile | `one-to-one`                                                                                                |
 | L1 provider mode    | `emulator`                                                                                                  |
@@ -34,7 +34,7 @@ The plan explicitly distinguishes enqueued submissions, durable mempool acceptan
 | Prometheus endpoint | `http://localhost:9090`                                                                                     |
 | Host                | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM                                                                       |
 | Harness version     | `0.1.0`                                                                                                     |
-| Evidence directory  | `demo/midgard-manager/packages/scalability-harness/benchmark-runs/30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c` |
+| Evidence directory  | `midgard-manager/packages/scalability-harness/benchmark-runs/30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c` |
 
 ## 🏃 Executed Runs
 

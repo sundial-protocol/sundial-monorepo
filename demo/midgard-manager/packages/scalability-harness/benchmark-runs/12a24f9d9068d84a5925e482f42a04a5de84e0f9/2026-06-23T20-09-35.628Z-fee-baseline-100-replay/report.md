@@ -9,8 +9,8 @@
 | Field | Value |
 | --- | --- |
 | Run ID | fee-baseline-100-replay |
-| Started At | 2026-06-23T16:59:57.155Z |
-| Git SHA | ef887af1415f4a34fc85dd1e128bcdd1039b790d |
+| Started At | 2026-06-23T20:09:35.628Z |
+| Git SHA | 12a24f9d9068d84a5925e482f42a04a5de84e0f9 |
 | Node Endpoint | http://localhost:3000 |
 | Prometheus Endpoint | http://localhost:9090 |
 | L1 Provider Mode | emulator |
@@ -49,7 +49,7 @@
 
 | Tier | Target TPS | Result | Enqueued Δ | Mempool Accepted Δ | Committed Tx Δ | Submitted Blocks Δ | Peak Queue | Peak Mempool | Commit Failures Δ | Merge Failures Δ | Collapse Reason |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | completed ✅ | 92848 | 93219 | 92015 | 508 | 41 | 646 | 0 | 0 | n/a |
+| 0 | 100 | completed ✅ | 93336 | 93682 | 92742 | 91 | 395 | 1224 | 0 | 0 | n/a |
 
 ## 🚦 Formal Run Classification
 
@@ -92,7 +92,7 @@ Gaps between adjacent columns identify where the pipeline loses throughput.
 
 | Tier | Target TPS | Enqueued TPS | Mempool Accepted TPS | Committed TPS |
 | --- | --- | --- | --- | --- |
-| 0 | 100 | 103.16 | 103.57 | 102.23 |
+| 0 | 100 | 103.70 | 104.09 | 103.04 |
 
 ![Received Transactions Per Second](charts/received-tps.svg)
 
@@ -115,7 +115,7 @@ require per-request JSONL.
 
 | Tier | Target TPS | Submitted | Rejected | Node Unavailable | Error | Total Retries | Retried Submissions | Submitted Latency p95 (ms) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 94129 | 0 | 0 | 0 | 0 | 0 | 50 |
+| 0 | 100 | 94197 | 0 | 0 | 0 | 0 | 0 | 50 |
 
 ## ⏱️ Accepted-to-Committed Latency Evidence
 
@@ -133,17 +133,17 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 
 | Tier | Target TPS | Method | Confidence | Resolved Tx Ratio | Accepted→Committed p50 (ms) | Accepted→Committed p95 (ms) | Accepted→Committed p99 (ms) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | cohort_counter_alignment_v1 | high | 97.3% | 15000 | 15000 | 15000 |
+| 0 | 100 | cohort_counter_alignment_v1 | high | 99.4% | 15000 | 15000 | 15000 |
 
 **Confidence Notes:**
 
-- Tier 0: Scrape step is approximately 15s; latency resolution is bounded by this interval. Only 97.3% of accepted transactions were matched to committed progress before window end.
+- Tier 0: Scrape step is approximately 15s; latency resolution is bounded by this interval. Only 99.4% of accepted transactions were matched to committed progress before window end.
 
 ## 📦 Queue and Mempool Behavior
 
 | Tier | Target TPS | Peak Queue | Final Queue (after recovery) | Peak Mempool | Final Mempool (after recovery) |
 | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 41 | 0 | 646 | 0 |
+| 0 | 100 | 395 | 0 | 1224 | 0 |
 
 ![Sundial Transactions in Queue](charts/tx-queue.svg)
 
@@ -162,7 +162,7 @@ L1 commitment fee fields are derived as follows:
 
 | Tier | Target TPS | Committed Blocks Δ | Submitted Blocks Δ | Merged Blocks Δ | Merge Failures Δ | Commit Failures Δ | L1 Fees Δ (lovelace) | Last L1 Fee (lovelace) | L1 Fee / Committed L2 Tx (lovelace) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 508 | 508 | 1 | 0 | 0 | 116410740 | 229155 | 1265.13 |
+| 0 | 100 | 91 | 91 | 1 | 0 | 0 | 20853105 | 229155 | 224.85 |
 
 ![Built Blocks](charts/built-blocks.svg)
 
@@ -221,7 +221,7 @@ Full log streams are in `loki-captures.json`.
 
 | Tier | Target TPS | Tier Window | Capture Range | Query | Streams | Entries | Truncated | Error |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 2026-06-23T17:00:24Z → 2026-06-23T17:20:25Z | 2026-06-23T17:00:24Z → 2026-06-23T17:21:25Z | `{job="containerlogs"}` | 7 | 5000 | true |  |
+| 0 | 100 | 2026-06-23T20:09:54Z → 2026-06-23T20:29:54Z | 2026-06-23T20:09:54Z → 2026-06-23T20:30:54Z | `{job="containerlogs"}` | 4 | 5000 | true |  |
 
 ## 🔍 Trace Evidence (Tempo)
 
@@ -230,7 +230,7 @@ Full trace summaries are in `tempo-captures.json`.
 
 | Tier | Target TPS | Window | Service | Traces | Inspected | Truncated | Error |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 100 | 2026-06-23T17:00:24Z → 2026-06-23T17:20:25Z | midgard-node | 500 | 1297 | true |  |
+| 0 | 100 | 2026-06-23T20:09:54Z → 2026-06-23T20:29:54Z | midgard-node | 500 | 3218 | true |  |
 
 ## 📂 Artifact Index
 

@@ -1,6 +1,6 @@
 # 📊 Scalability Baseline Report
 
-> **Scope:** This report measures the current behavior of the Midgard node under synthetic
+> **Scope:** This report measures the current behavior of the Sundial node under synthetic
 > load. Results reflect a single benchmark run executed without remediation and do not
 > claim or imply production scalability.
 
@@ -17,7 +17,7 @@
 | Wallet Mode              | test-wallet                                                                                                        |
 | Wallet Provisioning Note | test-wallet mode — node must be initialised with L2 genesis UTxOs for the generated test key                       |
 | Harness Version          | 0.1.0                                                                                                              |
-| Replay Corpus Path       | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
+| Replay Corpus Path       | midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
 | Replay Corpus SHA256     | 4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80                                                   |
 | Host                     | dev3 (linux/x64, 6 CPUs, 31.0 GB)                                                                                  |
 
@@ -39,7 +39,7 @@
 | Retry Delay                    | 500 ms                                                                                                             |
 | Request Events Mode            | off                                                                                                                |
 | Seed                           | initial-800-2026-05-20                                                                                             |
-| Replay Corpus Path             | /demo/midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
+| Replay Corpus Path             | midgard-manager/packages/scalability-harness/corpora/corpus-v1-net-preview-t-one-to-one-r-na-n-5000000.jsonl |
 | Max Consecutive Probe Failures | 5                                                                                                                  |
 | Stop On Prometheus Down        | false                                                                                                              |
 | Stop On Commitment Failure     | true                                                                                                               |
@@ -151,7 +151,7 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 | ---- | ---------- | ---------- | ---------------------------- | ------------ | ------------------------------ |
 | 0    | 800        | 2443       | 0                            | 1664382      | 1664382                        |
 
-![Midgard Transactions in Queue](charts/tx-queue.svg)
+![Sundial Transactions in Queue](charts/tx-queue.svg)
 
 ![Mempool Transactions](charts/mempool-count.svg)
 

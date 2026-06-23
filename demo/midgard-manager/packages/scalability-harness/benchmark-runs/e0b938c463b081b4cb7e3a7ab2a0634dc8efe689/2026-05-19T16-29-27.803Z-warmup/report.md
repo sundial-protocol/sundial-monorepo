@@ -1,6 +1,6 @@
 # 📊 Scalability Baseline Report
 
-> **Scope:** This report measures the current behavior of the Midgard node under synthetic
+> **Scope:** This report measures the current behavior of the Sundial node under synthetic
 > load. Results reflect a single benchmark run executed without remediation and do not
 > claim or imply production scalability.
 
@@ -145,7 +145,7 @@ Confidence notes indicate scrape-resolution limits and unresolved cohorts
 | ---- | ---------- | ---------- | ---------------------------- | ------------ | ------------------------------ |
 | 0    | 100        | 80         | 0                            | 4447         | 0                              |
 
-![Midgard Transactions in Queue](charts/tx-queue.svg)
+![Sundial Transactions in Queue](charts/tx-queue.svg)
 
 ![Mempool Transactions](charts/mempool-count.svg)
 
