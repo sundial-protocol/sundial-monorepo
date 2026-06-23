@@ -23,17 +23,17 @@ The plan explicitly distinguishes enqueued submissions, durable mempool acceptan
 
 ## 🔬 Test Scope
 
-| Field               | Value                                                                                                       |
-| :------------------ | :---------------------------------------------------------------------------------------------------------- |
-| System under test   | Sundial/Sundial node through the scalability harness                                                        |
-| Commit under test   | `30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c`                                                                  |
-| Transaction profile | `one-to-one`                                                                                                |
-| L1 provider mode    | `emulator`                                                                                                  |
-| Wallet mode         | `test-wallet`                                                                                               |
-| Node endpoint       | `http://localhost:3000`                                                                                     |
-| Prometheus endpoint | `http://localhost:9090`                                                                                     |
-| Host                | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM                                                                       |
-| Harness version     | `0.1.0`                                                                                                     |
+| Field               | Value                                                                                                  |
+| :------------------ | :----------------------------------------------------------------------------------------------------- |
+| System under test   | Sundial/Sundial node through the scalability harness                                                   |
+| Commit under test   | `30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c`                                                             |
+| Transaction profile | `one-to-one`                                                                                           |
+| L1 provider mode    | `emulator`                                                                                             |
+| Wallet mode         | `test-wallet`                                                                                          |
+| Node endpoint       | `http://localhost:3000`                                                                                |
+| Prometheus endpoint | `http://localhost:9090`                                                                                |
+| Host                | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM                                                                  |
+| Harness version     | `0.1.0`                                                                                                |
 | Evidence directory  | `midgard-manager/packages/scalability-harness/benchmark-runs/30eb12b19e9b3e4a3dbf90ee93309d3a5aed7a3c` |
 
 ## 🏃 Executed Runs
