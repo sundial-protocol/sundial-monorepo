@@ -11,7 +11,7 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:quality:start -->
-<img alt="Quality" src="https://img.shields.io/badge/quality-failing-red?style=flat-square" />
+<img alt="Quality" src="https://img.shields.io/badge/quality-passing-brightgreen?style=flat-square" />
 <!-- badge:quality:end --> 
     </td>
     <td>
@@ -50,12 +50,12 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:sdk-coverage:start -->
-<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-75.8%25-orange?style=flat-square" />
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-75.5%25-orange?style=flat-square" />
 <!-- badge:sdk-coverage:end -->
     </td>
     <td>
       <!-- badge:ts-coverage:start -->
-<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-failing-red?style=flat-square" />
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-80.6%25-yellowgreen?style=flat-square" />
 <!-- badge:ts-coverage:end -->
     </td>
     <td>
