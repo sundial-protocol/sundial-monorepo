@@ -111,9 +111,8 @@ export interface ChartRecord {
 }
 
 // ---------------------------------------------------------------------------
-// Panel catalog — mirrors Grafana dashboard panels, excluding:
-//   - "Block Commitment Worker Duration (s)" (needs histogram rate division)
-//   - "Total L1 User Events Count in Block Commitment" (excluded per spec)
+// Panel catalog — mirrors the operational dashboard panels used for benchmark
+// evidence, excluding only panels that require special histogram math.
 // ---------------------------------------------------------------------------
 
 export const PANEL_SPECS: readonly PanelSpec[] = [
@@ -284,6 +283,26 @@ export const PANEL_SPECS: readonly PanelSpec[] = [
     rate: false,
     unit: 'bytes',
     formatY: 'bytes',
+  },
+  {
+    slug: 'l1-fees-cumulative',
+    title: 'L1 Commitment Fees',
+    section: 'Block Pipeline',
+    metric: 'l1_commitment_fees_lovelace_total',
+    rate: false,
+    unit: 'lovelace',
+    formatY: 'default',
+    scaleZero: true,
+    normalizeToWindowStart: true,
+  },
+  {
+    slug: 'l1-fee-last',
+    title: 'Last L1 Commitment Fee',
+    section: 'Block Pipeline',
+    metric: 'l1_commitment_fee_lovelace_last',
+    rate: false,
+    unit: 'lovelace',
+    formatY: 'default',
   },
 
   // --- Failure Signals ---
