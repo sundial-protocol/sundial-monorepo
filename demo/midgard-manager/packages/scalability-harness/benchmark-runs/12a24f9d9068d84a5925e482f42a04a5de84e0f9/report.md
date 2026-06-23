@@ -12,73 +12,73 @@ The `229,155` lovelace L1 commitment fee is amortized more efficiently across su
 
 The before/after comparison uses the same benchmark scenario, replay corpus, host, transaction profile, provider mode, target rate, load duration, and recovery duration.
 
-| Field | Baseline | Optimized |
-| :--- | :--- | :--- |
-| Git commit | `ef887af1415f4a34fc85dd1e128bcdd1039b790d` | `12a24f9d9068d84a5925e482f42a04a5de84e0f9` |
-| Run started | `2026-06-23T16:59:57.155Z` | `2026-06-23T20:09:35.628Z` |
-| Scenario | `fee-baseline-100-replay` | `fee-baseline-100-replay` |
-| Target load | `100 TPS` | `100 TPS` |
-| Load / recovery | `900s / 300s` | `900s / 300s` |
-| Transaction profile | `one-to-one` | `one-to-one` |
-| L1 provider / wallet | `emulator / test-wallet` | `emulator / test-wallet` |
-| Replay corpus SHA256 | `4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80` | Same |
-| Host | `dev3`, 6 CPUs, 31.0 GB RAM | Same |
-| Result | Passed ✅ | Passed ✅ |
+| Field                | Baseline                                                           | Optimized                                  |
+| :------------------- | :----------------------------------------------------------------- | :----------------------------------------- |
+| Git commit           | `ef887af1415f4a34fc85dd1e128bcdd1039b790d`                         | `12a24f9d9068d84a5925e482f42a04a5de84e0f9` |
+| Run started          | `2026-06-23T16:59:57.155Z`                                         | `2026-06-23T20:09:35.628Z`                 |
+| Scenario             | `fee-baseline-100-replay`                                          | `fee-baseline-100-replay`                  |
+| Target load          | `100 TPS`                                                          | `100 TPS`                                  |
+| Load / recovery      | `900s / 300s`                                                      | `900s / 300s`                              |
+| Transaction profile  | `one-to-one`                                                       | `one-to-one`                               |
+| L1 provider / wallet | `emulator / test-wallet`                                           | `emulator / test-wallet`                   |
+| Replay corpus SHA256 | `4c1485e9f69df29001b9c14e8017d0bf0301b377aca02f95cfedd9cb75a3ca80` | Same                                       |
+| Host                 | `dev3`, 6 CPUs, 31.0 GB RAM                                        | Same                                       |
+| Result               | Passed ✅                                                          | Passed ✅                                  |
 
 Baseline evidence: [`ef887af1 fee benchmark report`](../ef887af1415f4a34fc85dd1e128bcdd1039b790d/2026-06-23T16-59-57.155Z-fee-baseline-100-replay/report.md).
 
 ## 🔬 Test Scope
 
-| Field | Value |
-| :--- | :--- |
-| System under test | Sundial node through the scalability harness |
-| Commit under test | `12a24f9d9068d84a5925e482f42a04a5de84e0f9` |
-| Transaction profile | `one-to-one` |
-| L1 provider mode | `emulator` |
-| Wallet mode | `test-wallet` |
-| Node endpoint | `http://localhost:3000` |
-| Prometheus endpoint | `http://localhost:9090` |
-| Host | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM |
-| Harness version | `0.1.0` |
-| Evidence directory | `midgard-manager/packages/scalability-harness/benchmark-runs/12a24f9d9068d84a5925e482f42a04a5de84e0f9` |
+| Field               | Value                                                                                                  |
+| :------------------ | :----------------------------------------------------------------------------------------------------- |
+| System under test   | Sundial node through the scalability harness                                                           |
+| Commit under test   | `12a24f9d9068d84a5925e482f42a04a5de84e0f9`                                                             |
+| Transaction profile | `one-to-one`                                                                                           |
+| L1 provider mode    | `emulator`                                                                                             |
+| Wallet mode         | `test-wallet`                                                                                          |
+| Node endpoint       | `http://localhost:3000`                                                                                |
+| Prometheus endpoint | `http://localhost:9090`                                                                                |
+| Host                | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM                                                                  |
+| Harness version     | `0.1.0`                                                                                                |
+| Evidence directory  | `midgard-manager/packages/scalability-harness/benchmark-runs/12a24f9d9068d84a5925e482f42a04a5de84e0f9` |
 
 ## 🏃 Executed Run
 
-| Run | Started | Target Profile | Duration | Result | Evidence |
-| :--- | :--- | :--- | :--- | :--- | :--- |
+| Run                       | Started                  | Target Profile      | Duration                  | Result    | Evidence                                                                  |
+| :------------------------ | :----------------------- | :------------------ | :------------------------ | :-------- | :------------------------------------------------------------------------ |
 | `fee-baseline-100-replay` | 2026-06-23T20:09:35.628Z | Replay at `100 TPS` | 900s load + 300s recovery | Passed ✅ | [`report.md`](2026-06-23T20-09-35.628Z-fee-baseline-100-replay/report.md) |
 
 ## 💰 Fee and Throughput Comparison
 
-| Metric | Baseline `ef887af1` | Optimized `12a24f9` | Change |
-| :--- | ---: | ---: | ---: |
-| Committed L2 transactions | 92,015 | 92,742 | +727 (+0.8%) |
-| Committed throughput | 102.23 tx/s | 103.04 tx/s | +0.81 tx/s (+0.8%) |
-| Submitted L1 commitment blocks | 508 | 91 | -417 (-82.1%) |
-| Committed L2 tx per submitted block | 181.13 | 1,019.14 | 5.6x |
-| Total L1 commitment fees | 116,410,740 lovelace | 20,853,105 lovelace | -95,557,635 (-82.1%) |
-| Last L1 commitment fee | 229,155 lovelace | 229,155 lovelace | No change |
-| L1 fee per committed L2 tx | 1,265.13 lovelace | 224.85 lovelace | -1,040.28 (-82.2%) |
-| Peak queue | 41 | 395 | +354 |
-| Peak mempool | 646 | 1,224 | +578 |
-| Final queue after recovery | 0 | 0 | No change |
-| Final mempool after recovery | 0 | 0 | No change |
-| Commitment failures | 0 | 0 | No change |
-| Merge failures | 0 | 0 | No change |
+| Metric                              |  Baseline `ef887af1` | Optimized `12a24f9` |               Change |
+| :---------------------------------- | -------------------: | ------------------: | -------------------: |
+| Committed L2 transactions           |               92,015 |              92,742 |         +727 (+0.8%) |
+| Committed throughput                |          102.23 tx/s |         103.04 tx/s |   +0.81 tx/s (+0.8%) |
+| Submitted L1 commitment blocks      |                  508 |                  91 |        -417 (-82.1%) |
+| Committed L2 tx per submitted block |               181.13 |            1,019.14 |                 5.6x |
+| Total L1 commitment fees            | 116,410,740 lovelace | 20,853,105 lovelace | -95,557,635 (-82.1%) |
+| Last L1 commitment fee              |     229,155 lovelace |    229,155 lovelace |            No change |
+| L1 fee per committed L2 tx          |    1,265.13 lovelace |     224.85 lovelace |   -1,040.28 (-82.2%) |
+| Peak queue                          |                   41 |                 395 |                 +354 |
+| Peak mempool                        |                  646 |               1,224 |                 +578 |
+| Final queue after recovery          |                    0 |                   0 |            No change |
+| Final mempool after recovery        |                    0 |                   0 |            No change |
+| Commitment failures                 |                    0 |                   0 |            No change |
+| Merge failures                      |                    0 |                   0 |            No change |
 
 ## 🚦 Formal Criteria Assessment
 
-| Criterion Area | Evidence | Assessment |
-| :--- | :--- | :--- |
-| Run classification | All 10 configured policy checks passed in the optimized run. | Passed ✅ |
-| Throughput preservation | Committed throughput changed from `102.23` to `103.04` tx/s at the same `100 TPS` target. | Passed ✅ |
-| L1 fee efficiency | Fee per committed L2 transaction fell from `1,265.13` to `224.85` lovelace. | Improved by 82.2% ✅ |
-| Commitment density | Average committed L2 transactions per submitted block increased from `181.13` to `1,019.14`. | Improved by 5.6x ✅ |
-| Commitment reliability | Both runs recorded `0` commitment failures. | Passed ✅ |
-| Merge reliability | Both runs recorded `0` merge failures. | Passed ✅ |
-| Queue recovery | Both runs ended recovery with queue size `0`. | Passed ✅ |
-| Mempool recovery | Both runs ended recovery with mempool size `0`. | Passed ✅ |
-| Accepted-to-committed latency | Both runs reported p50/p95/p99 of `15s`, bounded by the Prometheus scrape interval. | No measured regression ✅ |
+| Criterion Area                | Evidence                                                                                     | Assessment                |
+| :---------------------------- | :------------------------------------------------------------------------------------------- | :------------------------ |
+| Run classification            | All 10 configured policy checks passed in the optimized run.                                 | Passed ✅                 |
+| Throughput preservation       | Committed throughput changed from `102.23` to `103.04` tx/s at the same `100 TPS` target.    | Passed ✅                 |
+| L1 fee efficiency             | Fee per committed L2 transaction fell from `1,265.13` to `224.85` lovelace.                  | Improved by 82.2% ✅      |
+| Commitment density            | Average committed L2 transactions per submitted block increased from `181.13` to `1,019.14`. | Improved by 5.6x ✅       |
+| Commitment reliability        | Both runs recorded `0` commitment failures.                                                  | Passed ✅                 |
+| Merge reliability             | Both runs recorded `0` merge failures.                                                       | Passed ✅                 |
+| Queue recovery                | Both runs ended recovery with queue size `0`.                                                | Passed ✅                 |
+| Mempool recovery              | Both runs ended recovery with mempool size `0`.                                              | Passed ✅                 |
+| Accepted-to-committed latency | Both runs reported p50/p95/p99 of `15s`, bounded by the Prometheus scrape interval.          | No measured regression ✅ |
 
 ## 🔍 Key Findings
 
@@ -118,9 +118,9 @@ The relevant tradeoff is latency versus L1 cost. Fuller commitment batches requi
 
 ## 📦 Evidence Artifacts
 
-| Run | Key Artifacts |
-| :--- | :--- |
-| Optimized `12a24f9` | [`report.md`](2026-06-23T20-09-35.628Z-fee-baseline-100-replay/report.md), [`evidence archive`](2026-06-23T20-09-35.628Z-fee-baseline-100-replay/2026-06-23T20-09-35.628Z-fee-baseline-100-replay.zip) |
+| Run                 | Key Artifacts                                                                                                                                                                                                                                                                                  |
+| :------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Optimized `12a24f9` | [`report.md`](2026-06-23T20-09-35.628Z-fee-baseline-100-replay/report.md), [`evidence archive`](2026-06-23T20-09-35.628Z-fee-baseline-100-replay/2026-06-23T20-09-35.628Z-fee-baseline-100-replay.zip)                                                                                         |
 | Baseline `ef887af1` | [`report.md`](../ef887af1415f4a34fc85dd1e128bcdd1039b790d/2026-06-23T16-59-57.155Z-fee-baseline-100-replay/report.md), [`evidence archive`](../ef887af1415f4a34fc85dd1e128bcdd1039b790d/2026-06-23T16-59-57.155Z-fee-baseline-100-replay/2026-06-23T16-59-57.155Z-fee-baseline-100-replay.zip) |
 
 ## ⚠️ Limitations
