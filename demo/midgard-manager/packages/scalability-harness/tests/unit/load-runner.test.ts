@@ -419,6 +419,37 @@ describe('checkMetricStopConditions', () => {
     expect(result?.reason).toBe('merge_failure');
   });
 
+  it('returns null when merge failures stay within maxMergeFailureCount budget', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [{ query: 'merge_block_failures_total', deltaLoad: 1, deltaRecovery: 1 }],
+    });
+    expect(
+      checkMetricStopConditions(
+        { ...BASE_SC, stopOnMergeFailure: true, maxMergeFailureCount: 1 },
+        emptyWindow,
+        summary,
+        60,
+        100
+      )
+    ).toBeNull();
+  });
+
+  it('returns merge_failure when merge failures exceed maxMergeFailureCount budget', () => {
+    const summary = makeWindowSummary({
+      counterDeltas: [{ query: 'merge_block_failures_total', deltaLoad: 2, deltaRecovery: 2 }],
+    });
+    const result = checkMetricStopConditions(
+      { ...BASE_SC, stopOnMergeFailure: true, maxMergeFailureCount: 1 },
+      emptyWindow,
+      summary,
+      60,
+      100
+    );
+    expect(result?.reason).toBe('merge_failure');
+    expect(result?.metricValues?.merge_block_failures_total).toBe(2);
+    expect(result?.metricValues?.maxMergeFailureCount).toBe(1);
+  });
+
   it('returns null when merge failure deltaLoad is 0', () => {
     const summary = makeWindowSummary({
       counterDeltas: [{ query: 'merge_block_failures_total', deltaLoad: 0, deltaRecovery: 0 }],

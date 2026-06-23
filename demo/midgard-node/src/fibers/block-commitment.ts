@@ -278,6 +278,24 @@ const commitmentWindowTxRequestsDeferredCounter = Metric.counter(
   },
 ).register();
 
+const commitmentWindowAgeSecondsGauge = Metric.gauge(
+  "commitment_window_age_seconds",
+  {
+    description:
+      "Age in seconds of the current commitment window observed by the latest worker cycle",
+  },
+).register();
+
+const commitmentBatchWaitSkipsCounter = Metric.counter(
+  "commitment_batch_wait_skips_total",
+  {
+    description:
+      "Total commitment cycles intentionally delayed while waiting for a larger tx-only batch",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
 export const commitBlockDurationHistogramBoundaries =
   MetricBoundaries.exponential({ start: 0.1, factor: 2, count: 13 });
 
@@ -299,6 +317,8 @@ export const blockCommitmentMetrics = {
   commitmentWindowTxRequestsSelectedGauge,
   commitmentWindowTxRequestsDeferredGauge,
   commitmentWindowTxRequestsDeferredCounter,
+  commitmentWindowAgeSecondsGauge,
+  commitmentBatchWaitSkipsCounter,
   commitBlockDurationHistogram,
   ...blocksDbSeedingMetrics,
 } as const;
@@ -400,6 +420,10 @@ export const buildAndSubmitCommitmentBlockAction = () =>
           commitmentWindowTxRequestsDeferredGauge,
           BigInt(txRequestsDeferredInWindow),
         );
+        yield* Metric.set(
+          commitmentWindowAgeSecondsGauge,
+          (commitmentWindow?.windowAgeMs ?? 0) / 1000,
+        );
         yield* Metric.incrementBy(
           commitmentWindowTxRequestsDeferredCounter,
           BigInt(txRequestsDeferredInWindow),
@@ -422,11 +446,36 @@ export const buildAndSubmitCommitmentBlockAction = () =>
         break;
       }
       case "NoopCommitmentOutput": {
+        const commitmentWindow = workerOutput.commitmentWindow;
+        if (workerOutput.reason === "waiting_for_min_tx_batch") {
+          yield* Metric.increment(commitmentBatchWaitSkipsCounter);
+          yield* Metric.set(commitBlockL1UserEventsGauge, 0);
+          yield* Metric.set(commitBlockNumTxGauge, 0n);
+          yield* Metric.set(
+            commitmentWindowTxRequestsTotalGauge,
+            BigInt(commitmentWindow?.txRequestsTotalInWindow ?? 0),
+          );
+          yield* Metric.set(
+            commitmentWindowTxRequestsSelectedGauge,
+            BigInt(commitmentWindow?.txRequestsSelected ?? 0),
+          );
+          yield* Metric.set(commitmentWindowTxRequestsDeferredGauge, 0n);
+          yield* Metric.set(
+            commitmentWindowAgeSecondsGauge,
+            (commitmentWindow?.windowAgeMs ?? 0) / 1000,
+          );
+          yield* Metric.set(commitBlockEventsSizeGauge, 0);
+          yield* Effect.logInfo(
+            "🔹 No-op commitment cycle: waiting for a larger tx-only batch before committing.",
+          );
+          break;
+        }
         yield* Metric.set(commitBlockL1UserEventsGauge, 0);
         yield* Metric.set(commitBlockNumTxGauge, 0n);
         yield* Metric.set(commitmentWindowTxRequestsTotalGauge, 0n);
         yield* Metric.set(commitmentWindowTxRequestsSelectedGauge, 0n);
         yield* Metric.set(commitmentWindowTxRequestsDeferredGauge, 0n);
+        yield* Metric.set(commitmentWindowAgeSecondsGauge, 0);
         yield* Metric.set(commitBlockEventsSizeGauge, 0);
         yield* Effect.logInfo(
           "🔹 No-op commitment cycle: skipped empty window (no events).",
@@ -473,12 +522,14 @@ export const blockCommitmentFiber = (
     yield* Metric.set(commitmentWindowTxRequestsTotalGauge, 0n);
     yield* Metric.set(commitmentWindowTxRequestsSelectedGauge, 0n);
     yield* Metric.set(commitmentWindowTxRequestsDeferredGauge, 0n);
+    yield* Metric.set(commitmentWindowAgeSecondsGauge, 0);
     yield* Metric.update(commitBlockDurationHistogram, 0);
     yield* Metric.incrementBy(commitBlockCounter, 0n);
     yield* Metric.incrementBy(commitBlockTxCounter, 0n);
     yield* Metric.incrementBy(commitBlockCommitmentFailuresCounter, 0n);
     yield* Metric.incrementBy(commitBlockBackpressureSkipsCounter, 0n);
     yield* Metric.incrementBy(commitmentWindowTxRequestsDeferredCounter, 0n);
+    yield* Metric.incrementBy(commitmentBatchWaitSkipsCounter, 0n);
     yield* Metric.incrementBy(
       blocksDbSeedingMetrics.seedBlocksDbAttemptsCounter,
       0n,

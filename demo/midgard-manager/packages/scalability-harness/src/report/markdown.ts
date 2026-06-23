@@ -144,6 +144,9 @@ function renderScenario(scenario: ScalabilityScenario): string {
     ['Stop On Prometheus Down', String(sc.stopOnPrometheusDown)],
     ['Stop On Commitment Failure', String(sc.stopOnCommitmentFailure)],
     ['Stop On Merge Failure', String(sc.stopOnMergeFailure)],
+    ...(sc.maxMergeFailureCount !== undefined
+      ? [['Max Merge Failure Count', String(sc.maxMergeFailureCount)]]
+      : []),
     ...(sc.maxRecoveryQueueSize !== undefined
       ? [['Max Recovery Queue Size', String(sc.maxRecoveryQueueSize)]]
       : []),

@@ -88,7 +88,7 @@ export const nodeStatusCommand = Command.make(
           console.log(chalk.gray(`  $ midgard-manager configure-node --endpoint <url>`));
           console.log(chalk.gray('\nCommon endpoint configurations:'));
           console.log(chalk.gray('• Local development: http://localhost:3000'));
-          console.log(chalk.gray('• Docker container: http://localhost:8080'));
+          console.log(chalk.gray('• Docker container: http://localhost:3000'));
           console.log(chalk.gray('• Remote node: https://api.your-server.com'));
         }
       })

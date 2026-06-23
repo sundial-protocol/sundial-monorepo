@@ -28,6 +28,8 @@ type NodeConfigDep = {
   COMMITMENT_WINDOW_WARN_TX_REQUESTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_BYTES: number;
+  COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK: number;
+  COMMITMENT_MAX_WAIT_MS: number;
   COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: number;
   TX_QUEUE_DRAIN_BATCH_SIZE: number;
   TX_QUEUE_CONSUMER_WORKER_COUNT: number;
@@ -143,6 +145,12 @@ const makeConfig = Effect.gen(function* () {
   const commitmentWindowWarnTotalBytes = yield* Config.integer(
     "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
   ).pipe(Config.withDefault(20_000_000));
+  const commitmentMinTxRequestsPerBlock = yield* Config.integer(
+    "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
+  ).pipe(Config.withDefault(1));
+  const commitmentMaxWaitMs = yield* Config.integer(
+    "COMMITMENT_MAX_WAIT_MS",
+  ).pipe(Config.withDefault(0));
   const commitmentMaxTxRequestsPerBlock = yield* Config.integer(
     "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
   ).pipe(Config.withDefault(2_000));
@@ -345,9 +353,36 @@ const makeConfig = Effect.gen(function* () {
     commitmentWindowWarnTotalBytes,
   );
   yield* assertPositiveInteger(
+    "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
+    commitmentMinTxRequestsPerBlock,
+  );
+  yield* assertNonNegativeInteger(
+    "COMMITMENT_MAX_WAIT_MS",
+    commitmentMaxWaitMs,
+  );
+  yield* assertPositiveInteger(
     "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
     commitmentMaxTxRequestsPerBlock,
   );
+  if (commitmentMinTxRequestsPerBlock > commitmentMaxTxRequestsPerBlock) {
+    yield* Effect.fail(
+      new ConfigError({
+        message:
+          "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK must be less than or equal to COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+        cause: undefined,
+        fieldsAndValues: [
+          [
+            "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
+            String(commitmentMinTxRequestsPerBlock),
+          ],
+          [
+            "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+            String(commitmentMaxTxRequestsPerBlock),
+          ],
+        ],
+      }),
+    );
+  }
   yield* assertNonNegativeInteger(
     "COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG",
     commitmentMaxUnsubmittedBlockBacklog,
@@ -387,6 +422,8 @@ const makeConfig = Effect.gen(function* () {
     COMMITMENT_WINDOW_WARN_TX_REQUESTS: commitmentWindowWarnTxRequests,
     COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: commitmentWindowWarnTotalEvents,
     COMMITMENT_WINDOW_WARN_TOTAL_BYTES: commitmentWindowWarnTotalBytes,
+    COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK: commitmentMinTxRequestsPerBlock,
+    COMMITMENT_MAX_WAIT_MS: commitmentMaxWaitMs,
     COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: commitmentMaxTxRequestsPerBlock,
     TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,
     TX_QUEUE_CONSUMER_WORKER_COUNT: txQueueConsumerWorkerCount,

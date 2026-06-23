@@ -5,6 +5,7 @@ import {
   applyTxRequestsToLedger,
   applyDepositsToLedger,
   CommitmentWorkerMessageType,
+  CommitmentWindowStats,
   WorkerInput,
   WorkerMessage,
   WorkerOutput,
@@ -13,6 +14,7 @@ import {
   buildNewBlockEntry,
   applyBlockCommitmentLedgerProjection,
 } from "./utils/block-commitment.js";
+import { shouldDelayCommitmentForBatch } from "./utils/commitment-batching-policy.js";
 import {
   Database,
   Lucid,
@@ -38,16 +40,13 @@ const sumBufferBytes = (buffers: readonly Buffer[]): number =>
   buffers.reduce((acc, next) => acc + next.length, 0);
 
 type NoopCommitmentResult = {
-  noOpReason: "no_events_in_window";
+  noOpReason: "no_events_in_window" | "waiting_for_min_tx_batch";
+  commitmentWindow?: CommitmentWindowStats;
 };
 
 type SuccessfulCommitmentResult = {
   stats: BlocksDB.Stats;
-  commitmentWindow: {
-    txRequestsTotalInWindow: number;
-    txRequestsSelected: number;
-    txRequestsDeferredInWindow: number;
-  };
+  commitmentWindow: CommitmentWindowStats;
 };
 
 const NOOP_COMMITMENT_RESULT: NoopCommitmentResult = {
@@ -156,8 +155,19 @@ const mainProgram = (
               },
             );
           const totalEventsCount = BlocksDB.getTotalEventsCount(preflightStats);
+          const windowAgeMs = currentDate.getTime() - startDate.getTime();
+          const l1UserEventsCount =
+            preflightStats[BlocksDB.Columns.DEPOSITS_COUNT] +
+            preflightStats[BlocksDB.Columns.TX_ORDERS_COUNT] +
+            preflightStats[BlocksDB.Columns.WITHDRAWALS_COUNT];
+          const commitmentWindow: CommitmentWindowStats = {
+            txRequestsTotalInWindow,
+            txRequestsSelected: selectedTxRequests.length,
+            txRequestsDeferredInWindow: deferredTxRequestCount,
+            windowAgeMs,
+          };
           yield* Effect.logInfo(
-            `Commitment preflight window: start=${startDate.toISOString()} end=${currentDate.toISOString()} duration_ms=${currentDate.getTime() - startDate.getTime()} tx_requests=${preflightStats[BlocksDB.Columns.TX_REQUESTS_COUNT]} tx_orders=${preflightStats[BlocksDB.Columns.TX_ORDERS_COUNT]} deposits=${preflightStats[BlocksDB.Columns.DEPOSITS_COUNT]} withdrawals=${preflightStats[BlocksDB.Columns.WITHDRAWALS_COUNT]} total_events=${totalEventsCount} total_events_size_bytes=${preflightStats[BlocksDB.Columns.TOTAL_EVENTS_SIZE]}`,
+            `Commitment preflight window: start=${startDate.toISOString()} end=${currentDate.toISOString()} duration_ms=${windowAgeMs} tx_requests=${preflightStats[BlocksDB.Columns.TX_REQUESTS_COUNT]} tx_orders=${preflightStats[BlocksDB.Columns.TX_ORDERS_COUNT]} deposits=${preflightStats[BlocksDB.Columns.DEPOSITS_COUNT]} withdrawals=${preflightStats[BlocksDB.Columns.WITHDRAWALS_COUNT]} total_events=${totalEventsCount} total_events_size_bytes=${preflightStats[BlocksDB.Columns.TOTAL_EVENTS_SIZE]}`,
           );
           if (thresholdBreaches.length > 0) {
             yield* Effect.logWarning(
@@ -169,6 +179,28 @@ const mainProgram = (
               "No events in commitment window; skipping empty block commitment.",
             );
             return NOOP_COMMITMENT_RESULT;
+          }
+          if (
+            shouldDelayCommitmentForBatch({
+              txRequestsTotalInWindow,
+              l1UserEventsCount,
+              commitmentWindowAgeMs: windowAgeMs,
+              minTxRequestsPerBlock:
+                nodeConfig.COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK,
+              maxWaitMs: nodeConfig.COMMITMENT_MAX_WAIT_MS,
+            })
+          ) {
+            yield* Effect.logInfo(
+              `Delaying tx-only commitment window: tx_requests=${txRequestsTotalInWindow} min_tx_requests_per_block=${nodeConfig.COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK} window_age_ms=${windowAgeMs} max_wait_ms=${nodeConfig.COMMITMENT_MAX_WAIT_MS}`,
+            );
+            return {
+              noOpReason: "waiting_for_min_tx_batch",
+              commitmentWindow: {
+                ...commitmentWindow,
+                txRequestsSelected: 0,
+                txRequestsDeferredInWindow: 0,
+              },
+            } satisfies NoopCommitmentResult;
           }
           yield* ledgerTrie.checkpoint();
 
@@ -245,12 +277,8 @@ const mainProgram = (
             yield* ledgerTrie.commit();
             return {
               stats,
-              commitmentWindow: {
-                txRequestsTotalInWindow,
-                txRequestsSelected: selectedTxRequests.length,
-                txRequestsDeferredInWindow: deferredTxRequestCount,
-              },
-            };
+              commitmentWindow,
+            } satisfies SuccessfulCommitmentResult;
           }).pipe(Effect.tapError((_) => ledgerTrie.revert()));
         }),
     });
@@ -271,6 +299,7 @@ const wrapper = (ledgerTrie: MidgardMpt) =>
       const output: WorkerOutput = {
         type: "NoopCommitmentOutput",
         reason: result.noOpReason,
+        commitmentWindow: result.commitmentWindow,
       };
       return output;
     }

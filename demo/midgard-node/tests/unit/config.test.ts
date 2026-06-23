@@ -67,6 +67,8 @@ describe("NodeConfig", () => {
         expect(config.COMMITMENT_WINDOW_WARN_TX_REQUESTS).toBe(50_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS).toBe(60_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_BYTES).toBe(20_000_000);
+        expect(config.COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK).toBe(1);
+        expect(config.COMMITMENT_MAX_WAIT_MS).toBe(0);
         expect(config.COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK).toBe(2_000);
       }).pipe(Effect.provide(configLayer)),
     { timeout: 10000 },
@@ -319,6 +321,48 @@ describe("NodeConfig", () => {
   );
 
   it.effect(
+    "fails when COMMITMENT_MAX_WAIT_MS is negative",
+    () => {
+      const invalidProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["COMMITMENT_MAX_WAIT_MS", "-1"],
+        ]),
+      );
+      const invalidLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(invalidProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(invalidLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain("COMMITMENT_MAX_WAIT_MS");
+        }
+      });
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
     "fails when COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG is negative",
     () => {
       const invalidProvider = ConfigProvider.fromMap(
@@ -355,6 +399,51 @@ describe("NodeConfig", () => {
           expect(result.left).toBeInstanceOf(ConfigError);
           expect(result.left.message).toContain(
             "COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG",
+          );
+        }
+      });
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "fails when COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK exceeds COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+    () => {
+      const invalidProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK", "2001"],
+          ["COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK", "2000"],
+        ]),
+      );
+      const invalidLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(invalidProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(invalidLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain(
+            "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
           );
         }
       });

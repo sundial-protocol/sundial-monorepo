@@ -664,12 +664,15 @@ describe('renderReport — Scenario', () => {
         stopOnPrometheusDown: true,
         stopOnCommitmentFailure: true,
         stopOnMergeFailure: true,
+        maxMergeFailureCount: 1,
         maxRecoveryQueueSize: 500,
         maxRecoveryMempoolSize: 1000,
         minUsefulThroughputRatio: 0.5,
       },
     });
     const out = renderReport(makeInput({ scenario }));
+    expect(out).toContain('Max Merge Failure Count');
+    expect(out).toContain('1');
     expect(out).toContain('Max Recovery Queue Size');
     expect(out).toContain('500');
     expect(out).toContain('Max Recovery Mempool Size');
