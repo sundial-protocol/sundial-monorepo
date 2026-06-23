@@ -38,11 +38,7 @@ export type WorkerInput = {
 export type SuccessfulCommitmentOutput = {
   type: "SuccessfulCommitmentOutput";
   stats: BlocksDB.Stats;
-  commitmentWindow?: {
-    txRequestsTotalInWindow: number;
-    txRequestsSelected: number;
-    txRequestsDeferredInWindow: number;
-  };
+  commitmentWindow?: CommitmentWindowStats;
 };
 
 export type FailureOutput = {
@@ -56,7 +52,15 @@ export type SeededOutput = {
 
 export type NoopCommitmentOutput = {
   type: "NoopCommitmentOutput";
-  reason: "no_events_in_window";
+  reason: "no_events_in_window" | "waiting_for_min_tx_batch";
+  commitmentWindow?: CommitmentWindowStats;
+};
+
+export type CommitmentWindowStats = {
+  txRequestsTotalInWindow: number;
+  txRequestsSelected: number;
+  txRequestsDeferredInWindow: number;
+  windowAgeMs: number;
 };
 
 export type WorkerOutput =

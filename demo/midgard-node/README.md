@@ -119,9 +119,21 @@ SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES=1
 COMMITMENT_WINDOW_WARN_TX_REQUESTS=50000
 COMMITMENT_WINDOW_WARN_TOTAL_EVENTS=60000
 COMMITMENT_WINDOW_WARN_TOTAL_BYTES=20000000
+COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK=1
+COMMITMENT_MAX_WAIT_MS=0
 COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK=2000
 TX_PARSE_CONCURRENCY=8
 ```
+
+Batching notes:
+
+- `COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK` and `COMMITMENT_MAX_WAIT_MS` apply to
+  tx-only commitment windows.
+- Authenticated L1 user events (deposits, tx orders, withdrawals) bypass this
+  wait path and still commit immediately.
+- For fee-focused replay benchmarks, a practical candidate is
+  `COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK=1000` and
+  `COMMITMENT_MAX_WAIT_MS=10000`.
 
 Role notes:
 
@@ -236,6 +248,8 @@ Important commitment window choke metrics:
 - `commitment_window_tx_requests_selected`
 - `commitment_window_tx_requests_deferred`
 - `commitment_window_tx_requests_deferred_total`
+- `commitment_window_age_seconds`
+- `commitment_batch_wait_skips_total`
 
 Important block submission reliability metrics:
 

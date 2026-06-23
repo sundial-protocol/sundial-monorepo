@@ -36,6 +36,10 @@ export interface StopConditions {
   stopOnPrometheusDown: boolean;
   stopOnCommitmentFailure: boolean;
   stopOnMergeFailure: boolean;
+  // Merge-failure budget: mergeFailuresDelta may rise up to this count before
+  // the harness collapses the tier. Use 1 to tolerate a single transient merge
+  // build failure while still collapsing on repeated merge-path issues.
+  maxMergeFailureCount?: number;
   // Commitment-failure budget ratio: commitmentFailuresDelta / mempoolAcceptedDelta.
   // When provided with stopOnCommitmentFailure=true, collapse only when the observed
   // ratio exceeds this threshold. Use 0.0001 for a 0.01% budget.
@@ -645,6 +649,19 @@ export function validateScenario(raw: unknown): ScalabilityScenario {
   assertPresent(sc.stopOnMergeFailure, 'stopConditions.stopOnMergeFailure');
   if (typeof sc.stopOnMergeFailure !== 'boolean') {
     throw new ScenarioValidationError('stopConditions.stopOnMergeFailure must be a boolean');
+  }
+
+  if (sc.maxMergeFailureCount !== undefined) {
+    if (
+      typeof sc.maxMergeFailureCount !== 'number' ||
+      !isFinite(sc.maxMergeFailureCount) ||
+      sc.maxMergeFailureCount < 0 ||
+      !Number.isInteger(sc.maxMergeFailureCount)
+    ) {
+      throw new ScenarioValidationError(
+        `stopConditions.maxMergeFailureCount must be a non-negative integer when provided, got: ${sc.maxMergeFailureCount}`
+      );
+    }
   }
 
   if (sc.maxRecoveryQueueSize !== undefined) {

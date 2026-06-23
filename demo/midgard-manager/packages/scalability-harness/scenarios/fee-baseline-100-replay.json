@@ -23,9 +23,10 @@
   "stopConditions": {
     "maxConsecutiveNodeProbeFailures": 8,
     "stopOnPrometheusDown": true,
-    "stopOnCommitmentFailure": true,
+    "stopOnCommitmentFailure": false,
     "maxCommitmentFailureRatio": 0.0001,
     "stopOnMergeFailure": true,
+    "maxMergeFailureCount": 1,
     "maxRecoveryQueueSize": 5000,
     "maxRecoveryMempoolSize": 0,
     "maxUnsubmittedBlockBacklogGrowth": 0

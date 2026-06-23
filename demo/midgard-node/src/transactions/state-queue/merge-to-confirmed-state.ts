@@ -20,7 +20,7 @@ import {
   Script,
   TxSignBuilder,
 } from "@lucid-evolution/lucid";
-import { Effect, Metric, Ref } from "effect";
+import { Cause, Effect, Metric, Ref } from "effect";
 import {
   TxConfirmError,
   fetchFirstBlockTxs,
@@ -189,7 +189,14 @@ export const buildAndSubmitMergeTx = (
           stateQueueSpendingScript: spendScript,
           stateQueueMintingScript: mintScript,
         },
-      ).pipe(Effect.withSpan("mergeToConfirmedStateProgram"));
+      ).pipe(
+        Effect.withSpan("mergeToConfirmedStateProgram"),
+        Effect.tapErrorCause((cause) =>
+          Effect.logError(
+            `🔸 Failed to build/finalize merge transaction for block ${headerHash.toString("hex")}: ${Cause.pretty(cause)}`,
+          ),
+        ),
+      );
 
       // Submit the transaction
       const onSubmitFailure = (err: TxSubmitError) =>

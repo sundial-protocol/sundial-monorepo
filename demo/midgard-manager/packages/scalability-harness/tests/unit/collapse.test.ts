@@ -336,6 +336,35 @@ describe('detectCollapse — merge_failures', () => {
     expect(result?.values.mergeFailuresDelta).toBe(2);
   });
 
+  it('does not trigger when merge failures stay within maxMergeFailureCount budget', () => {
+    const result = detectCollapse(
+      makeInputs({
+        mergeFailuresDelta: 1,
+        stopConditions: {
+          ...BASE_STOP_CONDITIONS,
+          stopOnMergeFailure: true,
+          maxMergeFailureCount: 1,
+        },
+      })
+    );
+    expect(result).toBeNull();
+  });
+
+  it('returns merge_failures when merge failures exceed maxMergeFailureCount budget', () => {
+    const result = detectCollapse(
+      makeInputs({
+        mergeFailuresDelta: 2,
+        stopConditions: {
+          ...BASE_STOP_CONDITIONS,
+          stopOnMergeFailure: true,
+          maxMergeFailureCount: 1,
+        },
+      })
+    );
+    expect(result?.reason).toBe('merge_failures');
+    expect(result?.values.maxMergeFailureCount).toBe(1);
+  });
+
   it('does not trigger when flag is false', () => {
     const result = detectCollapse(
       makeInputs({

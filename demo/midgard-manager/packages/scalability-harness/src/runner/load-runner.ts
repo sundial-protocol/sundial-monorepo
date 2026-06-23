@@ -385,10 +385,16 @@ export function checkMetricStopConditions(
   if (stopConditions.stopOnMergeFailure) {
     const delta = windowSummary.counterDeltas.find((d) => d.query === 'merge_block_failures_total');
     if (delta !== undefined && delta.deltaLoad !== null && delta.deltaLoad > 0) {
-      return {
-        reason: 'merge_failure',
-        metricValues: { merge_block_failures_total: delta.deltaLoad },
-      };
+      const maxMergeFailureCount = stopConditions.maxMergeFailureCount ?? 0;
+      if (delta.deltaLoad > maxMergeFailureCount) {
+        return {
+          reason: 'merge_failure',
+          metricValues: {
+            merge_block_failures_total: delta.deltaLoad,
+            maxMergeFailureCount,
+          },
+        };
+      }
     }
   }
 
@@ -646,12 +652,17 @@ async function checkLiveMetricStopCondition(
         baseline.mergeFailuresTotal !== null &&
         currentFailures > baseline.mergeFailuresTotal
       ) {
-        return {
-          reason: 'merge_failure',
-          metricValues: {
-            merge_block_failures_total: currentFailures - baseline.mergeFailuresTotal,
-          },
-        };
+        const mergeFailuresDelta = currentFailures - baseline.mergeFailuresTotal;
+        const maxMergeFailureCount = stopConditions.maxMergeFailureCount ?? 0;
+        if (mergeFailuresDelta > maxMergeFailureCount) {
+          return {
+            reason: 'merge_failure',
+            metricValues: {
+              merge_block_failures_total: mergeFailuresDelta,
+              maxMergeFailureCount,
+            },
+          };
+        }
       }
     }
   } catch {

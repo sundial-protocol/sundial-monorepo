@@ -3,7 +3,7 @@ import { Lucid, AlwaysSucceedsContract, Globals } from "@/services/index.js";
 import { StateQueueTx } from "@/transactions/index.js";
 import { TxSignError, TxSubmitError } from "@/transactions/utils.js";
 import * as SDK from "@al-ft/midgard-sdk";
-import { Effect, pipe, Ref, Schedule } from "effect";
+import { Cause, Effect, pipe, Ref, Schedule } from "effect";
 import { Database } from "@/services/index.js";
 export const mergeAction: Effect.Effect<
   void,
@@ -61,7 +61,9 @@ export const mergeFiber = (
         Effect.tapErrorCause((cause) =>
           Effect.gen(function* () {
             yield* StateQueueTx.incrementMergeFailure;
-            yield* Effect.logWarning(cause);
+            yield* Effect.logError(
+              `🔸 Merge fiber failure: ${Cause.pretty(cause)}`,
+            );
           }),
         ),
         Effect.catchAllCause(() => Effect.void),

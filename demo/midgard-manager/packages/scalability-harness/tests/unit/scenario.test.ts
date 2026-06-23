@@ -110,6 +110,14 @@ describe('validateScenario', () => {
       expect(() => validateScenario(s)).not.toThrow();
     });
 
+    it('accepts maxMergeFailureCount as a stop condition', () => {
+      const s = {
+        ...VALID_SCENARIO,
+        stopConditions: { ...VALID_SCENARIO.stopConditions, maxMergeFailureCount: 1 },
+      };
+      expect(() => validateScenario(s)).not.toThrow();
+    });
+
     it('accepts maxUnsubmittedBlockBacklogGrowth as a stop condition', () => {
       const s = {
         ...VALID_SCENARIO,
@@ -448,6 +456,24 @@ describe('validateScenario', () => {
             ...VALID_SCENARIO.stopConditions,
             maxCommitmentFailureRatio: Number.NaN,
           },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects negative maxMergeFailureCount', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: { ...VALID_SCENARIO.stopConditions, maxMergeFailureCount: -1 },
+        })
+      ).toThrow(ScenarioValidationError);
+    });
+
+    it('rejects non-integer maxMergeFailureCount', () => {
+      expect(() =>
+        validateScenario({
+          ...VALID_SCENARIO,
+          stopConditions: { ...VALID_SCENARIO.stopConditions, maxMergeFailureCount: 1.5 },
         })
       ).toThrow(ScenarioValidationError);
     });

@@ -103,6 +103,15 @@ const readDurationHistogram = Metric.value(
 const readBackpressureSkipCounter = Metric.value(
   blockCommitmentMetrics.commitBlockBackpressureSkipsCounter,
 );
+const readBatchWaitSkipCounter = Metric.value(
+  blockCommitmentMetrics.commitmentBatchWaitSkipsCounter,
+);
+const readCommitmentWindowAgeGauge = Metric.value(
+  blockCommitmentMetrics.commitmentWindowAgeSecondsGauge,
+);
+const readCommitmentWindowTotalGauge = Metric.value(
+  blockCommitmentMetrics.commitmentWindowTxRequestsTotalGauge,
+);
 
 function runAction(layer = baseLayer) {
   return buildAndSubmitCommitmentBlockAction().pipe(
@@ -362,6 +371,59 @@ describe("buildAndSubmitCommitmentBlockAction — failure counter", () => {
         const thresholdLayer = yield* makeBackpressureThresholdLayer(1);
         yield* runAction(thresholdLayer);
         expect(makeWorkerInstance).toHaveBeenCalledTimes(1);
+      }),
+  );
+
+  it.effect(
+    "increments batching skip counter when worker delays for a larger tx batch",
+    () =>
+      Effect.gen(function* () {
+        makeWorkerInstance.mockReturnValue(
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: {
+              type: "NoopCommitmentOutput",
+              reason: "waiting_for_min_tx_batch",
+              commitmentWindow: {
+                txRequestsTotalInWindow: 250,
+                txRequestsSelected: 0,
+                txRequestsDeferredInWindow: 0,
+                windowAgeMs: 4_000,
+              },
+            },
+          }),
+        );
+        const delta = yield* metricDelta(
+          readBatchWaitSkipCounter,
+          runAction(),
+          (state) => state.count,
+        );
+        expect(delta).toBe(1n);
+      }),
+  );
+
+  it.effect(
+    "records waiting batch window gauges on batch-delay no-op output",
+    () =>
+      Effect.gen(function* () {
+        makeWorkerInstance.mockReturnValue(
+          makeEventWorker("message", {
+            type: CommitmentWorkerMessageType.RunCommitmentResult,
+            output: {
+              type: "NoopCommitmentOutput",
+              reason: "waiting_for_min_tx_batch",
+              commitmentWindow: {
+                txRequestsTotalInWindow: 250,
+                txRequestsSelected: 0,
+                txRequestsDeferredInWindow: 0,
+                windowAgeMs: 4_000,
+              },
+            },
+          }),
+        );
+        yield* runAction();
+        expect((yield* readCommitmentWindowTotalGauge).value).toBe(250n);
+        expect((yield* readCommitmentWindowAgeGauge).value).toBe(4);
       }),
   );
 });
