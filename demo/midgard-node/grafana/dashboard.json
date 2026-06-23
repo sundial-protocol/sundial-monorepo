@@ -1503,7 +1503,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "commit_block_l1_user_events{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
+          "expr": "l1_commitment_fees_lovelace_total{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "__auto",
@@ -1512,7 +1512,7 @@
           "useBackend": false
         }
       ],
-      "title": "Total L1 User Events Count in Block Commitment",
+      "title": "L1 Commitment Fees",
       "type": "timeseries"
     },
     {
@@ -1573,7 +1573,7 @@
               }
             ]
           },
-          "unit": "s"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -1605,17 +1605,17 @@
             "uid": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "rate(commit_block_duration_seconds_sum{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval]) / rate(commit_block_duration_seconds_count{job=\"sundial_nodes\",role=~\"sequencer|all\"}[$__rate_interval])",
+          "editorMode": "builder",
+          "expr": "l1_commitment_fee_lovelace_last{job=\"sundial_nodes\",role=~\"sequencer|all\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "avg duration",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "Block Commitment Worker Duration (s)",
+      "title": "Last L1 Commitment Fee",
       "type": "timeseries"
     },
     {

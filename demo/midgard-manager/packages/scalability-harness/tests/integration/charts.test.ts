@@ -39,8 +39,8 @@ beforeAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe('PANEL_SPECS catalog', () => {
-  it('contains exactly 21 panel specs', () => {
-    expect(PANEL_SPECS).toHaveLength(21);
+  it('contains exactly 28 panel specs', () => {
+    expect(PANEL_SPECS).toHaveLength(28);
   });
 
   it('all slugs are unique', () => {
@@ -68,25 +68,20 @@ describe('PANEL_SPECS catalog', () => {
     expect(metrics).not.toContain('commit_block_duration_seconds_count');
   });
 
-  it('does not include the excluded Total L1 User Events panel', () => {
-    const slugs = PANEL_SPECS.map((s) => s.slug);
-    expect(slugs).not.toContain('l1-user-events');
+  it('has 5 Throughput panels', () => {
+    expect(PANEL_SPECS.filter((s) => s.section === 'Throughput')).toHaveLength(5);
   });
 
-  it('has 4 Throughput panels', () => {
-    expect(PANEL_SPECS.filter((s) => s.section === 'Throughput')).toHaveLength(4);
+  it('has 4 Queue and Mempool panels', () => {
+    expect(PANEL_SPECS.filter((s) => s.section === 'Queue and Mempool')).toHaveLength(4);
   });
 
-  it('has 2 Queue and Mempool panels', () => {
-    expect(PANEL_SPECS.filter((s) => s.section === 'Queue and Mempool')).toHaveLength(2);
+  it('has 10 Block Pipeline panels', () => {
+    expect(PANEL_SPECS.filter((s) => s.section === 'Block Pipeline')).toHaveLength(10);
   });
 
-  it('has 8 Block Pipeline panels', () => {
-    expect(PANEL_SPECS.filter((s) => s.section === 'Block Pipeline')).toHaveLength(8);
-  });
-
-  it('has 3 Failure Signals panels', () => {
-    expect(PANEL_SPECS.filter((s) => s.section === 'Failure Signals')).toHaveLength(3);
+  it('has 5 Failure Signals panels', () => {
+    expect(PANEL_SPECS.filter((s) => s.section === 'Failure Signals')).toHaveLength(5);
   });
 
   it('has 4 Infrastructure panels', () => {
@@ -95,7 +90,13 @@ describe('PANEL_SPECS catalog', () => {
 
   it('rate panels reuse the same metric as a corresponding direct panel (counter reuse)', () => {
     // Failure-signal panels are rate-only: they show Δ/s with no paired cumulative panel
-    const failureOnlySlugs = new Set(['commit-failures', 'merge-failures', 'rejected-submissions']);
+    const failureOnlySlugs = new Set([
+      'commit-failures',
+      'merge-failures',
+      'rejected-submissions',
+      'rejected-stream-backpressure',
+      'rejected-offer-timeout',
+    ]);
     const rateSpecs = PANEL_SPECS.filter((s) => s.rate && !failureOnlySlugs.has(s.slug));
     for (const rateSpec of rateSpecs) {
       const hasDirect = PANEL_SPECS.some((s) => !s.rate && s.metric === rateSpec.metric);
@@ -276,16 +277,20 @@ describe('buildDataRows — multi-tier merging', () => {
 const PANELS_WITH_DATA_IN_OLD_RUN = new Set([
   'received-tps',
   'mempool-drain-rate',
+  'net-mempool-drain-rate',
   'received-cumulative',
   'committed-cumulative',
   'tx-queue',
   'mempool-count',
+  'mempool-growth-rate',
   'built-blocks',
   'built-blocks-rate',
   'submitted-blocks',
   'submitted-blocks-rate',
   'merged-blocks',
   'merged-blocks-rate',
+  'l1-fees-cumulative',
+  'l1-fee-last',
   // txs-per-block → absent (commit_block_txs_per_block added in task 1)
   // block-size → absent (commit_block_events_size_bytes added in task 1)
   'commit-failures',

@@ -459,7 +459,7 @@ function renderCommitSubmitMergeProgress(
   const prose = [
     'L1 commitment fee fields are derived as follows:',
     '- `L1 Fees Δ` from `l1_commitment_fees_lovelace_total` counter delta over load phase.',
-    '- `Last L1 Fee` from `l1_commitment_fee_lovelace_last` instant value at load stop.',
+    '- `Last L1 Fee` from `l1_commitment_fee_lovelace_last` at load stop, falling back to the nearest sampled value when the stop-time instant is unavailable.',
     '- `L1 Fee / Committed L2 Tx` = `L1 Fees Δ / Committed Tx Δ` when `Committed Tx Δ > 0`.',
   ].join('\n');
 

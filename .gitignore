@@ -57,6 +57,7 @@ out/
 # local env overrides
 .env.local
 .env.development.local
+.env.deploy.*
 .env.test.local
 .env.production.local
 

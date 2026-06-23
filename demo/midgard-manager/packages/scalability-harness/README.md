@@ -45,6 +45,7 @@ If you are already in `demo/midgard-manager/packages/scalability-harness`, use p
 
 ```bash
 npm run start -- run --scenario scenarios/warmup-replay.json
+npm run start -- run --scenario scenarios/fee-baseline-100-replay.json
 npm run start -- run --scenario scenarios/warmup-replay.json --dry-run
 npm run start -- run --scenario scenarios/practical-5000-replay.json --max-tier 2
 npm run start -- run --scenario scenarios/initial-800-replay.json --run-id initial-800-v2
@@ -174,17 +175,20 @@ The `standard-progression` plan covers both environments in sequence. Run it end
 
 ### Scenario reference
 
+For fee-focused before/after work, prefer a single sustained tier that the node can fully drain. Use `fee-baseline-100-replay.json` for fee evidence; keep `warmup-replay.json` as an instrumentation/smoke run rather than the main baseline artifact.
+
 | Order | File                                | runId                          | Env     | Target TPS | Test plan section             |
 | ----- | ----------------------------------- | ------------------------------ | ------- | ---------- | ----------------------------- |
 | 0     | `baseline-100-800-replay.json`      | `baseline-100-800-replay`      | Testnet | 100→800    | §13 step-ramp baseline        |
-| 1     | `warmup-replay.json`                | `warmup-replay`                | Both    | 100        | §8.1 warm-up                  |
-| 2     | `initial-800-replay.json`           | `initial-800-replay`           | Testnet | 800        | §8.1 testnet TPS validation   |
-| 3     | `institutional-1000-replay.json`    | `institutional-1000-replay`    | Testnet | 1,000      | §8.1 testnet industrial       |
-| 4     | `mainnet-2000-replay.json`          | `mainnet-2000-replay`          | Mainnet | 2,000      | §8.1 mainnet baseline         |
-| 5     | `practical-5000-replay.json`        | `practical-5000-replay`        | Mainnet | 5,000      | §8.1 practical mainnet target |
-| 6     | `spike-replay.json`                 | `spike-replay`                 | Mainnet | 10,000     | §8.1 peak spike               |
-| 7     | `saturation-discovery-replay.json`  | `saturation-discovery-replay`  | Mainnet | 50→1,600   | §8.3 saturation discovery     |
-| 8     | `saturation-ramp-25pct-replay.json` | `saturation-ramp-25pct-replay` | Mainnet | varies     | §8.3 25% increment ramp       |
+| 1     | `fee-baseline-100-replay.json`      | `fee-baseline-100-replay`      | Both    | 100        | fee before/after baseline     |
+| 2     | `warmup-replay.json`                | `warmup-replay`                | Both    | 100        | §8.1 warm-up                  |
+| 3     | `initial-800-replay.json`           | `initial-800-replay`           | Testnet | 800        | §8.1 testnet TPS validation   |
+| 4     | `institutional-1000-replay.json`    | `institutional-1000-replay`    | Testnet | 1,000      | §8.1 testnet industrial       |
+| 5     | `mainnet-2000-replay.json`          | `mainnet-2000-replay`          | Mainnet | 2,000      | §8.1 mainnet baseline         |
+| 6     | `practical-5000-replay.json`        | `practical-5000-replay`        | Mainnet | 5,000      | §8.1 practical mainnet target |
+| 7     | `spike-replay.json`                 | `spike-replay`                 | Mainnet | 10,000     | §8.1 peak spike               |
+| 8     | `saturation-discovery-replay.json`  | `saturation-discovery-replay`  | Mainnet | 50→1,600   | §8.3 saturation discovery     |
+| 9     | `saturation-ramp-25pct-replay.json` | `saturation-ramp-25pct-replay` | Mainnet | varies     | §8.3 25% increment ramp       |
 
 Tiers are generated from `startTps` to `maxTps` using `stepMultiplier` (multiply) or `ramp.percentIncrement` (percent increment). When `startTps === maxTps` the scenario has a single tier.
 
