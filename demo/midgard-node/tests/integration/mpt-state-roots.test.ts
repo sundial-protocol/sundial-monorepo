@@ -8,6 +8,7 @@ import { SqlClient } from "@effect/sql";
 
 import { makeTestSqlLayer } from "./harness/pglite-sql-layer.js";
 import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
+import { txCborA, txIdA, inputCborBytes } from "./harness/fixtures.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
 import { EMPTY_ROOT } from "../constants.js";
 import * as DBInitialization from "@/database/init.js";
@@ -31,9 +32,6 @@ import { breakDownTx } from "@/utils.js";
 // Deterministic MPT fixture key/value.
 const keyBuf = Buffer.alloc(32, 0xaa);
 const valueBuf = Buffer.alloc(64, 0xbb);
-
-const txCborA = Buffer.alloc(64, 0xbb);
-const txIdA = Buffer.alloc(32, 0xaa);
 
 const makeBaseLayers = () =>
   Layer.mergeAll(makeTestSqlLayer(), makeTestNodeConfigLayer());
@@ -307,7 +305,6 @@ it.effect("Applying tx requests updates ledger and txs roots", () => {
     const txsTrie = yield* MidgardMpt.create("nit042-txs");
 
     // Seed ledger with the outref that txCborA spends.
-    const inputCborBytes = Buffer.from([0x82, 0x01, 0x02]);
     yield* ledgerTrie.batch([
       { type: "put", key: inputCborBytes, value: Buffer.alloc(16, 0xcc) },
     ]);
@@ -338,7 +335,6 @@ it.effect("Applying tx orders updates ledger root", () => {
     const ledgerTrie = yield* MidgardMpt.create("nit043-ledger");
 
     // Seed ledger with the outref that txCborA spends.
-    const inputCborBytes = Buffer.from([0x82, 0x01, 0x02]);
     yield* ledgerTrie.batch([
       { type: "put", key: inputCborBytes, value: Buffer.alloc(16, 0xcc) },
     ]);

@@ -285,7 +285,7 @@ it.effect("insertMultiple chunks projection writes into transactions", () => {
 
   return MempoolDB.insertMultiple(manyProcessedTxs).pipe(
     Effect.map(() => {
-      expect(sqlHarness.getTransactionCallCount()).toBe(2);
+      expect(sqlHarness.getTransactionCallCount()).toBe(1);
       expect(
         vi.mocked(AddressHistoryDB.aggregateProcessedTxs),
       ).toHaveBeenCalledTimes(2);

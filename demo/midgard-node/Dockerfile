@@ -24,4 +24,4 @@ COPY --chown=node:node --from=build /deploy .
 COPY --chown=node:node --from=build /workspace/midgard-node/dist ./dist
 ENV NODE_ENV=production
 USER node
-CMD ["node", "./dist/index.js", "listen"]
+CMD ["node", "./dist/index.cjs", "listen"]

@@ -147,36 +147,38 @@ describe("txQueueProcessorAction", () => {
     }).pipe(Effect.provide(testLayer)),
   );
 
-  it.effect("keeps semantically rejected txs pending for retry and acks only accepted txs", () =>
-    Effect.gen(function* () {
-      const queue = makeQueueStub([
-        { id: "1-0", txCbor: "aa", deliveryCount: 1 },
-        { id: "2-0", txCbor: "bb", deliveryCount: 1 },
-      ]);
-      mempoolValidateAndInsertFn.mockReturnValue(
-        Effect.succeed({
-          acceptedMessages: [{ id: "1-0", txCbor: "aa", deliveryCount: 1 }],
-          insertedCount: 1,
-          rejected: [
-            {
-              message: { id: "2-0", txCbor: "bb", deliveryCount: 1 },
-              reason: "validation_rejected:E_INPUT_NOT_FOUND",
-            },
-          ],
-        }),
-      );
+  it.effect(
+    "keeps semantically rejected txs pending for retry and acks only accepted txs",
+    () =>
+      Effect.gen(function* () {
+        const queue = makeQueueStub([
+          { id: "1-0", txCbor: "aa", deliveryCount: 1 },
+          { id: "2-0", txCbor: "bb", deliveryCount: 1 },
+        ]);
+        mempoolValidateAndInsertFn.mockReturnValue(
+          Effect.succeed({
+            acceptedMessages: [{ id: "1-0", txCbor: "aa", deliveryCount: 1 }],
+            insertedCount: 1,
+            rejected: [
+              {
+                message: { id: "2-0", txCbor: "bb", deliveryCount: 1 },
+                reason: "validation_rejected:E_INPUT_NOT_FOUND",
+              },
+            ],
+          }),
+        );
 
-      yield* txQueueProcessorAction(100, 4, 1, true).pipe(
-        Effect.provideService(TxIngressQueue, queue),
-      );
+        yield* txQueueProcessorAction(100, 4, 1, true).pipe(
+          Effect.provideService(TxIngressQueue, queue),
+        );
 
-      expect(queue.ackSpy).toHaveBeenCalledWith(["1-0"]);
-      expect(queue.handleFailedSpy).toHaveBeenCalledTimes(1);
-      expect(queue.handleFailedSpy).toHaveBeenCalledWith(
-        { id: "2-0", txCbor: "bb", deliveryCount: 1 },
-        "validation_rejected:E_INPUT_NOT_FOUND",
-      );
-    }).pipe(Effect.provide(testLayer)),
+        expect(queue.ackSpy).toHaveBeenCalledWith(["1-0"]);
+        expect(queue.handleFailedSpy).toHaveBeenCalledTimes(1);
+        expect(queue.handleFailedSpy).toHaveBeenCalledWith(
+          { id: "2-0", txCbor: "bb", deliveryCount: 1 },
+          "validation_rejected:E_INPUT_NOT_FOUND",
+        );
+      }).pipe(Effect.provide(testLayer)),
   );
 
   it.effect("marks malformed txs as failed and retries", () =>

@@ -96,7 +96,11 @@ export const runPhaseAValidation = (
     validityIntervalStart: undefined,
     validityIntervalEnd: undefined,
     referenceInputs: [],
-    outputSum: { coin: () => 1n, has_multiassets: () => false, is_zero: () => true },
+    outputSum: {
+      coin: () => 1n,
+      has_multiassets: () => false,
+      is_zero: () => true,
+    },
     witnessKeyHashes: [],
     nativeScriptHashes: [],
     spent: queuedTx.tx.body.inputs,

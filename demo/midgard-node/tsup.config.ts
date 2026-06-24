@@ -6,4 +6,10 @@ export default defineConfig({
   dts: true,
   clean: false,
   sourcemap: true,
+  external: ["@dcspark/cardano-multiplatform-lib-nodejs"],
+  outExtension({ format }) {
+    return {
+      js: format === "cjs" ? ".cjs" : ".js",
+    };
+  },
 });

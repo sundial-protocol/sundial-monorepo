@@ -1,9 +1,20 @@
 import { Database } from "@/services/database.js";
 import { NodeConfig } from "@/services/config.js";
 import { Effect } from "effect";
-import { SqlClient } from "@effect/sql";
+import { SqlClient, SqlError } from "@effect/sql";
 import * as SDK from "@al-ft/midgard-sdk";
 import { CML } from "@lucid-evolution/lucid";
+import {
+  cmlOutputToMidgard,
+  cmlToMidgard,
+  outRefKey,
+  runPhaseAValidation,
+  runPhaseBValidationWithPatch,
+  type PhaseAConfig,
+  type QueuedTx,
+  type RejectedTx,
+  type UTxOState,
+} from "../../../midgard-ts/src/index.js";
 import {
   clearTable,
   sqlErrorToDatabaseError,
@@ -119,12 +130,43 @@ const decodeBytea = (value: Buffer | Uint8Array | string): Buffer =>
 const normalizeTxIdToBuffer = (txId: Buffer | Uint8Array | string): Buffer =>
   decodeBytea(txId);
 
-const networkIdForValidation = (network: NodeConfig["Type"]["NETWORK"]): 0 | 1 =>
-  network === "Mainnet" ? 1 : 0;
+const isSqlError = (error: unknown): error is SqlError.SqlError =>
+  typeof error === "object" &&
+  error !== null &&
+  "_tag" in error &&
+  error._tag === "SqlError";
 
-const defaultPhaseAConfig = (
-  nodeConfig: NodeConfig["Type"],
-): SDK.PhaseAConfig => {
+const asMidgardCmlOutput = (
+  output: CML.TransactionOutput,
+): Parameters<typeof cmlOutputToMidgard>[0] =>
+  output as unknown as Parameters<typeof cmlOutputToMidgard>[0];
+
+const asMidgardCmlTransaction = (
+  tx: CML.Transaction,
+): Parameters<typeof cmlToMidgard>[0] =>
+  tx as unknown as Parameters<typeof cmlToMidgard>[0];
+
+const mapSqlErrorToDatabaseError = <A, E, R>(
+  effect: Effect.Effect<A, SqlError.SqlError | E, R>,
+  message: string,
+): Effect.Effect<A, Exclude<E, SqlError.SqlError> | DatabaseError, R> =>
+  effect.pipe(
+    Effect.mapError((error): Exclude<E, SqlError.SqlError> | DatabaseError =>
+      isSqlError(error)
+        ? new DatabaseError({
+            message,
+            table: tableName,
+            cause: error,
+          })
+        : (error as Exclude<E, SqlError.SqlError> | DatabaseError),
+    ),
+  );
+
+const networkIdForValidation = (
+  network: NodeConfig["Type"]["NETWORK"],
+): 0 | 1 => (network === "Mainnet" ? 1 : 0);
+
+const defaultPhaseAConfig = (nodeConfig: NodeConfig["Type"]): PhaseAConfig => {
   const networkId = networkIdForValidation(nodeConfig.NETWORK);
   return {
     expectedNetworkId: networkId,
@@ -137,23 +179,25 @@ const defaultPhaseAConfig = (
 
 const txIdHex = (txId: Uint8Array): string => Buffer.from(txId).toString("hex");
 
-const formatValidationReason = (rejection: SDK.RejectedTx): string =>
+const formatValidationReason = (rejection: RejectedTx): string =>
   rejection.detail === null
     ? `validation_rejected:${rejection.code}`
     : `validation_rejected:${rejection.code}:${rejection.detail}`;
 
-const decodeLedgerState = (
-  entries: readonly Ledger.Entry[],
-): SDK.UTxOState => {
-  const state: SDK.UTxOState = new Map();
+const decodeLedgerState = (entries: readonly Ledger.Entry[]): UTxOState => {
+  const state: UTxOState = new Map();
   for (const entry of entries) {
-    const outRef = CML.TransactionInput.from_cbor_bytes(entry[Ledger.Columns.OUTREF]);
-    const key = SDK.outRefKey({
+    const outRef = CML.TransactionInput.from_cbor_bytes(
+      entry[Ledger.Columns.OUTREF],
+    );
+    const key = outRefKey({
       tx_id: outRef.transaction_id().to_raw_bytes(),
       index: Number(outRef.index()),
     });
-    const output = SDK.cmlOutputToMidgard(
-      CML.TransactionOutput.from_cbor_bytes(entry[Ledger.Columns.OUTPUT]),
+    const output = cmlOutputToMidgard(
+      asMidgardCmlOutput(
+        CML.TransactionOutput.from_cbor_bytes(entry[Ledger.Columns.OUTPUT]),
+      ),
     );
     state.set(key, output);
   }
@@ -163,63 +207,74 @@ const decodeLedgerState = (
 const insertValidatedChunk = (
   sql: SqlClient.SqlClient,
   txChunk: readonly ProcessedTx[],
-): Effect.Effect<number, SDK.CmlDeserializationError | SDK.DataCoercionError | DatabaseError, Database> =>
-  Effect.gen(function* () {
-    const txEntries = txChunk.map((tx) => ({
-      [Tx.Columns.TX_ID]: tx.txId,
-      [Tx.Columns.TX]: tx.txCbor,
-      [Columns.TX_SIZE_BYTES]: tx.txCbor.length,
-      [Columns.SPENT_OUTREFS]: tx.spent,
-      ...toProducedColumns(tx),
-    }));
-    const insertedTxRows = yield* sql<{
-      [Tx.Columns.TX_ID]: Buffer | Uint8Array | string;
-    }>`
-      INSERT INTO ${sql(tableName)} ${sql.insert(txEntries)}
-      ON CONFLICT (${sql(Tx.Columns.TX_ID)}) DO NOTHING
-      RETURNING ${sql(Tx.Columns.TX_ID)}`;
+): Effect.Effect<
+  number,
+  SDK.CmlDeserializationError | SDK.DataCoercionError | DatabaseError,
+  Database
+> =>
+  mapSqlErrorToDatabaseError(
+    Effect.gen(function* () {
+      const txEntries = txChunk.map((tx) => ({
+        [Tx.Columns.TX_ID]: tx.txId,
+        [Tx.Columns.TX]: tx.txCbor,
+        [Columns.TX_SIZE_BYTES]: tx.txCbor.length,
+        [Columns.SPENT_OUTREFS]: tx.spent,
+        ...toProducedColumns(tx),
+      }));
+      const insertedTxRows = yield* sql<{
+        [Tx.Columns.TX_ID]: Buffer | Uint8Array | string;
+      }>`
+        INSERT INTO ${sql(tableName)} ${sql.insert(txEntries)}
+        ON CONFLICT (${sql(Tx.Columns.TX_ID)}) DO NOTHING
+        RETURNING ${sql(Tx.Columns.TX_ID)}`;
 
-    if (insertedTxRows.length === 0) {
-      return 0;
-    }
-
-    const insertedTxIdsHex = new Set(
-      insertedTxRows.map((row) => normalizeTxIdToHex(row[Tx.Columns.TX_ID])),
-    );
-    const projectedTxIdsHex = new Set<string>();
-    const newlyInsertedProcessedTxs = txChunk.filter((processedTx) => {
-      const currentTxIdHex = processedTx.txId.toString("hex");
-      if (
-        !insertedTxIdsHex.has(currentTxIdHex) ||
-        projectedTxIdsHex.has(currentTxIdHex)
-      ) {
-        return false;
+      if (insertedTxRows.length === 0) {
+        return 0;
       }
-      projectedTxIdsHex.add(currentTxIdHex);
-      return true;
-    });
 
-    if (newlyInsertedProcessedTxs.length === 0) {
-      return 0;
-    }
-
-    const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
-      yield* AddressHistoryDB.aggregateProcessedTxs(
-        MempoolLedgerDB.tableName,
-        newlyInsertedProcessedTxs,
-        AddressHistoryDB.Status.SLATED,
+      const insertedTxIdsHex = new Set(
+        insertedTxRows.map((row) => normalizeTxIdToHex(row[Tx.Columns.TX_ID])),
       );
-    yield* AddressHistoryDB.upsertEntries(addressHistoryEntries);
-    yield* MempoolLedgerDB.insert(collectiveProduced);
-    yield* MempoolLedgerDB.clearUTxOs(collectiveSpent);
+      const projectedTxIdsHex = new Set<string>();
+      const newlyInsertedProcessedTxs = txChunk.filter((processedTx) => {
+        const currentTxIdHex = processedTx.txId.toString("hex");
+        if (
+          !insertedTxIdsHex.has(currentTxIdHex) ||
+          projectedTxIdsHex.has(currentTxIdHex)
+        ) {
+          return false;
+        }
+        projectedTxIdsHex.add(currentTxIdHex);
+        return true;
+      });
 
-    return insertedTxRows.length;
-  });
+      if (newlyInsertedProcessedTxs.length === 0) {
+        return 0;
+      }
+
+      const { addressHistoryEntries, collectiveProduced, collectiveSpent } =
+        yield* AddressHistoryDB.aggregateProcessedTxs(
+          MempoolLedgerDB.tableName,
+          newlyInsertedProcessedTxs,
+          AddressHistoryDB.Status.SLATED,
+        );
+      yield* AddressHistoryDB.upsertEntries(addressHistoryEntries);
+      yield* MempoolLedgerDB.insert(collectiveProduced);
+      yield* MempoolLedgerDB.clearUTxOs(collectiveSpent);
+
+      return insertedTxRows.length;
+    }),
+    "Failed to insert the given transactions",
+  );
 
 const insertProcessedTxsWithinTransaction = (
   sql: SqlClient.SqlClient,
   processedTxs: readonly ProcessedTx[],
-): Effect.Effect<number, SDK.CmlDeserializationError | SDK.DataCoercionError | DatabaseError, Database> =>
+): Effect.Effect<
+  number,
+  SDK.CmlDeserializationError | SDK.DataCoercionError | DatabaseError,
+  Database
+> =>
   Effect.gen(function* () {
     if (processedTxs.length === 0) {
       return 0;
@@ -321,10 +376,11 @@ export const insertMultiple = (
       ),
     ),
     Effect.tapError((e) => Effect.logError(`${tableName} db: insert: ${e}`)),
-    sqlErrorToDatabaseError(
-      tableName,
-      "Failed to insert the given transactions",
-    ),
+    (effect) =>
+      mapSqlErrorToDatabaseError(
+        effect,
+        "Failed to insert the given transactions",
+      ),
   );
 
 export const validateAndInsertMultiple = (
@@ -355,24 +411,64 @@ export const validateAndInsertMultiple = (
           message: TxIngressMessage;
           processedTx: ProcessedTx;
           txIdHex: string;
-          queuedTx: SDK.QueuedTx;
+          queuedTx: QueuedTx;
         }> = [];
+        const canonicalCandidatesByTxIdHex = new Map<
+          string,
+          { arrivalSeq: bigint; txCbor: Buffer }
+        >();
+        const duplicateCandidatesByCanonicalArrivalSeq = new Map<
+          bigint,
+          AcceptanceCandidate[]
+        >();
         const rejectedByArrivalSeq = new Map<bigint, AcceptanceRejection>();
 
         for (const candidate of candidates) {
           try {
-            const cmlTx = CML.Transaction.from_cbor_bytes(candidate.processedTx.txCbor);
+            const cmlTx = CML.Transaction.from_cbor_bytes(
+              candidate.processedTx.txCbor,
+            );
             const computedTxId = Buffer.from(
               CML.hash_transaction(cmlTx.body()).to_raw_bytes(),
             );
+            const computedTxIdHex = computedTxId.toString("hex");
+            const existingCanonical =
+              canonicalCandidatesByTxIdHex.get(computedTxIdHex);
+            if (existingCanonical !== undefined) {
+              if (
+                existingCanonical.txCbor.equals(candidate.processedTx.txCbor)
+              ) {
+                const duplicates =
+                  duplicateCandidatesByCanonicalArrivalSeq.get(
+                    existingCanonical.arrivalSeq,
+                  ) ?? [];
+                duplicates.push(candidate);
+                duplicateCandidatesByCanonicalArrivalSeq.set(
+                  existingCanonical.arrivalSeq,
+                  duplicates,
+                );
+              } else {
+                rejectedByArrivalSeq.set(candidate.arrivalSeq, {
+                  message: candidate.message,
+                  reason:
+                    "validation_rejected:E_DUPLICATE_TX_ID_CONFLICT:different cbor for identical tx hash",
+                });
+              }
+              continue;
+            }
+
+            canonicalCandidatesByTxIdHex.set(computedTxIdHex, {
+              arrivalSeq: candidate.arrivalSeq,
+              txCbor: candidate.processedTx.txCbor,
+            });
             queuedCandidates.push({
               arrivalSeq: candidate.arrivalSeq,
               message: candidate.message,
               processedTx: candidate.processedTx,
-              txIdHex: computedTxId.toString("hex"),
+              txIdHex: computedTxIdHex,
               queuedTx: {
                 txId: computedTxId,
-                tx: SDK.cmlToMidgard(cmlTx),
+                tx: cmlToMidgard(asMidgardCmlTransaction(cmlTx)),
                 arrivalSeq: candidate.arrivalSeq,
               },
             });
@@ -384,16 +480,14 @@ export const validateAndInsertMultiple = (
           }
         }
 
-        const phaseA = SDK.runPhaseAValidation(
+        const phaseA = runPhaseAValidation(
           queuedCandidates.map((candidate) => candidate.queuedTx),
           defaultPhaseAConfig(nodeConfig),
         );
         const preState = decodeLedgerState(yield* MempoolLedgerDB.retrieve);
-        const phaseB = SDK.runPhaseBValidationWithPatch(
-          phaseA.accepted,
-          preState,
-          { nowMillis: Date.now() },
-        );
+        const phaseB = runPhaseBValidationWithPatch(phaseA.accepted, preState, {
+          nowMillis: Date.now(),
+        });
 
         const acceptedArrivalSeqs = new Set(
           phaseB.accepted.map((accepted) => accepted.arrivalSeq),
@@ -410,6 +504,14 @@ export const validateAndInsertMultiple = (
         const acceptedCandidates = queuedCandidates.filter((candidate) =>
           acceptedArrivalSeqs.has(candidate.arrivalSeq),
         );
+        const acceptedMessages = acceptedCandidates.flatMap((candidate) => [
+          candidate.message,
+          ...(
+            duplicateCandidatesByCanonicalArrivalSeq.get(
+              candidate.arrivalSeq,
+            ) ?? []
+          ).map((duplicateCandidate) => duplicateCandidate.message),
+        ]);
 
         const insertedCount = yield* insertProcessedTxsWithinTransaction(
           sql,
@@ -425,25 +527,32 @@ export const validateAndInsertMultiple = (
           }
           const rejectionReasons =
             rejectionReasonsByTxId.get(candidate.txIdHex) ?? [];
-          rejectedByArrivalSeq.set(candidate.arrivalSeq, {
+          const rejection = {
             message: candidate.message,
             reason:
-              rejectionReasons.shift() ??
-              "validation_rejected:E_UNSPECIFIED",
-          });
+              rejectionReasons.shift() ?? "validation_rejected:E_UNSPECIFIED",
+          };
+          rejectedByArrivalSeq.set(candidate.arrivalSeq, rejection);
+          for (const duplicateCandidate of duplicateCandidatesByCanonicalArrivalSeq.get(
+            candidate.arrivalSeq,
+          ) ?? []) {
+            rejectedByArrivalSeq.set(duplicateCandidate.arrivalSeq, {
+              message: duplicateCandidate.message,
+              reason: rejection.reason,
+            });
+          }
         }
 
         return {
-          acceptedMessages: acceptedCandidates.map((candidate) => candidate.message),
+          acceptedMessages,
           insertedCount,
           rejected: Array.from(rejectedByArrivalSeq.values()),
         };
       }),
     );
-  }).pipe(
-    Effect.withLogSpan(`validateAndInsert ${tableName}`),
-    sqlErrorToDatabaseError(
-      tableName,
+  }).pipe(Effect.withLogSpan(`validateAndInsert ${tableName}`), (effect) =>
+    mapSqlErrorToDatabaseError(
+      effect,
       "Failed to validate and insert the given transactions",
     ),
   );
