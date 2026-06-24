@@ -48,6 +48,9 @@ export const CML = {
       );
     },
   },
+  TransactionOutput: {
+    from_cbor_bytes: () => ({}),
+  },
   TransactionOutputList: {
     new: () => {
       throw new Error(

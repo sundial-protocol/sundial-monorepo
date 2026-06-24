@@ -137,10 +137,14 @@ export const CML = {
     }),
     from_cbor_bytes: (bytes: Buffer) => ({
       transaction_id: () => ({
+        to_raw_bytes: () => Buffer.alloc(32, 0xaa),
         to_hex: () => Buffer.from(bytes).toString("hex").substring(0, 64),
       }),
       index: () => BigInt(0),
     }),
+  },
+  TransactionOutput: {
+    from_cbor_bytes: (_bytes: Uint8Array) => ({}),
   },
   TransactionUnspentOutput: {
     from_cbor_bytes: (bytes: Buffer) => ({

@@ -1,12 +1,13 @@
 import { describe, expect, vi, beforeEach } from "vitest";
 import { it } from "@effect/vitest";
-import { Effect, Metric, Ref } from "effect";
+import { Effect, Layer, Metric, Ref } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { createMockSqlHarness } from "./harness/mock-sql-layer.js";
 import { metricDelta } from "./harness/metric-snapshot.js";
+import { makeTestNodeConfigLayer } from "./harness/node-config-layer.js";
 
 const parseTxCborInWorkerPoolFn = vi.hoisted(() => vi.fn());
-const mempoolInsertFn = vi.hoisted(() => vi.fn());
+const mempoolValidateAndInsertFn = vi.hoisted(() => vi.fn());
 
 vi.mock("@/fibers/tx-parse-worker-pool.js", () => ({
   parseTxCborInWorkerPool: parseTxCborInWorkerPoolFn,
@@ -14,7 +15,7 @@ vi.mock("@/fibers/tx-parse-worker-pool.js", () => ({
 
 vi.mock("@/database/index.js", () => ({
   MempoolDB: {
-    insertMultiple: mempoolInsertFn,
+    validateAndInsertMultiple: mempoolValidateAndInsertFn,
   },
 }));
 
@@ -28,6 +29,7 @@ import {
 } from "@/services/tx-ingress-queue.js";
 
 const sqlHarness = createMockSqlHarness();
+const testLayer = Layer.mergeAll(sqlHarness.layer, makeTestNodeConfigLayer());
 
 const fakeProcessedTx = {
   txId: Buffer.alloc(32, 0xaa),
@@ -89,8 +91,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   sqlHarness.reset();
   parseTxCborInWorkerPoolFn.mockReturnValue(Effect.succeed(fakeProcessedTx));
-  mempoolInsertFn.mockImplementation((processedTxs: unknown[]) =>
-    Effect.succeed(processedTxs.length),
+  mempoolValidateAndInsertFn.mockImplementation((candidates: unknown[]) =>
+    Effect.succeed({
+      acceptedMessages: (candidates as { message: { id: string } }[]).map(
+        (candidate) => candidate.message,
+      ),
+      insertedCount: (candidates as unknown[]).length,
+      rejected: [],
+    }),
   );
 });
 
@@ -112,9 +120,9 @@ describe("txQueueProcessorAction", () => {
           1000,
           "midgard-tx-processor",
         );
-        expect(mempoolInsertFn).toHaveBeenCalledOnce();
+        expect(mempoolValidateAndInsertFn).toHaveBeenCalledOnce();
         expect(queue.ackSpy).toHaveBeenCalledWith(["1-0"]);
-      }).pipe(Effect.provide(sqlHarness.layer)),
+      }).pipe(Effect.provide(testLayer)),
   );
 
   it.effect("acks successfully persisted stream messages", () =>
@@ -133,10 +141,42 @@ describe("txQueueProcessorAction", () => {
       );
 
       expect(ackDelta).toBe(2n);
-      expect(mempoolInsertFn).toHaveBeenCalledOnce();
+      expect(mempoolValidateAndInsertFn).toHaveBeenCalledOnce();
       expect(queue.ackSpy).toHaveBeenCalledWith(["1-0", "2-0"]);
       expect(queue.handleFailedSpy).not.toHaveBeenCalled();
-    }).pipe(Effect.provide(sqlHarness.layer)),
+    }).pipe(Effect.provide(testLayer)),
+  );
+
+  it.effect("keeps semantically rejected txs pending for retry and acks only accepted txs", () =>
+    Effect.gen(function* () {
+      const queue = makeQueueStub([
+        { id: "1-0", txCbor: "aa", deliveryCount: 1 },
+        { id: "2-0", txCbor: "bb", deliveryCount: 1 },
+      ]);
+      mempoolValidateAndInsertFn.mockReturnValue(
+        Effect.succeed({
+          acceptedMessages: [{ id: "1-0", txCbor: "aa", deliveryCount: 1 }],
+          insertedCount: 1,
+          rejected: [
+            {
+              message: { id: "2-0", txCbor: "bb", deliveryCount: 1 },
+              reason: "validation_rejected:E_INPUT_NOT_FOUND",
+            },
+          ],
+        }),
+      );
+
+      yield* txQueueProcessorAction(100, 4, 1, true).pipe(
+        Effect.provideService(TxIngressQueue, queue),
+      );
+
+      expect(queue.ackSpy).toHaveBeenCalledWith(["1-0"]);
+      expect(queue.handleFailedSpy).toHaveBeenCalledTimes(1);
+      expect(queue.handleFailedSpy).toHaveBeenCalledWith(
+        { id: "2-0", txCbor: "bb", deliveryCount: 1 },
+        "validation_rejected:E_INPUT_NOT_FOUND",
+      );
+    }).pipe(Effect.provide(testLayer)),
   );
 
   it.effect("marks malformed txs as failed and retries", () =>
@@ -169,7 +209,7 @@ describe("txQueueProcessorAction", () => {
       expect(retryDelta).toBe(1n);
       expect(queue.ackSpy).not.toHaveBeenCalled();
       expect(queue.handleFailedSpy).toHaveBeenCalledTimes(1);
-    }).pipe(Effect.provide(sqlHarness.layer)),
+    }).pipe(Effect.provide(testLayer)),
   );
 
   it.effect("dead-letters failed messages when queue adapter says so", () =>
@@ -199,7 +239,7 @@ describe("txQueueProcessorAction", () => {
 
       expect(deadLetterDelta).toBe(1n);
       expect(queue.handleFailedSpy).toHaveBeenCalledTimes(1);
-    }).pipe(Effect.provide(sqlHarness.layer)),
+    }).pipe(Effect.provide(testLayer)),
   );
 
   it.effect("tracks stream depth peak from metrics snapshots", () =>
@@ -217,6 +257,6 @@ describe("txQueueProcessorAction", () => {
 
       const peak = yield* readPeakGauge;
       expect(peak.value).toBe(3n);
-    }).pipe(Effect.provide(sqlHarness.layer)),
+    }).pipe(Effect.provide(testLayer)),
   );
 });
