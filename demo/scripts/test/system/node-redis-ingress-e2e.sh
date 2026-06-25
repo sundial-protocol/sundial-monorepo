@@ -124,7 +124,10 @@ upsert_env POSTGRES_MAX_CONNECTIONS 50
 cleanup() {
   set +e
   cd "$NODE_DIR" || exit 0
-  container_compose -p "$E2E_COMPOSE_PROJECT" --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans
+  # The node service is gated behind the "monolith" compose profile; activate it
+  # so `down` actually removes the node container (otherwise it lingers, leaking
+  # a running container and the network on every run).
+  COMPOSE_PROFILES=monolith container_compose -p "$E2E_COMPOSE_PROJECT" --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans
   rm -f "$RUNTIME_ENV_FILE"
 }
 trap cleanup EXIT

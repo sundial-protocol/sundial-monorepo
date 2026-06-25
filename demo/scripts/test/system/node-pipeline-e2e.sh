@@ -123,6 +123,10 @@ upsert_env REDIS_STREAM_CONSUMER_NAME "midgard-node-pipeline-e2e"
 upsert_env TX_QUEUE_DEAD_LETTER_STREAM "midgard:tx-submissions:pipeline-e2e:dead-letter"
 upsert_env TX_QUEUE_DRAIN_BATCH_SIZE 250
 upsert_env REDIS_STREAM_BLOCK_MS 500
+# Reclaim transiently-pending entries quickly so dependency-ordering retries
+# (a child tx briefly drained before its parent) resolve within the short test
+# window instead of waiting out the production-default 30s claim idle.
+upsert_env TX_QUEUE_CLAIM_IDLE_MS 1000
 upsert_env LUCID_INIT_MAX_RETRIES 0
 # Space out sequencer fibers far enough that they don't interfere during the short test window
 upsert_env WAIT_BETWEEN_BLOCK_COMMITMENTS 600000
@@ -142,7 +146,10 @@ upsert_env POSTGRES_MAX_CONNECTIONS 50
 cleanup() {
   set +e
   cd "$NODE_DIR" || exit 0
-  container_compose -p "$E2E_COMPOSE_PROJECT" --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans
+  # The node service is gated behind the "monolith" compose profile; activate it
+  # so `down` actually removes the node container (otherwise it lingers, leaking
+  # a running container and the network on every run).
+  COMPOSE_PROFILES=monolith container_compose -p "$E2E_COMPOSE_PROJECT" --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans
   rm -f "$RUNTIME_ENV_FILE"
 }
 trap cleanup EXIT
