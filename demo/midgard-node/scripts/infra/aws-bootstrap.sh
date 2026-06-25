@@ -305,6 +305,12 @@ resolve_secret_value() {
     testnet-genesis-wallet-seed-phrase-c)
       resolve_env_value TESTNET_GENESIS_WALLET_SEED_PHRASE_C
       ;;
+    faucet-seed-phrase)
+      resolve_env_value FAUCET_SEED_PHRASE
+      ;;
+    faucet-api-key)
+      resolve_env_value FAUCET_API_KEY
+      ;;
     *)
       return 1
       ;;
@@ -364,6 +370,14 @@ ensure_secrets() {
     testnet-genesis-wallet-seed-phrase-b
     testnet-genesis-wallet-seed-phrase-c
   )
+
+  # The faucet wallet credentials are only required when the faucet is enabled.
+  if [[ "$(resolve_env_value FAUCET_ENABLED || true)" == "true" ]]; then
+    secret_names+=(
+      faucet-seed-phrase
+      faucet-api-key
+    )
+  fi
 
   for secret_name in "${secret_names[@]}"; do
     secret_value="$(resolve_secret_value "${secret_name}" || true)"

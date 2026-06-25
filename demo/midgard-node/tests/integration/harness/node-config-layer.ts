@@ -84,6 +84,14 @@ export const makeTestNodeConfigLayer = (opts: TestNodeConfigOptions = {}) => {
       MEMPOOL_MPT_DB_PATH: mempoolPath,
       LUCID_INIT_MAX_RETRIES: 0,
       GENESIS_UTXOS: opts.genesisUtxos ?? [],
+      FAUCET_ENABLED: false,
+      FAUCET_SEED_PHRASE: "",
+      FAUCET_API_KEY: "",
+      FAUCET_ADDRESS: "",
+      FAUCET_AMOUNT_LOVELACE: 100_000_000n,
+      FAUCET_COOLDOWN_SECONDS: 86_400,
+      FAUCET_DAILY_IP_LIMIT: 5,
+      FAUCET_MIN_BALANCE_LOVELACE: 100_000_000n,
     }),
   );
 };

@@ -38,3 +38,12 @@ network = "Preprod"
 
 prometheus_retention = "3d"
 loki_retention_days  = 3
+
+# Faucet wallet. Flip faucet_enabled to true once the faucet-seed-phrase and
+# faucet-api-key secrets exist in Secrets Manager under sundial-node/testnet/.
+faucet_enabled                     = false
+faucet_amount_lovelace             = "100000000"
+faucet_cooldown_seconds            = 86400
+faucet_daily_ip_limit              = 5
+faucet_min_balance_lovelace        = "100000000"
+faucet_genesis_allocation_lovelace = "10000000000000"
