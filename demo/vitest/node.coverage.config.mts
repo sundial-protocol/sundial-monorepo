@@ -55,11 +55,15 @@ export default defineConfig({
         "midgard-node/src/fibers/monitor-mempool.ts",
         "midgard-node/src/fibers/sync-user-events.ts",
         "midgard-node/src/fibers/tx-queue-processor.ts",
-        // Worker thread orchestrator — runs in worker_threads context
+        // Worker thread orchestrators — run in a worker_threads context;
+        // importing them on the main thread throws (they require a parentPort),
+        // so they are exercised by integration/e2e runs, not unit coverage.
         "midgard-node/src/workers/block-commitment.ts",
+        "midgard-node/src/workers/tx-parse.ts",
         // SQL-level DB modules — use SqlClient directly, integration-test territory
         "midgard-node/src/database/blocks.ts",
         "midgard-node/src/database/blocksTxs.ts",
+        "midgard-node/src/database/faucetClaims.ts",
       ],
       thresholds: {
         lines: 65,
