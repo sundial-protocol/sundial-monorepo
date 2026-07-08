@@ -2,3 +2,7 @@ packages:
   - midgard-node
   - midgard-sdk
   - midgard-ts
+
+blockExoticSubdeps: true
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
