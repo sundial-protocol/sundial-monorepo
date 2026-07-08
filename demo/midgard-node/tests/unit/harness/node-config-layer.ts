@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 import { NodeConfig } from "@/services/config.js";
 import { Layer } from "effect";
 
-export const makeTestNodeConfigLayer = () =>
+export const makeTestNodeConfigLayer = (
+  overrides: Partial<NodeConfig["Type"]> = {},
+) =>
   Layer.succeed(
     NodeConfig,
     NodeConfig.of({
@@ -67,5 +69,14 @@ export const makeTestNodeConfigLayer = () =>
       ),
       LUCID_INIT_MAX_RETRIES: 0,
       GENESIS_UTXOS: [],
+      FAUCET_ENABLED: false,
+      FAUCET_SEED_PHRASE: "",
+      FAUCET_API_KEY: "",
+      FAUCET_ADDRESS: "",
+      FAUCET_AMOUNT_LOVELACE: 100_000_000n,
+      FAUCET_COOLDOWN_SECONDS: 86_400,
+      FAUCET_DAILY_IP_LIMIT: 5,
+      FAUCET_MIN_BALANCE_LOVELACE: 100_000_000n,
+      ...overrides,
     }),
   );

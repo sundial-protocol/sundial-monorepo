@@ -21,9 +21,17 @@ import {
   ensureBlocksDBSeededFromChain,
 } from "@/fibers/seed-blocks-db-from-chain.js";
 import { DatabaseError } from "@/database/utils/common.js";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const COMMITMENT_WORKER_NAME = "commit-block-header";
-const COMMITMENT_WORKER_URL = new URL("./block-commitment.js", import.meta.url);
+const CURRENT_MODULE_DIR =
+  typeof __filename !== "undefined"
+    ? dirname(__filename)
+    : dirname(fileURLToPath(import.meta.url));
+const COMMITMENT_WORKER_URL = pathToFileURL(
+  resolve(CURRENT_MODULE_DIR, "./block-commitment.js"),
+);
 
 type PendingCommitmentWorkerRequest = {
   readonly complete: (effect: Effect.Effect<WorkerOutput, WorkerError>) => void;

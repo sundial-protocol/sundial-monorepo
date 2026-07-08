@@ -1,6 +1,7 @@
 import { Worker } from "node:worker_threads";
 import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { fromHex } from "@lucid-evolution/lucid";
 import { Effect } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
@@ -15,7 +16,13 @@ import {
 } from "@/workers/utils/tx-parse.js";
 
 const TX_PARSE_WORKER_NAME = "tx-parse";
-const TX_PARSE_WORKER_URL = new URL("./tx-parse.js", import.meta.url);
+const CURRENT_MODULE_DIR =
+  typeof __filename !== "undefined"
+    ? dirname(__filename)
+    : dirname(fileURLToPath(import.meta.url));
+const TX_PARSE_WORKER_URL = pathToFileURL(
+  resolve(CURRENT_MODULE_DIR, "./tx-parse.js"),
+);
 const TX_PARSE_WORKER_FILE = fileURLToPath(TX_PARSE_WORKER_URL);
 
 type PendingRequest = {

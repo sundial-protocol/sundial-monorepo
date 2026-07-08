@@ -16,6 +16,10 @@ export default defineConfig({
         demoRoot,
         "midgard-node/tests/unit/stubs/lucid.stub.ts",
       ),
+      "@dcspark/cardano-multiplatform-lib-nodejs": path.resolve(
+        demoRoot,
+        "midgard-ts/node_modules/@dcspark/cardano-multiplatform-lib-nodejs/cardano_multiplatform_lib.js",
+      ),
       "@/database/utils/ledger.js": path.resolve(
         demoRoot,
         "midgard-node/tests/unit/stubs/ledger.stub.ts",

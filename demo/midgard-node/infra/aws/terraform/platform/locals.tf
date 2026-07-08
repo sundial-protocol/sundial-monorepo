@@ -23,5 +23,11 @@ locals {
     { name = "WAIT_BETWEEN_MERGE_TXS", value = tostring(var.wait_between_merge_txs_ms) },
     { name = "COMMITMENT_WORKER_TIMEOUT_MS", value = tostring(var.commitment_worker_timeout_ms) },
     { name = "OLTP_EXPORTER_URL", value = "http://alloy.${var.private_dns_namespace_name}:4318/v1/traces" },
+    { name = "FAUCET_ENABLED", value = tostring(var.faucet_enabled) },
+    { name = "FAUCET_AMOUNT_LOVELACE", value = var.faucet_amount_lovelace },
+    { name = "FAUCET_COOLDOWN_SECONDS", value = tostring(var.faucet_cooldown_seconds) },
+    { name = "FAUCET_DAILY_IP_LIMIT", value = tostring(var.faucet_daily_ip_limit) },
+    { name = "FAUCET_MIN_BALANCE_LOVELACE", value = var.faucet_min_balance_lovelace },
+    { name = "FAUCET_GENESIS_ALLOCATION_LOVELACE", value = var.faucet_genesis_allocation_lovelace },
   ]
 }

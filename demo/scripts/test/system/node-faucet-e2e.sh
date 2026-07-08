@@ -3,12 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 NODE_DIR="$ROOT_DIR/demo/midgard-node"
-CORPUS_PATH="${CORPUS_PATH:-$ROOT_DIR/demo/midgard-node/tests/e2e/fixtures/corpus-ci-n500.jsonl}"
-
-if [[ ! -f "$CORPUS_PATH" ]]; then
-  echo "ERROR: corpus file not found at: $CORPUS_PATH" >&2
-  exit 1
-fi
 
 BASE_ENV_FILE="$NODE_DIR/.env"
 if [[ ! -f "$BASE_ENV_FILE" ]]; then
@@ -16,8 +10,13 @@ if [[ ! -f "$BASE_ENV_FILE" ]]; then
 fi
 
 CONTAINER_COMPOSE=()
-RUNTIME_ENV_FILE="$(mktemp /tmp/midgard-node-pipeline-e2e-env-XXXXXX)"
+RUNTIME_ENV_FILE="$(mktemp /tmp/midgard-node-faucet-e2e-env-XXXXXX)"
 cp "$BASE_ENV_FILE" "$RUNTIME_ENV_FILE"
+
+# Test-only knobs. The faucet seed must not reuse the operator/genesis seeds.
+FAUCET_API_KEY="e2e-faucet-secret-$$"
+FAUCET_SEED_PHRASE="legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title"
+FAUCET_AMOUNT_LOVELACE="100000000"
 
 die() {
   echo "$*" >&2
@@ -96,7 +95,7 @@ upsert_env() {
   fi
 }
 
-E2E_COMPOSE_PROJECT="sundial-test-$$"
+E2E_COMPOSE_PROJECT="sundial-faucet-test-$$"
 E2E_NODE_API_PORT="$(find_available_port 3010)"
 E2E_NODE_PROM_PORT="$(find_available_port 9465)"
 E2E_POSTGRES_PORT="$(find_available_port 5434)"
@@ -113,26 +112,31 @@ upsert_env L1_BLOCKFROST_API_URL "http://127.0.0.1:1"
 upsert_env L1_BLOCKFROST_KEY "e2e-dummy-key"
 upsert_env L1_OGMIOS_KEY "http://127.0.0.1:1"
 upsert_env L1_KUPO_KEY "http://127.0.0.1:1"
-# Use test-only seed phrases so the node can derive wallet addresses
+# Use test-only seed phrases so the node can derive wallet addresses.
 upsert_env L1_OPERATOR_SEED_PHRASE "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
 upsert_env L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
 upsert_env L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art"
-upsert_env REDIS_STREAM_KEY "midgard:tx-submissions:pipeline-e2e"
+upsert_env REDIS_STREAM_KEY "midgard:tx-submissions:faucet-e2e"
 upsert_env REDIS_STREAM_CONSUMER_GROUP "midgard-tx-processors"
-upsert_env REDIS_STREAM_CONSUMER_NAME "midgard-node-pipeline-e2e"
-upsert_env TX_QUEUE_DEAD_LETTER_STREAM "midgard:tx-submissions:pipeline-e2e:dead-letter"
-upsert_env TX_QUEUE_DRAIN_BATCH_SIZE 250
+upsert_env REDIS_STREAM_CONSUMER_NAME "midgard-node-faucet-e2e"
+upsert_env TX_QUEUE_DEAD_LETTER_STREAM "midgard:tx-submissions:faucet-e2e:dead-letter"
 upsert_env REDIS_STREAM_BLOCK_MS 500
-# Reclaim transiently-pending entries quickly so dependency-ordering retries
-# (a child tx briefly drained before its parent) resolve within the short test
-# window instead of waiting out the production-default 30s claim idle.
-upsert_env TX_QUEUE_CLAIM_IDLE_MS 1000
 upsert_env LUCID_INIT_MAX_RETRIES 0
-# Space out sequencer fibers far enough that they don't interfere during the short test window
+# Keep the faucet payout in the mempool for the duration of the test by spacing
+# out the sequencer fibers (block commitment/merge) far beyond the test window.
 upsert_env WAIT_BETWEEN_BLOCK_COMMITMENTS 600000
 upsert_env WAIT_BETWEEN_BLOCK_SUBMISSIONS 600000
 upsert_env WAIT_BETWEEN_USER_EVENT_FETCHES 600000
 upsert_env WAIT_BETWEEN_MERGE_TXS 600000
+# Faucet configuration under test.
+upsert_env FAUCET_ENABLED true
+upsert_env FAUCET_SEED_PHRASE "$FAUCET_SEED_PHRASE"
+upsert_env FAUCET_API_KEY "$FAUCET_API_KEY"
+upsert_env FAUCET_AMOUNT_LOVELACE "$FAUCET_AMOUNT_LOVELACE"
+upsert_env FAUCET_COOLDOWN_SECONDS 86400
+upsert_env FAUCET_DAILY_IP_LIMIT 5
+upsert_env FAUCET_MIN_BALANCE_LOVELACE 100000000
+upsert_env FAUCET_GENESIS_ALLOCATION_LOVELACE 10000000000000
 upsert_env NODE_API_HOST_PORT "$E2E_NODE_API_PORT"
 upsert_env NODE_PROM_HOST_PORT "$E2E_NODE_PROM_PORT"
 upsert_env POSTGRES_HOST_PORT "$E2E_POSTGRES_PORT"
@@ -146,9 +150,6 @@ upsert_env POSTGRES_MAX_CONNECTIONS 50
 cleanup() {
   set +e
   cd "$NODE_DIR" || exit 0
-  # The node service is gated behind the "monolith" compose profile; activate it
-  # so `down` actually removes the node container (otherwise it lingers, leaking
-  # a running container and the network on every run).
   COMPOSE_PROFILES=monolith container_compose -p "$E2E_COMPOSE_PROJECT" --env-file "$RUNTIME_ENV_FILE" -f docker-compose.yaml down -v --remove-orphans
   rm -f "$RUNTIME_ENV_FILE"
 }
@@ -169,10 +170,6 @@ done
 curl -fsS "http://127.0.0.1:${E2E_NODE_API_PORT}/health/live" >/dev/null
 
 API_BASE_URL="http://127.0.0.1:${E2E_NODE_API_PORT}" \
-REDIS_URL="redis://127.0.0.1:${E2E_REDIS_PORT}" \
-REDIS_STREAM_KEY="midgard:tx-submissions:pipeline-e2e" \
-TX_QUEUE_DEAD_LETTER_STREAM="midgard:tx-submissions:pipeline-e2e:dead-letter" \
-REDIS_STREAM_CONSUMER_GROUP="midgard-tx-processors" \
-CORPUS_PATH="$CORPUS_PATH" \
-PIPELINE_TX_COUNT="${PIPELINE_TX_COUNT:-500}" \
-pnpm exec vitest run --config vitest.e2e.config.ts tests/e2e/tx-ingress-pipeline.e2e.test.ts
+FAUCET_API_KEY="$FAUCET_API_KEY" \
+FAUCET_AMOUNT_LOVELACE="$FAUCET_AMOUNT_LOVELACE" \
+pnpm exec vitest run --config vitest.e2e.config.ts tests/e2e/faucet-claims.e2e.test.ts

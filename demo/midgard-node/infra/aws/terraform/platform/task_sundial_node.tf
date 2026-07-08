@@ -58,7 +58,7 @@ resource "aws_ecs_task_definition" "sundial_node" {
 
       environment = local.sundial_node_environment
 
-      secrets = [
+      secrets = concat([
         { name = "POSTGRES_PASSWORD", valueFrom = data.aws_secretsmanager_secret.rds_master_password.arn },
         { name = "L1_PROVIDER", valueFrom = data.aws_secretsmanager_secret.l1_provider.arn },
         { name = "L1_BLOCKFROST_API_URL", valueFrom = data.aws_secretsmanager_secret.l1_blockfrost_api_url.arn },
@@ -71,7 +71,12 @@ resource "aws_ecs_task_definition" "sundial_node" {
         { name = "TESTNET_GENESIS_WALLET_SEED_PHRASE_A", valueFrom = data.aws_secretsmanager_secret.testnet_genesis_wallet_seed_phrase_a.arn },
         { name = "TESTNET_GENESIS_WALLET_SEED_PHRASE_B", valueFrom = data.aws_secretsmanager_secret.testnet_genesis_wallet_seed_phrase_b.arn },
         { name = "TESTNET_GENESIS_WALLET_SEED_PHRASE_C", valueFrom = data.aws_secretsmanager_secret.testnet_genesis_wallet_seed_phrase_c.arn }
-      ]
+        ],
+        var.faucet_enabled ? [
+          { name = "FAUCET_SEED_PHRASE", valueFrom = data.aws_secretsmanager_secret.faucet_seed_phrase[0].arn },
+          { name = "FAUCET_API_KEY", valueFrom = data.aws_secretsmanager_secret.faucet_api_key[0].arn },
+        ] : [],
+      )
 
       mountPoints = [
         {

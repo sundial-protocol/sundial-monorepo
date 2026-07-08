@@ -272,7 +272,9 @@ function outputRefToCmlInput(ref: OutputReference): CML.TransactionInput {
 // TransactionOutput
 // ===========================================================================
 
-function cmlOutputToMidgard(out: CML.TransactionOutput): TransactionOutput {
+export function cmlOutputToMidgard(
+  out: CML.TransactionOutput,
+): TransactionOutput {
   // Midgard only supports post-Alonzo (Conway-format) outputs.
   if (out.kind() !== CML.TransactionOutputKind.ConwayFormatTxOut) {
     throw new ConversionError(

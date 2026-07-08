@@ -6,6 +6,7 @@ import {
   Globals,
   TxIngressQueue,
   TxIngressQueueService,
+  Faucet,
 } from "@/services/index.js";
 import * as SDK from "@al-ft/midgard-sdk";
 import { NodeSdk } from "@effect/opentelemetry";
@@ -76,6 +77,7 @@ const INIT_ENDPOINT: string = "init";
 const COMMIT_ENDPOINT: string = "commit";
 const RESET_ENDPOINT: string = "reset";
 const SUBMIT_ENDPOINT: string = "submit";
+const FAUCET_CLAIMS_ENDPOINT: string = "faucet/claims";
 const STATE_QUEUE_ENDPOINT: string = "stateQueue";
 const STATE_QUEUE_ROOT_UNIT_DIAGNOSTICS_ENDPOINT: string =
   "stateQueue/root-unit-diagnostics";
@@ -746,6 +748,129 @@ const postSubmitHandler = (submitIngressConfig: SubmitIngressConfig) =>
     ),
   );
 
+const FAUCET_CLAIM_ERROR_STATUS: Record<Faucet.FaucetClaimCode, number> = {
+  DISABLED: 404,
+  ADDRESS_INVALID: 400,
+  ADDRESS_NETWORK_MISMATCH: 400,
+  ADDRESS_NO_PAYMENT_CREDENTIAL: 400,
+  ADDRESS_SCRIPT: 400,
+  COOLDOWN: 429,
+  IP_LIMIT: 429,
+  DEPLETED: 503,
+  VALIDATION_FAILED: 500,
+  INTERNAL: 500,
+};
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const extractBearerToken = (headers: Record<string, string>): string | null => {
+  const header = headers["authorization"];
+  if (typeof header !== "string") {
+    return null;
+  }
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : null;
+};
+
+const postFaucetClaimsHandler = Effect.gen(function* () {
+  const nodeConfig = yield* NodeConfig;
+  const request = yield* HttpServerRequest.HttpServerRequest;
+
+  // Server-to-server bearer authentication. When the faucet is disabled the
+  // endpoint reports 404 so it is indistinguishable from a non-existent route.
+  if (!nodeConfig.FAUCET_ENABLED || nodeConfig.FAUCET_API_KEY === "") {
+    return yield* HttpServerResponse.json(
+      { error: "Faucet is not enabled" },
+      { status: 404 },
+    );
+  }
+  const token = extractBearerToken(request.headers);
+  if (token === null || token !== nodeConfig.FAUCET_API_KEY) {
+    yield* Effect.logWarning(
+      `POST /${FAUCET_CLAIMS_ENDPOINT} - missing or invalid bearer token`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  const parsedBody = yield* request.json.pipe(
+    Effect.map((value) => ({ ok: true as const, value })),
+    Effect.catchAll(() => Effect.succeed({ ok: false as const })),
+  );
+  if (
+    !parsedBody.ok ||
+    typeof parsedBody.value !== "object" ||
+    parsedBody.value === null
+  ) {
+    return yield* HttpServerResponse.json(
+      { error: "Request body must be a JSON object" },
+      { status: 400 },
+    );
+  }
+  const body = parsedBody.value;
+  const { address, idempotencyKey, ipHash } = body as Record<string, unknown>;
+  if (
+    !isNonEmptyString(address) ||
+    !isNonEmptyString(idempotencyKey) ||
+    !isNonEmptyString(ipHash)
+  ) {
+    return yield* HttpServerResponse.json(
+      {
+        error:
+          "Request body must contain non-empty 'address', 'idempotencyKey' and 'ipHash' strings",
+      },
+      { status: 400 },
+    );
+  }
+
+  const result = yield* Faucet.processClaim({
+    address,
+    idempotencyKey,
+    ipHash,
+  });
+  yield* Effect.logInfo(
+    `POST /${FAUCET_CLAIMS_ENDPOINT} - claim ${result.claimId} ${result.idempotentReplay ? "(idempotent replay) " : ""}tx ${result.txHash}`,
+  );
+  return yield* HttpServerResponse.json({
+    claimId: result.claimId,
+    txHash: result.txHash,
+    amount: result.amount.toString(),
+    nextEligibleAt: result.nextEligibleAt.toISOString(),
+  });
+}).pipe(
+  Effect.catchTag("FaucetClaimError", (e) =>
+    Effect.gen(function* () {
+      const status = FAUCET_CLAIM_ERROR_STATUS[e.code] ?? 500;
+      if (status >= 500) {
+        yield* Effect.logError(
+          `POST /${FAUCET_CLAIMS_ENDPOINT} - ${e.code}: ${e.message}`,
+        );
+      } else {
+        yield* Effect.logInfo(
+          `POST /${FAUCET_CLAIMS_ENDPOINT} - ${e.code}: ${e.message}`,
+        );
+      }
+      return yield* HttpServerResponse.json(
+        {
+          error: status >= 500 ? "Faucet request failed" : e.message,
+          code: e.code,
+          ...(e.nextEligibleAt
+            ? { nextEligibleAt: e.nextEligibleAt.toISOString() }
+            : {}),
+        },
+        { status },
+      );
+    }),
+  ),
+  Effect.catchAll((e) =>
+    failWith500("POST", FAUCET_CLAIMS_ENDPOINT, e, "Faucet request failed"),
+  ),
+);
+
+export const postFaucetClaimsHandlerForTesting = postFaucetClaimsHandler;
 export const postSubmitHandlerForTesting = postSubmitHandler;
 export const createResetHandlerForTesting = createResetHandler;
 export const createLockedActionHandlerForTesting = createLockedActionHandler;
@@ -853,6 +978,7 @@ const router = (
         `/${SUBMIT_ENDPOINT}`,
         postSubmitHandler(submitIngressConfig),
       ),
+      HttpRouter.post(`/${FAUCET_CLAIMS_ENDPOINT}`, postFaucetClaimsHandler),
     )
     .pipe(
       Effect.catchAllCause((cause) =>
@@ -894,6 +1020,7 @@ const apiIngressRouter = (
         `/${SUBMIT_ENDPOINT}`,
         postSubmitHandler(submitIngressConfig),
       ),
+      HttpRouter.post(`/${FAUCET_CLAIMS_ENDPOINT}`, postFaucetClaimsHandler),
     )
     .pipe(
       Effect.catchAllCause((cause) =>
