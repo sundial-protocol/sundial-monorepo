@@ -171,20 +171,30 @@ pub fn get_single_asset_from_value_apart_from_ada(
 
 /// For state UTxOs with specific policy IDs. Note that the address is not
 /// checked.
+fn authentic_input_and_asset_name(
+  inputs: List<Input>,
+  nft_policy_id: PolicyId,
+  input_index: Int,
+) -> (Input, AssetName) {
+  expect Some(
+    Input { output: Output { value: input_value, .. }, .. } as found_input,
+  ) = list.at(inputs, input_index)
+
+  expect (input_nft_policy_id, input_nft_asset_name, 1) =
+    get_single_asset_from_value_apart_from_ada(input_value)
+
+  expect input_nft_policy_id == nft_policy_id
+
+  (found_input, input_nft_asset_name)
+}
+
 pub fn get_authentic_input_with_policy_at(
   inputs: List<Input>,
   nft_policy_id: PolicyId,
   input_index: Int,
 ) -> Input {
-  expect Some(
-    Input { output: Output { value: input_value, .. }, .. } as found_input,
-  ) = list.at(inputs, input_index)
-
-  expect (input_nft_policy_id, _, 1) =
-    get_single_asset_from_value_apart_from_ada(input_value)
-
-  expect input_nft_policy_id == nft_policy_id
-
+  let (found_input, _) =
+    authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
   found_input
 }
 
@@ -196,14 +206,8 @@ pub fn get_authentic_input_asset_name_with_policy_at(
   nft_policy_id: PolicyId,
   input_index: Int,
 ) -> AssetName {
-  expect Some(Input { output: Output { value: input_value, .. }, .. }) =
-    list.at(inputs, input_index)
-
-  expect (input_nft_policy_id, input_nft_asset_name, 1) =
-    get_single_asset_from_value_apart_from_ada(input_value)
-
-  expect input_nft_policy_id == nft_policy_id
-
+  let (_, input_nft_asset_name) =
+    authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
   input_nft_asset_name
 }
 
@@ -213,15 +217,8 @@ pub fn get_authentic_input_and_asset_name_with_policy_at(
   input_index: Int,
   return: fn(Input, AssetName) -> result,
 ) -> result {
-  expect Some(
-    Input { output: Output { value: input_value, .. }, .. } as found_input,
-  ) = list.at(inputs, input_index)
-
-  expect (input_nft_policy_id, input_nft_asset_name, 1) =
-    get_single_asset_from_value_apart_from_ada(input_value)
-
-  expect input_nft_policy_id == nft_policy_id
-
+  let (found_input, input_nft_asset_name) =
+    authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
   return(found_input, input_nft_asset_name)
 }
 
@@ -233,19 +230,13 @@ pub fn get_authentic_input_datum_with_policy_at(
   nft_policy_id: PolicyId,
   input_index: Int,
 ) -> Data {
+  let (found_input, _) =
+    authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
+
   expect Some(Input {
-    output: Output {
-      value: input_value,
-      datum: InlineDatum(input_datum_data),
-      ..
-    },
+    output: Output { datum: InlineDatum(input_datum_data), .. },
     ..
-  }) = list.at(inputs, input_index)
-
-  expect (input_nft_policy_id, _, 1) =
-    get_single_asset_from_value_apart_from_ada(input_value)
-
-  expect input_nft_policy_id == nft_policy_id
+  }) = Some(found_input)
 
   input_datum_data
 }
@@ -258,19 +249,13 @@ pub fn get_authentic_input_datum_and_asset_name_with_policy_at(
   input_index: Int,
   return: fn(AssetName, Data) -> result,
 ) -> result {
+  let (found_input, input_nft_asset_name) =
+    authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
+
   expect Some(Input {
-    output: Output {
-      value: input_value,
-      datum: InlineDatum(input_datum_data),
-      ..
-    },
+    output: Output { datum: InlineDatum(input_datum_data), .. },
     ..
-  }) = list.at(inputs, input_index)
-
-  expect (input_nft_policy_id, input_nft_asset_name, 1) =
-    get_single_asset_from_value_apart_from_ada(input_value)
-
-  expect input_nft_policy_id == nft_policy_id
+  }) = Some(found_input)
 
   return(input_nft_asset_name, input_datum_data)
 }
@@ -282,15 +267,10 @@ pub fn get_authentic_input_with_nft_at(
   nft_asset_name: AssetName,
   input_index: Int,
 ) -> Input {
-  expect Some(
-    Input { output: Output { value: input_value, .. }, .. } as found_input,
-  ) = list.at(inputs, input_index)
+  let (found_input, input_nft_asset_name) =
+    authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
 
-  let input_nft_triplet =
-    get_single_asset_from_value_apart_from_ada(input_value)
-
-  expect input_nft_triplet == (nft_policy_id, nft_asset_name, 1)
-
+  expect input_nft_asset_name == nft_asset_name
   found_input
 }
 
@@ -303,20 +283,15 @@ pub fn get_authentic_input_datum_with_nft_at(
   nft_asset_name: AssetName,
   input_index: Int,
 ) -> Data {
+  let (found_input, input_nft_asset_name) =
+    authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
+
   expect Some(Input {
-    output: Output {
-      value: input_value,
-      datum: InlineDatum(input_datum_data),
-      ..
-    },
+    output: Output { datum: InlineDatum(input_datum_data), .. },
     ..
-  }) = list.at(inputs, input_index)
+  }) = Some(found_input)
 
-  let input_nft_triplet =
-    get_single_asset_from_value_apart_from_ada(input_value)
-
-  expect input_nft_triplet == (nft_policy_id, nft_asset_name, 1)
-
+  expect input_nft_asset_name == nft_asset_name
   input_datum_data
 }
 
