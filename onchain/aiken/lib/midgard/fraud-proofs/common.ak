@@ -387,8 +387,9 @@ pub fn verify_tx_in_state_queue_node_and_get_header(
   expect verify_tx_and_its_body(tx_id, tx, tx_body)
 
   // 2. Hub oracle must be provided as a reference input.
-  let hub.Datum { state_queue: state_queue_policy, .. } =
-    hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+  let state_queue_policy =
+    hub.get_datum_fields(reference_inputs, hub_oracle, hub_ref_input_index)
+      |> hub.state_queue_of
 
   let
     state_queue_datum,

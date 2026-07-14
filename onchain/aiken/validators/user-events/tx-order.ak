@@ -29,11 +29,10 @@ validator spend(hub_oracle: ScriptHash) {
       validity_override,
     } = redeemer
 
-    let hub.Datum {
-      tx_order: tx_order_policy_id,
-      settlement: settlement_policy_id,
-      ..
-    } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+    let hub_fields =
+      hub.get_datum_fields(reference_inputs, hub_oracle, hub_ref_input_index)
+    let tx_order_policy_id = hub_fields |> hub.tx_order_of
+    let settlement_policy_id = hub_fields |> hub.settlement_of
 
     let settlement.Datum { transactions_root, .. } =
       settlement.get_datum(
@@ -153,10 +152,7 @@ validator mint(hub_oracle: ScriptHash) {
     <-
       user_events.validate_mint(
         hub_oracle,
-        fn(hub_datum) {
-          let hub.Datum { tx_order_addr, .. } = hub_datum
-          tx_order_addr
-        },
+        fn(hub_fields) { hub_fields |> hub.tx_order_addr_of },
         redeemer,
         own_policy,
         tx,

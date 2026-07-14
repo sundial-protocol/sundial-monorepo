@@ -49,7 +49,7 @@ pub fn out_ref_to_nonce(out_ref: OutputReference) -> AssetName {
 
 pub fn validate_mint(
   hub_oracle: ScriptHash,
-  event_address_getter: fn(hub.Datum) -> Address,
+  event_address_getter: fn(List<Data>) -> Address,
   redeemer: MintRedeemer,
   own_policy: PolicyId,
   tx: Transaction,
@@ -72,11 +72,11 @@ pub fn validate_mint(
         ..
       } = tx
 
-      // Grab hub oracle datum.
-      let hub_datum =
-        hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+      // Grab hub oracle datum fields.
+      let hub_fields =
+        hub.get_datum_fields(reference_inputs, hub_oracle, hub_ref_input_index)
 
-      let event_address = event_address_getter(hub_datum)
+      let event_address = event_address_getter(hub_fields)
 
       authenticate_new_event(
         event_address,
