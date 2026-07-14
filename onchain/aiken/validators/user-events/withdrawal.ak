@@ -35,13 +35,12 @@ validator spend(hub_oracle: ScriptHash) {
       purpose,
     } = redeemer
 
-    let hub.Datum {
-      withdrawal: withdrawal_policy_id,
-      settlement: settlement_policy_id,
-      payout: payout_policy_id,
-      payout_addr,
-      ..
-    } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+    let hub_fields =
+      hub.get_datum_fields(reference_inputs, hub_oracle, hub_ref_input_index)
+    let withdrawal_policy_id = hub_fields |> hub.withdrawal_of
+    let settlement_policy_id = hub_fields |> hub.settlement_of
+    let payout_policy_id = hub_fields |> hub.payout_of
+    let payout_addr = hub_fields |> hub.payout_addr_of
 
     let settlement.Datum { withdrawals_root, .. } =
       settlement.get_datum(
@@ -220,10 +219,7 @@ validator mint(hub_oracle: ScriptHash) {
     <-
       user_events.validate_mint(
         hub_oracle,
-        fn(hub_datum) {
-          let hub.Datum { withdrawal_addr, .. } = hub_datum
-          withdrawal_addr
-        },
+        fn(hub_fields) { hub_fields |> hub.withdrawal_addr_of },
         redeemer,
         own_policy,
         tx,
