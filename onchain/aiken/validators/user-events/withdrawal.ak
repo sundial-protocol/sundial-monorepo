@@ -109,8 +109,15 @@ validator spend(hub_oracle: ScriptHash) {
           )
         expect withdrawal_utxo_out_ref == own_out_ref
 
-        let Pair(withdrawal_event_id, withdrawal_event_info) =
-          ledger_state.unsafe_event_to_key_value_pair(withdrawal_event)
+        // The datum is already fully decoded at script entry, so its `id` and
+        // `info` fields are used directly rather than re-parsing them from
+        // `Data`.
+        let ledger_state.WithdrawalEvent {
+          id: withdrawal_id,
+          info: withdrawal_event_info,
+        } = withdrawal_event
+        let withdrawal_event_id: Data = withdrawal_id
+        let withdrawal_event_info_data: Data = withdrawal_event_info
 
         // 5. Initiation of a payout accumulator can only happen for valid
         //    withdrawals.
@@ -126,7 +133,7 @@ validator spend(hub_oracle: ScriptHash) {
           plutarch_phas(
             withdrawals_root,
             withdrawal_event_id,
-            withdrawal_event_info,
+            withdrawal_event_info_data,
             membership_proof,
             redeemers,
             inclusion_proof_script_withdraw_redeemer_index,
@@ -164,11 +171,14 @@ validator spend(hub_oracle: ScriptHash) {
         // 5. For refunding invalid withdrawal orders, they must be included
         //    in the settlement's tree with the same invalidity provided via
         //    the redeemer.
-        let Pair(withdrawal_event_id, withdrawal_event_info) =
-          ledger_state.unsafe_event_to_key_value_pair(withdrawal_event)
-        //
-        expect coerced_withdrawal_info: ledger_state.WithdrawalInfo =
-          withdrawal_event_info
+        // The datum is already fully decoded at script entry, so its `id` and
+        // `info` fields are used directly rather than re-parsing them from
+        // `Data`.
+        let ledger_state.WithdrawalEvent {
+          id: withdrawal_id,
+          info: coerced_withdrawal_info,
+        } = withdrawal_event
+        let withdrawal_event_id: Data = withdrawal_id
         //
         let overridden_withdrawal_info: Data =
           ledger_state.WithdrawalInfo {
