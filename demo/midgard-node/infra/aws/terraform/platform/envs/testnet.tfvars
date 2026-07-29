@@ -17,7 +17,7 @@ ecs_host_ebs_size_gb       = 30
 ecs_desired_count          = 2
 ecs_min_size               = 2
 ecs_max_size               = 2
-enable_ecs_services        = false
+enable_ecs_services        = true
 enable_https_listener      = true
 sundial_node_image         = "000000000000.dkr.ecr.us-west-2.amazonaws.com/sundial/sundial-node:testnet-latest"
 sundial_node_desired_count = 1
@@ -41,7 +41,7 @@ loki_retention_days  = 3
 
 # Faucet wallet. Flip faucet_enabled to true once the faucet-seed-phrase and
 # faucet-api-key secrets exist in Secrets Manager under sundial-node/testnet/.
-faucet_enabled                     = false
+faucet_enabled                     = true
 faucet_amount_lovelace             = "100000000"
 faucet_cooldown_seconds            = 86400
 faucet_daily_ip_limit              = 5
