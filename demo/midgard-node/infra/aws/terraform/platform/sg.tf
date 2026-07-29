@@ -77,13 +77,40 @@ resource "aws_vpc_security_group_egress_rule" "sg_alb_egress_ecs_dynamic" {
   description                  = "ALB to ECS dynamic ports"
 }
 
+resource "aws_vpc_security_group_egress_rule" "sg_alb_egress_ecs_node_port" {
+  security_group_id            = aws_security_group.sg_alb.id
+  referenced_security_group_id = aws_security_group.sg_ecs.id
+  from_port                    = var.sundial_node_container_port
+  to_port                      = var.sundial_node_container_port
+  ip_protocol                  = "tcp"
+  description                  = "ALB to ECS sundial-node fixed HTTP port"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "sg_ecs_ingress_from_alb" {
   security_group_id            = aws_security_group.sg_ecs.id
   referenced_security_group_id = aws_security_group.sg_alb.id
   from_port                    = 32768
   to_port                      = 65535
   ip_protocol                  = "tcp"
-  description                  = "ALB forwarded requests and health checks"
+  description                  = "ALB forwarded requests and health checks (dynamic ports)"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "sg_ecs_ingress_from_alb_node_port" {
+  security_group_id            = aws_security_group.sg_ecs.id
+  referenced_security_group_id = aws_security_group.sg_alb.id
+  from_port                    = var.sundial_node_container_port
+  to_port                      = var.sundial_node_container_port
+  ip_protocol                  = "tcp"
+  description                  = "ALB forwarded requests and health checks (sundial-node fixed port)"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "sg_ecs_ingress_prometheus_from_ecs" {
+  security_group_id            = aws_security_group.sg_ecs.id
+  referenced_security_group_id = aws_security_group.sg_ecs.id
+  from_port                    = 9090
+  to_port                      = 9090
+  ip_protocol                  = "tcp"
+  description                  = "Inter-task Prometheus access (fixed port)"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "sg_ecs_ingress_metrics_from_ecs" {

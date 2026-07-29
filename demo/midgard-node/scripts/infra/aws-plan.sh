@@ -10,7 +10,7 @@ Usage: ./scripts/infra/aws-plan.sh [options]
 
 Options:
   --environment=testnet          Deployment environment (default: testnet)
-  --service=<sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|shared|rds>
+  --service=<sundial-node|prometheus|loki|alloy|grafana|postgres-exporter|obs|shared|rds|data-tier>
                        Optional targeted service selector
   --help               Show this message
 USAGE
@@ -108,11 +108,19 @@ terraform_targets_for_service() {
         "aws_db_parameter_group.main" \
         "aws_db_instance.main"
       ;;
+    data-tier)
+      printf '%s\n' \
+        "aws_db_subnet_group.main" \
+        "aws_db_parameter_group.main" \
+        "aws_db_instance.main" \
+        "aws_elasticache_subnet_group.redis" \
+        "aws_elasticache_cluster.redis"
+      ;;
     shared)
       return 0
       ;;
     *)
-      fail "--service must be one of: sundial-node prometheus loki alloy grafana postgres-exporter obs shared rds"
+      fail "--service must be one of: sundial-node prometheus loki alloy grafana postgres-exporter obs shared rds data-tier"
       ;;
   esac
 }

@@ -31,12 +31,13 @@ die() {
 
 usage() {
   cat <<'USAGE' >&2
-Usage: ./scripts/infra/aws-bootstrap.sh <state|ecr|secrets> [options]
+Usage: ./scripts/infra/aws-bootstrap.sh <state|ecr|secrets|grafana-assets> [options]
 
 Commands:
-  state      Ensure Terraform S3 backend + DynamoDB lock table exist
-  ecr        Ensure ECR repository exists and push the sundial-node image
-  secrets    Ensure bootstrap Secrets Manager entries exist
+  state           Ensure Terraform S3 backend + DynamoDB lock table exist
+  ecr             Ensure ECR repository exists and push the sundial-node image
+  secrets         Ensure bootstrap Secrets Manager entries exist
+  grafana-assets  Upload Grafana provisioning files (dashboard.json) to S3
 
 Options:
   --environment=testnet         Deployment environment (default: testnet)
@@ -486,6 +487,10 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    --)
+      shift
+      break
+      ;;
     *)
       die "unknown argument: $1"
       ;;
@@ -494,7 +499,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "${ACTION}" in
-  state|ecr|secrets) ;;
+  state|ecr|secrets|grafana-assets) ;;
   *)
     usage
     exit 1
@@ -519,6 +524,29 @@ export AWS_SDK_LOAD_CONFIG="${AWS_SDK_LOAD_CONFIG:-1}"
 
 log "action=${ACTION} environment=${ENVIRONMENT} platform_region=${AWS_PLATFORM_REGION} image_tag=${IMAGE_TAG} image_latest_tag=${IMAGE_LATEST_TAG:-disabled}"
 
+ensure_grafana_assets() {
+  require_command aws
+  local bucket="sundial-node-${ENVIRONMENT}-grafana-assets"
+  local grafana_dir="${ROOT_DIR}/grafana"
+
+  [[ -d "${grafana_dir}" ]] || die "grafana directory not found: ${grafana_dir}"
+
+  local dashboard_json="${grafana_dir}/dashboard.json"
+  [[ -f "${dashboard_json}" ]] || die "dashboard.json not found: ${dashboard_json}"
+
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    log "[dry-run] aws s3 cp ${dashboard_json} s3://${bucket}/dashboard.json --region ${AWS_PLATFORM_REGION}"
+    return 0
+  fi
+
+  if ! aws s3api head-bucket --bucket "${bucket}" --region "${AWS_PLATFORM_REGION}" >/dev/null 2>&1; then
+    die "grafana assets bucket does not exist: ${bucket} — run tofu apply first"
+  fi
+
+  aws s3 cp "${dashboard_json}" "s3://${bucket}/dashboard.json" --region "${AWS_PLATFORM_REGION}"
+  log "uploaded dashboard.json to s3://${bucket}/dashboard.json"
+}
+
 case "${ACTION}" in
   state)
     require_command aws
@@ -530,6 +558,9 @@ case "${ACTION}" in
     ;;
   secrets)
     ensure_secrets
+    ;;
+  grafana-assets)
+    ensure_grafana_assets
     ;;
 esac
 

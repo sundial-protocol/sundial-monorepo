@@ -15,6 +15,12 @@ resource "aws_db_parameter_group" "main" {
     name  = "log_min_duration_statement"
     value = "1000"
   }
+
+  parameter {
+    name         = "rds.force_ssl"
+    value        = "0"
+    apply_method = "pending-reboot"
+  }
 }
 
 resource "aws_db_instance" "main" {
