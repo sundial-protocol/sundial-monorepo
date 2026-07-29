@@ -9,7 +9,11 @@ import * as DBInitialization from "@/database/init.js";
 import * as MempoolDB from "@/database/mempool.js";
 import * as MempoolLedgerDB from "@/database/mempoolLedger.js";
 import { txQueueProcessorAction } from "@/fibers/tx-queue-processor.js";
-import { TxIngressQueue, TxIngressQueueService } from "@/services/index.js";
+import {
+  TxIngressQueue,
+  TxIngressQueueService,
+  type TxIngressMessage,
+} from "@/services/index.js";
 
 const makeQueueStub = (
   messages: ReadonlyArray<{
@@ -19,7 +23,9 @@ const makeQueueStub = (
   }>,
 ) => {
   const ackSpy = vi.fn((ids: readonly string[]) => Effect.succeed(ids.length));
-  const failedSpy = vi.fn(() => Effect.succeed("retry" as const));
+  const failedSpy = vi.fn((_message: TxIngressMessage, _reason: string) =>
+    Effect.succeed("retry" as const),
+  );
 
   const queue: TxIngressQueueService = {
     enqueue: (_txCbor: string) => Effect.succeed("1-0"),
@@ -100,5 +106,37 @@ describe("tx ingress processor integration", () => {
       expect(ackSpy).toHaveBeenCalledWith(["200-0", "201-0"]);
       expect(failedSpy).not.toHaveBeenCalled();
     }).pipe(Effect.provide(makeBaseLayer())),
+  );
+
+  it.effect(
+    "does not persist or ack an ingress message that fails validation",
+    () =>
+      Effect.gen(function* () {
+        const { queue, ackSpy, failedSpy } = makeQueueStub([
+          {
+            id: "300-0",
+            txCbor: txCborA.toString("hex"),
+            deliveryCount: 1,
+          },
+        ]);
+
+        yield* DBInitialization.program;
+        // Intentionally do NOT seed the ledger, so txCborA spends an input that
+        // does not exist and Phase B rejects it.
+
+        yield* txQueueProcessorAction(10, 4, 1, true).pipe(
+          Effect.provideService(TxIngressQueue, queue),
+        );
+
+        const count = yield* MempoolDB.retrieveTxCount;
+        expect(count).toBe(0n);
+        expect(ackSpy).not.toHaveBeenCalled();
+        expect(failedSpy).toHaveBeenCalledTimes(1);
+        // The structured validation reason is propagated to the failure handler
+        // (which decides retry vs dead-letter).
+        const [failedMessage, failureReason] = failedSpy.mock.calls[0]!;
+        expect(failedMessage.id).toBe("300-0");
+        expect(failureReason).toContain("E_INPUT_NOT_FOUND");
+      }).pipe(Effect.provide(makeBaseLayer())),
   );
 });

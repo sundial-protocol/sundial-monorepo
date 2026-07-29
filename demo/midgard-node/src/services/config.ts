@@ -28,6 +28,8 @@ type NodeConfigDep = {
   COMMITMENT_WINDOW_WARN_TX_REQUESTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: number;
   COMMITMENT_WINDOW_WARN_TOTAL_BYTES: number;
+  COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK: number;
+  COMMITMENT_MAX_WAIT_MS: number;
   COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: number;
   TX_QUEUE_DRAIN_BATCH_SIZE: number;
   TX_QUEUE_CONSUMER_WORKER_COUNT: number;
@@ -53,6 +55,14 @@ type NodeConfigDep = {
   MEMPOOL_MPT_DB_PATH: string;
   LUCID_INIT_MAX_RETRIES: number;
   GENESIS_UTXOS: UTxO[];
+  FAUCET_ENABLED: boolean;
+  FAUCET_SEED_PHRASE: string;
+  FAUCET_API_KEY: string;
+  FAUCET_ADDRESS: string;
+  FAUCET_AMOUNT_LOVELACE: bigint;
+  FAUCET_COOLDOWN_SECONDS: number;
+  FAUCET_DAILY_IP_LIMIT: number;
+  FAUCET_MIN_BALANCE_LOVELACE: bigint;
 };
 
 const makeConfig = Effect.gen(function* () {
@@ -143,6 +153,12 @@ const makeConfig = Effect.gen(function* () {
   const commitmentWindowWarnTotalBytes = yield* Config.integer(
     "COMMITMENT_WINDOW_WARN_TOTAL_BYTES",
   ).pipe(Config.withDefault(20_000_000));
+  const commitmentMinTxRequestsPerBlock = yield* Config.integer(
+    "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
+  ).pipe(Config.withDefault(1));
+  const commitmentMaxWaitMs = yield* Config.integer(
+    "COMMITMENT_MAX_WAIT_MS",
+  ).pipe(Config.withDefault(0));
   const commitmentMaxTxRequestsPerBlock = yield* Config.integer(
     "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
   ).pipe(Config.withDefault(2_000));
@@ -224,6 +240,122 @@ const makeConfig = Effect.gen(function* () {
   const seedB = yield* Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_B");
   const seedC = yield* Config.string("TESTNET_GENESIS_WALLET_SEED_PHRASE_C");
 
+  // ---------------------------------------------------------------------------
+  // Faucet wallet
+  //
+  // A dedicated, genesis-funded wallet that the (forthcoming) faucet service
+  // spends from to hand out L2 test ADA. The seed phrase and API key are
+  // sensitive and must come from AWS Secrets Manager in production; they must
+  // NOT reuse a genesis or operator seed. The remaining knobs stay
+  // server-configurable so claim economics can be tuned without a redeploy.
+  // ---------------------------------------------------------------------------
+  const parseLovelace = (name: string, raw: string) =>
+    Effect.try({
+      try: () => BigInt(raw),
+      catch: () =>
+        new ConfigError({
+          message: `Config field must be an integer number of lovelace: ${name}`,
+          cause: undefined,
+          fieldsAndValues: [[name, raw]],
+        }),
+    });
+
+  const faucetEnabled = yield* Config.boolean("FAUCET_ENABLED").pipe(
+    Config.withDefault(false),
+  );
+  const faucetSeedPhrase = yield* Config.string("FAUCET_SEED_PHRASE").pipe(
+    Config.withDefault(""),
+  );
+  const faucetApiKey = yield* Config.string("FAUCET_API_KEY").pipe(
+    Config.withDefault(""),
+  );
+  const faucetAmountLovelace = yield* Config.string(
+    "FAUCET_AMOUNT_LOVELACE",
+  ).pipe(
+    Config.withDefault("100000000"),
+    Effect.flatMap((raw) => parseLovelace("FAUCET_AMOUNT_LOVELACE", raw)),
+  );
+  const faucetCooldownSeconds = yield* Config.integer(
+    "FAUCET_COOLDOWN_SECONDS",
+  ).pipe(Config.withDefault(86_400));
+  const faucetDailyIpLimit = yield* Config.integer(
+    "FAUCET_DAILY_IP_LIMIT",
+  ).pipe(Config.withDefault(5));
+  const faucetMinBalanceLovelace = yield* Config.string(
+    "FAUCET_MIN_BALANCE_LOVELACE",
+  ).pipe(
+    Config.withDefault("100000000"),
+    Effect.flatMap((raw) => parseLovelace("FAUCET_MIN_BALANCE_LOVELACE", raw)),
+  );
+  const faucetGenesisAllocationLovelace = yield* Config.string(
+    "FAUCET_GENESIS_ALLOCATION_LOVELACE",
+  ).pipe(
+    Config.withDefault("10000000000000"), // ~10,000,000 L2 test ADA
+    Effect.flatMap((raw) =>
+      parseLovelace("FAUCET_GENESIS_ALLOCATION_LOVELACE", raw),
+    ),
+  );
+
+  if (faucetEnabled) {
+    if (isProduction && faucetSeedPhrase.trim() === "") {
+      yield* Effect.fail(
+        new ConfigError({
+          message:
+            "FAUCET_SEED_PHRASE is required when FAUCET_ENABLED=true in production",
+          cause: undefined,
+          fieldsAndValues: [["FAUCET_SEED_PHRASE", "<missing>"]],
+        }),
+      );
+    }
+    if (isProduction && faucetApiKey.trim() === "") {
+      yield* Effect.fail(
+        new ConfigError({
+          message:
+            "FAUCET_API_KEY is required when FAUCET_ENABLED=true in production",
+          cause: undefined,
+          fieldsAndValues: [["FAUCET_API_KEY", "<missing>"]],
+        }),
+      );
+    }
+    if (
+      faucetSeedPhrase.trim() !== "" &&
+      (faucetSeedPhrase.trim() === seedA.trim() ||
+        faucetSeedPhrase.trim() === seedB.trim() ||
+        faucetSeedPhrase.trim() === seedC.trim() ||
+        faucetSeedPhrase.trim() === operatorSeedPhrase.trim())
+    ) {
+      yield* Effect.fail(
+        new ConfigError({
+          message:
+            "FAUCET_SEED_PHRASE must not reuse a genesis or operator seed phrase",
+          cause: undefined,
+          fieldsAndValues: [["FAUCET_SEED_PHRASE", "<reused>"]],
+        }),
+      );
+    }
+  }
+
+  // The faucet is funded the same way as the other genesis wallets: a single
+  // large UTxO at its own address, only on testnet and only when configured.
+  const faucetAddress =
+    faucetEnabled && faucetSeedPhrase.trim() !== ""
+      ? walletFromSeed(faucetSeedPhrase, { network }).address
+      : "";
+  const faucetGenesisUtxos: UTxO[] =
+    faucetEnabled && faucetAddress !== "" && network !== "Mainnet"
+      ? [
+          {
+            txHash:
+              "fa0ce700fa0ce700fa0ce700fa0ce700fa0ce700fa0ce700fa0ce700fa0ce700",
+            outputIndex: 0,
+            address: faucetAddress,
+            assets: {
+              lovelace: faucetGenesisAllocationLovelace,
+            },
+          },
+        ]
+      : [];
+
   const genesisUtxos: UTxO[] = [
     {
       txHash:
@@ -285,6 +417,7 @@ const makeConfig = Effect.gen(function* () {
         //   BigInt("15"),
       },
     },
+    ...faucetGenesisUtxos,
   ];
 
   const assertPositiveInteger = (fieldName: string, value: number) =>
@@ -308,6 +441,41 @@ const makeConfig = Effect.gen(function* () {
             fieldsAndValues: [[fieldName, String(value)]],
           }),
         );
+
+  const assertPositiveBigInt = (fieldName: string, value: bigint) =>
+    value > 0n
+      ? Effect.void
+      : Effect.fail(
+          new ConfigError({
+            message: `Config field must be a positive integer: ${fieldName}`,
+            cause: undefined,
+            fieldsAndValues: [[fieldName, String(value)]],
+          }),
+        );
+
+  const assertNonNegativeBigInt = (fieldName: string, value: bigint) =>
+    value >= 0n
+      ? Effect.void
+      : Effect.fail(
+          new ConfigError({
+            message: `Config field must be a non-negative integer: ${fieldName}`,
+            cause: undefined,
+            fieldsAndValues: [[fieldName, String(value)]],
+          }),
+        );
+
+  if (faucetEnabled) {
+    yield* assertPositiveBigInt("FAUCET_AMOUNT_LOVELACE", faucetAmountLovelace);
+    yield* assertNonNegativeBigInt(
+      "FAUCET_MIN_BALANCE_LOVELACE",
+      faucetMinBalanceLovelace,
+    );
+    yield* assertPositiveInteger(
+      "FAUCET_COOLDOWN_SECONDS",
+      faucetCooldownSeconds,
+    );
+    yield* assertPositiveInteger("FAUCET_DAILY_IP_LIMIT", faucetDailyIpLimit);
+  }
 
   yield* assertPositiveInteger(
     "TX_QUEUE_DRAIN_BATCH_SIZE",
@@ -345,9 +513,36 @@ const makeConfig = Effect.gen(function* () {
     commitmentWindowWarnTotalBytes,
   );
   yield* assertPositiveInteger(
+    "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
+    commitmentMinTxRequestsPerBlock,
+  );
+  yield* assertNonNegativeInteger(
+    "COMMITMENT_MAX_WAIT_MS",
+    commitmentMaxWaitMs,
+  );
+  yield* assertPositiveInteger(
     "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
     commitmentMaxTxRequestsPerBlock,
   );
+  if (commitmentMinTxRequestsPerBlock > commitmentMaxTxRequestsPerBlock) {
+    yield* Effect.fail(
+      new ConfigError({
+        message:
+          "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK must be less than or equal to COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+        cause: undefined,
+        fieldsAndValues: [
+          [
+            "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
+            String(commitmentMinTxRequestsPerBlock),
+          ],
+          [
+            "COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+            String(commitmentMaxTxRequestsPerBlock),
+          ],
+        ],
+      }),
+    );
+  }
   yield* assertNonNegativeInteger(
     "COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG",
     commitmentMaxUnsubmittedBlockBacklog,
@@ -387,6 +582,8 @@ const makeConfig = Effect.gen(function* () {
     COMMITMENT_WINDOW_WARN_TX_REQUESTS: commitmentWindowWarnTxRequests,
     COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: commitmentWindowWarnTotalEvents,
     COMMITMENT_WINDOW_WARN_TOTAL_BYTES: commitmentWindowWarnTotalBytes,
+    COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK: commitmentMinTxRequestsPerBlock,
+    COMMITMENT_MAX_WAIT_MS: commitmentMaxWaitMs,
     COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: commitmentMaxTxRequestsPerBlock,
     TX_QUEUE_DRAIN_BATCH_SIZE: txQueueDrainBatchSize,
     TX_QUEUE_CONSUMER_WORKER_COUNT: txQueueConsumerWorkerCount,
@@ -412,6 +609,14 @@ const makeConfig = Effect.gen(function* () {
     MEMPOOL_MPT_DB_PATH: mempoolMptDbPath,
     LUCID_INIT_MAX_RETRIES: lucidInitMaxRetries,
     GENESIS_UTXOS: network === "Mainnet" ? [] : genesisUtxos,
+    FAUCET_ENABLED: faucetEnabled,
+    FAUCET_SEED_PHRASE: faucetSeedPhrase,
+    FAUCET_API_KEY: faucetApiKey,
+    FAUCET_ADDRESS: faucetAddress,
+    FAUCET_AMOUNT_LOVELACE: faucetAmountLovelace,
+    FAUCET_COOLDOWN_SECONDS: faucetCooldownSeconds,
+    FAUCET_DAILY_IP_LIMIT: faucetDailyIpLimit,
+    FAUCET_MIN_BALANCE_LOVELACE: faucetMinBalanceLovelace,
   };
 }).pipe(
   Effect.mapError((e) =>

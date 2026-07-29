@@ -53,6 +53,8 @@ out/
 .turbo/
 .pnp
 .pnp.js
+.pnpm-store/
+
 
 # local env overrides
 .env.local

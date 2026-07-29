@@ -11,6 +11,30 @@ import { CML, TxBuilder, UTxO, utxoToCore } from "@lucid-evolution/lucid";
 import { DatabaseError } from "@/database/utils/common.js";
 import { handleSignSubmit } from "@/transactions/utils.js";
 
+// Midgard only supports Conway-format (post-Alonzo) transaction outputs, and
+// the mempool acceptance validator decodes the ledger pre-state with that
+// invariant. Lucid's `utxoToCore` emits legacy-format outputs for simple
+// address+value UTxOs, so genesis seeds must be re-encoded to Conway format
+// before they are persisted; otherwise the validator cannot decode the
+// pre-state and no mempool transaction is ever accepted.
+const toConwayFormatOutputCbor = (
+  output: CML.TransactionOutput,
+): Uint8Array => {
+  if (output.kind() === CML.TransactionOutputKind.ConwayFormatTxOut) {
+    return output.to_cbor_bytes();
+  }
+  const conway = CML.ConwayFormatTxOut.new(output.address(), output.amount());
+  const datum = output.datum();
+  if (datum !== undefined) {
+    conway.set_datum_option(datum);
+  }
+  const scriptRef = output.script_ref();
+  if (scriptRef !== undefined) {
+    conway.set_script_reference(scriptRef);
+  }
+  return CML.TransactionOutput.new_conway_format_tx_out(conway).to_cbor_bytes();
+};
+
 const insertGenesisUtxos: Effect.Effect<
   void,
   DatabaseError,
@@ -28,7 +52,9 @@ const insertGenesisUtxos: Effect.Effect<
     return {
       [Ledger.Columns.TX_ID]: Buffer.from(utxo.txHash, "hex"),
       [Ledger.Columns.OUTREF]: Buffer.from(core.input().to_cbor_bytes()),
-      [Ledger.Columns.OUTPUT]: Buffer.from(core.output().to_cbor_bytes()),
+      [Ledger.Columns.OUTPUT]: Buffer.from(
+        toConwayFormatOutputCbor(core.output()),
+      ),
       [Ledger.Columns.ADDRESS]: utxo.address,
     };
   });

@@ -15,7 +15,7 @@ services:
       logging_jobname: "containerlogs"
     command:
       - node
-      - ./dist/index.js
+      - ./dist/index.cjs
       - listen
     ports:
       - "3000:3000" # api server

@@ -2,7 +2,7 @@
 
 ## 📋 Executive Summary
 
-This report summarizes three scalability benchmark executions for Sundial/Midgard at Git commit `e0b938c463b081b4cb7e3a7ab2a0634dc8efe689`. The runs were executed with the scalability harness under `demo/midgard-manager/packages/scalability-harness/benchmark-runs` and evaluated against the execution model, metrics, and acceptance criteria defined in [`internal-docs/scalability-stress-test-report.md`](https://github.com/sundial-protocol/internal-docs/blob/main/scalability-stress-test-report.md).
+This report summarizes three scalability benchmark executions for Sundial/Sundial at Git commit `e0b938c463b081b4cb7e3a7ab2a0634dc8efe689`. The runs were executed with the scalability harness under `midgard-manager/packages/scalability-harness/benchmark-runs` and evaluated against the execution model, metrics, and acceptance criteria defined in [`internal-docs/scalability-stress-test-report.md`](https://github.com/sundial-protocol/internal-docs/blob/main/scalability-stress-test-report.md).
 
 The evidence shows that the node accepted high L2 submission volume and completed short-window stepped tiers up to a nominal `800 TPS` target. However, the formal 30-minute `800 TPS` replay failed. During that run, the node durably accepted `1,858,055` transactions but committed only `787,733` before the recovery window ended, leaving `1,664,382` transactions in the mempool and recording `2` commitment failures. Under the plan's classification rules, the overall result is **Failed 🚫** for initial `800 TPS` sustained validation.
 
@@ -23,18 +23,18 @@ The plan explicitly distinguishes enqueued submissions, durable mempool acceptan
 
 ## 🔬 Test Scope
 
-| Field               | Value                                                                                                       |
-| :------------------ | :---------------------------------------------------------------------------------------------------------- |
-| System under test   | Sundial/Midgard node through the scalability harness                                                        |
-| Commit under test   | `e0b938c463b081b4cb7e3a7ab2a0634dc8efe689`                                                                  |
-| Transaction profile | `one-to-one`                                                                                                |
-| L1 provider mode    | `emulator`                                                                                                  |
-| Wallet mode         | `test-wallet`                                                                                               |
-| Node endpoint       | `http://localhost:3000`                                                                                     |
-| Prometheus endpoint | `http://localhost:9090`                                                                                     |
-| Host                | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM                                                                       |
-| Harness version     | `0.1.0`                                                                                                     |
-| Evidence directory  | `demo/midgard-manager/packages/scalability-harness/benchmark-runs/e0b938c463b081b4cb7e3a7ab2a0634dc8efe689` |
+| Field               | Value                                                                                                  |
+| :------------------ | :----------------------------------------------------------------------------------------------------- |
+| System under test   | Sundial/Sundial node through the scalability harness                                                   |
+| Commit under test   | `e0b938c463b081b4cb7e3a7ab2a0634dc8efe689`                                                             |
+| Transaction profile | `one-to-one`                                                                                           |
+| L1 provider mode    | `emulator`                                                                                             |
+| Wallet mode         | `test-wallet`                                                                                          |
+| Node endpoint       | `http://localhost:3000`                                                                                |
+| Prometheus endpoint | `http://localhost:9090`                                                                                |
+| Host                | `dev3` Linux x64, 6 CPUs, 31.0 GB RAM                                                                  |
+| Harness version     | `0.1.0`                                                                                                |
+| Evidence directory  | `midgard-manager/packages/scalability-harness/benchmark-runs/e0b938c463b081b4cb7e3a7ab2a0634dc8efe689` |
 
 ## 🏃 Executed Runs
 

@@ -40,6 +40,10 @@ export default defineConfig({
         demoRoot,
         "midgard-node/tests/integration/stubs/lucid.stub.ts",
       ),
+      "@dcspark/cardano-multiplatform-lib-nodejs": path.resolve(
+        demoRoot,
+        "midgard-ts/node_modules/@dcspark/cardano-multiplatform-lib-nodejs/cardano_multiplatform_lib.js",
+      ),
       // Source alias — maps @/* imports to the midgard-node src tree.
       "@": path.resolve(demoRoot, "midgard-node/src"),
     },

@@ -1,6 +1,7 @@
 export * from "./always-succeeds.js";
 export * from "./config.js";
 export * from "./database.js";
+export * as Faucet from "./faucet.js";
 export * from "./globals.js";
 export * from "./lucid.js";
 export * from "./tx-ingress-queue.js";

@@ -133,10 +133,11 @@ export function detectCollapse(inputs: CollapseInputs): CollapseResult | null {
 
   if (stopConditions.stopOnMergeFailure) {
     const delta = inputs.mergeFailuresDelta;
-    if (delta !== null && delta > 0) {
+    const maxMergeFailureCount = stopConditions.maxMergeFailureCount ?? 0;
+    if (delta !== null && delta > maxMergeFailureCount) {
       return {
         reason: 'merge_failures',
-        values: { mergeFailuresDelta: delta },
+        values: { mergeFailuresDelta: delta, maxMergeFailureCount },
       };
     }
   }

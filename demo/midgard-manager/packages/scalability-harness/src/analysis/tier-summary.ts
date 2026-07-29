@@ -137,6 +137,45 @@ function deriveL1FeePerCommittedL2Tx(
   return l1CommitmentFeesDeltaLovelace / committedTxDelta;
 }
 
+function deriveLastL1CommitmentFeeLovelace(metricWindow: TierMetricWindow | null): number | null {
+  if (metricWindow === null) return null;
+
+  const atLoadStop = metricWindow.afterLoad['l1_commitment_fee_lovelace_last'] ?? null;
+  if (atLoadStop !== null) {
+    return atLoadStop;
+  }
+
+  const loadStopSeconds = new Date(metricWindow.stoppedAt).getTime() / 1000;
+  const rangeSeries = metricWindow.ranges['l1_commitment_fee_lovelace_last'] ?? [];
+  let latestAtOrBeforeLoadStop: { ts: number; value: number } | null = null;
+  let earliestAfterLoadStop: { ts: number; value: number } | null = null;
+
+  for (const series of rangeSeries) {
+    for (const [ts, rawValue] of series.values) {
+      const value = Number.parseFloat(rawValue);
+      if (!Number.isFinite(value)) continue;
+
+      if (ts <= loadStopSeconds) {
+        if (latestAtOrBeforeLoadStop === null || ts > latestAtOrBeforeLoadStop.ts) {
+          latestAtOrBeforeLoadStop = { ts, value };
+        }
+      } else if (earliestAfterLoadStop === null || ts < earliestAfterLoadStop.ts) {
+        earliestAfterLoadStop = { ts, value };
+      }
+    }
+  }
+
+  if (latestAtOrBeforeLoadStop !== null) {
+    return latestAtOrBeforeLoadStop.value;
+  }
+
+  if (earliestAfterLoadStop !== null) {
+    return earliestAfterLoadStop.value;
+  }
+
+  return metricWindow.afterRecovery['l1_commitment_fee_lovelace_last'] ?? null;
+}
+
 function deriveFinalGaugeDeltaAfterRecovery(
   metricWindow: TierMetricWindow | null,
   query: string
@@ -193,8 +232,7 @@ export function buildTierSummary(input: TierSummaryInput): TierSummary {
     metricWindow,
     'l1_commitment_fees_lovelace_total'
   );
-  const l1CommitmentFeeLastLovelace =
-    metricWindow?.afterLoad['l1_commitment_fee_lovelace_last'] ?? null;
+  const l1CommitmentFeeLastLovelace = deriveLastL1CommitmentFeeLovelace(metricWindow);
 
   const queueGauge = lookupGauge(gaugeSummaries, 'tx_stream_depth');
   const mempoolGauge = lookupGauge(gaugeSummaries, 'mempool_tx_count');

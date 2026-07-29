@@ -222,6 +222,50 @@ variable "private_dns_namespace_name" {
   default     = "sundial-node.local"
 }
 
+# ---------------------------------------------------------------------------
+# Faucet wallet
+#
+# When enabled, the node reads FAUCET_SEED_PHRASE and FAUCET_API_KEY from
+# AWS Secrets Manager (sundial-node/<env>/faucet-seed-phrase and
+# .../faucet-api-key) and funds a dedicated faucet wallet at genesis. The
+# non-secret economic knobs below are passed as plain task environment.
+# ---------------------------------------------------------------------------
+variable "faucet_enabled" {
+  description = "Enable the dedicated, genesis-funded faucet wallet."
+  type        = bool
+  default     = false
+}
+
+variable "faucet_amount_lovelace" {
+  description = "Lovelace paid out per successful faucet claim."
+  type        = string
+  default     = "100000000"
+}
+
+variable "faucet_cooldown_seconds" {
+  description = "Minimum seconds between successful claims for the same address."
+  type        = number
+  default     = 86400
+}
+
+variable "faucet_daily_ip_limit" {
+  description = "Maximum successful claims per hashed IP per 24h."
+  type        = number
+  default     = 5
+}
+
+variable "faucet_min_balance_lovelace" {
+  description = "Faucet is reported depleted once its balance falls below this."
+  type        = string
+  default     = "100000000"
+}
+
+variable "faucet_genesis_allocation_lovelace" {
+  description = "Lovelace funded to the faucet wallet at genesis (testnet only)."
+  type        = string
+  default     = "10000000000000"
+}
+
 variable "prometheus_image" {
   type    = string
   default = "prom/prometheus:v3.5.1"

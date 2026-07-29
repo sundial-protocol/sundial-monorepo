@@ -67,8 +67,162 @@ describe("NodeConfig", () => {
         expect(config.COMMITMENT_WINDOW_WARN_TX_REQUESTS).toBe(50_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_EVENTS).toBe(60_000);
         expect(config.COMMITMENT_WINDOW_WARN_TOTAL_BYTES).toBe(20_000_000);
+        expect(config.COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK).toBe(1);
+        expect(config.COMMITMENT_MAX_WAIT_MS).toBe(0);
         expect(config.COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK).toBe(2_000);
+        expect(config.FAUCET_ENABLED).toBe(false);
+        expect(config.FAUCET_SEED_PHRASE).toBe("");
+        expect(config.FAUCET_API_KEY).toBe("");
+        expect(config.FAUCET_ADDRESS).toBe("");
+        expect(config.FAUCET_AMOUNT_LOVELACE).toBe(100_000_000n);
+        expect(config.FAUCET_COOLDOWN_SECONDS).toBe(86_400);
+        expect(config.FAUCET_DAILY_IP_LIMIT).toBe(5);
+        expect(config.FAUCET_MIN_BALANCE_LOVELACE).toBe(100_000_000n);
+        // The faucet wallet must not be funded while disabled.
+        expect(
+          config.GENESIS_UTXOS.some(
+            (u) => u.assets.lovelace === 10_000_000_000_000n,
+          ),
+        ).toBe(false);
       }).pipe(Effect.provide(configLayer)),
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "funds a dedicated faucet genesis UTxO when FAUCET_ENABLED",
+    () => {
+      const faucetProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["FAUCET_ENABLED", "true"],
+          ["FAUCET_SEED_PHRASE", "dedicated faucet seed phrase"],
+          ["FAUCET_API_KEY", "faucet-api-key"],
+          ["FAUCET_AMOUNT_LOVELACE", "100000000"],
+          ["FAUCET_GENESIS_ALLOCATION_LOVELACE", "10000000000000"],
+        ]),
+      );
+      const faucetLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(faucetProvider)),
+      );
+      return Effect.gen(function* () {
+        const config = yield* NodeConfig;
+        expect(config.FAUCET_ENABLED).toBe(true);
+        expect(config.FAUCET_ADDRESS).toBe("addr_test1mock");
+        const faucetUtxo = config.GENESIS_UTXOS.find(
+          (u) => u.assets.lovelace === 10_000_000_000_000n,
+        );
+        expect(faucetUtxo).toBeDefined();
+        expect(faucetUtxo?.address).toBe("addr_test1mock");
+      }).pipe(Effect.provide(faucetLayer));
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "fails when FAUCET_SEED_PHRASE reuses a genesis seed",
+    () => {
+      const reusedProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["FAUCET_ENABLED", "true"],
+          ["FAUCET_SEED_PHRASE", "seed phrase a"],
+          ["FAUCET_API_KEY", "faucet-api-key"],
+        ]),
+      );
+      const reusedLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(reusedProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(reusedLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain("FAUCET_SEED_PHRASE");
+        }
+      });
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "fails closed when FAUCET_ENABLED in production without a seed",
+    () => {
+      const productionProvider = ConfigProvider.fromMap(
+        new Map([
+          ["NODE_ENV", "production"],
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["REDIS_URL", "redis://redis:6379"],
+          ["POSTGRES_HOST", "postgres"],
+          ["POSTGRES_PASSWORD", "postgres"],
+          ["POSTGRES_DB", "midgard"],
+          ["POSTGRES_USER", "postgres"],
+          ["LEDGER_MPT_DB_PATH", "ledger"],
+          ["MEMPOOL_MPT_DB_PATH", "mempool"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["FAUCET_ENABLED", "true"],
+        ]),
+      );
+      const productionLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(productionProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(productionLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain("FAUCET_SEED_PHRASE");
+        }
+      });
+    },
     { timeout: 10000 },
   );
 
@@ -319,6 +473,48 @@ describe("NodeConfig", () => {
   );
 
   it.effect(
+    "fails when COMMITMENT_MAX_WAIT_MS is negative",
+    () => {
+      const invalidProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["COMMITMENT_MAX_WAIT_MS", "-1"],
+        ]),
+      );
+      const invalidLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(invalidProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(invalidLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain("COMMITMENT_MAX_WAIT_MS");
+        }
+      });
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
     "fails when COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG is negative",
     () => {
       const invalidProvider = ConfigProvider.fromMap(
@@ -355,6 +551,51 @@ describe("NodeConfig", () => {
           expect(result.left).toBeInstanceOf(ConfigError);
           expect(result.left.message).toContain(
             "COMMITMENT_MAX_UNSUBMITTED_BLOCK_BACKLOG",
+          );
+        }
+      });
+    },
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "fails when COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK exceeds COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK",
+    () => {
+      const invalidProvider = ConfigProvider.fromMap(
+        new Map([
+          ["L1_PROVIDER", "Kupmios"],
+          ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+          ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+          ["L1_OGMIOS_KEY", "ogmios-key"],
+          ["L1_KUPO_KEY", "kupo-key"],
+          ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+          [
+            "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+            "seed phrase block commitment",
+          ],
+          ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+          ["NETWORK", "Preview"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+          ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+          ["COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK", "2001"],
+          ["COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK", "2000"],
+        ]),
+      );
+      const invalidLayer = NodeConfig.layer.pipe(
+        Layer.provide(Layer.setConfigProvider(invalidProvider)),
+      );
+      return Effect.gen(function* () {
+        const result = yield* Effect.either(
+          Effect.gen(function* () {
+            return yield* NodeConfig;
+          }).pipe(Effect.provide(invalidLayer)),
+        );
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain(
+            "COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK",
           );
         }
       });

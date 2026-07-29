@@ -17,3 +17,4 @@ bdf05f3b474f2c4d03616a802c6c8e706d56df54:demo/midgard-manager/packages/cli/src/c
 f79ff1e1cda1b6c8fe8bbdbb66614987b3dfcdf7:offchain/cabal.project:generic-api-key:4
 4ba6e35e8ddec84e90f3c2679da20e4b088e11a9:demo/midgard-node/scripts/fund-bc-wallet.mjs:generic-api-key:4
 c256e6f65a89fe0b24e443618a39114891d22faa:demo/midgard-node/scripts/fund-bc-wallet.mjs:generic-api-key:4
+7e822d8d7fd5e27f8a3c9d4f22f3804df1aa1a42:demo/midgard-node/.env.deploy.testnet:generic-api-key:11

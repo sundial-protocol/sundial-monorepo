@@ -57,6 +57,8 @@ export const makeTestNodeConfigLayer = (opts: TestNodeConfigOptions = {}) => {
       COMMITMENT_WINDOW_WARN_TX_REQUESTS: 50_000,
       COMMITMENT_WINDOW_WARN_TOTAL_EVENTS: 60_000,
       COMMITMENT_WINDOW_WARN_TOTAL_BYTES: 20_000_000,
+      COMMITMENT_MIN_TX_REQUESTS_PER_BLOCK: 1,
+      COMMITMENT_MAX_WAIT_MS: 0,
       COMMITMENT_MAX_TX_REQUESTS_PER_BLOCK: 2_000,
       TX_QUEUE_DRAIN_BATCH_SIZE: 100,
       TX_QUEUE_CONSUMER_WORKER_COUNT: 1,
@@ -82,6 +84,14 @@ export const makeTestNodeConfigLayer = (opts: TestNodeConfigOptions = {}) => {
       MEMPOOL_MPT_DB_PATH: mempoolPath,
       LUCID_INIT_MAX_RETRIES: 0,
       GENESIS_UTXOS: opts.genesisUtxos ?? [],
+      FAUCET_ENABLED: false,
+      FAUCET_SEED_PHRASE: "",
+      FAUCET_API_KEY: "",
+      FAUCET_ADDRESS: "",
+      FAUCET_AMOUNT_LOVELACE: 100_000_000n,
+      FAUCET_COOLDOWN_SECONDS: 86_400,
+      FAUCET_DAILY_IP_LIMIT: 5,
+      FAUCET_MIN_BALANCE_LOVELACE: 100_000_000n,
     }),
   );
 };

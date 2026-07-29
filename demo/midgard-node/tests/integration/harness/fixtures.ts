@@ -1,20 +1,67 @@
+import { CML } from "@lucid-evolution/lucid";
 import * as Ledger from "@/database/utils/ledger.js";
 
-export const txCborA = Buffer.alloc(64, 0xbb);
-export const txIdA = Buffer.alloc(32, 0xaa);
+const producedSigningKey = CML.PrivateKey.from_normal_bytes(
+  new Uint8Array(32).fill(0x21),
+);
+const producedPublicKey = producedSigningKey.to_public();
+const producedCredential = CML.Credential.new_pub_key(producedPublicKey.hash());
+const producedAddress = CML.EnterpriseAddress.new(
+  0,
+  producedCredential,
+).to_address();
 
-// Spent outref produced by the lucid stub (mockInputList.get returns inputCborBytes).
-export const inputCborBytes = Buffer.from([0x82, 0x01, 0x02]);
-// Produced outref from CML.TransactionInput.new in the lucid stub.
-export const outrefCborBytes = Buffer.from([0x82, 0xab, 0xcd]);
-export const outputCborBytes = Buffer.alloc(16, 0xcc);
+const spentSigningKey = CML.PrivateKey.from_normal_bytes(
+  new Uint8Array(32).fill(0x42),
+);
+const spentPublicKey = spentSigningKey.to_public();
+const spentCredential = CML.Credential.new_pub_key(spentPublicKey.hash());
+const seedAddress = CML.EnterpriseAddress.new(0, spentCredential).to_address();
 
-// Address returned by the lucid stub for all produced outputs.
-export const testAddress =
-  "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58";
-// Different address for spent-input seeds so (event_id, address) is unique.
-export const spentAddress =
-  "addr_test1vz0p8k0ekk5xvms5jlqmajgddmqm4xp58yd8c92lvd63hwcv6znrl";
+const spendInputHash = CML.TransactionHash.from_raw_bytes(
+  new Uint8Array(32).fill(0x11),
+);
+const spendInput = CML.TransactionInput.new(spendInputHash, 0n);
+
+const outputs = CML.TransactionOutputList.new();
+outputs.add(
+  CML.TransactionOutput.new_conway_format_tx_out(
+    CML.ConwayFormatTxOut.new(producedAddress, CML.Value.from_coin(1_830_000n)),
+  ),
+);
+
+const inputs = CML.TransactionInputList.new();
+inputs.add(spendInput);
+
+const body = CML.TransactionBody.new(inputs, outputs, 170_000n);
+body.set_network_id(CML.NetworkId.new(0n));
+
+const bodyHash = CML.hash_transaction(body);
+const witnessSet = CML.TransactionWitnessSet.new();
+const vkeyWitnesses = CML.VkeywitnessList.new();
+vkeyWitnesses.add(
+  CML.Vkeywitness.new(
+    spentPublicKey,
+    spentSigningKey.sign(bodyHash.to_raw_bytes()),
+  ),
+);
+witnessSet.set_vkeywitnesses(vkeyWitnesses);
+
+const signedTx = CML.Transaction.new(body, witnessSet, true);
+
+export const txCborA = Buffer.from(signedTx.to_cbor_bytes());
+export const txIdA = Buffer.from(bodyHash.to_raw_bytes());
+export const inputCborBytes = Buffer.from(spendInput.to_cbor_bytes());
+export const outrefCborBytes = Buffer.from(
+  CML.TransactionInput.new(bodyHash, 0n).to_cbor_bytes(),
+);
+export const outputCborBytes = Buffer.from(
+  CML.TransactionOutput.new_conway_format_tx_out(
+    CML.ConwayFormatTxOut.new(seedAddress, CML.Value.from_coin(2_000_000n)),
+  ).to_cbor_bytes(),
+);
+export const testAddress = producedAddress.to_bech32();
+export const spentAddress = seedAddress.to_bech32();
 
 export const makeSeedLedgerEntry = (): Ledger.Entry => ({
   [Ledger.Columns.TX_ID]: txIdA,

@@ -46,11 +46,11 @@ export default defineConfig({
       // Integration tests may reach into node repository layers directly.
       "@node": path.resolve(demoRoot, "midgard-node/src"),
       // @effect/vitest lives in midgard-node/node_modules (not the SDK's).
-      // The test files live under midgard-sdk/ where it is not installed, so
-      // the alias bridges the gap without requiring a separate npm install.
+      // Point directly at the ESM build so Vitest is not re-imported through
+      // the package's CommonJS default entry.
       "@effect/vitest": path.resolve(
         demoRoot,
-        "midgard-node/node_modules/@effect/vitest",
+        "midgard-node/node_modules/@effect/vitest/dist/esm/index.js",
       ),
     },
   },

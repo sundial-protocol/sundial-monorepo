@@ -1,10 +1,10 @@
 import { Effect, Either, Metric, pipe, Ref, Schedule } from "effect";
 import * as SDK from "@al-ft/midgard-sdk";
 import { MempoolDB } from "@/database/index.js";
-import type { ProcessedTx } from "@/utils.js";
 import { DatabaseError } from "@/database/utils/common.js";
 import {
   Database,
+  NodeConfig,
   TxIngressMessage,
   TxIngressQueue,
   TxIngressQueueError,
@@ -172,7 +172,7 @@ export const txQueueProcessorAction = (
   | SDK.DataCoercionError
   | WorkerError
   | TxIngressQueueError,
-  Database | TxIngressQueue
+  Database | NodeConfig | TxIngressQueue
 > =>
   Effect.gen(function* () {
     const txIngressQueue = yield* TxIngressQueue;
@@ -229,10 +229,9 @@ export const txQueueProcessorAction = (
         );
       }
 
-      const validMessages: TxIngressMessage[] = [];
-      const processedTxs: ProcessedTx[] = [];
+      const acceptedCandidates: MempoolDB.AcceptanceCandidate[] = [];
 
-      for (const outcome of parsedOutcomes) {
+      for (const [parsedIndex, outcome] of parsedOutcomes.entries()) {
         if (outcome.parsed._tag === "Left") {
           const error = outcome.parsed.left;
           yield* registerFailedMessage(
@@ -243,41 +242,57 @@ export const txQueueProcessorAction = (
           continue;
         }
 
-        validMessages.push(outcome.message);
-        processedTxs.push(outcome.parsed.right);
+        acceptedCandidates.push({
+          arrivalSeq: BigInt(parsedIndex),
+          message: outcome.message,
+          processedTx: outcome.parsed.right,
+        });
       }
 
-      if (processedTxs.length === 0) {
+      if (acceptedCandidates.length === 0) {
         continue;
       }
 
       const persistResult = yield* Effect.either(
-        MempoolDB.insertMultiple(processedTxs),
+        MempoolDB.validateAndInsertMultiple(acceptedCandidates),
       );
       if (persistResult._tag === "Left") {
         const reason = `mempool_insert_failed:${persistResult.left.message}`;
         yield* Effect.logWarning(
-          `Failed to persist ${processedTxs.length} tx(s) from stream chunk; keeping entries pending for retry: ${persistResult.left.message}`,
+          `Failed to validate/persist ${acceptedCandidates.length} tx(s) from stream chunk; keeping entries pending for retry: ${persistResult.left.message}`,
         );
         yield* Effect.forEach(
-          validMessages,
+          acceptedCandidates.map((candidate) => candidate.message),
           (message) => registerFailedMessage(message, reason, withMonitoring),
           { discard: true },
         );
         continue;
       }
 
-      const ackedCount = yield* txIngressQueue.ack(
-        validMessages.map((m) => m.id),
+      yield* Effect.forEach(
+        persistResult.right.rejected,
+        (rejection) =>
+          registerFailedMessage(
+            rejection.message,
+            rejection.reason,
+            withMonitoring,
+          ),
+        { discard: true },
       );
-      if (withMonitoring && ackedCount > 0) {
-        yield* Metric.incrementBy(txStreamAckCounter, BigInt(ackedCount));
+
+      if (persistResult.right.acceptedMessages.length > 0) {
+        const ackedCount = yield* txIngressQueue.ack(
+          persistResult.right.acceptedMessages.map((message) => message.id),
+        );
+        if (withMonitoring && ackedCount > 0) {
+          yield* Metric.incrementBy(txStreamAckCounter, BigInt(ackedCount));
+        }
       }
 
-      if (withMonitoring && persistResult.right > 0) {
+      if (withMonitoring && persistResult.right.insertedCount > 0) {
         yield* Metric.incrementBy(
           txMempoolAcceptedCounter,
-          BigInt(persistResult.right),
+          BigInt(persistResult.right.insertedCount),
         );
       }
     }
@@ -318,7 +333,7 @@ export const txQueueProcessorFiber = (
   txQueueConsumerWorkerCount: number,
   consumerNamePrefix: string,
   withMonitoring?: boolean,
-): Effect.Effect<void, never, Database | TxIngressQueue> =>
+): Effect.Effect<void, never, Database | NodeConfig | TxIngressQueue> =>
   pipe(
     Effect.gen(function* () {
       const txIngressQueue = yield* TxIngressQueue;

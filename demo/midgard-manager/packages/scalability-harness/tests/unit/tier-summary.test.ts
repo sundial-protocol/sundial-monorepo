@@ -520,6 +520,57 @@ describe('buildTierSummary — normal tier', () => {
     expect(s.l1CommitmentFeeLastLovelace).toBe(2_400_000);
   });
 
+  it('falls back to the latest sampled l1CommitmentFeeLastLovelace at or before load stop', () => {
+    const s = buildTierSummary(
+      makeInput({
+        metricWindow: {
+          tierIndex: 0,
+          targetTps: 10,
+          startedAt: STARTED_AT,
+          stoppedAt: STOPPED_AT,
+          recoveryStartedAt: STOPPED_AT,
+          recoveryStoppedAt: '2025-01-01T00:01:30.000Z',
+          before: {},
+          afterLoad: { l1_commitment_fee_lovelace_last: null },
+          afterRecovery: { l1_commitment_fee_lovelace_last: 2_600_000 },
+          ranges: {
+            l1_commitment_fee_lovelace_last: [
+              {
+                metric: { __name__: 'l1_commitment_fee_lovelace_last' },
+                values: [
+                  [new Date('2025-01-01T00:00:45.000Z').getTime() / 1000, '2100000'],
+                  [new Date('2025-01-01T00:00:59.000Z').getTime() / 1000, '2400000'],
+                  [new Date('2025-01-01T00:01:10.000Z').getTime() / 1000, '2600000'],
+                ],
+              },
+            ],
+          },
+        },
+      })
+    );
+    expect(s.l1CommitmentFeeLastLovelace).toBe(2_400_000);
+  });
+
+  it('falls back to afterRecovery l1CommitmentFeeLastLovelace when no sampled load-stop value exists', () => {
+    const s = buildTierSummary(
+      makeInput({
+        metricWindow: {
+          tierIndex: 0,
+          targetTps: 10,
+          startedAt: STARTED_AT,
+          stoppedAt: STOPPED_AT,
+          recoveryStartedAt: STOPPED_AT,
+          recoveryStoppedAt: '2025-01-01T00:01:30.000Z',
+          before: {},
+          afterLoad: { l1_commitment_fee_lovelace_last: null },
+          afterRecovery: { l1_commitment_fee_lovelace_last: 2_600_000 },
+          ranges: {},
+        },
+      })
+    );
+    expect(s.l1CommitmentFeeLastLovelace).toBe(2_600_000);
+  });
+
   it('computes l1FeePerCommittedL2TxLovelace from fee delta and committed tx delta', () => {
     const s = buildTierSummary(
       makeInput({

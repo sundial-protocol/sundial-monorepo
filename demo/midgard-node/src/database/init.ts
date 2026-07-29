@@ -10,6 +10,7 @@ import {
   MempoolDB,
   MempoolLedgerDB,
   DepositsDB,
+  FaucetClaimsDB,
   TxOrdersDB,
   WithdrawalsDB,
   Tx,
@@ -41,6 +42,7 @@ export const program: Effect.Effect<
   yield* UserEvents.createTable(DepositsDB.tableName);
   yield* UserEvents.createTable(TxOrdersDB.tableName);
   yield* UserEvents.createTable(WithdrawalsDB.tableName);
+  yield* FaucetClaimsDB.createTable();
 
   yield* Effect.logInfo("PostgreSQL database initialized Successfully.");
 }).pipe(

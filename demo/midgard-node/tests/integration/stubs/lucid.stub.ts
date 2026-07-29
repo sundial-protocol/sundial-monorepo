@@ -1,3 +1,5 @@
+import * as CMLReal from "../../../../node_modules/.pnpm/node_modules/@anastasia-labs/cardano-multiplatform-lib-nodejs/cardano_multiplatform_lib.js";
+
 // Integration stub for @lucid-evolution/lucid.
 //
 // Unlike the unit stub (which throws on every call), this stub returns
@@ -63,89 +65,4 @@ export const coreToUtxo = (cml: { to_cbor_bytes: () => Uint8Array }): UTxO => {
   }
 };
 
-// CML stubs — provide enough surface for transaction parsing paths.
-const inputCborBytes = Buffer.from([0x82, 0x01, 0x02]);
-const outputCborBytes = Buffer.alloc(16, 0xcc);
-const outrefCborBytes = Buffer.from([0x82, 0xab, 0xcd]);
-
-const mockTxHash = {
-  to_raw_bytes: () => Buffer.alloc(32, 0xaa),
-  to_hex: () => "aa".repeat(32),
-};
-
-const mockInputList = {
-  len: () => 1,
-  get: (_i: number) => ({ to_cbor_bytes: () => inputCborBytes }),
-};
-
-const mockOutputList = {
-  len: () => 1,
-  get: (_i: number) => ({
-    to_cbor_bytes: () => outputCborBytes,
-    address: () => ({
-      to_bech32: () =>
-        "addr_test1wzylc3gg4h37gt69yx057gkn4egefs5t9rsycmryecpsenswtdp58",
-    }),
-  }),
-};
-
-const mockBody = {
-  inputs: () => mockInputList,
-  outputs: () => mockOutputList,
-};
-
-export const CML = {
-  Transaction: {
-    from_cbor_bytes: (_bytes: Uint8Array) => ({ body: () => mockBody }),
-    new: (body: unknown, _witness: unknown, _bool: boolean) => ({
-      body: () => body,
-    }),
-  },
-  TransactionBody: {
-    new: (inputs: unknown, outputs: unknown, fee: bigint) => ({
-      inputs: () => inputs,
-      outputs: () => outputs,
-      fee: () => fee,
-    }),
-  },
-  TransactionWitnessSet: {
-    new: () => ({}),
-  },
-  TransactionInputList: {
-    new: () => {
-      const items: unknown[] = [];
-      return {
-        add: (item: unknown) => items.push(item),
-        len: () => items.length,
-        get: (i: number) => items[i],
-      };
-    },
-  },
-  TransactionOutputList: {
-    new: () => {
-      const items: unknown[] = [];
-      return {
-        add: (item: unknown) => items.push(item),
-        len: () => items.length,
-        get: (i: number) => items[i],
-      };
-    },
-  },
-  TransactionInput: {
-    new: (_hash: unknown, _idx: bigint) => ({
-      to_cbor_bytes: () => outrefCborBytes,
-    }),
-    from_cbor_bytes: (bytes: Buffer) => ({
-      transaction_id: () => ({
-        to_hex: () => Buffer.from(bytes).toString("hex").substring(0, 64),
-      }),
-      index: () => BigInt(0),
-    }),
-  },
-  TransactionUnspentOutput: {
-    from_cbor_bytes: (bytes: Buffer) => ({
-      to_cbor_bytes: () => bytes,
-    }),
-  },
-  hash_transaction: () => mockTxHash,
-};
+export const CML = CMLReal;

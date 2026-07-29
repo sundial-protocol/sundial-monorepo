@@ -1,6 +1,10 @@
 packages:
   - 'packages/*'
 
+blockExoticSubdeps: true
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+
 overrides:
   ip-address: '10.2.0'
   ws: '8.20.1'
