@@ -551,10 +551,10 @@ resource "aws_ecs_task_definition" "cadvisor" {
 
   container_definitions = jsonencode([
     {
-      name       = "cadvisor"
-      image      = var.cadvisor_image
-      essential  = true
-      privileged = true
+      name         = "cadvisor"
+      image        = var.cadvisor_image
+      essential    = true
+      privileged   = true
       portMappings = [{ containerPort = 8080, hostPort = 0, protocol = "tcp" }]
       mountPoints = [
         { sourceVolume = "rootfs", containerPath = "/rootfs", readOnly = true },

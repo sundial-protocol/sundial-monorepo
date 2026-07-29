@@ -3,7 +3,7 @@ RUN corepack enable
 
 FROM base AS build
 WORKDIR /workspace
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY midgard-sdk/package.json ./midgard-sdk/package.json
 COPY midgard-node/package.json ./midgard-node/package.json
 COPY midgard-ts/package.json ./midgard-ts/package.json
