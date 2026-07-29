@@ -1,15 +1,15 @@
 environment = "testnet"
 aws_region  = "us-west-2"
 
-api_domain     = "sundial-node.testnet.sundialprotocol.com"
-grafana_domain = "grafana.testnet.sundialprotocol.com"
+api_domain     = "rpc.testnet.sundialprotocol.com"
+grafana_domain = "dashboard.testnet.sundialprotocol.com"
 
 vpc_cidr             = "10.2.0.0/16"
 availability_zones   = ["us-west-2a", "us-west-2b"]
 public_subnet_cidrs  = ["10.2.0.0/24", "10.2.2.0/24"]
 private_subnet_cidrs = ["10.2.1.0/24", "10.2.3.0/24"]
 
-nat_type          = "instance"
+nat_type          = "gateway"
 nat_instance_type = "t3.micro"
 
 ecs_instance_type          = "m6i.large"
@@ -19,7 +19,7 @@ ecs_min_size               = 2
 ecs_max_size               = 2
 enable_ecs_services        = true
 enable_https_listener      = true
-sundial_node_image         = "000000000000.dkr.ecr.us-west-2.amazonaws.com/sundial/sundial-node:testnet-latest"
+sundial_node_image         = "810809345231.dkr.ecr.us-west-2.amazonaws.com/sundial/sundial-node:testnet-latest"
 sundial_node_desired_count = 1
 
 redis_node_type = "cache.t3.micro"
