@@ -44,6 +44,7 @@ vi.mock("@lucid-evolution/lucid", () => {
     get: (_i: number) => ({
       to_cbor_bytes: () => outputCborBytes,
       address: () => ({ to_bech32: () => testAddress }),
+      kind: () => 1, // CML.TransactionOutputKind.ConwayFormatTxOut
     }),
   };
   const mockBody = {
@@ -111,6 +112,9 @@ vi.mock("@lucid-evolution/lucid", () => {
         from_cbor_bytes: vi.fn((bytes: Buffer) => ({
           to_cbor_bytes: () => bytes,
         })),
+      },
+      TransactionOutputKind: {
+        ConwayFormatTxOut: 1,
       },
     },
     utxoToCore: vi.fn((utxo: any) => ({

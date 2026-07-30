@@ -6,7 +6,7 @@ import * as ETH_UTILS from "@ethereumjs/util";
 import { UTxO, toHex, utxoToCore } from "@lucid-evolution/lucid";
 import { Level } from "level";
 import { Database, NodeConfig } from "@/services/index.js";
-import { FileSystemError } from "@/utils.js";
+import { FileSystemError, toConwayFormatOutputCbor } from "@/utils.js";
 import * as FS from "fs";
 import * as SDK from "@al-ft/midgard-sdk";
 import { DatabaseError } from "@/database/utils/common.js";
@@ -31,7 +31,7 @@ export const utxoToPutBatchOp = (
     const op: ETH_UTILS.BatchDBOp = {
       type: "put",
       key: Buffer.from(core.input().to_cbor_bytes()),
-      value: Buffer.from(core.output().to_cbor_bytes()),
+      value: Buffer.from(toConwayFormatOutputCbor(core.output())),
     };
     return op;
   });
