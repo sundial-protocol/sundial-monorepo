@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "indexer-utxorpc", "indexer-utxorpc", "{2840FA42-A358-11C3-73AA-571548AFEAFE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "gen", "gen", "{FA8C2A72-A659-6C3B-1C76-307EA858FD92}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Utxorpc.Spec", "indexer-utxorpc\gen\dotnet\Utxorpc.Spec.csproj", "{15C40323-8C18-AF5D-DFCD-D1BA27BB6D72}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{15C40323-8C18-AF5D-DFCD-D1BA27BB6D72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{15C40323-8C18-AF5D-DFCD-D1BA27BB6D72}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{15C40323-8C18-AF5D-DFCD-D1BA27BB6D72}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{15C40323-8C18-AF5D-DFCD-D1BA27BB6D72}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FA8C2A72-A659-6C3B-1C76-307EA858FD92} = {2840FA42-A358-11C3-73AA-571548AFEAFE}
+		{15C40323-8C18-AF5D-DFCD-D1BA27BB6D72} = {FA8C2A72-A659-6C3B-1C76-307EA858FD92}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {715D07C9-7B32-41BB-9D31-5FEE5B466746}
+	EndGlobalSection
+EndGlobal

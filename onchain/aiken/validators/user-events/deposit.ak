@@ -33,12 +33,11 @@ validator spend(hub_oracle: ScriptHash) {
       inclusion_proof_script_withdraw_redeemer_index,
     } = redeemer
 
-    let hub.Datum {
-      deposit: deposit_policy_id,
-      settlement: settlement_policy_id,
-      reserve_addr,
-      ..
-    } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+    let hub_fields =
+      hub.get_datum_fields(reference_inputs, hub_oracle, hub_ref_input_index)
+    let deposit_policy_id = hub_fields |> hub.deposit_of
+    let settlement_policy_id = hub_fields |> hub.settlement_of
+    let reserve_addr = hub_fields |> hub.reserve_addr_of
 
     let settlement.Datum { deposits_root, .. } =
       reference_inputs
@@ -141,10 +140,7 @@ validator mint(hub_oracle: ScriptHash) {
     <-
       user_events.validate_mint(
         hub_oracle,
-        fn(hub_datum) {
-          let hub.Datum { deposit_addr, .. } = hub_datum
-          deposit_addr
-        },
+        fn(hub_fields) { hub_fields |> hub.deposit_addr_of },
         redeemer,
         own_policy,
         tx,

@@ -35,13 +35,12 @@ validator spend(hub_oracle: ScriptHash) {
       purpose,
     } = redeemer
 
-    let hub.Datum {
-      withdrawal: withdrawal_policy_id,
-      settlement: settlement_policy_id,
-      payout: payout_policy_id,
-      payout_addr,
-      ..
-    } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+    let hub_fields =
+      hub.get_datum_fields(reference_inputs, hub_oracle, hub_ref_input_index)
+    let withdrawal_policy_id = hub_fields |> hub.withdrawal_of
+    let settlement_policy_id = hub_fields |> hub.settlement_of
+    let payout_policy_id = hub_fields |> hub.payout_of
+    let payout_addr = hub_fields |> hub.payout_addr_of
 
     let settlement.Datum { withdrawals_root, .. } =
       settlement.get_datum(
@@ -110,8 +109,15 @@ validator spend(hub_oracle: ScriptHash) {
           )
         expect withdrawal_utxo_out_ref == own_out_ref
 
-        let Pair(withdrawal_event_id, withdrawal_event_info) =
-          ledger_state.unsafe_event_to_key_value_pair(withdrawal_event)
+        // The datum is already fully decoded at script entry, so its `id` and
+        // `info` fields are used directly rather than re-parsing them from
+        // `Data`.
+        let ledger_state.WithdrawalEvent {
+          id: withdrawal_id,
+          info: withdrawal_event_info,
+        } = withdrawal_event
+        let withdrawal_event_id: Data = withdrawal_id
+        let withdrawal_event_info_data: Data = withdrawal_event_info
 
         // 5. Initiation of a payout accumulator can only happen for valid
         //    withdrawals.
@@ -127,7 +133,7 @@ validator spend(hub_oracle: ScriptHash) {
           plutarch_phas(
             withdrawals_root,
             withdrawal_event_id,
-            withdrawal_event_info,
+            withdrawal_event_info_data,
             membership_proof,
             redeemers,
             inclusion_proof_script_withdraw_redeemer_index,
@@ -165,11 +171,14 @@ validator spend(hub_oracle: ScriptHash) {
         // 5. For refunding invalid withdrawal orders, they must be included
         //    in the settlement's tree with the same invalidity provided via
         //    the redeemer.
-        let Pair(withdrawal_event_id, withdrawal_event_info) =
-          ledger_state.unsafe_event_to_key_value_pair(withdrawal_event)
-        //
-        expect coerced_withdrawal_info: ledger_state.WithdrawalInfo =
-          withdrawal_event_info
+        // The datum is already fully decoded at script entry, so its `id` and
+        // `info` fields are used directly rather than re-parsing them from
+        // `Data`.
+        let ledger_state.WithdrawalEvent {
+          id: withdrawal_id,
+          info: coerced_withdrawal_info,
+        } = withdrawal_event
+        let withdrawal_event_id: Data = withdrawal_id
         //
         let overridden_withdrawal_info: Data =
           ledger_state.WithdrawalInfo {
@@ -220,10 +229,7 @@ validator mint(hub_oracle: ScriptHash) {
     <-
       user_events.validate_mint(
         hub_oracle,
-        fn(hub_datum) {
-          let hub.Datum { withdrawal_addr, .. } = hub_datum
-          withdrawal_addr
-        },
+        fn(hub_fields) { hub_fields |> hub.withdrawal_addr_of },
         redeemer,
         own_policy,
         tx,
