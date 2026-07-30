@@ -105,17 +105,27 @@ resource "aws_ecs_task_definition" "prometheus" {
               static_configs:
                 - targets: ["localhost:9090"]
 
-            - job_name: sundial-node
+            - job_name: sundial_nodes
               metrics_path: /metrics
               dns_sd_configs:
                 - names: ["sundial-node.${var.private_dns_namespace_name}"]
                   type: SRV
                   refresh_interval: 30s
+              relabel_configs:
+                - target_label: role
+                  replacement: all
 
             - job_name: postgres-exporter
               metrics_path: /metrics
               dns_sd_configs:
                 - names: ["postgres-exporter.${var.private_dns_namespace_name}"]
+                  type: SRV
+                  refresh_interval: 30s
+
+            - job_name: cadvisor
+              metrics_path: /metrics
+              dns_sd_configs:
+                - names: ["cadvisor.${var.private_dns_namespace_name}"]
                   type: SRV
                   refresh_interval: 30s
           CFG
@@ -126,7 +136,7 @@ resource "aws_ecs_task_definition" "prometheus" {
             --storage.tsdb.retention.time=${var.prometheus_retention}
         CMD
       ]
-      portMappings = [{ containerPort = 9090, hostPort = 0, protocol = "tcp" }]
+      portMappings = [{ containerPort = 9090, hostPort = 9090, protocol = "tcp" }]
       mountPoints  = [{ sourceVolume = "prometheus-data", containerPath = "/prometheus", readOnly = false }]
       logConfiguration = {
         logDriver = "awslogs"
@@ -148,6 +158,9 @@ resource "aws_ecs_service" "prometheus" {
   task_definition = aws_ecs_task_definition.prometheus.arn
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
+
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
 
   service_registries {
     registry_arn   = aws_service_discovery_service.prometheus.arn
@@ -201,6 +214,9 @@ resource "aws_ecs_service" "loki" {
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
 
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
+
   service_registries {
     registry_arn   = aws_service_discovery_service.loki.arn
     container_name = "loki"
@@ -246,7 +262,7 @@ resource "aws_ecs_task_definition" "alloy" {
           otelcol.exporter.debug "default" {}
           CFG
 
-          exec /bin/alloy run --server.http.listen-addr=0.0.0.0:12345 /tmp/config.alloy
+          exec /bin/alloy run --server.http.listen-addr=0.0.0.0:12345 --stability.level=experimental /tmp/config.alloy
         CMD
       ]
       portMappings = [{ containerPort = 4318, hostPort = 0, protocol = "tcp" }]
@@ -270,6 +286,9 @@ resource "aws_ecs_service" "alloy" {
   task_definition = aws_ecs_task_definition.alloy.arn
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
+
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
 
   service_registries {
     registry_arn   = aws_service_discovery_service.alloy.arn
@@ -299,6 +318,81 @@ resource "aws_ecs_task_definition" "grafana" {
       name      = "grafana"
       image     = var.grafana_image
       essential = true
+      user      = "root"
+
+      entryPoint = ["/bin/sh", "-ec"]
+      command = [
+        <<-CMD
+          # Install aws-cli (Alpine and Debian/Ubuntu Grafana base images).
+          if command -v apk >/dev/null 2>&1; then
+            apk add -q --no-cache aws-cli 2>/dev/null || true
+          elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq 2>/dev/null
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq awscli 2>/dev/null || true
+          fi
+
+          # Resolve Prometheus URL via Cloud Map DiscoverInstances API.
+          # Cloud Map SRV records use instance-id subdomains as targets (no A records),
+          # so DNS-based resolution does not work. DiscoverInstances returns the actual
+          # EC2 private IP and host port directly.
+          PROMETHEUS_URL=""
+          if command -v aws >/dev/null 2>&1; then
+            PROM_DATA=$(aws servicediscovery discover-instances \
+              --namespace-name ${var.private_dns_namespace_name} \
+              --service-name prometheus \
+              --region ${var.aws_region} \
+              --query 'Instances[0].[Attributes.AWS_INSTANCE_IPV4, Attributes.AWS_INSTANCE_PORT]' \
+              --output text 2>/dev/null)
+            PROM_IP=$(printf '%s' "$PROM_DATA" | awk '{print $1}')
+            PROM_PORT=$(printf '%s' "$PROM_DATA" | awk '{print $2}')
+            if [ -n "$PROM_IP" ] && [ "$PROM_IP" != "None" ]; then
+              PROMETHEUS_URL="http://$PROM_IP:$PROM_PORT"
+            fi
+          fi
+          PROMETHEUS_URL="$${PROMETHEUS_URL:-http://localhost:9090}"
+          echo "[grafana-init] Prometheus URL: $PROMETHEUS_URL"
+
+          # Write datasource provisioning
+          mkdir -p /etc/grafana/provisioning/datasources
+          printf '%s\n' \
+            'apiVersion: 1' \
+            'datasources:' \
+            '  - name: Prometheus' \
+            '    type: prometheus' \
+            '    uid: prometheus' \
+            "    url: $PROMETHEUS_URL" \
+            '    access: proxy' \
+            '    isDefault: true' \
+            >/etc/grafana/provisioning/datasources/prometheus.yaml
+
+          # Write dashboard provider provisioning
+          mkdir -p /etc/grafana/provisioning/dashboards /var/lib/grafana/dashboards
+          printf '%s\n' \
+            'apiVersion: 1' \
+            'providers:' \
+            '  - name: Default' \
+            '    folder: Sundial' \
+            '    type: file' \
+            '    options:' \
+            '      path: /var/lib/grafana/dashboards' \
+            >/etc/grafana/provisioning/dashboards/default.yaml
+
+          # Download dashboard JSON from S3 (uses ECS task role credentials)
+          if command -v aws >/dev/null 2>&1; then
+            aws s3 cp "s3://${aws_s3_bucket.grafana_assets.bucket}/dashboard.json" \
+              /var/lib/grafana/dashboards/dashboard.json \
+              --region ${var.aws_region} 2>/dev/null \
+              && echo "[grafana-init] dashboard downloaded from S3" \
+              || echo "[grafana-init] warning: dashboard download failed; starting without it"
+          fi
+
+          # Fix ownership so grafana user (UID 472) can read provisioning files
+          chown -R 472:472 /etc/grafana/provisioning /var/lib/grafana 2>/dev/null || true
+
+          exec /run.sh
+        CMD
+      ]
+
       environment = [
         { name = "GF_SECURITY_ADMIN_USER", value = "admin" },
         { name = "GF_AUTH_ANONYMOUS_ENABLED", value = "true" },
@@ -325,11 +419,15 @@ resource "aws_ecs_task_definition" "grafana" {
 resource "aws_ecs_service" "grafana" {
   count = var.enable_ecs_services ? 1 : 0
 
-  name            = "grafana"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.grafana.arn
-  desired_count   = var.observability_desired_count
-  launch_type     = "EC2"
+  name                 = "grafana"
+  cluster              = aws_ecs_cluster.main.id
+  task_definition      = aws_ecs_task_definition.grafana.arn
+  desired_count        = var.observability_desired_count
+  launch_type          = "EC2"
+  force_new_deployment = true
+
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
 
   load_balancer {
     target_group_arn = aws_lb_target_group.grafana.arn
@@ -392,10 +490,104 @@ resource "aws_ecs_service" "postgres_exporter" {
   desired_count   = var.observability_desired_count
   launch_type     = "EC2"
 
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 200
+
   service_registries {
     registry_arn   = aws_service_discovery_service.postgres_exporter.arn
     container_name = "postgres-exporter"
     container_port = 9187
+  }
+
+  depends_on = [aws_ecs_cluster_capacity_providers.main]
+}
+
+# ─── cAdvisor ─────────────────────────────────────────────────────────────────
+
+resource "aws_service_discovery_service" "cadvisor" {
+  name = "cadvisor"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.internal.id
+
+    dns_records {
+      type = "SRV"
+      ttl  = 10
+    }
+
+    routing_policy = "MULTIVALUE"
+  }
+}
+
+resource "aws_ecs_task_definition" "cadvisor" {
+  family                   = "${local.name_prefix}-cadvisor"
+  requires_compatibilities = ["EC2"]
+  network_mode             = "bridge"
+  cpu                      = "256"
+  memory                   = "256"
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  volume {
+    name      = "rootfs"
+    host_path = "/"
+  }
+  volume {
+    name      = "var-run"
+    host_path = "/var/run"
+  }
+  volume {
+    name      = "sys"
+    host_path = "/sys"
+  }
+  volume {
+    name      = "var-lib-docker"
+    host_path = "/var/lib/docker"
+  }
+  volume {
+    name      = "dev-disk"
+    host_path = "/dev/disk"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name         = "cadvisor"
+      image        = var.cadvisor_image
+      essential    = true
+      privileged   = true
+      portMappings = [{ containerPort = 8080, hostPort = 0, protocol = "tcp" }]
+      mountPoints = [
+        { sourceVolume = "rootfs", containerPath = "/rootfs", readOnly = true },
+        { sourceVolume = "var-run", containerPath = "/var/run", readOnly = false },
+        { sourceVolume = "sys", containerPath = "/sys", readOnly = true },
+        { sourceVolume = "var-lib-docker", containerPath = "/var/lib/docker", readOnly = true },
+        { sourceVolume = "dev-disk", containerPath = "/dev/disk", readOnly = true },
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "cadvisor"
+        }
+      }
+    }
+  ])
+}
+
+resource "aws_ecs_service" "cadvisor" {
+  count = var.enable_ecs_services ? 1 : 0
+
+  name                = "cadvisor"
+  cluster             = aws_ecs_cluster.main.id
+  task_definition     = aws_ecs_task_definition.cadvisor.arn
+  scheduling_strategy = "DAEMON"
+  launch_type         = "EC2"
+
+  service_registries {
+    registry_arn   = aws_service_discovery_service.cadvisor.arn
+    container_name = "cadvisor"
+    container_port = 8080
   }
 
   depends_on = [aws_ecs_cluster_capacity_providers.main]

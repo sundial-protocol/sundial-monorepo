@@ -4,7 +4,6 @@
   "scripts": {
     "build": "turbo build",
     "build:manager": "pnpm --dir midgard-manager run build",
-    "manager:tx:corpus:generate:benchmark-runs": "pnpm --dir midgard-manager run tx:corpus:generate:benchmark-runs",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "format-check": "prettier --check \"**/*.{ts,tsx,md}\"",
     "test": "vitest run --mode=test",
@@ -81,22 +80,7 @@
     "test:unit:coverage:sdk": "node ../scripts/readme/refresh-badges.mjs sdk-coverage 1 && node ../scripts/readme/run-badged-command.mjs sdk-coverage \"vitest run --config vitest/sdk.coverage.config.mts --coverage\"",
     "test:unit:coverage:ts": "node ../scripts/readme/refresh-badges.mjs ts-coverage 1 && node ../scripts/readme/run-badged-command.mjs ts-coverage \"vitest run --config vitest/ts.coverage.config.mts --coverage\"",
     "test:unit:coverage:all": "pnpm run test:unit:coverage:node && pnpm run test:unit:coverage:sdk && pnpm run test:unit:coverage:ts",
-    "infra:testnet:bootstrap": "pnpm --dir midgard-node run infra:testnet:bootstrap",
-    "infra:testnet:bootstrap:state": "pnpm --dir midgard-node run infra:testnet:bootstrap:state",
-    "infra:testnet:bootstrap:secrets": "pnpm --dir midgard-node run infra:testnet:bootstrap:secrets",
-    "infra:testnet:images:push": "pnpm --dir midgard-node run infra:testnet:images:push",
-    "infra:testnet:apply:dry-run": "pnpm --dir midgard-node run infra:testnet:apply:dry-run",
-    "infra:testnet:apply:commit": "pnpm --dir midgard-node run infra:testnet:apply:commit",
-    "infra:testnet:plan": "pnpm --dir midgard-node run infra:testnet:plan",
-    "infra:testnet:output": "pnpm --dir midgard-node run infra:testnet:output",
-    "infra:testnet:validate": "pnpm --dir midgard-node run infra:testnet:validate",
-    "infra:testnet:logs": "pnpm --dir midgard-node run infra:testnet:logs",
-    "infra:testnet:live": "pnpm --dir midgard-node run infra:testnet:live",
-    "infra:testnet:release:tag:node": "pnpm --dir midgard-node run infra:testnet:release:tag:node",
-    "infra:testnet:restart": "pnpm --dir midgard-node run infra:testnet:restart",
-    "infra:testnet:ver:node": "pnpm --dir midgard-node run infra:testnet:ver:node",
-    "infra:terraform:check": "pnpm --dir midgard-node run infra:terraform:check",
-    "infra:check:all": "node ../scripts/readme/run-badged-command.mjs infra \"pnpm run infra:terraform:check\""
+    "infra:check:all": "node ../scripts/readme/run-badged-command.mjs infra \"pnpm --dir midgard-node run infra:terraform:check\""
   },
   "devDependencies": {
     "@vitest/coverage-v8": "3.2.6",
@@ -113,58 +97,5 @@
   "packageManager": "pnpm@10.33.4",
   "overrides": {
     "test-exclude": "^8.0.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "effect": "3.21.2",
-      "test-exclude": "^8.0.0",
-      "libsodium-wrappers-sumo": "0.8.4",
-      "libsodium-sumo": "0.8.4",
-      "@cardano-sdk/core": "0.46.12",
-      "@cardano-sdk/crypto": "0.4.5",
-      "ip-address": "10.2.0",
-      "pbkdf2": "3.1.5",
-      "sha.js": "2.4.12",
-      "protobufjs@7": "7.5.7",
-      "glob@10": "10.5.0",
-      "minimatch@3": "3.1.5",
-      "minimatch@9": "9.0.9",
-      "rollup@4": "4.60.3",
-      "esbuild": "0.28.1",
-      "flatted": "3.4.2",
-      "picomatch@2": "2.3.2",
-      "picomatch@4": "4.0.4",
-      "lodash": "4.18.1",
-      "brace-expansion@1": "1.1.14",
-      "brace-expansion@2": "2.1.0",
-      "ajv@6": "6.15.0",
-      "js-yaml": "4.2.0",
-      "postcss": "8.5.14",
-      "@eslint/plugin-kit": "0.7.1",
-      "diff@4": "4.0.4",
-      "glob": "^13.0.6",
-      "uuid": "^11.1.1",
-      "@effect/platform-node>ws": "8.21.0",
-      "@effect/platform-node-shared>ws": "8.21.0",
-      "undici": ">=7.28.0",
-      "ws@7": "7.5.11",
-      "vite@6": ">=6.4.3",
-      "@babel/core": ">=7.29.6",
-      "@opentelemetry/core": ">=2.8.0",
-      "shell-quote": ">=1.8.4"
-    },
-    "peerDependencyRules": {
-      "allowedVersions": {
-        "@harmoniclabs/crypto": "0.2.5"
-      }
-    },
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "cbor-extract",
-      "classic-level",
-      "esbuild",
-      "msgpackr-extract",
-      "protobufjs"
-    ]
   }
 }

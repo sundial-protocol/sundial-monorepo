@@ -53,3 +53,8 @@ output "efs_file_system_id" {
   description = "EFS file system used for MPT storage."
   value       = aws_efs_file_system.mpt.id
 }
+
+output "grafana_assets_bucket" {
+  description = "S3 bucket for Grafana provisioning assets (dashboard JSON)."
+  value       = aws_s3_bucket.grafana_assets.bucket
+}
