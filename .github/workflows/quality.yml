@@ -31,10 +31,17 @@ jobs:
         with:
           paths: '^(demo/|\.github/actions/|\.github/workflows/quality\.yml)'
 
+  # The gate below is applied per-step, not on the job. A job-level `if` skips
+  # the job before the matrix is expanded, so GitHub cannot evaluate
+  # `${{ matrix.name }}` and publishes a single check run literally named
+  # "matrix.name". The contexts required by the `main` ruleset (Build, Lint
+  # Check, Type Check, Format Check) would then never be reported at all, and
+  # every PR that does not touch demo/ would sit blocked on them forever.
+  # Keeping the matrix expanded lets each check report its real name and pass
+  # in seconds when there is nothing to run.
   checks:
     name: ${{ matrix.name }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-slim
     timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
@@ -55,19 +62,22 @@ jobs:
             command: pnpm run build
     steps:
       - name: Checkout
+        if: needs.detect-changes.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Setup l2 workspace
+        if: needs.detect-changes.outputs.run == 'true'
         uses: ./.github/actions/setup-l2
 
       - name: Setup OpenTofu
-        if: matrix.name == 'Format Check'
+        if: needs.detect-changes.outputs.run == 'true' && matrix.name == 'Format Check'
         uses: opentofu/setup-opentofu@v1
         with:
           tofu_version: 1.11.6
           tofu_wrapper: false
 
       - name: Run check
+        if: needs.detect-changes.outputs.run == 'true'
         run: ${{ matrix.command }}
         working-directory: demo
 

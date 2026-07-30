@@ -160,6 +160,7 @@ test-suite helpers-tests
   main-is:        Test.hs
   hs-source-dirs: tests
   other-modules:
+    Testing.Budget
     Testing.Crypto
     Testing.Eval
     Testing.MembershipValidator

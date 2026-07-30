@@ -29,11 +29,10 @@ validator spend(hub_oracle: ScriptHash) {
       validity_override,
     } = redeemer
 
-    let hub.Datum {
-      tx_order: tx_order_policy_id,
-      settlement: settlement_policy_id,
-      ..
-    } = hub.get_datum(reference_inputs, hub_oracle, hub_ref_input_index)
+    let hub_fields =
+      hub.get_datum_fields(reference_inputs, hub_oracle, hub_ref_input_index)
+    let tx_order_policy_id = hub_fields |> hub.tx_order_of
+    let settlement_policy_id = hub_fields |> hub.settlement_of
 
     let settlement.Datum { transactions_root, .. } =
       settlement.get_datum(
@@ -102,10 +101,11 @@ validator spend(hub_oracle: ScriptHash) {
 
     // 6. For tx order UTxOs to be collectible, they must be stored in
     //    the tree with the validity provided via the redeemer.
-    let Pair(tx_order_event_id, tx_order_event_tx) =
-      ledger_state.unsafe_event_to_key_value_pair(tx_order_event)
-    //
-    expect tx_order_tx: ledger_state.MidgardTxCompact = tx_order_event_tx
+    //    The datum is already fully decoded at script entry, so its `id` and
+    //    `tx` fields are used directly rather than re-parsing them from `Data`.
+    let ledger_state.TxOrderEvent { id: tx_order_id, tx: tx_order_tx } =
+      tx_order_event
+    let tx_order_event_id: Data = tx_order_id
     //
     let overridden_tx_order_tx: Data =
       ledger_state.MidgardTxCompact {
@@ -153,10 +153,7 @@ validator mint(hub_oracle: ScriptHash) {
     <-
       user_events.validate_mint(
         hub_oracle,
-        fn(hub_datum) {
-          let hub.Datum { tx_order_addr, .. } = hub_datum
-          tx_order_addr
-        },
+        fn(hub_fields) { hub_fields |> hub.tx_order_addr_of },
         redeemer,
         own_policy,
         tx,
