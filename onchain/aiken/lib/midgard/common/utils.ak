@@ -233,10 +233,10 @@ pub fn get_authentic_input_datum_with_policy_at(
   let (found_input, _) =
     authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
 
-  expect Some(Input {
+  expect Input {
     output: Output { datum: InlineDatum(input_datum_data), .. },
     ..
-  }) = Some(found_input)
+  } = found_input
 
   input_datum_data
 }
@@ -252,10 +252,10 @@ pub fn get_authentic_input_datum_and_asset_name_with_policy_at(
   let (found_input, input_nft_asset_name) =
     authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
 
-  expect Some(Input {
+  expect Input {
     output: Output { datum: InlineDatum(input_datum_data), .. },
     ..
-  }) = Some(found_input)
+  } = found_input
 
   return(input_nft_asset_name, input_datum_data)
 }
@@ -286,10 +286,10 @@ pub fn get_authentic_input_datum_with_nft_at(
   let (found_input, input_nft_asset_name) =
     authentic_input_and_asset_name(inputs, nft_policy_id, input_index)
 
-  expect Some(Input {
+  expect Input {
     output: Output { datum: InlineDatum(input_datum_data), .. },
     ..
-  }) = Some(found_input)
+  } = found_input
 
   expect input_nft_asset_name == nft_asset_name
   input_datum_data
