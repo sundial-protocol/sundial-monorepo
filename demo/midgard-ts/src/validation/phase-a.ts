@@ -28,7 +28,6 @@
 
 import * as CML from "@dcspark/cardano-multiplatform-lib-nodejs";
 import { midgardToCml, midgardValueToCml } from "../cardano";
-import { encodeTransaction } from "../index";
 import { OutputReference } from "../types/primitives";
 import {
   PhaseAAccepted,
@@ -74,8 +73,9 @@ function validateOne(
   // R2 - tx hash integrity
   // TODO: In theory I can just hash the Midgard TransactionBody with black2b-256 to achieve the same thing, no? The conversion to CML is done here just to be sure, but most likely should be dropped.
   let txBodyHash: Uint8Array;
+  let cmlTx: CML.Transaction;
   try {
-    const cmlTx = midgardToCml(tx, net);
+    cmlTx = midgardToCml(tx, net);
     txBodyHash = CML.hash_transaction(cmlTx.body()).to_raw_bytes();
   } catch (e) {
     return reject(
@@ -157,7 +157,14 @@ function validateOne(
   }
 
   // R11 - minimum fee
-  const encodedLen = encodeTransaction(tx).length;
+  //
+  // minFeeA/minFeeB are Cardano protocol parameters calibrated against the
+  // CBOR-encoded transaction size, not Midgard's internal binary encoding
+  // (which is 8-byte-aligned and larger, e.g. a fixed 40-byte
+  // OutputReference vs. CBOR's ~34 bytes). Measuring against
+  // encodeTransaction(tx).length would reject correctly-priced transactions
+  // that pay the textbook Cardano minimum fee against their real CBOR size.
+  const encodedLen = cmlTx.to_cbor_bytes().length;
   const minFee = config.minFeeA * BigInt(encodedLen) + config.minFeeB;
   if (body.fee < minFee) {
     return reject(txId, RejectCodes.MinFee, `${body.fee} < ${minFee}`);

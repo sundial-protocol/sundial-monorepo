@@ -114,6 +114,37 @@ it("bigint i64 round trips positive and negative amounts", () => {
     }
 });
 
+it("writeBigU64 throws on negative values instead of silently wrapping", () => {
+    const w = new Writer();
+    expect(() => writeBigU64(w, -5n)).toThrow(/OutOfRange/);
+});
+
+it("writeBigU64 throws on values above u64 max", () => {
+    const w = new Writer();
+    expect(() => writeBigU64(w, 0xffffffffffffffffn + 1n)).toThrow(/OutOfRange/);
+});
+
+it("writeBigU64 accepts u64 boundary values", () => {
+    const w1 = new Writer();
+    expect(() => writeBigU64(w1, 0n)).not.toThrow();
+    const w2 = new Writer();
+    expect(() => writeBigU64(w2, 0xffffffffffffffffn)).not.toThrow();
+});
+
+it("writeBigI64 throws on values outside i64 range", () => {
+    const w1 = new Writer();
+    expect(() => writeBigI64(w1, -(1n << 63n) - 1n)).toThrow(/OutOfRange/);
+    const w2 = new Writer();
+    expect(() => writeBigI64(w2, (1n << 63n))).toThrow(/OutOfRange/);
+});
+
+it("writeBigI64 accepts i64 boundary values", () => {
+    const w1 = new Writer();
+    expect(() => writeBigI64(w1, -(1n << 63n))).not.toThrow();
+    const w2 = new Writer();
+    expect(() => writeBigI64(w2, (1n << 63n) - 1n)).not.toThrow();
+});
+
 it("u16 round trip uses padded static encoding", () => {
     const input = 513;
     const w = new Writer();
