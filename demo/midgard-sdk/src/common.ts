@@ -24,17 +24,40 @@ import {
   Bech32DeserializationError,
   HashingError,
   LucidError,
+  TimeoutError,
   UnauthenticUtxoError,
 } from "./errors.js";
 import { getStateToken, logDroppedUTxOs } from "./internals.js";
 
 export * from "./errors.js";
 
-export const makeReturn = <A, E>(program: Effect.Effect<A, E>) => {
+/**
+ * Default ceiling for how long a single `makeReturn`-wrapped program (i.e.
+ * any public `fetchX`/`unsignedXTx` call, which may itself issue one or more
+ * provider requests) is allowed to run before failing with a `TimeoutError`.
+ * Without this, a provider RPC that never settles would hang the returned
+ * promise forever, with no SDK-level way to recover.
+ */
+export const DEFAULT_PROVIDER_TIMEOUT_MS = 30_000;
+
+export const makeReturn = <A, E>(
+  program: Effect.Effect<A, E>,
+  timeoutMs: number = DEFAULT_PROVIDER_TIMEOUT_MS,
+) => {
+  const timedProgram = program.pipe(
+    Effect.timeoutFail({
+      duration: timeoutMs,
+      onTimeout: () =>
+        new TimeoutError({
+          message: `Operation timed out after ${timeoutMs}ms`,
+          cause: "Effect.timeoutFail",
+        }),
+    }),
+  );
   return {
-    unsafeRun: () => Effect.runPromise(program),
-    safeRun: () => Effect.runPromise(Effect.either(program)),
-    program: () => program,
+    unsafeRun: () => Effect.runPromise(timedProgram),
+    safeRun: () => Effect.runPromise(Effect.either(timedProgram)),
+    program: () => timedProgram,
   };
 };
 

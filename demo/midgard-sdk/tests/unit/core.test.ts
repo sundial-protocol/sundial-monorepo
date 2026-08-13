@@ -61,6 +61,29 @@ describe("SDK unit core helpers", () => {
     expect(result.right).toBe("ok");
   });
 
+  it("makeReturn unsafeRun rejects with TimeoutError when the program hangs past the timeout", async () => {
+    const neverSettles = Effect.promise(() => new Promise<string>(() => {}));
+
+    await expect(makeReturn(neverSettles, 10).unsafeRun()).rejects.toThrow(
+      "Operation timed out after 10ms",
+    );
+  });
+
+  it("makeReturn safeRun reports a TimeoutError Left when the program hangs past the timeout", async () => {
+    const neverSettles = Effect.promise(() => new Promise<string>(() => {}));
+
+    const result = await makeReturn(neverSettles, 10).safeRun();
+    expect(result._tag).toBe("Left");
+    if (result._tag === "Left") {
+      expect(result.left._tag).toBe("TimeoutError");
+    }
+  });
+
+  it("makeReturn unsafeRun resolves normally when the program finishes within the timeout", async () => {
+    const result = await makeReturn(Effect.succeed("fast"), 1_000).unsafeRun();
+    expect(result).toBe("fast");
+  });
+
   it("Accept lowercase hex string", () => {
     expect(sdk.isHexString("deadbeef0123456789")).toBe(true);
   });
