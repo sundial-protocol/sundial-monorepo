@@ -126,7 +126,10 @@ export const incompleteWithdrawalTxProgram = (
 
     const withdrawalNFT = toUnit(params.policyId, assetName);
 
-    const inclusionTime = yield* findInclusionTimeForUserEvent(lucid);
+    const inclusionTime = yield* findInclusionTimeForUserEvent(
+      lucid,
+      "withdrawal",
+    );
 
     const withdrawalOrderDatum: WithdrawalOrderDatum = {
       event: {
