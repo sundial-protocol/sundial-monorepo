@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
-import { toUnit } from "@lucid-evolution/lucid";
+import { Data, toUnit } from "@lucid-evolution/lucid";
 
+import * as sdk from "../../src/index.ts";
 import {
   createSlashedOperatorMintRedeemerCBOR,
   fetchUserEventRefUTxO,
   getOperatorNFT,
+  incompleteRemoveOperatorBadSettlementTxProgram,
   incompleteResolveSettlementProgram,
   unsignedResolveSettlementTxProgram,
 } from "../../src/settlement.ts";
@@ -15,12 +17,14 @@ import {
   assetNameA,
   makeBuilderSpy,
   makeLucidMock,
+  makeMidgardValidatorsFixture,
   makeUtxo,
   merkleRootA,
   merkleRootB,
   policyIdA,
   posixT1,
   posixT2,
+  posixT3,
   pubKeyHashA,
   scriptHashA,
   txHashA,
@@ -223,5 +227,69 @@ describe("SDK unit settlement programs", () => {
     expect(deposit.utxo.txHash).toBe(txHashA);
     expect(txOrder.utxo.txHash).toBe(txHashB);
     expect(withdrawal.utxo.txHash).toBe("44".repeat(32));
+  });
+
+  it("Remove operator bad settlement reports a non-empty error when network is unspecified", async () => {
+    const builder = makeBuilderSpy();
+    const lucid = makeLucidMock(builder);
+
+    const activeDatum = Data.to(
+      { key: pubKeyHashA, link: null, bondUnlockTime: posixT2 },
+      sdk.ActiveOperatorDatum,
+    );
+    const retiredDatum = Data.to(
+      { key: scriptHashA, link: scriptHashA, bondUnlockTime: posixT3 },
+      sdk.RetiredOperatorDatum,
+    );
+    const validators = makeMidgardValidatorsFixture();
+    const hubDatum = await Effect.runPromise(
+      sdk.makeHubOracleDatum(validators as any),
+    );
+    const hubDatumCbor = Data.to(hubDatum, sdk.HubOracleDatum);
+
+    lucid.utxosAt
+      .mockResolvedValueOnce([
+        makeUtxo({ txHash: txHashA, outputIndex: 0, datum: activeDatum }),
+      ])
+      .mockResolvedValueOnce([
+        makeUtxo({ txHash: txHashB, outputIndex: 1, datum: retiredDatum }),
+      ])
+      .mockResolvedValueOnce([
+        makeUtxo({ txHash: txHashA, outputIndex: 0, datum: hubDatumCbor }),
+      ]);
+    vi.spyOn(lucid, "config").mockReturnValue({ network: undefined } as any);
+
+    const result = await Effect.runPromise(
+      Effect.either(
+        incompleteRemoveOperatorBadSettlementTxProgram(lucid as any, {
+          slashedOperatorKey: pubKeyHashA,
+          activeOperatorMintingPolicy: validatorA.mintingScript as any,
+          fraudProverAddress: addressKeyA,
+          fraudProverDatum: "00",
+          hubOracleValidator: validatorA,
+          eventType: "Deposit",
+          eventAddress: addressScriptA,
+          eventPolicyId: policyIdA,
+          activeOperatorParams: {
+            activeOperatorAddress: addressScriptA,
+            operator: pubKeyHashA,
+            activeOperatorPolicyId: policyIdA,
+          },
+          retiredOperatorParams: {
+            retiredOperatorAddress: addressScriptA,
+            operator: pubKeyHashA,
+            retiredOperatorPolicyId: policyIdA,
+          },
+        }),
+      ),
+    );
+
+    expect(result._tag).toBe("Left");
+    if (result._tag === "Left") {
+      expect(result.left._tag).toBe("UnspecifiedNetworkError");
+      expect(result.left.message).toBe(
+        "Failed to build the remove operator bad settlement transaction",
+      );
+    }
   });
 });
