@@ -56,6 +56,25 @@ describe("postSubmitHandler", () => {
     expect(body).toEqual({ error: "Invalid CBOR provided" });
   });
 
+  it("rejects odd-length hex CBOR", async () => {
+    // Regression guard: odd-length hex used to pass validation here and
+    // reach the tx-parse worker, whose fromHex() call throws synchronously
+    // outside any Effect/try boundary and crashes the worker thread.
+    const request = new Request("http://localhost/submit", {
+      method: "POST",
+      body: "abc",
+    });
+
+    const response = await Effect.runPromise(
+      runSubmitHandler(makeQueueStub(), request),
+    );
+    const webResponse = HttpServerResponse.toWeb(response);
+    const body = await webResponse.json();
+
+    expect(webResponse.status).toBe(400);
+    expect(body).toEqual({ error: "Invalid CBOR provided" });
+  });
+
   it("returns 200 with message id on successful enqueue", async () => {
     const queue = makeQueueStub({
       enqueue: (_value: string) => Effect.succeed("42-0"),

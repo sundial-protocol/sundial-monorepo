@@ -21,6 +21,14 @@ describe("parseTxCborInWorkerPool fallback", () => {
     expect(Exit.isFailure(exit)).toBe(true);
   });
 
+  it("surfaces malformed hex as an Effect failure instead of throwing", async () => {
+    // Regression guard: fromHex() throws a plain synchronous Error on
+    // odd-length hex. It must be caught inside Effect.try rather than
+    // escaping this call as an uncaught exception.
+    const exit = await Effect.runPromiseExit(parseTxCborInWorkerPool("abc", 1));
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
   it("reset is safe to call when no pool has been created", () => {
     expect(() => unsafeResetTxParseWorkerPoolForTesting()).not.toThrow();
   });
