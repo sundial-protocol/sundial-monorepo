@@ -590,9 +590,13 @@ const getStateQueueRootUnitDiagnosticsHandler =
     stateQueueRootUnitDiagnosticsSnapshot,
   );
 
+const NON_NEGATIVE_INTEGER_RE = /^\d+$/;
+
 const getTxsOfAddressHandler = Effect.gen(function* () {
   const params = yield* HttpServerRequest.ParsedSearchParams;
   const addr = params["address"];
+  const limitParam = params["limit"];
+  const offsetParam = params["offset"];
 
   if (typeof addr !== "string") {
     yield* Effect.logInfo(
@@ -603,6 +607,44 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
       { status: 400 },
     );
   }
+
+  if (
+    limitParam !== undefined &&
+    (typeof limitParam !== "string" ||
+      !NON_NEGATIVE_INTEGER_RE.test(limitParam) ||
+      Number(limitParam) < 1)
+  ) {
+    yield* Effect.logInfo(
+      `GET /${ADDRESS_HISTORY_ENDPOINT} - Invalid limit: ${limitParam}`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: `Invalid limit: ${limitParam}` },
+      { status: 400 },
+    );
+  }
+
+  if (
+    offsetParam !== undefined &&
+    (typeof offsetParam !== "string" ||
+      !NON_NEGATIVE_INTEGER_RE.test(offsetParam))
+  ) {
+    yield* Effect.logInfo(
+      `GET /${ADDRESS_HISTORY_ENDPOINT} - Invalid offset: ${offsetParam}`,
+    );
+    return yield* HttpServerResponse.json(
+      { error: `Invalid offset: ${offsetParam}` },
+      { status: 400 },
+    );
+  }
+
+  const limit = Math.min(
+    limitParam !== undefined
+      ? Number(limitParam)
+      : AddressHistoryDB.DEFAULT_ADDRESS_HISTORY_LIMIT,
+    AddressHistoryDB.MAX_ADDRESS_HISTORY_LIMIT,
+  );
+  const offset = offsetParam !== undefined ? Number(offsetParam) : 0;
+
   try {
     const addrDetails = getAddressDetails(addr);
     if (!addrDetails.paymentCredential) {
@@ -613,10 +655,18 @@ const getTxsOfAddressHandler = Effect.gen(function* () {
       );
     }
 
-    const cbors = yield* AddressHistoryDB.retrieve(addrDetails.address.bech32);
-    yield* Effect.logInfo(`Found ${cbors.length} CBORs with ${addr}`);
+    const cbors = yield* AddressHistoryDB.retrieve(addrDetails.address.bech32, {
+      limit,
+      offset,
+    });
+    yield* Effect.logInfo(
+      `Found ${cbors.length} CBORs with ${addr} (limit=${limit}, offset=${offset})`,
+    );
     return yield* HttpServerResponse.json({
       txs: cbors.map(SDK.bufferToHex),
+      limit,
+      offset,
+      hasMore: cbors.length === limit,
     });
   } catch (error) {
     yield* Effect.logInfo(`Invalid address: ${addr}`);
@@ -910,6 +960,7 @@ export const createResetHandlerForTesting = createResetHandler;
 export const createLockedActionHandlerForTesting = createLockedActionHandler;
 export const getStateQueueRootUnitDiagnosticsHandlerForTesting =
   createStateQueueRootUnitDiagnosticsHandler;
+export const getTxsOfAddressHandlerForTesting = getTxsOfAddressHandler;
 
 const getCommitmentWalletBalanceHandler = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
