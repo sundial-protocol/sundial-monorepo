@@ -72,6 +72,7 @@ const makeQueueStub = (
   const handleFailedSpy = vi.fn(() => Effect.succeed("retry" as const));
 
   return {
+    ping: Effect.void,
     enqueue: (_txCbor: string) => Effect.succeed("1-0"),
     rawXadd: (_txCbor, callback) => callback(null, "1-0"),
     ensureConsumerGroup: Effect.void,

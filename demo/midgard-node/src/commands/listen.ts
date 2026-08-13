@@ -135,20 +135,53 @@ const handleGenericGetFailure = (endpoint: string, e: SDK.GenericErrorFields) =>
 
 const getHealthLiveHandler = HttpServerResponse.json({ status: "ok" });
 
-const getHealthReadyHandler = HealthDB.checkReady.pipe(
-  Effect.flatMap(() => HttpServerResponse.json({ status: "ready" })),
-  Effect.catchTag("DatabaseError", (e) =>
-    Effect.gen(function* () {
-      yield* Effect.logError(
-        `GET /${HEALTH_READY_ENDPOINT} - database readiness failure: ${e.message}`,
-      );
-      return yield* HttpServerResponse.json(
-        { status: "not_ready" },
-        { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
-      );
-    }),
-  ),
-);
+type ReadinessSubsystem = "database" | "redis" | "l1Provider";
+
+const HEALTH_READY_CHECK_TIMEOUT_MS = 3_000;
+
+// Runs a subsystem probe with a bounded timeout, collapsing any failure
+// (probe error or timeout) to the subsystem's name rather than propagating it,
+// so one slow/unreachable dependency can't hang the whole readiness check.
+const checkReadinessSubsystem = <E, R>(
+  name: ReadinessSubsystem,
+  probe: Effect.Effect<void, E, R>,
+): Effect.Effect<ReadinessSubsystem | null, never, R> =>
+  probe.pipe(
+    Effect.timeout(`${HEALTH_READY_CHECK_TIMEOUT_MS} millis`),
+    Effect.as(null as ReadinessSubsystem | null),
+    Effect.catchAll(() => Effect.succeed(name)),
+  );
+
+const getHealthReadyHandler = Effect.gen(function* () {
+  const txIngressQueue = yield* TxIngressQueue;
+  const lucid = yield* Lucid;
+
+  const failing = yield* Effect.all(
+    [
+      checkReadinessSubsystem("database", HealthDB.checkReady),
+      checkReadinessSubsystem("redis", txIngressQueue.ping),
+      checkReadinessSubsystem("l1Provider", lucid.checkReady),
+    ],
+    { concurrency: "unbounded" },
+  ).pipe(
+    Effect.map(
+      (results) =>
+        results.filter((r): r is ReadinessSubsystem => r !== null),
+    ),
+  );
+
+  if (failing.length > 0) {
+    yield* Effect.logError(
+      `GET /${HEALTH_READY_ENDPOINT} - readiness failure: ${failing.join(", ")}`,
+    );
+    return yield* HttpServerResponse.json(
+      { status: "not_ready", failing },
+      { status: Http2Constants.HTTP_STATUS_SERVICE_UNAVAILABLE },
+    );
+  }
+
+  return yield* HttpServerResponse.json({ status: "ready" });
+});
 
 const lookupTxCbor = (txHashBytes: Buffer, txHashParam: string) =>
   MempoolDB.retrieveTxCborByHash(txHashBytes).pipe(
@@ -872,6 +905,7 @@ const postFaucetClaimsHandler = Effect.gen(function* () {
 
 export const postFaucetClaimsHandlerForTesting = postFaucetClaimsHandler;
 export const postSubmitHandlerForTesting = postSubmitHandler;
+export const getHealthReadyHandlerForTesting = getHealthReadyHandler;
 export const createResetHandlerForTesting = createResetHandler;
 export const createLockedActionHandlerForTesting = createLockedActionHandler;
 export const getStateQueueRootUnitDiagnosticsHandlerForTesting =
