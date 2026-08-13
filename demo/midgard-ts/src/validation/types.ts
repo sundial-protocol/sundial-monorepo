@@ -116,8 +116,16 @@ export type PhaseAConfig = {
 };
 
 export type PhaseBConfig = {
-  /** Current wall-clock time in milliseconds (POSIX ms). Used for R10. */
-  readonly nowMillis: number;
+  /**
+   * Current Cardano absolute slot number for the network being validated
+   * against. Used for R10.
+   *
+   * `validityIntervalStart`/`validityIntervalEnd` (ttl) on a transaction are
+   * slot numbers, not POSIX timestamps, so this must be a slot number too —
+   * e.g. via the caller's `unixTimeToSlot(network, Date.now())` — not
+   * `Date.now()` itself.
+   */
+  readonly nowSlot: number;
 };
 
 // ---------------------------------------------------------------------------
