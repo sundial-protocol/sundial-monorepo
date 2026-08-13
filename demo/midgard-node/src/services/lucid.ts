@@ -92,6 +92,14 @@ const makeDegradedCheckReady: Effect.Effect<void, SDK.LucidError> =
     }),
   );
 
+// Retries indefinitely (LUCID_INIT_MAX_RETRIES=-1) but with capped, jittered
+// exponential backoff rather than a fixed 1s interval, so a slow-to-warm-up
+// or rate-limited L1 provider (e.g. Blockfrost) isn't hammered forever.
+export const lucidInitRetrySchedule = Schedule.exponential("1 second").pipe(
+  Schedule.union(Schedule.spaced("30 seconds")),
+  Schedule.jittered,
+);
+
 const makeLucid: Effect.Effect<
   {
     // Backward-compatible alias to the main operator wallet API.
@@ -113,20 +121,32 @@ const makeLucid: Effect.Effect<
 > = Effect.gen(function* () {
   const nodeConfig = yield* NodeConfig;
 
-  // LUCID_INIT_MAX_RETRIES=-1 (default): retry indefinitely until the L1 provider
-  // is reachable. LUCID_INIT_MAX_RETRIES=0: try once; if it fails, run in degraded
-  // mode (no L1 connectivity). Use 0 in E2E test environments that don't need L1.
+  // NODE_ROLE=tx-processor only does Redis consumer-group processing and has
+  // no L1 dependency, so it never attempts (or retries) Lucid init.
+  //
+  // Otherwise, LUCID_INIT_MAX_RETRIES=-1 (default): retry indefinitely, with
+  // capped/jittered exponential backoff, until the L1 provider is reachable.
+  // LUCID_INIT_MAX_RETRIES=0: try once; if it fails, run in degraded mode (no
+  // L1 connectivity). Use 0 in E2E test environments that don't need L1.
   const lucidApisOption: Option.Option<LucidApis> =
-    nodeConfig.LUCID_INIT_MAX_RETRIES < 0
-      ? yield* buildPinnedLucidApis(nodeConfig)
-          .pipe(Effect.retry(Schedule.fixed("1000 millis")))
-          .pipe(Effect.map(Option.some))
-      : yield* Effect.option(buildPinnedLucidApis(nodeConfig));
+    nodeConfig.NODE_ROLE === "tx-processor"
+      ? Option.none()
+      : nodeConfig.LUCID_INIT_MAX_RETRIES < 0
+        ? yield* buildPinnedLucidApis(nodeConfig)
+            .pipe(Effect.retry(lucidInitRetrySchedule))
+            .pipe(Effect.map(Option.some))
+        : yield* Effect.option(buildPinnedLucidApis(nodeConfig));
 
   if (Option.isNone(lucidApisOption)) {
-    yield* Effect.logWarning(
-      `Lucid initialization failed; node running in degraded mode (no L1 connectivity). NODE_ROLE=${nodeConfig.NODE_ROLE}`,
-    );
+    if (nodeConfig.NODE_ROLE === "tx-processor") {
+      yield* Effect.logInfo(
+        `Lucid initialization skipped; NODE_ROLE=tx-processor has no L1 dependency.`,
+      );
+    } else {
+      yield* Effect.logWarning(
+        `Lucid initialization failed; node running in degraded mode (no L1 connectivity). NODE_ROLE=${nodeConfig.NODE_ROLE}`,
+      );
+    }
     // Proxy crashes with a descriptive message if L1 methods are actually called,
     // which should not happen for api/tx-processor roles.
     const degradedApi = new Proxy({} as LE.LucidEvolution, {
