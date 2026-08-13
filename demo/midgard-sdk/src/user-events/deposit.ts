@@ -108,7 +108,10 @@ export const incompleteDepositTxProgram = (
 
     const depositNFT = toUnit(params.policyId, assetName);
 
-    const inclusionTime = yield* findInclusionTimeForUserEvent(lucid);
+    const inclusionTime = yield* findInclusionTimeForUserEvent(
+      lucid,
+      "deposit",
+    );
 
     const depositDatum: DepositDatum = {
       event: {

@@ -110,7 +110,10 @@ export const incompleteTxOrderTxProgram = (
     );
     const txOrderNFT = toUnit(params.policyId, assetName);
 
-    const inclusionTime = yield* findInclusionTimeForUserEvent(lucid);
+    const inclusionTime = yield* findInclusionTimeForUserEvent(
+      lucid,
+      "tx order",
+    );
 
     const txOrderDatum: TxOrderDatum = {
       event: {

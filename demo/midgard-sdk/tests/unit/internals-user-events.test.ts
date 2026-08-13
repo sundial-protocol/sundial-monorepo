@@ -223,11 +223,28 @@ describe("SDK unit internals and user-event programs", () => {
     const lucid = makeLucidMock();
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     const inclusionTime = await Effect.runPromise(
-      findInclusionTimeForUserEvent(lucid as any),
+      findInclusionTimeForUserEvent(lucid as any, "deposit"),
     );
     expect(inclusionTime).toBe(1_050_000);
     expect(nowSpy).toHaveBeenCalled();
   });
+
+  it.each(["deposit", "tx order", "withdrawal"] as const)(
+    "Inclusion time reports %s in the error when network is unspecified",
+    async (eventName) => {
+      const lucid = makeLucidMock();
+      vi.spyOn(lucid, "config").mockReturnValue({ network: undefined } as any);
+      const result = await Effect.runPromise(
+        Effect.either(findInclusionTimeForUserEvent(lucid as any, eventName)),
+      );
+      expect(result._tag).toBe("Left");
+      if (result._tag === "Left") {
+        expect(result.left.message).toBe(
+          `Failed to build the ${eventName} transaction`,
+        );
+      }
+    },
+  );
 
   it("Nonce asset name uses provided nonce UTxO", async () => {
     const builder = makeBuilderSpy();
