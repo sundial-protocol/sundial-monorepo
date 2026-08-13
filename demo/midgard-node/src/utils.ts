@@ -39,7 +39,9 @@ export const logInfo = (msg: string) => {
 
 export const isHexString = (str: string): boolean => {
   const hexRegex = /^[0-9A-Fa-f]+$/;
-  return hexRegex.test(str);
+  // Odd-length input can't decode to whole bytes; fromHex() throws
+  // synchronously on it, so reject it here before it reaches any decoder.
+  return str.length % 2 === 0 && hexRegex.test(str);
 };
 
 export const breakDownTxMinimally = (

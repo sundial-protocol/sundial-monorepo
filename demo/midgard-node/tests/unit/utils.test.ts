@@ -13,6 +13,17 @@ describe("isHexString", () => {
   it("accepts uppercase hex string", () => {
     expect(isHexString("DEADBEEF0123456789")).toBe(true);
   });
+
+  it("rejects odd-length hex strings", () => {
+    // fromHex() throws a plain synchronous Error on odd-length input, so
+    // this must be rejected before it ever reaches a decoder.
+    expect(isHexString("abc")).toBe(false);
+    expect(isHexString("a")).toBe(false);
+  });
+
+  it("rejects non-hex characters", () => {
+    expect(isHexString("zz")).toBe(false);
+  });
 });
 
 describe("batchProgram", () => {
