@@ -9,6 +9,7 @@ import {
   fromHex,
   PolicyId,
 } from "@lucid-evolution/lucid";
+import { calculateMinLovelaceFromUTxO } from "@lucid-evolution/utils";
 import {
   GenericErrorFields,
   HashingError,
@@ -96,7 +97,7 @@ export const incompleteDepositTxProgram = (
   params: DepositParams,
 ): Effect.Effect<
   TxBuilder,
-  HashingError | LucidError | UnspecifiedNetworkError
+  HashingError | LucidError | UnspecifiedNetworkError | DepositError
 > =>
   Effect.gen(function* () {
     const { inputUtxo, assetName } = yield* getNonceInputAndAssetName(
@@ -130,11 +131,35 @@ export const incompleteDepositTxProgram = (
       },
     };
     const mintRedeemerCBOR = Data.to(mintRedeemer, UserEventMintRedeemer);
+
+    const protocolParameters = lucid.config().protocolParameters;
+    if (protocolParameters === undefined) {
+      return yield* new LucidError({
+        message: "Failed to build the deposit transaction",
+        cause: "Missing protocol parameters in Lucid config",
+      });
+    }
+    const minLovelace = calculateMinLovelaceFromUTxO(
+      protocolParameters.coinsPerUtxoByte,
+      {
+        txHash: inputUtxo.txHash,
+        outputIndex: inputUtxo.outputIndex,
+        address: params.depositScriptAddress,
+        assets: { [depositNFT]: 1n },
+        datum: depositDatumCBOR,
+      },
+    );
+    if (params.depositAmount < minLovelace) {
+      return yield* new DepositError({
+        message: `Deposit amount (${params.depositAmount} lovelace) is below the minimum ADA required to hold this UTxO (${minLovelace} lovelace)`,
+        cause: "InsufficientDepositAmount",
+      });
+    }
+
     const assets = {
       lovelace: params.depositAmount,
     };
 
-    // TODO: Currently there are no considerations for fees and/or min ADA.
     const tx = buildUserEventMintTransaction({
       lucid,
       inputUtxo,
