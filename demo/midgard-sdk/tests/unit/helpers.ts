@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Logger } from "effect";
 import {
   Data,
   credentialToAddress,
@@ -467,6 +467,21 @@ export const makeStateQueueUtxo = (params: {
     utxo,
     datum: params.datum,
     assetName,
+  };
+};
+
+/**
+ * Captures messages emitted via `Effect.log*` instead of letting them go to
+ * the default console logger, so tests can assert on diagnostic logging.
+ */
+export const captureLogs = () => {
+  const entries: unknown[][] = [];
+  const testLogger = Logger.make(({ message }) => {
+    entries.push(Array.isArray(message) ? message : [message]);
+  });
+  return {
+    entries,
+    layer: Logger.replace(Logger.defaultLogger, testLogger),
   };
 };
 

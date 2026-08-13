@@ -45,7 +45,8 @@ export type TxOrderUTxO = AuthenticUTxO<TxOrderDatum, UserEventExtraFields>;
 export type TxOrderFetchConfig = UserEventFetchConfig;
 
 /**
- * Silently drops invalid UTxOs.
+ * Drops invalid UTxOs; see `authenticateUTxOs` for the diagnostic logging
+ * emitted when that happens.
  */
 export const utxosToTxOrderUTxOs = (
   utxos: UTxO[],
