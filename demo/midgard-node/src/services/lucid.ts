@@ -1,6 +1,7 @@
 import { Effect, Option, Schedule } from "effect";
 import { ConfigError, NodeConfig } from "./config.js";
 import * as LE from "@lucid-evolution/lucid";
+import * as SDK from "@al-ft/midgard-sdk";
 
 interface LucidApis {
   mainApi: LE.LucidEvolution;
@@ -61,6 +62,36 @@ const buildPinnedLucidApis = (
     return { mainApi, blockCommitmentApi, mergeApi };
   });
 
+const makeL1ProviderCheckReady = (
+  mainApi: LE.LucidEvolution,
+): Effect.Effect<void, SDK.LucidError> => {
+  const provider = mainApi.config().provider;
+  return provider === undefined
+    ? Effect.fail(
+        new SDK.LucidError({
+          message: "L1 provider readiness check failed: no provider configured",
+          cause: undefined,
+        }),
+      )
+    : Effect.tryPromise({
+        try: () => provider.getProtocolParameters(),
+        catch: (e) =>
+          new SDK.LucidError({
+            message: "L1 provider readiness check failed",
+            cause: e,
+          }),
+      }).pipe(Effect.asVoid);
+};
+
+const makeDegradedCheckReady: Effect.Effect<void, SDK.LucidError> =
+  Effect.fail(
+    new SDK.LucidError({
+      message:
+        "Lucid not initialized (degraded mode); L1 provider unavailable",
+      cause: undefined,
+    }),
+  );
+
 const makeLucid: Effect.Effect<
   {
     // Backward-compatible alias to the main operator wallet API.
@@ -73,6 +104,9 @@ const makeLucid: Effect.Effect<
     switchToOperatorsMainWallet: Effect.Effect<void>;
     switchToOperatorsBlockCommitmentWallet: Effect.Effect<void>;
     switchToOperatorsMergingWallet: Effect.Effect<void>;
+    // Probes L1 connectivity by querying the underlying provider; used by
+    // the /health/ready endpoint so degraded/unreachable L1 fails readiness.
+    checkReady: Effect.Effect<void, SDK.LucidError>;
   },
   ConfigError,
   NodeConfig
@@ -114,6 +148,7 @@ const makeLucid: Effect.Effect<
       switchToOperatorsMainWallet: degradedWalletSwitch,
       switchToOperatorsBlockCommitmentWallet: degradedWalletSwitch,
       switchToOperatorsMergingWallet: degradedWalletSwitch,
+      checkReady: makeDegradedCheckReady,
     };
   }
 
@@ -142,6 +177,7 @@ const makeLucid: Effect.Effect<
     switchToOperatorsMainWallet: noOpWalletSwitch,
     switchToOperatorsBlockCommitmentWallet: noOpWalletSwitch,
     switchToOperatorsMergingWallet: noOpWalletSwitch,
+    checkReady: makeL1ProviderCheckReady(lucidApis.mainApi),
   };
 });
 
@@ -149,3 +185,5 @@ export class Lucid extends Effect.Service<Lucid>()("Lucid", {
   effect: makeLucid,
   dependencies: [NodeConfig.layer],
 }) {}
+
+export const makeL1ProviderCheckReadyForTesting = makeL1ProviderCheckReady;

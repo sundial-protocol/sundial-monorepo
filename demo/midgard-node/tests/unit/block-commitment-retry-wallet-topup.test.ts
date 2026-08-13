@@ -210,6 +210,7 @@ const makeRuntimeLayer = (
       switchToOperatorsMainWallet: Effect.void,
       switchToOperatorsBlockCommitmentWallet: Effect.void,
       switchToOperatorsMergingWallet: Effect.void,
+      checkReady: Effect.void,
     }),
   );
 };

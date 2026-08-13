@@ -28,6 +28,7 @@ const makeQueueStub = (
   );
 
   const queue: TxIngressQueueService = {
+    ping: Effect.void,
     enqueue: (_txCbor: string) => Effect.succeed("1-0"),
     rawXadd: (_txCbor, callback) => callback(null, "1-0"),
     ensureConsumerGroup: Effect.void,

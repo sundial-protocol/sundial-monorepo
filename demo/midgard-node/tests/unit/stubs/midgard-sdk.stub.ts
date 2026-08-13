@@ -40,6 +40,16 @@ export class CmlDeserializationError extends Error {
   }
 }
 
+export class LucidError extends Error {
+  readonly _tag = "LucidError";
+  readonly cause?: unknown;
+  constructor(fields: GenericErrorFields) {
+    super(fields.message);
+    this.name = "LucidError";
+    this.cause = fields.cause;
+  }
+}
+
 export const outRefKey = (ref: { tx_id: Uint8Array; index: number }): string =>
   `${Buffer.from(ref.tx_id).toString("hex")}:${ref.index}`;
 
