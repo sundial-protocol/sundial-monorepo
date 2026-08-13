@@ -208,8 +208,59 @@ export const authenticateUTxO: {
   );
 };
 
+export type DroppedUTxO = {
+  readonly utxo: UTxO;
+  readonly error: { readonly _tag: string; readonly message: string; readonly cause: unknown };
+};
+
 /**
- * Silently drops invalid UTxOs.
+ * Logs a warning listing every UTxO that failed conversion, so a caller
+ * seeing an empty (or shorter than expected) result can tell "nothing here"
+ * apart from "some UTxOs failed to parse/authenticate" by checking the logs,
+ * rather than the failures being silently swallowed with no diagnostic path.
+ */
+export const logDroppedUTxOs = (
+  context: string,
+  failures: ReadonlyArray<DroppedUTxO>,
+): Effect.Effect<void> =>
+  failures.length === 0
+    ? Effect.void
+    : Effect.logWarning(
+        `${context}: dropped ${failures.length} invalid UTxO(s)`,
+        failures.map(({ utxo, error }) => ({
+          utxo: `${utxo.txHash}#${utxo.outputIndex}`,
+          tag: error._tag,
+          message: error.message,
+          cause: error.cause,
+        })),
+      );
+
+const authenticateAndLogDropped = <TAuth>(
+  utxos: UTxO[],
+  nftPolicy: string,
+  effects: Effect.Effect<TAuth, DataCoercionError | UnauthenticUtxoError>[],
+): Effect.Effect<TAuth[]> =>
+  Effect.gen(function* () {
+    const effectsWithRef = effects.map((effect, i) =>
+      effect.pipe(
+        Effect.mapError((error) => ({ utxo: utxos[i], error }) as const),
+      ),
+    );
+    const [failures, successes] = yield* Effect.partition(
+      effectsWithRef,
+      (effect) => effect,
+    );
+    yield* logDroppedUTxOs(
+      `authenticateUTxOs (policy ${nftPolicy})`,
+      failures,
+    );
+    return successes;
+  });
+
+/**
+ * Drops UTxOs that fail to authenticate (wrong/missing datum, wrong NFT,
+ * etc.), logging a warning with each dropped UTxO's reference and error so
+ * the failures remain diagnosable rather than silently swallowed.
  */
 export const authenticateUTxOs: {
   <TDatum>(
@@ -236,7 +287,7 @@ export const authenticateUTxOs: {
     >[] = utxos.map((utxo) =>
       authenticateUTxO<TDatum>(utxo, nftPolicy, schema),
     );
-    return Effect.allSuccesses(effects);
+    return authenticateAndLogDropped(utxos, nftPolicy, effects);
   }
 
   const effects: Effect.Effect<
@@ -245,7 +296,7 @@ export const authenticateUTxOs: {
   >[] = utxos.map((utxo) =>
     authenticateUTxO<TDatum, TExtra>(utxo, nftPolicy, schema, extraFields),
   );
-  return Effect.allSuccesses(effects);
+  return authenticateAndLogDropped(utxos, nftPolicy, effects);
 };
 
 export type FetchSingleAuthenticUTxOConfig<

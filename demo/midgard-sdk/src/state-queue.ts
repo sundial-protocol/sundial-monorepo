@@ -29,7 +29,7 @@ import {
   utxoAtByNFTUnit,
 } from "@/common.js";
 import { LucidError, makeReturn } from "@/common.js";
-import { getStateToken } from "@/internals.js";
+import { getStateToken, logDroppedUTxOs } from "@/internals.js";
 import {
   NodeDatum,
   NodeDatumSchema,
@@ -158,15 +158,31 @@ export const utxoToStateQueueUTxO = (
   });
 
 /**
- * Silently drops invalid UTxOs.
+ * Drops UTxOs that fail to convert to a `StateQueueUTxO` (wrong/missing
+ * datum, wrong NFT, etc.), logging a warning with each dropped UTxO's
+ * reference and error so the failures remain diagnosable rather than
+ * silently swallowed.
  */
 export const utxosToStateQueueUTxOs = (
   utxos: UTxO[],
   nftPolicy: string,
-): Effect.Effect<StateQueueUTxO[]> => {
-  const effects = utxos.map((u) => utxoToStateQueueUTxO(u, nftPolicy));
-  return Effect.allSuccesses(effects);
-};
+): Effect.Effect<StateQueueUTxO[]> =>
+  Effect.gen(function* () {
+    const effectsWithRef = utxos.map((utxo) =>
+      utxoToStateQueueUTxO(utxo, nftPolicy).pipe(
+        Effect.mapError((error) => ({ utxo, error }) as const),
+      ),
+    );
+    const [failures, successes] = yield* Effect.partition(
+      effectsWithRef,
+      (effect) => effect,
+    );
+    yield* logDroppedUTxOs(
+      `utxosToStateQueueUTxOs (policy ${nftPolicy})`,
+      failures,
+    );
+    return successes;
+  });
 
 export const findLinkStateQueueUTxO = (
   link: NodeKey,
