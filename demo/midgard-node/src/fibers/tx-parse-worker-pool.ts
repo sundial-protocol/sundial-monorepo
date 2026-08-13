@@ -37,6 +37,10 @@ type PendingRequest = {
 type WorkerSlot = {
   worker: Worker;
   pending: Map<number, PendingRequest>;
+  // Set before a deliberate `.terminate()` (pool reset/shutdown) so the
+  // "exit" handler below can tell that apart from a crash and skip
+  // respawning into a pool that's being torn down anyway.
+  terminated: boolean;
 };
 
 type TxParseWorkerPoolState = {
@@ -76,6 +80,7 @@ const spawnWorker = (): WorkerSlot => {
   const workerSlot: WorkerSlot = {
     worker,
     pending: new Map(),
+    terminated: false,
   };
 
   worker.on("message", (message: ParseTxResponseMessage) => {
@@ -118,16 +123,35 @@ const spawnWorker = (): WorkerSlot => {
         `exit code ${code}`,
         `tx parse worker exited with code ${code}`,
       );
-      return;
+    } else {
+      failAllPendingRequests(
+        workerSlot,
+        "exit code 0",
+        "tx parse worker exited while request was in-flight",
+      );
     }
-    failAllPendingRequests(
-      workerSlot,
-      "exit code 0",
-      "tx parse worker exited while request was in-flight",
-    );
+    // A deliberate `.terminate()` (pool reset/shutdown) already marks the
+    // slot as terminated, so only an unexpected crash reaches here. Replace
+    // the dead slot in place so the pool doesn't permanently lose capacity
+    // and future round-robin turns don't keep hitting a terminated worker.
+    if (!workerSlot.terminated) {
+      respawnWorkerSlot(workerSlot);
+    }
   });
 
   return workerSlot;
+};
+
+const respawnWorkerSlot = (deadSlot: WorkerSlot) => {
+  const state = txParseWorkerPoolState;
+  if (state === null) {
+    return;
+  }
+  const index = state.workers.indexOf(deadSlot);
+  if (index === -1) {
+    return;
+  }
+  state.workers[index] = spawnWorker();
 };
 
 const terminateWorkerPool = (state: TxParseWorkerPoolState | null) => {
@@ -135,6 +159,7 @@ const terminateWorkerPool = (state: TxParseWorkerPoolState | null) => {
     return;
   }
   for (const workerSlot of state.workers) {
+    workerSlot.terminated = true;
     failAllPendingRequests(
       workerSlot,
       "pool reset",
@@ -222,7 +247,19 @@ export const parseTxCborInWorkerPool = (
             }),
           ),
         )
-    : breakDownTx(fromHex(txCborHex));
+    : // fromHex() throws a plain synchronous Error on malformed input; run
+      // it inside Effect.try so a bad payload surfaces as a normal Effect
+      // failure instead of an uncaught exception on this path.
+      Effect.try({
+        try: () => fromHex(txCborHex),
+        catch: (e) =>
+          new SDK.CmlDeserializationError({
+            message: `Failed to decode hex-encoded transaction: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+            cause: e,
+          }),
+      }).pipe(Effect.flatMap(breakDownTx));
 
 export const unsafeResetTxParseWorkerPoolForTesting = () => {
   terminateWorkerPool(txParseWorkerPoolState);
