@@ -296,7 +296,20 @@ export class MidgardMpt {
             valueEncoding,
           }),
         catch: (e) => MptError.trieCreate(trieName, e),
-      });
+      }).pipe(
+        // db.open() above already succeeded by this point, so on failure here
+        // the LevelDB handle must be closed explicitly. Otherwise its on-disk
+        // lock leaks forever: every retry opens a brand new Level instance
+        // against the same path and fails to acquire the same still-held
+        // lock, with no way to recover short of a process restart.
+        Effect.tapError(() =>
+          Effect.promise(() =>
+            databaseAndPath
+              ? databaseAndPath.database.close().catch(() => undefined)
+              : Promise.resolve(),
+          ),
+        ),
+      );
       return new MidgardMpt(trie, trieName, databaseAndPath);
     });
   }
