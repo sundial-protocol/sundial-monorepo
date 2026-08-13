@@ -100,6 +100,12 @@ export class Reader {
   remaining(): number {
     return this.buf.length - this.pos;
   }
+
+  // Current absolute byte offset into the input buffer; used to pinpoint
+  // where in a multi-KB block a decode error occurred.
+  tell(): number {
+    return this.pos;
+  }
 }
 
 // ---------------------------------------------------------------------------

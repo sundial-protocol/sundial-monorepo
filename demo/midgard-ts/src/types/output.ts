@@ -312,6 +312,7 @@ function writeValueDynamic(w: Writer, v: Value): void {
 
 // fuel: fuel-types/src/canonical.rs:167 — Deserialize::decode_static (reads discriminant, branches on variant)
 function readValueStatic(r: Reader): ValuePartial {
+  const discOffset = r.tell();
   const disc = readU64(r);
   if (disc === 0) {
     return { type: "Coin", coin: readBigU64(r) };
@@ -320,7 +321,9 @@ function readValueStatic(r: Reader): ValuePartial {
     const maPartial = readMultiassetStatic(r);
     return { type: "MultiAsset", coin, maPartial };
   }
-  throw new Error("UnknownDiscriminant for Value");
+  throw new Error(
+    `UnknownDiscriminant for Value: got ${disc} at byte offset ${discOffset}, expected 0 (Coin) or 1 (MultiAsset)`,
+  );
 }
 
 // fuel: fuel-types/src/canonical.rs:172 — Deserialize::decode_dynamic (MultiAsset variant only)
@@ -358,6 +361,7 @@ function writeValueCompactStatic(w: Writer, v: ValueCompact): void {
 
 // fuel: fuel-types/src/canonical.rs:167 — Deserialize::decode_static (reads discriminant + variant fields)
 function readValueCompactStatic(r: Reader): ValueCompact {
+  const discOffset = r.tell();
   const disc = readU64(r);
   if (disc === 0) return { type: "Coin", coin: readBigU64(r) };
   if (disc === 1) {
@@ -365,7 +369,9 @@ function readValueCompactStatic(r: Reader): ValueCompact {
     const hash = readHash32Static(r);
     return { type: "MultiAsset", coin, hash };
   }
-  throw new Error("UnknownDiscriminant for ValueCompact");
+  throw new Error(
+    `UnknownDiscriminant for ValueCompact: got ${disc} at byte offset ${discOffset}, expected 0 (Coin) or 1 (MultiAsset)`,
+  );
 }
 
 // ===========================================================================
