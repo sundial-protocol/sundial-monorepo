@@ -672,7 +672,8 @@ export const incompleteRemoveOperatorBadSettlementTxProgram = (
     const network = lucid.config().network;
     if (!network) {
       return yield* new UnspecifiedNetworkError({
-        message: "",
+        message:
+          "Failed to build the remove operator bad settlement transaction",
         cause: "Cardano network not found",
       });
     }
