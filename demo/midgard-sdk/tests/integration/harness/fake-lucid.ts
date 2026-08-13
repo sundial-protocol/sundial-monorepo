@@ -14,6 +14,8 @@ export type FakeLucidOptions = {
   walletUtxos?: unknown[];
   /** Network returned by `config().network`. */
   network?: string;
+  /** `coinsPerUtxoByte` returned by `config().protocolParameters`. */
+  coinsPerUtxoByte?: bigint;
 };
 
 export type SubmitRecorder = {
@@ -64,7 +66,10 @@ export type FakeLucid = {
     address: () => Promise<string>;
     submitTx: (cbor: string) => Promise<string>;
   };
-  config: () => { network: string };
+  config: () => {
+    network: string;
+    protocolParameters: { coinsPerUtxoByte: bigint };
+  };
   newTx: () => FakeBuilder;
 };
 
@@ -164,7 +169,12 @@ export const makeFakeLucid = (opts: FakeLucidOptions = {}): FakeLucidResult => {
         return submitRecorder.lastTxId;
       },
     }),
-    config: () => ({ network: opts.network ?? "Preview" }),
+    config: () => ({
+      network: opts.network ?? "Preview",
+      protocolParameters: {
+        coinsPerUtxoByte: opts.coinsPerUtxoByte ?? 4_310n,
+      },
+    }),
     newTx: makeBuilderSpy,
   };
 
