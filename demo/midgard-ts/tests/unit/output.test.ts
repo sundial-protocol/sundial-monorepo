@@ -178,3 +178,31 @@ it("readMintStatic rejects inner asset count exceeding remaining bytes", () => {
     const r = new Reader(w.toBytes());
     expect(() => readMintStatic(r)).toThrow(/UnboundedLength/);
 });
+
+// ---------------------------------------------------------------------------
+// Discriminant-decode errors must report the bad value and its byte offset
+// ---------------------------------------------------------------------------
+
+it("decodeTransactionOutput reports the bad Value discriminant and its byte offset", () => {
+    const encoded = encodeTransactionOutput(coinOutputA);
+    // address len (8 bytes) precedes the value discriminant, which starts at offset 8
+    encoded[15] = 9; // corrupt the low byte of the discriminant u64
+    expect(() => decodeTransactionOutput(encoded)).toThrow(
+      /UnknownDiscriminant for Value: got 9 at byte offset 8/,
+    );
+});
+
+it("decodeTransactionOutputCompact reports the bad ValueCompact discriminant and its byte offset", () => {
+    const compact: TransactionOutputCompact = {
+      address: addressA,
+      value: { type: "Coin", coin: 1_000_000n },
+      datum_hash: undefined,
+      script_ref_hash: undefined,
+    };
+    const encoded = encodeTransactionOutputCompact(compact);
+    // address len (8 bytes) precedes the value discriminant, which starts at offset 8
+    encoded[15] = 9; // corrupt the low byte of the discriminant u64
+    expect(() => decodeTransactionOutputCompact(encoded)).toThrow(
+      /UnknownDiscriminant for ValueCompact: got 9 at byte offset 8/,
+    );
+});

@@ -251,11 +251,14 @@ export function writeCredentialStatic(w: Writer, c: Credential): void {
 
 // fuel: fuel-types/src/canonical.rs:167 — Deserialize::decode_static (reads discriminant, branches)
 export function readCredentialStatic(r: Reader): Credential {
+  const discOffset = r.tell();
   const disc = readU64(r);
   const hash = readHash28Static(r);
   if (disc === 0) return { type: "PubKey", hash };
   if (disc === 1) return { type: "Script", hash };
-  throw new Error("UnknownDiscriminant for Credential");
+  throw new Error(
+    `UnknownDiscriminant for Credential: got ${disc} at byte offset ${discOffset}, expected 0 (PubKey) or 1 (Script)`,
+  );
 }
 
 // fuel: fuel-types/src/canonical.rs:112 — Serialize::to_bytes (static-only, no dynamic section)
