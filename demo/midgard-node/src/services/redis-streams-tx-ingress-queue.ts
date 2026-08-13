@@ -269,6 +269,7 @@ const makeRedisStreamsTxIngressQueue = Effect.acquireRelease(
     });
 
     const queueService: TxIngressQueueService = {
+      ping: tryRedis("PING", () => producerClient.ping()).pipe(Effect.asVoid),
       enqueue: (txCbor: string) =>
         tryRedis("XADD", () =>
           producerClient.xadd(

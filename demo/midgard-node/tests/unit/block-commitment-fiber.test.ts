@@ -70,6 +70,7 @@ const fakeLucidLayer = Layer.succeed(
     switchToOperatorsMainWallet: Effect.void,
     switchToOperatorsBlockCommitmentWallet: Effect.void,
     switchToOperatorsMergingWallet: Effect.void,
+    checkReady: Effect.void,
   }),
 );
 
