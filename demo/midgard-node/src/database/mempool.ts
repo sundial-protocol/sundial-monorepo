@@ -3,7 +3,7 @@ import { NodeConfig } from "@/services/config.js";
 import { Effect } from "effect";
 import { SqlClient, SqlError } from "@effect/sql";
 import * as SDK from "@al-ft/midgard-sdk";
-import { CML } from "@lucid-evolution/lucid";
+import { CML, unixTimeToSlot } from "@lucid-evolution/lucid";
 import {
   cmlOutputToMidgard,
   cmlToMidgard,
@@ -486,7 +486,7 @@ export const validateAndInsertMultiple = (
         );
         const preState = decodeLedgerState(yield* MempoolLedgerDB.retrieve);
         const phaseB = runPhaseBValidationWithPatch(phaseA.accepted, preState, {
-          nowMillis: Date.now(),
+          nowSlot: unixTimeToSlot(nodeConfig.NETWORK, Date.now()),
         });
 
         const acceptedArrivalSeqs = new Set(
