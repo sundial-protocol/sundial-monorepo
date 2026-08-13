@@ -43,7 +43,8 @@ export type DepositUTxO = AuthenticUTxO<DepositDatum, UserEventExtraFields>;
 export type DepositFetchConfig = UserEventFetchConfig;
 
 /**
- * Silently drops invalid UTxOs.
+ * Drops invalid UTxOs; see `authenticateUTxOs` for the diagnostic logging
+ * emitted when that happens.
  */
 export const utxosToDepositUTxOs = (
   utxos: UTxO[],

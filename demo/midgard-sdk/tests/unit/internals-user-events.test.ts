@@ -26,6 +26,7 @@ import {
 import {
   addressDataKeyA,
   addressScriptA,
+  captureLogs,
   policyIdA,
   posixT0,
   posixT1,
@@ -115,6 +116,43 @@ describe("SDK unit internals and user-event programs", () => {
     expect(result).toHaveLength(2);
     expect(result[0].utxo.txHash).toBe(txHashA);
     expect(result[1].utxo.txHash).toBe(txHashB);
+  });
+
+  it("authenticateUTxOs logs dropped UTxOs instead of silently discarding them", async () => {
+    const validUtxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
+    const invalidUtxo = makeUtxo({
+      txHash: txHashB,
+      outputIndex: 1,
+      datum: undefined,
+    });
+
+    const { entries, layer } = captureLogs();
+
+    const result = await Effect.runPromise(
+      authenticateUTxOs(
+        [validUtxo as any, invalidUtxo as any],
+        policyIdA,
+        DepositDatum,
+      ).pipe(Effect.provide(layer)),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].utxo.txHash).toBe(txHashA);
+
+    const warning = entries.find(
+      (entry) =>
+        typeof entry[0] === "string" &&
+        entry[0].includes("dropped 1 invalid UTxO"),
+    );
+    expect(warning).toBeDefined();
+    const details = warning?.[1] as Array<{ utxo: string; tag: string }>;
+    expect(details).toHaveLength(1);
+    expect(details[0].utxo).toBe(`${txHashB}#1`);
+    expect(details[0].tag).toBe("DataCoercionError");
   });
 
   it("fetchSingleAuthenticUTxOProgram returns one converted UTxO", async () => {

@@ -11,6 +11,7 @@ import {
   addressKeyA,
   addressScriptA,
   assetNameA,
+  captureLogs,
   hexA,
   makeLucidMock,
   makeUtxo,
@@ -182,6 +183,41 @@ describe("SDK unit core helpers", () => {
       expect(value.length).toBeGreaterThan(0);
       expect(/^[a-zA-Z0-9_]+$/.test(value)).toBe(true);
     }
+  });
+
+  describe("utxosAtByNFTPolicyId", () => {
+    it("logs a warning with dropped UTxO details and returns only authentic ones", async () => {
+      const authenticUtxo = makeUtxo({ txHash: txHashA, outputIndex: 0 });
+      const otherPolicyUtxo = makeUtxo({
+        txHash: txHashB,
+        outputIndex: 1,
+        unit: `${"bb".repeat(28)}${assetNameA}`,
+      });
+      const lucid = makeLucidMock();
+      lucid.utxosAt.mockResolvedValue([authenticUtxo, otherPolicyUtxo]);
+
+      const { entries, layer } = captureLogs();
+
+      const result = await Effect.runPromise(
+        sdk
+          .utxosAtByNFTPolicyId(lucid as any, addressScriptA, policyIdA)
+          .pipe(Effect.provide(layer)),
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].utxo.txHash).toBe(txHashA);
+
+      const warning = entries.find(
+        (entry) =>
+          typeof entry[0] === "string" &&
+          entry[0].includes("dropped 1 invalid UTxO"),
+      );
+      expect(warning).toBeDefined();
+      const details = warning?.[1] as Array<{ utxo: string; tag: string }>;
+      expect(details).toHaveLength(1);
+      expect(details[0].utxo).toBe(`${txHashB}#1`);
+      expect(details[0].tag).toBe("UnauthenticUtxoError");
+    });
   });
 
   describe("utxoAtByNFTUnit", () => {
