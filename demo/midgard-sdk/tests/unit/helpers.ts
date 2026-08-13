@@ -370,7 +370,10 @@ export const makeLucidMock = (builder?: BuilderSpy): LucidMock => {
     utxosAt: vi.fn(async () => []),
     utxosAtWithUnit: vi.fn(async () => []),
     wallet: vi.fn(() => wallet),
-    config: vi.fn(() => ({ network: "Preview" })),
+    config: vi.fn(() => ({
+      network: "Preview",
+      protocolParameters: { coinsPerUtxoByte: 4_310n },
+    })),
     overrideUTxOs: vi.fn(),
     switchProvider: vi.fn(async () => undefined),
     fromTx: vi.fn(() => selectedBuilder.completedTx),

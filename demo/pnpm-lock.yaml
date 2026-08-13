@@ -116,7 +116,7 @@ importers:
         version: 0.3.0
       '@lucid-evolution/lucid':
         specifier: ^0.4.30
-        version: 0.4.30(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)(rxjs@7.8.2)
+        version: 0.4.30(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)(fast-check@3.23.2)
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -198,7 +198,10 @@ importers:
         version: 0.3.0
       '@lucid-evolution/lucid':
         specifier: ^0.4.30
-        version: 0.4.30(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)(rxjs@7.8.2)
+        version: 0.4.30(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)(rxjs@7.8.2)
+      '@lucid-evolution/utils':
+        specifier: ^0.1.66
+        version: 0.1.66(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0
@@ -4471,7 +4474,31 @@ snapshots:
 
   '@cardano-ogmios/schema@6.9.0': {}
 
-  '@cardano-sdk/core@0.46.12(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(rxjs@7.8.2)':
+  '@cardano-sdk/core@0.46.12(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)':
+    dependencies:
+      '@biglup/is-cid': 1.0.3
+      '@cardano-ogmios/client': 6.9.0
+      '@cardano-ogmios/schema': 6.9.0
+      '@cardano-sdk/crypto': 0.4.5(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)
+      '@cardano-sdk/util': 0.17.1
+      '@foxglove/crc': 0.0.3
+      '@scure/base': 1.2.6
+      fraction.js: 4.0.1
+      ip-address: 10.2.0
+      lodash: 4.18.1
+      ts-custom-error: 3.3.1
+      ts-log: 2.2.7
+      web-encoding: 1.1.5
+    transitivePeerDependencies:
+      - '@dcspark/cardano-multiplatform-lib-asmjs'
+      - '@dcspark/cardano-multiplatform-lib-browser'
+      - '@dcspark/cardano-multiplatform-lib-nodejs'
+      - bufferutil
+      - encoding
+      - react-native-b4a
+      - utf-8-validate
+
+  '@cardano-sdk/core@0.46.12(rxjs@7.8.2)':
     dependencies:
       '@biglup/is-cid': 1.0.3
       '@cardano-ogmios/client': 6.9.0
@@ -5141,7 +5168,7 @@ snapshots:
 
   '@lucid-evolution/crc8@0.1.8': {}
 
-  '@lucid-evolution/lucid@0.4.30(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)(rxjs@7.8.2)':
+  '@lucid-evolution/lucid@0.4.30(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)(fast-check@3.23.2)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
@@ -5150,11 +5177,41 @@ snapshots:
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
       '@lucid-evolution/plutus': 0.1.29
-      '@lucid-evolution/provider': 0.1.91(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
+      '@lucid-evolution/provider': 0.1.91(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)
       '@lucid-evolution/sign_data': 0.1.25
       '@lucid-evolution/uplc': 0.2.20
-      '@lucid-evolution/utils': 0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
-      '@lucid-evolution/wallet': 0.1.72(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
+      '@lucid-evolution/utils': 0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)
+      '@lucid-evolution/wallet': 0.1.72(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)
+      effect: 3.21.2
+    transitivePeerDependencies:
+      - '@dcspark/cardano-multiplatform-lib-asmjs'
+      - '@dcspark/cardano-multiplatform-lib-browser'
+      - '@dcspark/cardano-multiplatform-lib-nodejs'
+      - '@harmoniclabs/bytestring'
+      - '@harmoniclabs/cbor'
+      - '@harmoniclabs/crypto'
+      - '@harmoniclabs/pair'
+      - bufferutil
+      - encoding
+      - fast-check
+      - react-native-b4a
+      - rxjs
+      - utf-8-validate
+
+  '@lucid-evolution/lucid@0.4.30(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(fast-check@3.23.2)(rxjs@7.8.2)':
+    dependencies:
+      '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
+      '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
+      '@effect/schema': 0.66.16(effect@3.21.2)(fast-check@3.23.2)
+      '@emurgo/cardano-message-signing-nodejs': 1.1.0
+      '@lucid-evolution/core-types': 0.1.22
+      '@lucid-evolution/core-utils': 0.1.16
+      '@lucid-evolution/plutus': 0.1.29
+      '@lucid-evolution/provider': 0.1.91(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
+      '@lucid-evolution/sign_data': 0.1.25
+      '@lucid-evolution/uplc': 0.2.20
+      '@lucid-evolution/utils': 0.1.66(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
+      '@lucid-evolution/wallet': 0.1.72(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
       effect: 3.21.2
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
@@ -5179,7 +5236,7 @@ snapshots:
       '@lucid-evolution/core-utils': 0.1.16
       '@sinclair/typebox': 0.32.35
 
-  '@lucid-evolution/provider@0.1.91(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)':
+  '@lucid-evolution/provider@0.1.91(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
@@ -5187,8 +5244,33 @@ snapshots:
       '@effect/schema': 0.68.27(effect@3.21.2)
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
-      '@lucid-evolution/utils': 0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
-      '@lucid-evolution/wallet': 0.1.72(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
+      '@lucid-evolution/utils': 0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)
+      '@lucid-evolution/wallet': 0.1.72(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)
+      effect: 3.21.2
+    transitivePeerDependencies:
+      - '@dcspark/cardano-multiplatform-lib-asmjs'
+      - '@dcspark/cardano-multiplatform-lib-browser'
+      - '@dcspark/cardano-multiplatform-lib-nodejs'
+      - '@harmoniclabs/bytestring'
+      - '@harmoniclabs/cbor'
+      - '@harmoniclabs/crypto'
+      - '@harmoniclabs/pair'
+      - bufferutil
+      - encoding
+      - react-native-b4a
+      - rxjs
+      - utf-8-validate
+
+  '@lucid-evolution/provider@0.1.91(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)':
+    dependencies:
+      '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
+      '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
+      '@effect/platform': 0.71.7(effect@3.21.2)
+      '@effect/schema': 0.68.27(effect@3.21.2)
+      '@lucid-evolution/core-types': 0.1.22
+      '@lucid-evolution/core-utils': 0.1.16
+      '@lucid-evolution/utils': 0.1.66(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
+      '@lucid-evolution/wallet': 0.1.72(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
       effect: 3.21.2
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
@@ -5215,11 +5297,11 @@ snapshots:
 
   '@lucid-evolution/uplc@0.2.20': {}
 
-  '@lucid-evolution/utils@0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)':
+  '@lucid-evolution/utils@0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
-      '@cardano-sdk/core': 0.46.12(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(rxjs@7.8.2)
+      '@cardano-sdk/core': 0.46.12(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)
       '@effect/schema': 0.68.27(effect@3.21.2)
       '@harmoniclabs/plutus-data': 1.2.6(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)
       '@harmoniclabs/uplc': 1.4.1(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(@harmoniclabs/plutus-data@1.2.6(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6))
@@ -5245,14 +5327,67 @@ snapshots:
       - rxjs
       - utf-8-validate
 
-  '@lucid-evolution/wallet@0.1.72(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)':
+  '@lucid-evolution/utils@0.1.66(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)':
+    dependencies:
+      '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
+      '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
+      '@cardano-sdk/core': 0.46.12(rxjs@7.8.2)
+      '@effect/schema': 0.68.27(effect@3.21.2)
+      '@harmoniclabs/plutus-data': 1.2.6(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)
+      '@harmoniclabs/uplc': 1.4.1(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(@harmoniclabs/plutus-data@1.2.6(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6))
+      '@lucid-evolution/core-types': 0.1.22
+      '@lucid-evolution/core-utils': 0.1.16
+      '@lucid-evolution/crc8': 0.1.8
+      '@lucid-evolution/plutus': 0.1.29
+      '@lucid-evolution/uplc': 0.2.20
+      bip39: 3.1.0
+      cbor-x: 1.6.4
+      effect: 3.21.2
+    transitivePeerDependencies:
+      - '@dcspark/cardano-multiplatform-lib-asmjs'
+      - '@dcspark/cardano-multiplatform-lib-browser'
+      - '@dcspark/cardano-multiplatform-lib-nodejs'
+      - '@harmoniclabs/bytestring'
+      - '@harmoniclabs/cbor'
+      - '@harmoniclabs/crypto'
+      - '@harmoniclabs/pair'
+      - bufferutil
+      - encoding
+      - react-native-b4a
+      - rxjs
+      - utf-8-validate
+
+  '@lucid-evolution/wallet@0.1.72(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)':
     dependencies:
       '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
       '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
       '@lucid-evolution/core-types': 0.1.22
       '@lucid-evolution/core-utils': 0.1.16
       '@lucid-evolution/sign_data': 0.1.25
-      '@lucid-evolution/utils': 0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
+      '@lucid-evolution/utils': 0.1.66(@dcspark/cardano-multiplatform-lib-nodejs@6.2.0)(@harmoniclabs/crypto@0.3.0)
+      bip39: 3.1.0
+    transitivePeerDependencies:
+      - '@dcspark/cardano-multiplatform-lib-asmjs'
+      - '@dcspark/cardano-multiplatform-lib-browser'
+      - '@dcspark/cardano-multiplatform-lib-nodejs'
+      - '@harmoniclabs/bytestring'
+      - '@harmoniclabs/cbor'
+      - '@harmoniclabs/crypto'
+      - '@harmoniclabs/pair'
+      - bufferutil
+      - encoding
+      - react-native-b4a
+      - rxjs
+      - utf-8-validate
+
+  '@lucid-evolution/wallet@0.1.72(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)':
+    dependencies:
+      '@anastasia-labs/cardano-multiplatform-lib-browser': 6.0.2-3
+      '@anastasia-labs/cardano-multiplatform-lib-nodejs': 6.0.2-3
+      '@lucid-evolution/core-types': 0.1.22
+      '@lucid-evolution/core-utils': 0.1.16
+      '@lucid-evolution/sign_data': 0.1.25
+      '@lucid-evolution/utils': 0.1.66(@harmoniclabs/bytestring@1.0.0)(@harmoniclabs/cbor@1.6.6)(@harmoniclabs/crypto@0.3.0)(@harmoniclabs/pair@1.0.0)(rxjs@7.8.2)
       bip39: 3.1.0
     transitivePeerDependencies:
       - '@dcspark/cardano-multiplatform-lib-asmjs'
