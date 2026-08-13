@@ -302,4 +302,64 @@ describe("AddressHistoryDB", () => {
       Effect.provide(sqlHarness.layer),
     );
   });
+
+  // The mock SQL harness replaces every interpolated value (including
+  // `sql.literal(...)` values) with a `?` placeholder in `template`, and
+  // records the actual substituted values, in order, in `values`. So the
+  // query shape is asserted via `template`, and the effective LIMIT/OFFSET
+  // via the trailing two entries of `values`.
+  const getLimitOffsetCall = () =>
+    sqlHarness.getCalls().find((c) => c.template.includes("LIMIT ? OFFSET"));
+
+  it.effect(
+    "retrieve defaults to a bounded LIMIT/OFFSET when none given",
+    () => {
+      sqlHarness.setRows([{ tx: txCborA }]);
+      return AddressHistoryDB.retrieve(testAddress).pipe(
+        Effect.map(() => {
+          const call = getLimitOffsetCall();
+          expect(call).toBeDefined();
+          expect(call?.values.slice(-2)).toEqual([
+            String(AddressHistoryDB.DEFAULT_ADDRESS_HISTORY_LIMIT),
+            "0",
+          ]);
+        }),
+        Effect.provide(sqlHarness.layer),
+      );
+    },
+  );
+
+  it.effect("retrieve forwards a caller-supplied limit and offset", () => {
+    sqlHarness.setRows([{ tx: txCborA }]);
+    return AddressHistoryDB.retrieve(testAddress, {
+      limit: 25,
+      offset: 50,
+    }).pipe(
+      Effect.map(() => {
+        const call = getLimitOffsetCall();
+        expect(call?.values.slice(-2)).toEqual(["25", "50"]);
+      }),
+      Effect.provide(sqlHarness.layer),
+    );
+  });
+
+  it.effect(
+    "retrieve clamps an out-of-range limit/offset instead of running an unbounded query",
+    () => {
+      sqlHarness.setRows([{ tx: txCborA }]);
+      return AddressHistoryDB.retrieve(testAddress, {
+        limit: 10_000_000,
+        offset: -5,
+      }).pipe(
+        Effect.map(() => {
+          const call = getLimitOffsetCall();
+          expect(call?.values.slice(-2)).toEqual([
+            String(AddressHistoryDB.MAX_ADDRESS_HISTORY_LIMIT),
+            "0",
+          ]);
+        }),
+        Effect.provide(sqlHarness.layer),
+      );
+    },
+  );
 });
