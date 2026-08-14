@@ -66,3 +66,10 @@ export const coreToUtxo = (cml: { to_cbor_bytes: () => Uint8Array }): UTxO => {
 };
 
 export const CML = CMLReal;
+
+// Deterministic stand-in for @lucid-evolution/lucid's unixTimeToSlot: these
+// integration fixtures never set a tx validity interval, so phase B's slot
+// comparison never triggers on the returned value — it only needs to be a
+// stable, well-defined number.
+export const unixTimeToSlot = (_network: unknown, unixTime: number): number =>
+  Math.floor(unixTime / 1000);

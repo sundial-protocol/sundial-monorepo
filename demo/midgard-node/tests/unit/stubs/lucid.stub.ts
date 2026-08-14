@@ -9,6 +9,13 @@ export const utxoToCore = (_utxo: UTxO): unknown => {
   throw new Error("utxoToCore is not implemented in unit stubs.");
 };
 
+export const unixTimeToSlot = (
+  _network: unknown,
+  _unixTime: number,
+): number => {
+  throw new Error("unixTimeToSlot is not implemented in unit stubs.");
+};
+
 export const CML = {
   Transaction: {
     from_cbor_bytes: () => {

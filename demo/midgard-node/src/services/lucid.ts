@@ -83,14 +83,12 @@ const makeL1ProviderCheckReady = (
       }).pipe(Effect.asVoid);
 };
 
-const makeDegradedCheckReady: Effect.Effect<void, SDK.LucidError> =
-  Effect.fail(
-    new SDK.LucidError({
-      message:
-        "Lucid not initialized (degraded mode); L1 provider unavailable",
-      cause: undefined,
-    }),
-  );
+const makeDegradedCheckReady: Effect.Effect<void, SDK.LucidError> = Effect.fail(
+  new SDK.LucidError({
+    message: "Lucid not initialized (degraded mode); L1 provider unavailable",
+    cause: undefined,
+  }),
+);
 
 // Retries indefinitely (LUCID_INIT_MAX_RETRIES=-1) but with capped, jittered
 // exponential backoff rather than a fixed 1s interval, so a slow-to-warm-up

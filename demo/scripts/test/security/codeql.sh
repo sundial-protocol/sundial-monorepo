@@ -8,6 +8,7 @@ readonly query_pack="codeql/javascript-queries"
 readonly analysis_category="javascript-typescript"
 readonly high_security_threshold="4.0"
 readonly parser_script="${script_dir}/codeql-threshold-check.mjs"
+readonly pack_cache_dir="${HOME}/.codeql/packages/${query_pack}"
 
 if [[ $# -ne 1 ]]; then
   echo "[security-codeql] usage: codeql.sh <project-directory>" >&2
@@ -52,16 +53,34 @@ if ! command -v rsync >/dev/null 2>&1; then
   exit 1
 fi
 
+prune_corrupt_pack_versions() {
+  local version_dir
+  if [[ ! -d "${pack_cache_dir}" ]]; then
+    return 0
+  fi
+  for version_dir in "${pack_cache_dir}"/*/; do
+    [[ -d "${version_dir}" ]] || continue
+    if [[ ! -f "${version_dir}qlpack.yml" ]]; then
+      echo "[security-codeql] removing incomplete pack version download: ${version_dir}" >&2
+      rm -rf "${version_dir}"
+    fi
+  done
+}
+
 bootstrap_query_pack() {
+  prune_corrupt_pack_versions
+
   if codeql resolve queries "${query_pack}" >/dev/null 2>&1; then
     if ! codeql pack download --force "${query_pack}" >/dev/null 2>&1; then
       echo "[security-codeql] continuing with installed query pack because refresh failed." >&2
     fi
+    prune_corrupt_pack_versions
     return 0
   fi
 
   echo "[security-codeql] bootstrapping query pack '${query_pack}'." >&2
   codeql pack download "${query_pack}"
+  prune_corrupt_pack_versions
 }
 
 refresh_source_snapshot() {
