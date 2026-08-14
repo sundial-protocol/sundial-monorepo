@@ -45,17 +45,17 @@ Submodules are listed below.
   <tr>
     <td>
       <!-- badge:node-coverage:start -->
-<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-69.8%25-orange?style=flat-square" />
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-72.3%25-orange?style=flat-square" />
 <!-- badge:node-coverage:end -->
     </td>
     <td>
       <!-- badge:sdk-coverage:start -->
-<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-75.5%25-orange?style=flat-square" />
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-77.7%25-orange?style=flat-square" />
 <!-- badge:sdk-coverage:end -->
     </td>
     <td>
       <!-- badge:ts-coverage:start -->
-<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-80.6%25-yellowgreen?style=flat-square" />
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-82.3%25-yellowgreen?style=flat-square" />
 <!-- badge:ts-coverage:end -->
     </td>
     <td>

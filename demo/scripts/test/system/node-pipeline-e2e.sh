@@ -121,7 +121,13 @@ upsert_env REDIS_STREAM_KEY "midgard:tx-submissions:pipeline-e2e"
 upsert_env REDIS_STREAM_CONSUMER_GROUP "midgard-tx-processors"
 upsert_env REDIS_STREAM_CONSUMER_NAME "midgard-node-pipeline-e2e"
 upsert_env TX_QUEUE_DEAD_LETTER_STREAM "midgard:tx-submissions:pipeline-e2e:dead-letter"
-upsert_env TX_QUEUE_DRAIN_BATCH_SIZE 250
+#
+# Keep monolithic e2e runs below container memory limits. Larger drain batches
+# let the processor load too many corpus transactions at once, which can OOM
+# the node before it has a chance to ack or persist them.
+upsert_env TX_QUEUE_DRAIN_BATCH_SIZE 25
+upsert_env TX_QUEUE_CLAIM_BATCH_SIZE 25
+upsert_env TX_PARSE_CONCURRENCY 2
 upsert_env REDIS_STREAM_BLOCK_MS 500
 # Reclaim transiently-pending entries quickly so dependency-ordering retries
 # (a child tx briefly drained before its parent) resolve within the short test

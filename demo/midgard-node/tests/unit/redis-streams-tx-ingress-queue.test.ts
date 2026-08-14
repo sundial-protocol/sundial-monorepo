@@ -403,7 +403,8 @@ describe("RedisStreamsTxIngressQueue", () => {
 
   it.effect("ping fails when Redis is unreachable", () =>
     Effect.gen(function* () {
-      redisState.pingImpl = () => Promise.reject(new Error("connect ECONNREFUSED"));
+      redisState.pingImpl = () =>
+        Promise.reject(new Error("connect ECONNREFUSED"));
 
       const queue = yield* TxIngressQueue;
       const result = yield* Effect.either(queue.ping);

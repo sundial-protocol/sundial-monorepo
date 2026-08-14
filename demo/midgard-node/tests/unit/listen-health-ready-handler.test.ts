@@ -66,10 +66,7 @@ const unhealthyLucidLayer = makeLucidLayer(
 const failingSqlLayer = Layer.succeed(
   SqlClient.SqlClient,
   Object.assign(
-    () =>
-      Effect.fail(
-        new SqlError.SqlError({ message: "connection refused" }),
-      ),
+    () => Effect.fail(new SqlError.SqlError({ message: "connection refused" })),
     {
       withTransaction: <A, E, R>(eff: Effect.Effect<A, E, R>) => eff,
       insert: (obj: unknown) => obj,
@@ -108,7 +105,11 @@ describe("getHealthReadyHandler", () => {
 
   it("returns 503 and reports database when Postgres is down", async () => {
     const response = await Effect.runPromise(
-      runHealthReadyHandler(makeQueueStub(), healthyLucidLayer, failingSqlLayer),
+      runHealthReadyHandler(
+        makeQueueStub(),
+        healthyLucidLayer,
+        failingSqlLayer,
+      ),
     );
     const webResponse = HttpServerResponse.toWeb(response);
     const body = await webResponse.json();
@@ -169,7 +170,11 @@ describe("getHealthReadyHandler", () => {
     });
 
     const response = await Effect.runPromise(
-      runHealthReadyHandler(unhealthyQueue, unhealthyLucidLayer, failingSqlLayer),
+      runHealthReadyHandler(
+        unhealthyQueue,
+        unhealthyLucidLayer,
+        failingSqlLayer,
+      ),
     );
     const webResponse = HttpServerResponse.toWeb(response);
     const body = (await webResponse.json()) as {
