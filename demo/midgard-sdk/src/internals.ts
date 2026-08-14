@@ -210,7 +210,11 @@ export const authenticateUTxO: {
 
 export type DroppedUTxO = {
   readonly utxo: UTxO;
-  readonly error: { readonly _tag: string; readonly message: string; readonly cause: unknown };
+  readonly error: {
+    readonly _tag: string;
+    readonly message: string;
+    readonly cause: unknown;
+  };
 };
 
 /**
@@ -250,10 +254,7 @@ const authenticateAndLogDropped = <TAuth>(
       effectsWithRef,
       (effect) => effect,
     );
-    yield* logDroppedUTxOs(
-      `authenticateUTxOs (policy ${nftPolicy})`,
-      failures,
-    );
+    yield* logDroppedUTxOs(`authenticateUTxOs (policy ${nftPolicy})`, failures);
     return successes;
   });
 

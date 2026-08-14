@@ -164,9 +164,8 @@ const getHealthReadyHandler = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   ).pipe(
-    Effect.map(
-      (results) =>
-        results.filter((r): r is ReadinessSubsystem => r !== null),
+    Effect.map((results) =>
+      results.filter((r): r is ReadinessSubsystem => r !== null),
     ),
   );
 
