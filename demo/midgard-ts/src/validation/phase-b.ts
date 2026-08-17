@@ -223,7 +223,7 @@ const validateCandidateAgainstState = (
   node: CandidateNode,
   stateValue: (key: string) => TransactionOutput | undefined,
   spentByAccepted: Set<string>,
-  nowMillis: number,
+  nowSlot: number,
 ): CandidateDecision => {
   const { candidate } = node;
   const fail = (
@@ -235,23 +235,23 @@ const validateCandidateAgainstState = (
     rejection: { txId: candidate.txId, code, detail },
   });
 
-  // R10 - validity interval vs current time
+  // R10 - validity interval (slot numbers) vs current slot
   if (
     candidate.validityIntervalStart !== undefined &&
-    nowMillis < candidate.validityIntervalStart
+    nowSlot < candidate.validityIntervalStart
   ) {
     return fail(
       RejectCodes.ValidityIntervalMismatch,
-      `now ${nowMillis} < validityStart ${candidate.validityIntervalStart}`,
+      `now slot ${nowSlot} < validityStart ${candidate.validityIntervalStart}`,
     );
   }
   if (
     candidate.validityIntervalEnd !== undefined &&
-    nowMillis > candidate.validityIntervalEnd
+    nowSlot > candidate.validityIntervalEnd
   ) {
     return fail(
       RejectCodes.ValidityIntervalMismatch,
-      `now ${nowMillis} > ttl ${candidate.validityIntervalEnd}`,
+      `now slot ${nowSlot} > ttl ${candidate.validityIntervalEnd}`,
     );
   }
 
@@ -467,7 +467,7 @@ export function runPhaseBValidationWithPatch(
           n,
           stateValue,
           spentByAccepted,
-          config.nowMillis,
+          config.nowSlot,
         ),
       );
 

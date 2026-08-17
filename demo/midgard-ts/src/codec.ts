@@ -100,6 +100,12 @@ export class Reader {
   remaining(): number {
     return this.buf.length - this.pos;
   }
+
+  // Current absolute byte offset into the input buffer; used to pinpoint
+  // where in a multi-KB block a decode error occurred.
+  tell(): number {
+    return this.pos;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +142,9 @@ export function readU64(r: Reader): number {
 // ---------------------------------------------------------------------------
 
 export function writeBigU64(w: Writer, n: bigint): void {
+  if (n < 0n || n > 0xffffffffffffffffn) {
+    throw new Error(`OutOfRange: u64 value ${n} outside [0, 2^64-1]`);
+  }
   const buf = new ArrayBuffer(8);
   const dv = new DataView(buf);
   dv.setUint32(0, Number(n >> 32n), false);
@@ -158,6 +167,9 @@ export function readBigU64(r: Reader): bigint {
 // ---------------------------------------------------------------------------
 
 export function writeBigI64(w: Writer, n: bigint): void {
+  if (n < -(1n << 63n) || n > (1n << 63n) - 1n) {
+    throw new Error(`OutOfRange: i64 value ${n} outside [-2^63, 2^63-1]`);
+  }
   const buf = new ArrayBuffer(8);
   const dv = new DataView(buf);
   const twos = n < 0n ? n + (1n << 64n) : n;

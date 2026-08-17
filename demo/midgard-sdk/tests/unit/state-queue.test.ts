@@ -6,6 +6,7 @@ import * as sdk from "../../src/index.ts";
 import { ConfirmedState, Header } from "../../src/index.ts";
 import {
   addressScriptA,
+  captureLogs,
   confirmedStateFixture,
   headerFixture,
   type BuilderSpy,
@@ -14,6 +15,7 @@ import {
   makeConfirmedStateQueueNode,
   makeLucidMock,
   makeStateQueueUtxo,
+  makeUtxo,
   merkleRootA,
   merkleRootB,
   policyIdA,
@@ -168,6 +170,35 @@ describe("SDK unit state queue programs", () => {
     expect(
       await Effect.runPromise(sdk.headerHashFromStateQueueUTxO(block)),
     ).toBe(blockKey);
+  });
+
+  it("utxosToStateQueueUTxOs logs dropped UTxOs instead of silently discarding them", async () => {
+    const { confirmed } = makeThreeNodeQueue();
+    const invalidUtxo = makeUtxo({
+      txHash: tailTxHash,
+      outputIndex: 2,
+      unit: toUnit(policyIdA, "deadbeef"),
+    });
+
+    const { entries, layer } = captureLogs();
+
+    const result = await Effect.runPromise(
+      sdk
+        .utxosToStateQueueUTxOs([confirmed.utxo, invalidUtxo], policyIdA)
+        .pipe(Effect.provide(layer)),
+    );
+
+    expect(result.map(({ utxo }) => utxo.txHash)).toEqual([txHashA]);
+
+    const warning = entries.find(
+      (entry) =>
+        typeof entry[0] === "string" &&
+        entry[0].includes("dropped 1 invalid UTxO"),
+    );
+    expect(warning).toBeDefined();
+    const details = warning?.[1] as Array<{ utxo: string; tag: string }>;
+    expect(details).toHaveLength(1);
+    expect(details[0].utxo).toBe(`${tailTxHash}#2`);
   });
 
   it("fetchSortedStateQueueUTxOsProgram parses and sorts fetched queue UTxOs", async () => {

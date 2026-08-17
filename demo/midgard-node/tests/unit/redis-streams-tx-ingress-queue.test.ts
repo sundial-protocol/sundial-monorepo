@@ -19,6 +19,7 @@ const redisState = vi.hoisted(() => ({
     Promise.resolve(["0-0", []] as unknown[]),
   xreadgroupImpl: (_args: unknown[]) => Promise.resolve(null),
   delImpl: (_args: unknown[]) => Promise.resolve(1),
+  pingImpl: (_args: unknown[]) => Promise.resolve("PONG"),
 }));
 
 vi.mock("ioredis", () => {
@@ -77,6 +78,11 @@ vi.mock("ioredis", () => {
       redisState.calls.push({ method: "del", args });
       return redisState.delImpl(args);
     }
+
+    ping(...args: unknown[]) {
+      redisState.calls.push({ method: "ping", args });
+      return redisState.pingImpl(args);
+    }
   }
 
   return {
@@ -102,6 +108,7 @@ beforeEach(() => {
   redisState.xautoclaimImpl = () => Promise.resolve(["0-0", []] as unknown[]);
   redisState.xreadgroupImpl = () => Promise.resolve(null);
   redisState.delImpl = () => Promise.resolve(1);
+  redisState.pingImpl = () => Promise.resolve("PONG");
 });
 
 describe("RedisStreamsTxIngressQueue", () => {
@@ -382,5 +389,31 @@ describe("RedisStreamsTxIngressQueue", () => {
           "MKSTREAM",
         ]);
       }).pipe(runWithQueue),
+  );
+
+  it.effect("ping succeeds when Redis responds to PING", () =>
+    Effect.gen(function* () {
+      const queue = yield* TxIngressQueue;
+      yield* queue.ping;
+
+      const pingCalls = redisState.calls.filter((c) => c.method === "ping");
+      expect(pingCalls.length).toBe(1);
+    }).pipe(runWithQueue),
+  );
+
+  it.effect("ping fails when Redis is unreachable", () =>
+    Effect.gen(function* () {
+      redisState.pingImpl = () =>
+        Promise.reject(new Error("connect ECONNREFUSED"));
+
+      const queue = yield* TxIngressQueue;
+      const result = yield* Effect.either(queue.ping);
+
+      expect(result._tag).toBe("Left");
+      if (result._tag === "Left") {
+        expect(result.left._tag).toBe("TxIngressQueueError");
+        expect(result.left.operation).toBe("PING");
+      }
+    }).pipe(runWithQueue),
   );
 });

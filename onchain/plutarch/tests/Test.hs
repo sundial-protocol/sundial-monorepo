@@ -20,6 +20,7 @@ import Plutarch.Core.Utils
 import Plutarch.MerkleTree.Helpers
 import Plutarch.MerkleTree.Merkling
 import Plutarch.Monadic qualified as P
+import Testing.Budget qualified as Budget
 import Testing.Crypto qualified as Crypto
 import Testing.MembershipValidator qualified as MembershipValidator
 import Testing.MerklePatriciaForestry qualified as MPF
@@ -128,4 +129,5 @@ tests =
     , MPF.tests
     , Crypto.tests
     , MembershipValidator.tests
+    , Budget.tests
     ]

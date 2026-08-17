@@ -11,6 +11,7 @@ import {
   addressKeyA,
   addressScriptA,
   assetNameA,
+  captureLogs,
   hexA,
   makeLucidMock,
   makeUtxo,
@@ -58,6 +59,29 @@ describe("SDK unit core helpers", () => {
     const result = await makeReturn(Effect.succeed("ok")).safeRun();
     expect(result._tag).toBe("Right");
     expect(result.right).toBe("ok");
+  });
+
+  it("makeReturn unsafeRun rejects with TimeoutError when the program hangs past the timeout", async () => {
+    const neverSettles = Effect.promise(() => new Promise<string>(() => {}));
+
+    await expect(makeReturn(neverSettles, 10).unsafeRun()).rejects.toThrow(
+      "Operation timed out after 10ms",
+    );
+  });
+
+  it("makeReturn safeRun reports a TimeoutError Left when the program hangs past the timeout", async () => {
+    const neverSettles = Effect.promise(() => new Promise<string>(() => {}));
+
+    const result = await makeReturn(neverSettles, 10).safeRun();
+    expect(result._tag).toBe("Left");
+    if (result._tag === "Left") {
+      expect(result.left._tag).toBe("TimeoutError");
+    }
+  });
+
+  it("makeReturn unsafeRun resolves normally when the program finishes within the timeout", async () => {
+    const result = await makeReturn(Effect.succeed("fast"), 1_000).unsafeRun();
+    expect(result).toBe("fast");
   });
 
   it("Accept lowercase hex string", () => {
@@ -182,6 +206,41 @@ describe("SDK unit core helpers", () => {
       expect(value.length).toBeGreaterThan(0);
       expect(/^[a-zA-Z0-9_]+$/.test(value)).toBe(true);
     }
+  });
+
+  describe("utxosAtByNFTPolicyId", () => {
+    it("logs a warning with dropped UTxO details and returns only authentic ones", async () => {
+      const authenticUtxo = makeUtxo({ txHash: txHashA, outputIndex: 0 });
+      const otherPolicyUtxo = makeUtxo({
+        txHash: txHashB,
+        outputIndex: 1,
+        unit: `${"bb".repeat(28)}${assetNameA}`,
+      });
+      const lucid = makeLucidMock();
+      lucid.utxosAt.mockResolvedValue([authenticUtxo, otherPolicyUtxo]);
+
+      const { entries, layer } = captureLogs();
+
+      const result = await Effect.runPromise(
+        sdk
+          .utxosAtByNFTPolicyId(lucid as any, addressScriptA, policyIdA)
+          .pipe(Effect.provide(layer)),
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].utxo.txHash).toBe(txHashA);
+
+      const warning = entries.find(
+        (entry) =>
+          typeof entry[0] === "string" &&
+          entry[0].includes("dropped 1 invalid UTxO"),
+      );
+      expect(warning).toBeDefined();
+      const details = warning?.[1] as Array<{ utxo: string; tag: string }>;
+      expect(details).toHaveLength(1);
+      expect(details[0].utxo).toBe(`${txHashB}#1`);
+      expect(details[0].tag).toBe("UnauthenticUtxoError");
+    });
   });
 
   describe("utxoAtByNFTUnit", () => {

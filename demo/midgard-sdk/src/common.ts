@@ -24,17 +24,40 @@ import {
   Bech32DeserializationError,
   HashingError,
   LucidError,
+  TimeoutError,
   UnauthenticUtxoError,
 } from "./errors.js";
-import { getStateToken } from "./internals.js";
+import { getStateToken, logDroppedUTxOs } from "./internals.js";
 
 export * from "./errors.js";
 
-export const makeReturn = <A, E>(program: Effect.Effect<A, E>) => {
+/**
+ * Default ceiling for how long a single `makeReturn`-wrapped program (i.e.
+ * any public `fetchX`/`unsignedXTx` call, which may itself issue one or more
+ * provider requests) is allowed to run before failing with a `TimeoutError`.
+ * Without this, a provider RPC that never settles would hang the returned
+ * promise forever, with no SDK-level way to recover.
+ */
+export const DEFAULT_PROVIDER_TIMEOUT_MS = 30_000;
+
+export const makeReturn = <A, E>(
+  program: Effect.Effect<A, E>,
+  timeoutMs: number = DEFAULT_PROVIDER_TIMEOUT_MS,
+) => {
+  const timedProgram = program.pipe(
+    Effect.timeoutFail({
+      duration: timeoutMs,
+      onTimeout: () =>
+        new TimeoutError({
+          message: `Operation timed out after ${timeoutMs}ms`,
+          cause: "Effect.timeoutFail",
+        }),
+    }),
+  );
   return {
-    unsafeRun: () => Effect.runPromise(program),
-    safeRun: () => Effect.runPromise(Effect.either(program)),
-    program: () => program,
+    unsafeRun: () => Effect.runPromise(timedProgram),
+    safeRun: () => Effect.runPromise(Effect.either(timedProgram)),
+    program: () => timedProgram,
   };
 };
 
@@ -96,7 +119,9 @@ export const utxoAtByNFTUnit = (
   );
 
 /**
- * Silently drops the UTxOs without proper authentication NFTs.
+ * Drops the UTxOs without proper authentication NFTs, logging a warning with
+ * each dropped UTxO's reference and error so the failures remain diagnosable
+ * rather than silently swallowed.
  */
 export const utxosAtByNFTPolicyId = (
   lucid: LucidEvolution,
@@ -114,30 +139,36 @@ export const utxosAtByNFTPolicyId = (
       },
     });
 
-    const nftEffects: Effect.Effect<BeaconUTxO, UnauthenticUtxoError>[] =
-      allUTxOs.map((u: UTxO) => {
-        const nftsEffect = getStateToken(u.assets);
-        return Effect.andThen(
-          nftsEffect,
-          ([sym, assetName]): Effect.Effect<
-            BeaconUTxO,
-            UnauthenticUtxoError
-          > => {
-            if (sym === policyId) {
-              return Effect.succeed({ utxo: u, policyId, assetName });
-            }
+    const nftEffects: Effect.Effect<
+      BeaconUTxO,
+      { utxo: UTxO; error: UnauthenticUtxoError }
+    >[] = allUTxOs.map((u: UTxO) => {
+      const nftsEffect = getStateToken(u.assets);
+      return Effect.andThen(
+        nftsEffect,
+        ([sym, assetName]): Effect.Effect<BeaconUTxO, UnauthenticUtxoError> => {
+          if (sym === policyId) {
+            return Effect.succeed({ utxo: u, policyId, assetName });
+          }
 
-            return Effect.fail(
-              new UnauthenticUtxoError({
-                message: "Failed to get assets from fetched UTxOs",
-                cause: "UTxO doesn't have the expected NFT policy ID",
-              }),
-            );
-          },
-        );
-      });
+          return Effect.fail(
+            new UnauthenticUtxoError({
+              message: "Failed to get assets from fetched UTxOs",
+              cause: "UTxO doesn't have the expected NFT policy ID",
+            }),
+          );
+        },
+      ).pipe(Effect.mapError((error) => ({ utxo: u, error }) as const));
+    });
 
-    const authenticUTxOs = yield* Effect.allSuccesses(nftEffects);
+    const [failures, authenticUTxOs] = yield* Effect.partition(
+      nftEffects,
+      (effect) => effect,
+    );
+    yield* logDroppedUTxOs(
+      `utxosAtByNFTPolicyId (policy ${policyId})`,
+      failures,
+    );
     return authenticUTxOs;
   }).pipe(
     Effect.catchAllDefect(

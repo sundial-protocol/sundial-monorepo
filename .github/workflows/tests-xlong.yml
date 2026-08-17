@@ -28,10 +28,13 @@ jobs:
         with:
           paths: '^(demo/|\.github/actions/|\.github/workflows/tests-xlong\.yml)'
 
+  # Gated per-step rather than on the job: a job-level `if` skips before the
+  # matrix expands, so the required "Node Integration Tests" context would be
+  # published as a single "matrix.name" check and never satisfy the `main`
+  # ruleset. See quality.yml for the full rationale.
   xlong-tests:
     name: ${{ matrix.name }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.run == 'true'
     runs-on: ubuntu-slim
     timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
@@ -43,11 +46,14 @@ jobs:
             command: pnpm run test:integration:node
     steps:
       - name: Checkout
+        if: needs.detect-changes.outputs.run == 'true'
         uses: actions/checkout@v4
 
       - name: Setup l2 workspace
+        if: needs.detect-changes.outputs.run == 'true'
         uses: ./.github/actions/setup-l2
 
       - name: Run test suite
+        if: needs.detect-changes.outputs.run == 'true'
         run: ${{ matrix.command }}
         working-directory: demo

@@ -1,7 +1,7 @@
 import { describe, expect } from "vitest";
 import { it } from "@effect/vitest";
 import { CML, Data, toUnit } from "@lucid-evolution/lucid";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 import {
   DepositDatum,
   fetchDepositUTxOsProgram,
@@ -134,6 +134,33 @@ describe("SDK user-events integration", () => {
       });
       expect(decoded.inclusionTime).toBeGreaterThan(0n);
     }),
+  );
+
+  it.effect(
+    "deposit builder rejects a depositAmount below the minimum ADA required for the UTxO",
+    () =>
+      Effect.gen(function* () {
+        const { lucid } = makeFakeLucid({ walletUtxos: [FIXTURE_NONCE_UTXO] });
+        const result = yield* Effect.either(
+          incompleteDepositTxProgram(lucid as any, {
+            depositScriptAddress: FIXTURE_ADDRESS_SCRIPT_A,
+            mintingPolicy: FIXTURE_VALIDATOR.mintingScript,
+            policyId: FIXTURE_POLICY_ID_A,
+            nonceUTxO: FIXTURE_NONCE_UTXO as any,
+            depositAmount: 1n,
+            depositInfo: {
+              l2Address: { PublicKeyCredential: [FIXTURE_PUB_KEY_HASH_A] },
+              l2Datum: null,
+            },
+          }),
+        );
+
+        expect(Either.isLeft(result)).toBe(true);
+        if (Either.isLeft(result)) {
+          expect(result.left._tag).toBe("DepositError");
+          expect(String(result.left.message)).toMatch(/minimum ADA/i);
+        }
+      }),
   );
 
   it.effect("deposit fetch decodes one authentic UTxO", () =>

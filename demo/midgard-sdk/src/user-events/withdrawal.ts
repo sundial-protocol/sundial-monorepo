@@ -57,7 +57,8 @@ export type WithdrawalUTxO = AuthenticUTxO<
 export type WithdrawalFetchConfig = UserEventFetchConfig;
 
 /**
- * Silently drops invalid UTxOs.
+ * Drops invalid UTxOs; see `authenticateUTxOs` for the diagnostic logging
+ * emitted when that happens.
  */
 export const utxosToWithdrawalUTxOs = (
   utxos: UTxO[],
@@ -126,7 +127,10 @@ export const incompleteWithdrawalTxProgram = (
 
     const withdrawalNFT = toUnit(params.policyId, assetName);
 
-    const inclusionTime = yield* findInclusionTimeForUserEvent(lucid);
+    const inclusionTime = yield* findInclusionTimeForUserEvent(
+      lucid,
+      "withdrawal",
+    );
 
     const withdrawalOrderDatum: WithdrawalOrderDatum = {
       event: {

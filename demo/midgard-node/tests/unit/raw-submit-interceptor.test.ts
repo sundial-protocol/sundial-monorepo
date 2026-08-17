@@ -66,6 +66,23 @@ describe("handleRawSubmitRequest", () => {
     expect(xadd).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for odd-length hex body", () => {
+    // Regression guard: odd-length hex used to pass validation and reach the
+    // tx-parse worker, whose fromHex() call throws synchronously outside any
+    // Effect/try boundary and crashes the worker thread.
+    const req = makeReq();
+    const res = makeRes();
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+
+    handleRawSubmitRequest(req, res, xadd, onEnqueued, onRejected);
+    fireBody(req, "abc");
+
+    expect(res.writeHead).toHaveBeenCalledWith(400, expect.any(Object));
+    expect(JSON.parse(res.body)).toEqual({ error: "Invalid CBOR provided" });
+    expect(xadd).not.toHaveBeenCalled();
+  });
+
   it("returns 400 for empty body", () => {
     const req = makeReq();
     const res = makeRes();

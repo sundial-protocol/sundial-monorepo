@@ -74,3 +74,11 @@ it("Script credential codec round trips", () => {
     expect(decoded.type).toBe("Script");
     expect(decoded.hash).toEqual(hash28B);
 });
+
+it("decodeCredential reports the bad discriminant value and its byte offset", () => {
+    const encoded = encodeCredential({ type: "PubKey" as const, hash: hash28A });
+    encoded[7] = 9; // corrupt the low byte of the u64 discriminant (offset 0)
+    expect(() => decodeCredential(encoded)).toThrow(
+      /UnknownDiscriminant for Credential: got 9 at byte offset 0/,
+    );
+});

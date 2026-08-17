@@ -149,13 +149,14 @@ export const buildUserEventMintTransaction = (
 
 export const findInclusionTimeForUserEvent = (
   lucid: LucidEvolution,
+  eventName: "deposit" | "tx order" | "withdrawal",
 ): Effect.Effect<number, UnspecifiedNetworkError> =>
   Effect.gen(function* () {
     const currTime = Date.now();
     const network = lucid.config().network;
     if (network === undefined) {
       return yield* new UnspecifiedNetworkError({
-        message: "Failed to build the deposit transaction",
+        message: `Failed to build the ${eventName} transaction`,
         cause: "Unknown",
       });
     }

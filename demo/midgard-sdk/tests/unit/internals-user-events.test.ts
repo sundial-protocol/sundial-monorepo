@@ -26,6 +26,7 @@ import {
 import {
   addressDataKeyA,
   addressScriptA,
+  captureLogs,
   policyIdA,
   posixT0,
   posixT1,
@@ -115,6 +116,43 @@ describe("SDK unit internals and user-event programs", () => {
     expect(result).toHaveLength(2);
     expect(result[0].utxo.txHash).toBe(txHashA);
     expect(result[1].utxo.txHash).toBe(txHashB);
+  });
+
+  it("authenticateUTxOs logs dropped UTxOs instead of silently discarding them", async () => {
+    const validUtxo = makeUtxo({
+      txHash: txHashA,
+      outputIndex: 0,
+      datum: validDepositDatumCbor,
+    });
+    const invalidUtxo = makeUtxo({
+      txHash: txHashB,
+      outputIndex: 1,
+      datum: undefined,
+    });
+
+    const { entries, layer } = captureLogs();
+
+    const result = await Effect.runPromise(
+      authenticateUTxOs(
+        [validUtxo as any, invalidUtxo as any],
+        policyIdA,
+        DepositDatum,
+      ).pipe(Effect.provide(layer)),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].utxo.txHash).toBe(txHashA);
+
+    const warning = entries.find(
+      (entry) =>
+        typeof entry[0] === "string" &&
+        entry[0].includes("dropped 1 invalid UTxO"),
+    );
+    expect(warning).toBeDefined();
+    const details = warning?.[1] as Array<{ utxo: string; tag: string }>;
+    expect(details).toHaveLength(1);
+    expect(details[0].utxo).toBe(`${txHashB}#1`);
+    expect(details[0].tag).toBe("DataCoercionError");
   });
 
   it("fetchSingleAuthenticUTxOProgram returns one converted UTxO", async () => {
@@ -223,11 +261,28 @@ describe("SDK unit internals and user-event programs", () => {
     const lucid = makeLucidMock();
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     const inclusionTime = await Effect.runPromise(
-      findInclusionTimeForUserEvent(lucid as any),
+      findInclusionTimeForUserEvent(lucid as any, "deposit"),
     );
     expect(inclusionTime).toBe(1_050_000);
     expect(nowSpy).toHaveBeenCalled();
   });
+
+  it.each(["deposit", "tx order", "withdrawal"] as const)(
+    "Inclusion time reports %s in the error when network is unspecified",
+    async (eventName) => {
+      const lucid = makeLucidMock();
+      vi.spyOn(lucid, "config").mockReturnValue({ network: undefined } as any);
+      const result = await Effect.runPromise(
+        Effect.either(findInclusionTimeForUserEvent(lucid as any, eventName)),
+      );
+      expect(result._tag).toBe("Left");
+      if (result._tag === "Left") {
+        expect(result.left.message).toBe(
+          `Failed to build the ${eventName} transaction`,
+        );
+      }
+    },
+  );
 
   it("Nonce asset name uses provided nonce UTxO", async () => {
     const builder = makeBuilderSpy();

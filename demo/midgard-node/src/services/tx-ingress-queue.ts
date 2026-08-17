@@ -18,6 +18,7 @@ export type TxIngressMetricsSnapshot = {
 };
 
 export type TxIngressQueueService = {
+  readonly ping: Effect.Effect<void, TxIngressQueueError>;
   readonly enqueue: (
     txCbor: string,
   ) => Effect.Effect<string, TxIngressQueueError>;

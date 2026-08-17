@@ -18,6 +18,7 @@ const runSubmitHandler = (
 const makeQueueStub = (
   overrides?: Partial<TxIngressQueueService>,
 ): TxIngressQueueService => ({
+  ping: Effect.void,
   enqueue: (_txCbor: string) => Effect.succeed("1-0"),
   rawXadd: (_txCbor, callback) => callback(null, "1-0"),
   ensureConsumerGroup: Effect.void,
@@ -43,6 +44,25 @@ describe("postSubmitHandler", () => {
     const request = new Request("http://localhost/submit?tx_cbor=aa", {
       method: "POST",
       body: "not-hex-body",
+    });
+
+    const response = await Effect.runPromise(
+      runSubmitHandler(makeQueueStub(), request),
+    );
+    const webResponse = HttpServerResponse.toWeb(response);
+    const body = await webResponse.json();
+
+    expect(webResponse.status).toBe(400);
+    expect(body).toEqual({ error: "Invalid CBOR provided" });
+  });
+
+  it("rejects odd-length hex CBOR", async () => {
+    // Regression guard: odd-length hex used to pass validation here and
+    // reach the tx-parse worker, whose fromHex() call throws synchronously
+    // outside any Effect/try boundary and crashes the worker thread.
+    const request = new Request("http://localhost/submit", {
+      method: "POST",
+      body: "abc",
     });
 
     const response = await Effect.runPromise(

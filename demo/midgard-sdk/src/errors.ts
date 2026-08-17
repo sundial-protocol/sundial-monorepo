@@ -45,6 +45,10 @@ export class MissingDatumError extends EffectData.TaggedError(
   "MissingDatumError",
 )<GenericErrorFields> {}
 
+export class TimeoutError extends EffectData.TaggedError(
+  "TimeoutError",
+)<GenericErrorFields> {}
+
 export class UnauthenticUtxoError extends EffectData.TaggedError(
   "UnauthenticUtxoError",
 )<GenericErrorFields> {}

@@ -23,6 +23,8 @@ import { NodeConfig } from "@/services/config.js";
 
 const tableName = "address_history";
 const MAX_SPENT_OUTREFS_LOOKUP_BATCH_SIZE = 1000;
+export const DEFAULT_ADDRESS_HISTORY_LIMIT = 100;
+export const MAX_ADDRESS_HISTORY_LIMIT = 500;
 type ByteaValue = Buffer | Uint8Array | string;
 
 const byteaValueToHex = (value: ByteaValue): string =>
@@ -289,35 +291,61 @@ export const delTxHash = (
     ),
   );
 
+export type RetrieveOptions = {
+  limit?: number;
+  offset?: number;
+};
+
+// Coerces caller-supplied pagination values into safe, bounded integers
+// before they're interpolated as SQL literals, regardless of what the HTTP
+// layer already validated.
+const clampLimit = (limit?: number): number =>
+  limit === undefined || !Number.isFinite(limit)
+    ? DEFAULT_ADDRESS_HISTORY_LIMIT
+    : Math.min(Math.max(Math.trunc(limit), 1), MAX_ADDRESS_HISTORY_LIMIT);
+
+const clampOffset = (offset?: number): number =>
+  offset === undefined || !Number.isFinite(offset)
+    ? 0
+    : Math.max(Math.trunc(offset), 0);
+
 /**
- * Retrieves all cbors from MempoolDB and ImmutableDB which mention provided
- * address.
+ * Retrieves a page of cbors from MempoolDB and ImmutableDB which mention the
+ * provided address, most recent first.
  *
  * Works by performing an inner join with tables [tx_id | address] and
- * [tx_id | tx], getting [address | tx] as a result.
+ * [tx_id | tx], getting [address | tx] as a result. Since an address'
+ * history is unbounded and grows with the chain, results are always capped
+ * by `limit` (default `DEFAULT_ADDRESS_HISTORY_LIMIT`, max
+ * `MAX_ADDRESS_HISTORY_LIMIT`) and paged via `offset`.
  */
 export const retrieve = (
   address: Address,
+  options?: RetrieveOptions,
 ): Effect.Effect<readonly Buffer[], DatabaseError, Database> =>
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
+    const limit = clampLimit(options?.limit);
+    const offset = clampOffset(options?.offset);
     yield* Effect.logInfo(
-      `${tableName} db: attempt to retrieve value with address ${address}`,
+      `${tableName} db: attempt to retrieve value with address ${address} (limit=${limit}, offset=${offset})`,
     );
 
     const result = yield* sql<
       Pick<Tx.Entry, Tx.Columns.TX>
     >`SELECT ${sql(Tx.Columns.TX)} FROM (
-      SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
+      SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}, ${sql(Tx.Columns.TIMESTAMPTZ)}
       FROM ${sql(MempoolDB.tableName)}
       UNION
-      SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}
+      SELECT ${sql(Tx.Columns.TX_ID)}, ${sql(Tx.Columns.TX)}, ${sql(Tx.Columns.TIMESTAMPTZ)}
       FROM ${sql(ImmutableDB.tableName)}
     ) AS tx_union
     INNER JOIN ${sql(
       tableName,
     )} ON tx_union.${sql(Tx.Columns.TX_ID)} = ${sql(tableName)}.${sql(Columns.EVENT_ID)}
-    WHERE ${sql(tableName)}.${sql(Columns.ADDRESS)} = ${address};`;
+    WHERE ${sql(tableName)}.${sql(Columns.ADDRESS)} = ${address}
+    ORDER BY tx_union.${sql(Tx.Columns.TIMESTAMPTZ)} DESC, tx_union.${sql(Tx.Columns.TX_ID)} DESC
+    LIMIT ${sql.literal(String(limit))} OFFSET ${sql.literal(String(offset))};`;
 
     return result.map((r) => r[Tx.Columns.TX]);
   }).pipe(

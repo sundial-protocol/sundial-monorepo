@@ -129,6 +129,7 @@ const genesisDepositTx = (
 ): Effect.Effect<
   TxBuilder,
   | SDK.Bech32DeserializationError
+  | SDK.DepositError
   | SDK.HashingError
   | SDK.LucidError
   | SDK.UnspecifiedNetworkError,

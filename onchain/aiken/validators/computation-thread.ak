@@ -62,12 +62,13 @@ validator mint(
 
         // 3. Transaction must retrieve policy ID of the state queue from the
         //    authentic hub oracle utxo.
-        let hub.Datum { state_queue: state_queue_policy_id, .. } =
-          hub.get_datum(
+        let state_queue_policy_id =
+          hub.get_datum_fields(
             reference_inputs,
             hub_oracle_script_hash,
             hub_oracle_ref_input_index,
           )
+            |> hub.state_queue_of
 
         // 4. Transaction must reference the fraudulent block. Let its key be
         //    `fraudulent_header_hash`.
