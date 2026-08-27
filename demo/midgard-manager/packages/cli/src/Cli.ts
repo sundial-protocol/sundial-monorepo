@@ -3,6 +3,9 @@ import * as Command from '@effect/cli/Command';
 import { interactiveCommand } from './cli/interactive/index.js';
 import { generateTxCommand, stopTxCommand, txStatusCommand } from './commands/generate-tx.js';
 import { configureNodeCommand, nodeStatusCommand } from './commands/node.js';
+import { sendCommand } from './commands/send.js';
+import { txLookupCommand } from './commands/tx-lookup.js';
+import { walletCommand } from './commands/wallet.js';
 
 /**
  * Main CLI help text
@@ -35,6 +38,12 @@ EXAMPLES:
 
 # Interactive mode (recommended)
 $ pnpm start interactive
+
+# Wallets and sending funds
+$ pnpm start wallet create alice
+$ pnpm start wallet balance alice
+$ pnpm start send --from alice --to <addr_test1...> --amount 1.5
+$ pnpm start tx-lookup <hash>
 
 # Transaction Generator
 $ pnpm tx-generator start --test-wallet --type mixed --batch-size 10 --interval 5 --concurrency 1
@@ -70,6 +79,11 @@ const mainCommand = Command.make('midgard-manager')
     Command.withSubcommands([
       // Interactive mode
       interactiveCommand,
+
+      // End-user commands
+      walletCommand,
+      sendCommand,
+      txLookupCommand,
 
       // Command groups
       nodeCommands,

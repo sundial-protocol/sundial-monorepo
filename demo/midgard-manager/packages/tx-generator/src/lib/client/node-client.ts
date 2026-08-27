@@ -1,3 +1,4 @@
+import { CML, coreToUtxo, UTxO } from '@lucid-evolution/lucid';
 import { Effect } from 'effect';
 
 import { logFailedTransaction, logSubmittedTransaction } from '../../utils/logging.js';
@@ -260,6 +261,27 @@ export class MidgardNodeClient {
       attempts,
       retriesUsed: Math.max(attempts - 1, 0),
     };
+  }
+
+  /**
+   * Fetch the spendable L2 UTxOs for an address
+   */
+  async getUtxos(address: string): Promise<UTxO[]> {
+    const response = await fetch(`${this.baseUrl}/utxos?address=${encodeURIComponent(address)}`);
+    if (!response.ok) {
+      throw new Error(`GET /utxos failed: ${response.status} ${await response.text()}`);
+    }
+    const { utxos } = (await response.json()) as {
+      utxos: { outref: string; value: string }[];
+    };
+    return utxos.map(({ outref, value }) =>
+      coreToUtxo(
+        CML.TransactionUnspentOutput.new(
+          CML.TransactionInput.from_cbor_hex(outref),
+          CML.TransactionOutput.from_cbor_hex(value)
+        )
+      )
+    );
   }
 
   /**

@@ -76,3 +76,6 @@ yarn-error.log*
 .vercel/
 .next/
 .DS_Store
+
+# midgard-manager CLI wallet keys (plaintext testnet private keys)
+demo/midgard-manager/config/wallets/

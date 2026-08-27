@@ -1,69 +1,118 @@
-import { Args, Command } from '@effect/cli';
+import { Args, Command, Options } from '@effect/cli';
+import { MidgardNodeClient } from '@midgard-manager/tx-generator';
 import chalk from 'chalk';
 import { Effect, pipe } from 'effect';
 
 import {
-  generateWallet,
-  getWalletDetails,
-  initializeDefaultWallet,
+  createWallet,
+  getWallet,
+  importWallet,
   listWallets,
   removeWallet,
-} from '../utils/wallet.js';
+} from '../config/wallets.js';
+
+export const maskKey = (privateKey: string) =>
+  `${privateKey.substring(0, 10)}...${privateKey.slice(-5)}`;
+
+const endpointOption = Options.text('endpoint')
+  .pipe(Options.withDescription('Midgard node endpoint URL'))
+  .pipe(Options.withDefault('http://localhost:3000'));
+
+const nameArg = Args.text({ name: 'NAME' }).pipe(Args.withDescription('Wallet name'));
 
 /**
  * Command to generate a new wallet
  */
-const generateCommand = Command.make(
-  'generate',
+const createCommand = Command.make('create', { name: nameArg }, ({ name }) => {
+  return pipe(
+    Effect.tryPromise(async () => {
+      try {
+        const wallet = await createWallet(name);
+        console.log(chalk.green(`✓ Created wallet: ${name}`));
+        console.log(chalk.gray(`Address: ${wallet.address}`));
+        console.log(chalk.gray(`Private Key: ${maskKey(wallet.privateKey)}`));
+        console.log();
+        console.log(chalk.gray('Fund it from the faucet, then check its balance with:'));
+        console.log(chalk.gray(`$ midgard wallet balance ${name}`));
+      } catch (error) {
+        console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
+      }
+    })
+  );
+}).pipe(Command.withDescription('Generate a new wallet with a fresh keypair'));
+
+/**
+ * Command to import an existing private key as a wallet
+ */
+const importCommand = Command.make(
+  'import',
   {
-    name: Args.text('NAME').pipe(Args.withDescription('Name of the wallet to generate')),
+    name: nameArg,
+    privateKey: Options.text('private-key').pipe(
+      Options.withDescription('ed25519 private key in bech32 format (ed25519_sk...)')
+    ),
   },
-  ({ name }) => {
+  ({ name, privateKey }) => {
     return pipe(
       Effect.tryPromise(async () => {
-        // Generate new wallet
-        const wallet = await generateWallet(name);
-
-        console.log(chalk.green(`✓ Generated new wallet: ${name}`));
-        console.log(chalk.gray(`Address: ${wallet.address}`));
-        console.log(
-          chalk.gray(
-            `Private Key: ${wallet.privateKey.substring(0, 10)}...${wallet.privateKey.slice(-5)}`
-          )
-        );
+        try {
+          const wallet = await importWallet(name, privateKey);
+          console.log(chalk.green(`✓ Imported wallet: ${name}`));
+          console.log(chalk.gray(`Address: ${wallet.address}`));
+        } catch (error) {
+          console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
+        }
       })
     );
   }
+).pipe(
+  Command.withDescription(
+    'Import an existing private key as a named wallet (not for browser-wallet keys — CIP-30 never exposes those)'
+  )
 );
 
 /**
- * Command to show wallet details
+ * Command to show a wallet's address
  */
-const detailsCommand = Command.make(
-  'details',
-  {
-    name: Args.text('NAME').pipe(Args.withDescription('Name of the wallet to show details for')),
-  },
-  ({ name }) => {
+const addressCommand = Command.make('address', { name: nameArg }, ({ name }) => {
+  return pipe(
+    Effect.tryPromise(async () => {
+      const wallet = await getWallet(name);
+      if (!wallet) {
+        console.error(chalk.red(`❌ Wallet '${name}' not found`));
+        return;
+      }
+      console.log(wallet.address);
+    })
+  );
+}).pipe(Command.withDescription("Print a wallet's address"));
+
+/**
+ * Command to show a wallet's spendable L2 balance
+ */
+const balanceCommand = Command.make(
+  'balance',
+  { name: nameArg, endpoint: endpointOption },
+  ({ name, endpoint }) => {
     return pipe(
       Effect.tryPromise(async () => {
-        const wallet = getWalletDetails(name);
+        const wallet = await getWallet(name);
         if (!wallet) {
           console.error(chalk.red(`❌ Wallet '${name}' not found`));
           return;
         }
 
-        console.log(chalk.blue(`Details for wallet: ${name}`));
-        console.log(chalk.gray(`Address: ${wallet.address}`));
-        console.log(
-          chalk.gray(
-            `Private Key: ${wallet.privateKey.substring(0, 10)}...${wallet.privateKey.slice(-5)}`
-          )
-        );
+        const client = new MidgardNodeClient({ baseUrl: endpoint, enableLogs: false });
+        const utxos = await client.getUtxos(wallet.address);
+        const lovelace = utxos.reduce((sum, utxo) => sum + utxo.assets.lovelace, 0n);
+
+        console.log(chalk.blue(`Balance for ${name} (${wallet.address}):`));
+        console.log(`  ${(Number(lovelace) / 1_000_000).toFixed(6)} sBTC`);
+        console.log(chalk.gray(`  (${lovelace} lovelace across ${utxos.length} UTxO(s))`));
       })
     );
   }
-);
+).pipe(Command.withDescription("Check a wallet's spendable testnet sBTC balance"));
 
 /**
  * Command to list all wallets
@@ -71,57 +120,52 @@ const detailsCommand = Command.make(
 const listCommand = Command.make('list', {}, () => {
   return pipe(
     Effect.tryPromise(async () => {
-      // Initialize default wallet if needed
-      await initializeDefaultWallet();
-
-      const wallets = listWallets();
+      const wallets = await listWallets();
       if (wallets.length === 0) {
         console.log(chalk.yellow('⚠️ No wallets found'));
+        console.log(chalk.gray('Create one with: midgard wallet create <name>'));
         return;
       }
 
       console.log(chalk.blue('Available wallets:'));
-      for (const name of wallets) {
-        const wallet = getWalletDetails(name);
+      for (const walletName of wallets) {
+        const wallet = await getWallet(walletName);
         if (wallet) {
-          console.log(
-            ` ${chalk.green('•')} ${name}${wallet.isDefault ? chalk.gray(' (default)') : ''}`
-          );
+          console.log(` ${chalk.green('•')} ${walletName} — ${wallet.address}`);
         }
       }
-
-      console.log();
-      console.log(chalk.gray('For details on a specific wallet, use:'));
-      console.log(chalk.gray(`$ midgard-manager wallet details <name>`));
     })
   );
-});
+}).pipe(Command.withDescription('List all wallets'));
 
 /**
  * Command to remove a wallet
  */
-const removeCommand = Command.make(
-  'remove',
-  {
-    name: Args.text('NAME').pipe(Args.withDescription('Name of the wallet to remove')),
-  },
-  ({ name }) => {
-    return pipe(
-      Effect.tryPromise(async () => {
-        try {
-          removeWallet(name);
-          console.log(chalk.green(`✓ Removed wallet: ${name}`));
-        } catch (error) {
-          console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
-        }
-      })
-    );
-  }
-);
+const removeCommand = Command.make('remove', { name: nameArg }, ({ name }) => {
+  return pipe(
+    Effect.tryPromise(async () => {
+      try {
+        await removeWallet(name);
+        console.log(chalk.green(`✓ Removed wallet: ${name}`));
+      } catch (error) {
+        console.error(chalk.red(error instanceof Error ? error.message : 'Unknown error'));
+      }
+    })
+  );
+}).pipe(Command.withDescription('Remove a wallet'));
 
 /**
  * Main wallet command group
  */
 export const walletCommand = Command.make('wallet')
-  .pipe(Command.withDescription('Manage wallets for transaction signing'))
-  .pipe(Command.withSubcommands([generateCommand, detailsCommand, listCommand, removeCommand]));
+  .pipe(Command.withDescription('Manage wallets for signing and sending L2 transactions'))
+  .pipe(
+    Command.withSubcommands([
+      createCommand,
+      importCommand,
+      listCommand,
+      addressCommand,
+      balanceCommand,
+      removeCommand,
+    ])
+  );
