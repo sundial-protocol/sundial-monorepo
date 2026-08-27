@@ -7,7 +7,7 @@ tmp_file="$(mktemp)"
 trap 'rm -f "$tmp_file"' EXIT
 
 awk '
-  /^[[:space:]]*Co-Authored-By:[[:space:]]+.+noreply@anthropic\.com[[:space:]]*>?[[:space:]]*$/ {
+  tolower($0) ~ /^[[:space:]]*(co-authored-by|signed-off-by):/ {
     next
   }
   {
