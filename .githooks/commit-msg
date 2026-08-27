@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+msg_file="${1:?commit message file is required}"
+tmp_file="$(mktemp)"
+trap 'rm -f "$tmp_file"' EXIT
+
+awk '
+  /^[[:space:]]*Co-Authored-By:[[:space:]]+.+noreply@anthropic\.com[[:space:]]*>?[[:space:]]*$/ {
+    next
+  }
+  {
+    print
+  }
+' "$msg_file" > "$tmp_file"
+
+if ! cmp -s "$tmp_file" "$msg_file"; then
+  cp "$tmp_file" "$msg_file"
+fi
