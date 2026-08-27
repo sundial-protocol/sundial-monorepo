@@ -53,3 +53,13 @@ The convention is the same as Lucid Evolution, i.e. functions that return
 
 Note that this SDK is under ongoing development and these conventions may not
 hold for every single function yet.
+
+## Examples
+
+- [`examples/send-payment.ts`](./examples/send-payment.ts) — builds, signs,
+  and submits a plain payment against a running `sundial-node`. There's no
+  published `Provider` wiring Lucid Evolution to the node's HTTP API (the
+  modules above only cover deposit/withdrawal/tx-order), so this example
+  implements a minimal one backed by `GET /utxos` and `POST /submit`. See
+  [`internal-docs/api.md`](../../internal-docs/api.md) for the full
+  walkthrough and the CIP-30 wallet-signing variant.
