@@ -58,7 +58,7 @@ program
     "Flag for enabling interactions with monitoring services",
   )
   .action(async (_args, options) => {
-    console.log("🌳 Midgard");
+    console.log("🌞 Sundial");
     const { withMonitoring } = options.opts();
     const mainEffect = pipe(
       runNode(withMonitoring),

@@ -13,7 +13,7 @@ export interface LogoOptions {
  */
 export function displayLogo(options: LogoOptions = {}): void {
   const { headerText } = options;
-  const treeEmoji = '🌳';
+  const treeEmoji = '🌞';
 
   console.log(`┌─ ${treeEmoji} ${chalk.bold.green('MIDGARD MANAGER')} `);
   console.log(`│ ${chalk.dim('MVP')} · CLI Tool for Testing/Demo`);
