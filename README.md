@@ -85,7 +85,7 @@ Submodules are listed below.
 `/airdrop-engine` - Airdrop engine for distributing yield to Sundial users.
 
 # Bridging
-`/charms-cardano` - Cardano side of the Charms bridge, written in Aiken by Sundial developers.
+`/charms-bridge` - the settlement-L1 side of the Charms bridge, written in Aiken by Sundial developers.
 
 # Layer 2
 
