@@ -33,42 +33,41 @@ export const nodeStatusCommand = Command.make(
         const spinner = ora(`Checking Midgard node status at ${endpoint}...`).start();
 
         try {
-          // Try to fetch the node status
-          const statusEndpoint = `${endpoint}/api/status`;
           const controller = new AbortController();
-
-          // Set a timeout for the request
           const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-          const response = await fetch(statusEndpoint, {
-            signal: controller.signal,
-          });
+          // sundial-node has no /api/status route (see internal-docs/api.md's
+          // "Current Caveats") — health/readiness are what's actually served.
+          const [liveResponse, readyResponse] = await Promise.all([
+            fetch(`${endpoint}/health/live`, { signal: controller.signal }),
+            fetch(`${endpoint}/health/ready`, { signal: controller.signal }),
+          ]);
           clearTimeout(timeoutId);
 
-          if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
+          if (!liveResponse.ok) {
+            throw new Error(`HTTP error: ${liveResponse.status}`);
           }
 
-          const data = await response.json();
-          spinner.succeed('Node is online');
+          const readyData = (await readyResponse.json()) as {
+            status: string;
+            failing?: string[];
+          };
+          spinner.succeed(
+            readyResponse.ok ? 'Node is online and ready' : 'Node is online but not ready'
+          );
 
-          // Display node information
           console.log(chalk.blue.bold('\n📊 Midgard Node Status\n'));
-          console.log(chalk.white(`• Version: ${chalk.green(data.version || 'unknown')}`));
-          console.log(chalk.white(`• Chain: ${chalk.green(data.network || 'unknown')}`));
-
-          if (data.blockHeight) {
-            console.log(chalk.white(`• Block Height: ${chalk.green(data.blockHeight)}`));
+          console.log(chalk.white(`• Live: ${chalk.green('yes')}`));
+          console.log(
+            chalk.white(
+              `• Ready: ${readyResponse.ok ? chalk.green('yes') : chalk.yellow(`no (${readyData.status})`)}`
+            )
+          );
+          if (readyData.failing && readyData.failing.length > 0) {
+            console.log(
+              chalk.white(`• Failing subsystems: ${chalk.red(readyData.failing.join(', '))}`)
+            );
           }
-
-          if (data.peers) {
-            console.log(chalk.white(`• Connected Peers: ${chalk.green(data.peers.length)}`));
-          }
-
-          if (data.mempool) {
-            console.log(chalk.white(`• Mempool Transactions: ${chalk.green(data.mempool.count)}`));
-          }
-
           console.log(chalk.white(`• Endpoint: ${chalk.cyan(endpoint)}`));
         } catch (error) {
           spinner.fail('Failed to connect to node');
@@ -172,7 +171,7 @@ export const configureNodeCommand = Command.make(
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-            const response = await fetch(`${nodeConfig.endpoint}/api/status`, {
+            const response = await fetch(`${nodeConfig.endpoint}/health/live`, {
               signal: controller.signal,
             });
 
