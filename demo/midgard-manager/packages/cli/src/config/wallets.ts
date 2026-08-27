@@ -4,10 +4,19 @@ import { join } from 'path';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-// Get the directory path relative to the project
+// Get the directory path relative to the project.
+//
+// tsup bundles this whole package into a single dist/bin.js, so at runtime
+// import.meta.url always resolves to <package-root>/dist regardless of this
+// file's original src/ nesting — dist -> cli -> packages -> midgard-manager
+// is 3 levels up, not 4 (4 was the right count for this file's un-bundled
+// src/config/ location, but nothing in this package actually runs
+// un-bundled — `start`/`build` both go through dist/bin.js). Getting this
+// wrong silently pointed wallet storage at demo/config/wallets instead of
+// demo/midgard-manager/config/wallets.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const PROJECT_ROOT = join(__dirname, '../../../..'); // Simplified path to project root
+const PROJECT_ROOT = join(__dirname, '../../..');
 const CONFIG_DIR = join(PROJECT_ROOT, 'config/wallets');
 const WALLET_CONFIG_PATH = join(CONFIG_DIR, 'default.json');
 

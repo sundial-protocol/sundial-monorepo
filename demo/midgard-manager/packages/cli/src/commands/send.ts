@@ -47,14 +47,14 @@ export const sendCommand = Command.make(
           return;
         }
 
-        const lucid = await Lucid(new MidgardNodeProvider(endpoint), 'Preprod');
-        lucid.selectWallet.fromPrivateKey(wallet.privateKey);
-
         console.log(
           chalk.gray(`Sending ${amount} sBTC from ${from} (${wallet.address}) to ${to}...`)
         );
 
         try {
+          const lucid = await Lucid(new MidgardNodeProvider(endpoint), 'Preprod');
+          lucid.selectWallet.fromPrivateKey(wallet.privateKey);
+
           const tx = await lucid.newTx().pay.ToAddress(to, { lovelace }).complete();
           const signed = await tx.sign.withPrivateKey(wallet.privateKey).complete();
           const txHash = await signed.submit();
@@ -66,7 +66,7 @@ export const sendCommand = Command.make(
           console.error(
             chalk.red(`Failed to send: ${error instanceof Error ? error.message : error}`)
           );
-          console.log(chalk.gray('Is the node running? Check with: midgard node-status'));
+          console.log(chalk.gray('Is the node running? Check with: midgard node node-status'));
         }
       })
     );

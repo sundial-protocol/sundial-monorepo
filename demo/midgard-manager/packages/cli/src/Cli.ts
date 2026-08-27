@@ -50,8 +50,8 @@ $ pnpm tx-generator start --test-wallet --type mixed --batch-size 10 --interval 
 $ pnpm tx-generator status
 
 # Node Operations
-$ pnpm start node-status
-$ pnpm start configure-node --interactive
+$ pnpm start node node-status
+$ pnpm start node configure-node --interactive
 
 For more detailed transaction generator options:
 $ pnpm tx-generator --help`;

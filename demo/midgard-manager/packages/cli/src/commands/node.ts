@@ -6,11 +6,12 @@ import ora from 'ora-classic';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-// Get the directory path relative to the monorepo
+// tsup bundles this package into a single dist/bin.js, so import.meta.url
+// always resolves to <package-root>/dist at runtime — 3 levels up reaches
+// demo/midgard-manager (see the same note in ../config/wallets.ts).
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const MONOREPO_ROOT = join(__dirname, '../../../../../..');
-const PROJECT_ROOT = join(MONOREPO_ROOT, 'demo/midgard-manager');
+const PROJECT_ROOT = join(__dirname, '../../..');
 
 // Store node configuration in the project's config directory
 const CONFIG_DIR = join(PROJECT_ROOT, 'config');
@@ -84,7 +85,7 @@ export const nodeStatusCommand = Command.make(
           console.log(chalk.gray(`• Verify the node endpoint: ${endpoint}`));
           console.log(chalk.gray('• Check network connectivity'));
           console.log(chalk.gray('• Try configuring a different endpoint:'));
-          console.log(chalk.gray(`  $ midgard-manager configure-node --endpoint <url>`));
+          console.log(chalk.gray(`  $ midgard node configure-node --endpoint <url>`));
           console.log(chalk.gray('\nCommon endpoint configurations:'));
           console.log(chalk.gray('• Local development: http://localhost:3000'));
           console.log(chalk.gray('• Docker container: http://localhost:3000'));
@@ -188,7 +189,7 @@ export const configureNodeCommand = Command.make(
 
           console.log();
           console.log(chalk.gray('To check node status:'));
-          console.log(chalk.gray(`$ midgard-manager node-status`));
+          console.log(chalk.gray(`$ midgard node node-status`));
         } catch (error) {
           spinner.fail('Failed to save configuration');
           console.error(chalk.red(`Error: ${error.message}`));

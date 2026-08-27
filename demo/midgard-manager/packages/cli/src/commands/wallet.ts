@@ -102,13 +102,20 @@ const balanceCommand = Command.make(
           return;
         }
 
-        const client = new MidgardNodeClient({ baseUrl: endpoint, enableLogs: false });
-        const utxos = await client.getUtxos(wallet.address);
-        const lovelace = utxos.reduce((sum, utxo) => sum + utxo.assets.lovelace, 0n);
+        try {
+          const client = new MidgardNodeClient({ baseUrl: endpoint, enableLogs: false });
+          const utxos = await client.getUtxos(wallet.address);
+          const lovelace = utxos.reduce((sum, utxo) => sum + utxo.assets.lovelace, 0n);
 
-        console.log(chalk.blue(`Balance for ${name} (${wallet.address}):`));
-        console.log(`  ${(Number(lovelace) / 1_000_000).toFixed(6)} sBTC`);
-        console.log(chalk.gray(`  (${lovelace} lovelace across ${utxos.length} UTxO(s))`));
+          console.log(chalk.blue(`Balance for ${name} (${wallet.address}):`));
+          console.log(`  ${(Number(lovelace) / 1_000_000).toFixed(6)} sBTC`);
+          console.log(chalk.gray(`  (${lovelace} lovelace across ${utxos.length} UTxO(s))`));
+        } catch (error) {
+          console.error(
+            chalk.red(`Failed to fetch balance: ${error instanceof Error ? error.message : error}`)
+          );
+          console.log(chalk.gray(`Is the node reachable at ${endpoint}?`));
+        }
       })
     );
   }
