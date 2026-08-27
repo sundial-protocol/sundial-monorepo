@@ -9,3 +9,10 @@ targetRules = ["generic-api-key"]
 paths = [
   '''(^|/)demo/midgard-node/logs/.*\.log$'''
 ]
+
+[[allowlists]]
+description = "Mock ed25519 private keys in midgard-manager unit/integration tests"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)demo/midgard-manager/packages/[^/]+/tests/.*\.(test|spec)\.ts$'''
+]
