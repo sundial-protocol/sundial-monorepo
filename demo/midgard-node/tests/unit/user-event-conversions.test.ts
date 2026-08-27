@@ -30,6 +30,29 @@ const lucidMocks = vi.hoisted(() => {
       to_cbor_bytes: () => Buffer.from("output"),
     }),
   );
+  const conwayFormatTxOutNew = vi.fn((address: unknown, amount: unknown) => {
+    let datum: unknown = undefined;
+    return {
+      address,
+      amount,
+      set_datum_option: (d: unknown) => {
+        datum = d;
+      },
+      getDatum: () => datum,
+    };
+  });
+  const transactionOutputNewConwayFormatTxOut = vi.fn(
+    (conway: {
+      address: unknown;
+      amount: unknown;
+      getDatum: () => unknown;
+    }) => ({
+      address: () => conway.address,
+      amount: () => conway.amount,
+      datum: () => conway.getDatum(),
+      to_cbor_bytes: () => Buffer.from("output"),
+    }),
+  );
   const transactionHashFromHex = vi.fn((hex: string) => ({
     to_hex: () => hex,
     to_raw_bytes: () => Buffer.from(hex, "hex"),
@@ -58,6 +81,7 @@ const lucidMocks = vi.hoisted(() => {
     addressFromBech32,
     assetNameFromHex,
     checkedSub,
+    conwayFormatTxOutNew,
     dataFrom,
     datumOptionFromCborHex,
     mapAssetInsert,
@@ -66,6 +90,7 @@ const lucidMocks = vi.hoisted(() => {
     transactionHashFromHex,
     transactionInputNew,
     transactionOutputNew,
+    transactionOutputNewConwayFormatTxOut,
     transactionUnspentOutputFromCborBytes,
     transactionUnspentOutputNew,
     valueNew,
@@ -79,6 +104,9 @@ vi.mock("@lucid-evolution/lucid", () => ({
     },
     AssetName: {
       from_hex: lucidMocks.assetNameFromHex,
+    },
+    ConwayFormatTxOut: {
+      new: lucidMocks.conwayFormatTxOutNew,
     },
     DatumOption: {
       from_cbor_hex: lucidMocks.datumOptionFromCborHex,
@@ -100,6 +128,8 @@ vi.mock("@lucid-evolution/lucid", () => ({
     },
     TransactionOutput: {
       new: lucidMocks.transactionOutputNew,
+      new_conway_format_tx_out:
+        lucidMocks.transactionOutputNewConwayFormatTxOut,
     },
     TransactionUnspentOutput: {
       from_cbor_bytes: lucidMocks.transactionUnspentOutputFromCborBytes,

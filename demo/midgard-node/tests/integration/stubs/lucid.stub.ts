@@ -31,38 +31,37 @@ export const toHex = (bytes: Uint8Array): string =>
 
 export const fromHex = (hex: string): Uint8Array => Buffer.from(hex, "hex");
 
-// Converts a UTxO to a CML-compatible object whose to_cbor_bytes() serialises
-// to a stable deterministic buffer.  Sufficient for ledger MPT put operations.
-export const utxoToCore = (
-  utxo: UTxO,
-): {
-  input: () => { to_cbor_bytes: () => Uint8Array };
-  output: () => { to_cbor_bytes: () => Uint8Array };
-} => ({
-  input: () => ({
-    to_cbor_bytes: () =>
-      Buffer.from(
-        JSON.stringify({ txHash: utxo.txHash, outputIndex: utxo.outputIndex }),
-      ),
-  }),
-  output: () => ({
-    to_cbor_bytes: () => Buffer.alloc(16, 0xcc),
-  }),
-});
+// Converts a UTxO to a real CML.TransactionUnspentOutput, mirroring real
+// Lucid's `utxoToCore`: the output is built via the legacy (pre-Conway)
+// constructor, since that's what real Lucid emits for simple address+value
+// UTxOs. Callers that persist this to the ledger are expected to re-encode it
+// to Conway format themselves (see `toConwayFormatOutputCbor`). Returning a
+// real TransactionUnspentOutput (rather than a plain object) matches the real
+// library's shape: it natively supports `.input()`, `.output()`, and
+// `.to_cbor_bytes()`, all of which callers in `src/` rely on.
+export const utxoToCore = (utxo: UTxO): CMLReal.TransactionUnspentOutput => {
+  const input = CMLReal.TransactionInput.new(
+    CMLReal.TransactionHash.from_hex(utxo.txHash),
+    BigInt(utxo.outputIndex),
+  );
+  const address = CMLReal.Address.from_bech32(utxo.address);
+  const lovelace = utxo.assets.lovelace ?? 0n;
+  const output = CMLReal.TransactionOutput.new(
+    address,
+    CMLReal.Value.from_coin(lovelace),
+  );
+  return CMLReal.TransactionUnspentOutput.new(input, output);
+};
 
-export const coreToUtxo = (cml: { to_cbor_bytes: () => Uint8Array }): UTxO => {
-  const bytes = Buffer.from(cml.to_cbor_bytes()).toString("utf8");
-  try {
-    const data = JSON.parse(bytes);
-    return {
-      txHash: data.txHash ?? "aa".repeat(32),
-      outputIndex: data.outputIndex ?? 0,
-      address: "",
-      assets: {},
-    };
-  } catch {
-    return { txHash: "aa".repeat(32), outputIndex: 0, address: "", assets: {} };
-  }
+export const coreToUtxo = (cml: CMLReal.TransactionUnspentOutput): UTxO => {
+  const input = cml.input();
+  const output = cml.output();
+  return {
+    txHash: input.transaction_id().to_hex(),
+    outputIndex: Number(input.index()),
+    address: output.address().to_bech32(),
+    assets: { lovelace: output.amount().coin() },
+  };
 };
 
 export const CML = CMLReal;

@@ -41,7 +41,7 @@ resource "aws_ecs_task_definition" "sundial_node" {
       name      = "sundial-node"
       image     = var.sundial_node_image
       essential = true
-      command   = ["node", "./dist/index.js", "listen", "--with-monitoring"]
+      command   = ["node", "./dist/index.cjs", "listen", "--with-monitoring"]
 
       portMappings = [
         {

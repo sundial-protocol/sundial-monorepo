@@ -4,6 +4,7 @@ resource "aws_lb" "api" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.sg_alb.id]
   subnets            = aws_subnet.public[*].id
+  idle_timeout       = 660
 
   access_logs {
     bucket  = aws_s3_bucket.alb_access_logs.id

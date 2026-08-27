@@ -44,6 +44,45 @@ export const isHexString = (str: string): boolean => {
   return str.length % 2 === 0 && hexRegex.test(str);
 };
 
+// Midgard only supports Conway-format (post-Alonzo) transaction outputs, and
+// the mempool acceptance validator decodes the ledger pre-state with that
+// invariant. `CML.TransactionOutput.new` builds the legacy (pre-Conway)
+// format, so any code constructing an output that will be persisted to the
+// ledger must go through this constructor instead.
+export const newConwayFormatTxOutput = (
+  address: CML.Address,
+  value: CML.Value,
+  datumOption?: CML.DatumOption,
+): CML.TransactionOutput => {
+  const conway = CML.ConwayFormatTxOut.new(address, value);
+  if (datumOption !== undefined) {
+    conway.set_datum_option(datumOption);
+  }
+  return CML.TransactionOutput.new_conway_format_tx_out(conway);
+};
+
+// Same invariant as `newConwayFormatTxOutput`, but for re-encoding an output
+// that may already be in either format (e.g. one produced by Lucid's
+// `utxoToCore`, which emits legacy-format outputs for simple address+value
+// UTxOs) rather than one being constructed from scratch.
+export const toConwayFormatOutputCbor = (
+  output: CML.TransactionOutput,
+): Uint8Array => {
+  if (output.kind() === CML.TransactionOutputKind.ConwayFormatTxOut) {
+    return output.to_cbor_bytes();
+  }
+  const conway = CML.ConwayFormatTxOut.new(output.address(), output.amount());
+  const datum = output.datum();
+  if (datum !== undefined) {
+    conway.set_datum_option(datum);
+  }
+  const scriptRef = output.script_ref();
+  if (scriptRef !== undefined) {
+    conway.set_script_reference(scriptRef);
+  }
+  return CML.TransactionOutput.new_conway_format_tx_out(conway).to_cbor_bytes();
+};
+
 export const breakDownTxMinimally = (
   txCBOR: Buffer,
   txHash?: Buffer,
@@ -121,7 +160,7 @@ export const breakDownTx = (
         [Ledger.Columns.OUTREF]: Buffer.from(
           CML.TransactionInput.new(txHash, BigInt(i)).to_cbor_bytes(),
         ),
-        [Ledger.Columns.OUTPUT]: Buffer.from(output.to_cbor_bytes()),
+        [Ledger.Columns.OUTPUT]: Buffer.from(toConwayFormatOutputCbor(output)),
         [Ledger.Columns.ADDRESS]: output.address().to_bech32(),
       });
     }

@@ -7,6 +7,7 @@ import * as SDK from "@al-ft/midgard-sdk";
 import { NodeConfig } from "@/services/config.js";
 import { Ledger } from "./index.js";
 import { AlwaysSucceedsContract } from "@/services/always-succeeds.js";
+import { newConwayFormatTxOutput } from "@/utils.js";
 
 export const tableName = "deposits_utxos";
 
@@ -106,7 +107,7 @@ export const entryToCMLUTxO = (
       });
     }
 
-    const transactionOutput = CML.TransactionOutput.new(
+    const transactionOutput = newConwayFormatTxOutput(
       CML.Address.from_bech32(l2AddressBech32),
       l2Amount,
       l2Datum,
