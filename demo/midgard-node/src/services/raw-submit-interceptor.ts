@@ -7,6 +7,11 @@ export type RawSubmitInterceptorOptions = {
   readonly xadd: XaddFn;
   readonly onEnqueued: () => void;
   readonly onRejected: () => void;
+  // Called once per handled request with the final HTTP status code and the
+  // wall-clock duration in seconds. Used to feed the shared HTTP request
+  // metrics for the `POST /submit` ingress path, which bypasses the Effect
+  // router (and therefore the router-level metrics middleware).
+  readonly onResponse?: (statusCode: number, durationSeconds: number) => void;
 };
 
 export type RawSubmitInterceptor = {
@@ -26,7 +31,13 @@ export const handleRawSubmitRequest = (
   xadd: XaddFn,
   onEnqueued: () => void,
   onRejected: () => void,
+  onResponse?: (statusCode: number, durationSeconds: number) => void,
 ): void => {
+  const startedAt = performance.now();
+  const report = (statusCode: number): void => {
+    onResponse?.(statusCode, (performance.now() - startedAt) / 1000);
+  };
+
   const chunks: Buffer[] = [];
 
   req.on("data", (chunk: Buffer) => {
@@ -38,6 +49,7 @@ export const handleRawSubmitRequest = (
       onRejected();
       res.writeHead(400, JSON_HEADER);
       res.end(JSON.stringify({ error: "Request read error" }));
+      report(400);
     }
   });
 
@@ -48,6 +60,7 @@ export const handleRawSubmitRequest = (
       onRejected();
       res.writeHead(400, JSON_HEADER);
       res.end(JSON.stringify({ error: "Invalid CBOR provided" }));
+      report(400);
       return;
     }
 
@@ -55,6 +68,7 @@ export const handleRawSubmitRequest = (
       if (err != null || id === null) {
         res.writeHead(500, JSON_HEADER);
         res.end(JSON.stringify({ error: "Failed to enqueue transaction" }));
+        report(500);
         return;
       }
       onEnqueued();
@@ -65,6 +79,7 @@ export const handleRawSubmitRequest = (
           id,
         }),
       );
+      report(200);
     });
   });
 };
@@ -86,6 +101,7 @@ export const createRawSubmitInterceptor = (
             options.xadd,
             options.onEnqueued,
             options.onRejected,
+            options.onResponse,
           );
           return true;
         }

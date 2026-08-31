@@ -301,6 +301,12 @@ variable "prometheus_retention" {
   default = "3d"
 }
 
+variable "prometheus_retention_size" {
+  description = "Hard cap on Prometheus TSDB size (safety net alongside time-based retention)."
+  type        = string
+  default     = "0"
+}
+
 variable "loki_retention_days" {
   type    = number
   default = 3

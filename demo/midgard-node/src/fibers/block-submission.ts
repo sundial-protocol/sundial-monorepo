@@ -125,6 +125,29 @@ const unsubmittedBlockBacklogGauge = Metric.gauge("unsubmitted_block_backlog", {
   bigint: true,
 }).register();
 
+// L1 settlement observability. Full reorg/rollback tracking needs a dedicated
+// chain follower (future work); these two counters capture the settlement
+// signals already available on the submission path.
+const l1CommitmentPrecheckConfirmedCounter = Metric.counter(
+  "l1_commitment_precheck_confirmed",
+  {
+    description:
+      "A counter for blocks whose L1 commitment was already found on-chain by the pre-submit L1 check (idempotent recovery after an earlier timed-out attempt)",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
+const l1CommitmentIdempotentRecoveredCounter = Metric.counter(
+  "l1_commitment_idempotent_recovered",
+  {
+    description:
+      "A counter for block submissions where the L1 submit reported a conflict but a follow-up L1 inclusion check confirmed the commitment had actually landed",
+    bigint: true,
+    incremental: true,
+  },
+).register();
+
 export const blockSubmissionMetrics = {
   submitBlockCounter,
   submitBlockFailuresCounter,
@@ -137,6 +160,8 @@ export const blockSubmissionMetrics = {
   l1CommitmentFeesLovelaceCounter,
   l1CommitmentFeeLovelaceLastGauge,
   unsubmittedBlockBacklogGauge,
+  l1CommitmentPrecheckConfirmedCounter,
+  l1CommitmentIdempotentRecoveredCounter,
 } as const;
 
 export const initializeSubmissionMetrics = Effect.all([
@@ -160,6 +185,14 @@ export const initializeSubmissionMetrics = Effect.all([
   ),
   Metric.set(blockSubmissionMetrics.l1CommitmentFeeLovelaceLastGauge, 0n),
   Metric.set(blockSubmissionMetrics.unsubmittedBlockBacklogGauge, 0n),
+  Metric.incrementBy(
+    blockSubmissionMetrics.l1CommitmentPrecheckConfirmedCounter,
+    0n,
+  ),
+  Metric.incrementBy(
+    blockSubmissionMetrics.l1CommitmentIdempotentRecoveredCounter,
+    0n,
+  ),
 ]);
 
 const loadSubmissionMetricsBaselineFromDb = Effect.gen(function* () {
@@ -732,7 +765,11 @@ export const submitEarliestBlock = Effect.gen(function* () {
         );
         let submissionTxCborBytes = blockEntry[BlocksDB.Columns.L1_CBOR];
 
-        if (!txAlreadyOnL1) {
+        if (txAlreadyOnL1) {
+          yield* Metric.increment(
+            blockSubmissionMetrics.l1CommitmentPrecheckConfirmedCounter,
+          );
+        } else {
           yield* submitTxCborWithoutSigningProgram(
             submissionTxCborBytes,
             headerHashHex,
@@ -784,6 +821,9 @@ export const submitEarliestBlock = Effect.gen(function* () {
                 if (!confirmedOnL1) {
                   return yield* Effect.fail(submitError);
                 }
+                yield* Metric.increment(
+                  blockSubmissionMetrics.l1CommitmentIdempotentRecoveredCounter,
+                );
                 yield* Effect.logInfo(
                   `🔗 ✅ Idempotent submit recovery succeeded for header_hash=${headerHashHex}; continuing with DB apply and status transition.`,
                 );
