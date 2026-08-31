@@ -62,6 +62,29 @@ npm run start -- tiers --scenario scenarios/practical-5000-replay.json
 npm run start -- tiers --scenario scenarios/saturation-ramp-25pct-replay.json --max-tier 4
 ```
 
+### Retrospective reliability report
+
+Produces a dated SLO-compliance report over a **closed calendar window** from
+Prometheus (and optionally Loki). SLIs/objectives come from
+`demo/midgard-node/slo/slo.json` — the same source as the Prometheus recording
+rules. Output is a frozen evidence bundle (internal Markdown + HTML, a redacted
+public Markdown, raw range-query JSON, charts, `MANIFEST.sha256`).
+
+```bash
+# A full calendar month
+npm run start -- reliability-report --month 2026-08 --env testnet \
+  --prometheus http://localhost:9090 --loki http://localhost:3100
+
+# An explicit window
+npm run start -- reliability-report --from 2026-08-01 --to 2026-08-15T00:00:00Z \
+  --env testnet --prometheus http://localhost:9090
+
+# Re-render from a frozen bundle (no network calls)
+npm run start -- regen-reliability-report ./reliability-reports/testnet-2026-08
+```
+
+Exit code is non-zero when the disposition is `Failed` (an SLO was missed).
+
 ### Collateral top-up (block commitment wallet)
 
 If block commitments fail with collateral errors (for example "required 5000000 Lovelace collateral"),

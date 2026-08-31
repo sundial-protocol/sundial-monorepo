@@ -20,6 +20,13 @@ import { ArtifactWriter } from '../evidence/artifacts.js';
 import { GrafanaScreenshotService } from '../evidence/grafana-screenshots.js';
 import { PlanArtifactWriter } from '../evidence/plan-artifacts.js';
 import { sanitizePathLikeText } from '../path-sanitization.js';
+import {
+  type ReliabilityConfig,
+  ReliabilityConfigError,
+  resolveWindow,
+} from '../reliability/config.js';
+import { regenReliabilityReport, runReliabilityReport } from '../reliability/run.js';
+import { resolveSloPath, SloConfigError } from '../reliability/slo.js';
 import { generateCharts } from '../report/charts.js';
 import { renderReport } from '../report/markdown.js';
 import type { ScenarioRunRecord } from '../report/plan-markdown.js';
@@ -891,6 +898,130 @@ program
     const reportPath = path.join(runDir, 'report.md');
     await writeFile(reportPath, markdown, 'utf8');
     console.log(chalk.green(`Report written: ${redactPathLike(reportPath)}`));
+  });
+
+// ---------------------------------------------------------------------------
+// reliability-report
+// ---------------------------------------------------------------------------
+
+program
+  .command('reliability-report')
+  .description('Generate a retrospective SLO/reliability report for a closed calendar window')
+  .option('--month <YYYY-MM>', 'reporting window: a full calendar month (UTC)')
+  .option('--from <iso>', 'reporting window start (ISO-8601 or YYYY-MM-DD, UTC)')
+  .option('--to <iso>', 'reporting window end (ISO-8601 or YYYY-MM-DD, UTC)')
+  .requiredOption('--env <name>', 'environment name (e.g. testnet)')
+  .requiredOption('--prometheus <url>', 'Prometheus base URL')
+  .option('--loki <url>', 'Loki base URL (enables the error/warn log excerpt)')
+  .option('--grafana <url>', 'Grafana base URL (referenced in the report)')
+  .option('--slo <path>', 'path to slo.json (default: demo/midgard-node/slo/slo.json)')
+  .option('--output-dir <dir>', 'output bundle directory', './reliability-reports')
+  .option('--rolling-window <dur>', 'rolling window for timeseries/breach detection', '1h')
+  .option('--step <seconds>', 'range-query step in seconds', (v) => parseInt(v, 10), 60)
+  .action(
+    async (opts: {
+      month?: string;
+      from?: string;
+      to?: string;
+      env: string;
+      prometheus: string;
+      loki?: string;
+      grafana?: string;
+      slo?: string;
+      outputDir: string;
+      rollingWindow: string;
+      step: number;
+    }) => {
+      let config: ReliabilityConfig;
+      try {
+        const window = resolveWindow(opts);
+        const sloPath = resolveSloPath(opts.slo);
+        const stamp = window.label.replace(/[^0-9A-Za-z-]+/g, '_').slice(0, 40);
+        config = {
+          window,
+          environment: opts.env,
+          prometheusEndpoint: opts.prometheus.replace(/\/$/, ''),
+          lokiEndpoint: opts.loki?.replace(/\/$/, ''),
+          grafanaBaseUrl: opts.grafana?.replace(/\/$/, ''),
+          sloPath,
+          rollingWindow: opts.rollingWindow,
+          stepSeconds: Number.isFinite(opts.step) && opts.step > 0 ? opts.step : 60,
+          outputDir: path.resolve(opts.outputDir, `${opts.env}-${stamp}`),
+        };
+      } catch (err) {
+        if (err instanceof ReliabilityConfigError || err instanceof SloConfigError) {
+          console.error(chalk.red(`\nReliability report blocked: ${err.message}`));
+          process.exit(1);
+        }
+        throw err;
+      }
+
+      console.log(chalk.blue('\nScalability Harness — Reliability Report'));
+      console.log(
+        chalk.gray(
+          `Window:     ${config.window.from.toISOString()} → ${config.window.to.toISOString()}`
+        )
+      );
+      console.log(chalk.gray(`Env:        ${config.environment}`));
+      console.log(chalk.gray(`Prometheus: ${config.prometheusEndpoint}`));
+      console.log(chalk.gray(`Output:     ${redactPathLike(config.outputDir)}`));
+
+      const harnessVersion = await readHarnessVersion();
+      let result: Awaited<ReturnType<typeof runReliabilityReport>>;
+      try {
+        result = await runReliabilityReport(config, harnessVersion);
+      } catch (err) {
+        console.error(chalk.red(`\nReliability report failed: ${String(err)}`));
+        process.exit(1);
+      }
+
+      console.log(
+        chalk.green(
+          `\nReport:  ${redactPathLike(path.join(result.outDir, 'reliability-report.md'))}`
+        )
+      );
+      console.log(
+        chalk.gray(
+          `Public:  ${redactPathLike(path.join(result.outDir, 'reliability-report.public.md'))}`
+        )
+      );
+      console.log(
+        chalk.gray(`Bundle:  ${redactPathLike(path.join(result.outDir, 'MANIFEST.sha256'))}`)
+      );
+      const color =
+        result.disposition === 'Passed'
+          ? chalk.green
+          : result.disposition === 'Passed with Observations'
+            ? chalk.yellow
+            : chalk.red;
+      console.log(`Disposition: ${color(result.disposition)}`);
+      if (result.disposition === 'Failed') process.exit(1);
+    }
+  );
+
+// ---------------------------------------------------------------------------
+// regen-reliability-report
+// ---------------------------------------------------------------------------
+
+program
+  .command('regen-reliability-report <bundle-dir>')
+  .description('Re-render a reliability report from a frozen evidence bundle (no network calls)')
+  .action(async (bundleDir: string) => {
+    console.log(
+      chalk.blue(`\nRegen Reliability Report — ${redactPathLike(path.resolve(bundleDir))}`)
+    );
+    try {
+      const { disposition } = await regenReliabilityReport(bundleDir);
+      console.log(
+        chalk.green(
+          'Re-rendered reliability-report.{md,html,public.md} + refreshed MANIFEST.sha256'
+        )
+      );
+      console.log(chalk.gray(`Disposition: ${disposition}`));
+    } catch (err) {
+      console.error(chalk.red(`Regen failed: ${String(err)}`));
+      process.exit(1);
+    }
   });
 
 program.parse();
