@@ -1,0 +1,69 @@
+# promtool test rules rules/tests/slo.test.yml
+# Exercises the generated SLI / burn-rate / alert rules against synthetic series.
+rule_files:
+  - ../slo-recording.rules.yml
+  - ../slo-alerts.rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  # 100% of /submit requests succeed -> ratio 1, zero burn, no alert.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_requests_total{job="sundial_nodes",route="submit",method="POST",status_class="2xx"}'
+        values: "0+60x180"
+    promql_expr_test:
+      - expr: slo:submit_ingress_availability:ratio_rate5m
+        eval_time: 30m
+        exp_samples:
+          - labels: 'slo:submit_ingress_availability:ratio_rate5m{slo="submit_ingress_availability", window="5m"}'
+            value: 1
+      - expr: slo:submit_ingress_availability:burn_rate1h
+        eval_time: 90m
+        exp_samples:
+          - labels: 'slo:submit_ingress_availability:burn_rate1h{slo="submit_ingress_availability"}'
+            value: 0
+    alert_rule_test:
+      - alertname: SLOBurnRate_submit_ingress_availability_page
+        eval_time: 90m
+        exp_alerts: []
+
+  # 50% of /submit requests are 5xx -> ratio 0.5, burn rate 50 -> fast-burn page fires.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_requests_total{job="sundial_nodes",route="submit",method="POST",status_class="2xx"}'
+        values: "0+30x180"
+      - series: 'http_server_requests_total{job="sundial_nodes",route="submit",method="POST",status_class="5xx"}'
+        values: "0+30x180"
+    promql_expr_test:
+      - expr: slo:submit_ingress_availability:ratio_rate1h
+        eval_time: 120m
+        exp_samples:
+          - labels: 'slo:submit_ingress_availability:ratio_rate1h{slo="submit_ingress_availability", window="1h"}'
+            value: 0.5
+    alert_rule_test:
+      - alertname: SLOBurnRate_submit_ingress_availability_page
+        eval_time: 130m
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              slo: submit_ingress_availability
+            exp_annotations:
+              summary: "SLO submit_ingress_availability burning error budget fast (2% in 1h)"
+              description: "Fraction of POST /submit requests answered with a 2xx status. Objective 0.99. Burn rate over 1h and 5m both exceed 14.4x."
+
+  # Node exporter down for 10m -> availability ratio 0 -> availability page fires.
+  - interval: 1m
+    input_series:
+      - series: 'up{job="sundial_nodes"}'
+        values: "0x20"
+    alert_rule_test:
+      - alertname: SLOAvailabilityLow_node_availability
+        eval_time: 12m
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              slo: node_availability
+            exp_annotations:
+              summary: "node_availability below 0.9 over the last 5m"
+              description: "Prometheus scrape availability of the node exporter over the window."

@@ -42,6 +42,12 @@ import {
 import { isHexString } from "@/utils.js";
 import { createRawSubmitInterceptor } from "@/services/raw-submit-interceptor.js";
 import {
+  makeHttpMetricsMiddleware,
+  recordHttpRequest,
+  registerBuildInfo,
+} from "@/commands/http-metrics.js";
+import packageJson from "../../package.json" with { type: "json" };
+import {
   HttpRouter,
   HttpServer,
   HttpServerRequest,
@@ -87,6 +93,30 @@ const COMMITMENT_WALLET_BALANCE_ENDPOINT: string = "commitment-wallet/balance";
 const HEALTH_LIVE_ENDPOINT: string = "health/live";
 const HEALTH_READY_ENDPOINT: string = "health/ready";
 const COMMITMENT_WALLET_BALANCE_QUERY_TIMEOUT_MS = 4_000;
+
+// Routes that keep their own `route` label in HTTP metrics; anything else
+// collapses to `other` to keep label cardinality bounded. `POST /submit` is
+// intercepted before the router and reported separately.
+const KNOWN_HTTP_ROUTES: readonly string[] = [
+  HEALTH_LIVE_ENDPOINT,
+  HEALTH_READY_ENDPOINT,
+  TX_ENDPOINT,
+  ADDRESS_HISTORY_ENDPOINT,
+  UTXOS_ENDPOINT,
+  BLOCK_ENDPOINT,
+  INIT_ENDPOINT,
+  COMMIT_ENDPOINT,
+  MERGE_ENDPOINT,
+  RESET_ENDPOINT,
+  STATE_QUEUE_ENDPOINT,
+  STATE_QUEUE_ROOT_UNIT_DIAGNOSTICS_ENDPOINT,
+  STATE_QUEUE_REPAIR_ROOT_UNITS_ENDPOINT,
+  COMMITMENT_WALLET_BALANCE_ENDPOINT,
+  SUBMIT_ENDPOINT,
+  FAUCET_CLAIMS_ENDPOINT,
+];
+
+const httpMetricsMiddleware = makeHttpMetricsMiddleware(KNOWN_HTTP_ROUTES);
 const txAcceptedCounter = Metric.counter("tx_submissions_enqueued", {
   description:
     "A counter for tracking L2 transaction submissions that passed hex validation and were enqueued to the durable ingress stream",
@@ -1152,6 +1182,15 @@ export const runNode = (withMonitoring?: boolean) =>
         xadd: txIngressQueue.rawXadd,
         onEnqueued: () => Effect.runSync(Metric.increment(txAcceptedCounter)),
         onRejected: () => Effect.runSync(Metric.increment(txRejectedCounter)),
+        onResponse: (statusCode, durationSeconds) =>
+          Effect.runSync(
+            recordHttpRequest(
+              SUBMIT_ENDPOINT,
+              "POST",
+              statusCode,
+              durationSeconds,
+            ),
+          ),
       }).attachToServer(httpServer);
     }
 
@@ -1166,6 +1205,7 @@ export const runNode = (withMonitoring?: boolean) =>
             nodeConfig.NODE_ROLE === "api"
               ? apiIngressRouter({ txIngressQueue })
               : router({ txIngressQueue }),
+            httpMetricsMiddleware,
           ),
           NodeHttpServer.layer(() => srv, { port: nodeConfig.PORT }),
         ),
@@ -1255,7 +1295,16 @@ export const runNode = (withMonitoring?: boolean) =>
       }));
 
       yield* pipe(
-        program,
+        Effect.zipRight(
+          registerBuildInfo({
+            version: packageJson.version,
+            commit: process.env.MIDGARD_NODE_COMMIT ?? "unknown",
+            l1Provider: nodeConfig.L1_PROVIDER,
+            network: nodeConfig.NETWORK,
+            role: nodeConfig.NODE_ROLE,
+          }),
+          program,
+        ),
         Effect.withSpan("midgard"),
         Effect.provide(MetricsLive),
         Effect.catchAllCause(Effect.logError),

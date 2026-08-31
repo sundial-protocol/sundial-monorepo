@@ -1,0 +1,77 @@
+{
+  "_readme": [
+    "Single source of truth for Sundial node SLIs / SLOs.",
+    "Edit this file, then regenerate the Prometheus rules and commit them:",
+    "    node slo/gen-rules.mjs",
+    "    promtool check rules rules/*.yml",
+    "Never hand-edit rules/slo-recording.rules.yml or rules/slo-alerts.rules.yml.",
+    "The reliability report (Phase 4) reads the same objectives from here so the",
+    "report, the recording rules and the alerts can never drift apart."
+  ],
+  "job": "sundial_nodes",
+  "errorBudgetWindow": "30d",
+  "ratioWindows": ["5m", "30m", "1h", "6h", "1d", "3d", "30d"],
+  "latencyWindows": ["5m", "1h", "1d"],
+  "latencyQuantiles": [0.5, 0.95, 0.99],
+  "burnRateAlerts": [
+    { "severity": "page", "longWindow": "1h", "shortWindow": "5m", "factor": 14.4, "for": "2m", "budgetConsumed": "2% in 1h" },
+    { "severity": "ticket", "longWindow": "6h", "shortWindow": "30m", "factor": 6, "for": "15m", "budgetConsumed": "5% in 6h" }
+  ],
+  "slos": [
+    {
+      "id": "submit_ingress_availability",
+      "kind": "ratio",
+      "objective": 0.99,
+      "description": "Fraction of POST /submit requests answered with a 2xx status.",
+      "good": "sum(rate(http_server_requests_total{job=\"sundial_nodes\",route=\"submit\",status_class=\"2xx\"}[$w]))",
+      "total": "sum(rate(http_server_requests_total{job=\"sundial_nodes\",route=\"submit\"}[$w]))"
+    },
+    {
+      "id": "tx_end_to_end_success",
+      "kind": "ratio",
+      "objective": 0.99,
+      "ratioClampMax": 1,
+      "description": "L2 tx requests included in committed blocks vs transactions enqueued at ingress (long-window signal; noisy under a minute due to pipeline lag, clamped to 1).",
+      "good": "sum(rate(commit_block_tx_count_total{job=\"sundial_nodes\"}[$w]))",
+      "total": "sum(rate(tx_submissions_enqueued_total{job=\"sundial_nodes\"}[$w]))"
+    },
+    {
+      "id": "l1_commitment_success",
+      "kind": "ratio",
+      "objective": 0.999,
+      "description": "Committed blocks that did not hit a commitment-worker failure (timeout, crash, SDK/CML error).",
+      "good": "clamp_min(sum(rate(commit_block_count_total{job=\"sundial_nodes\"}[$w])) - sum(rate(commit_block_commitment_failures_total{job=\"sundial_nodes\"}[$w])), 0)",
+      "total": "sum(rate(commit_block_count_total{job=\"sundial_nodes\"}[$w]))"
+    },
+    {
+      "id": "merge_success",
+      "kind": "ratio",
+      "objective": 0.999,
+      "description": "Blocks merged into confirmed state that did not hit a merge failure.",
+      "good": "clamp_min(sum(rate(merge_block_count_total{job=\"sundial_nodes\"}[$w])) - sum(rate(merge_block_failures_total{job=\"sundial_nodes\"}[$w])), 0)",
+      "total": "sum(rate(merge_block_count_total{job=\"sundial_nodes\"}[$w]))"
+    },
+    {
+      "id": "submit_ingress_latency",
+      "kind": "latency",
+      "objectiveSeconds": 1.0,
+      "description": "POST /submit request latency (p95 target).",
+      "bucketMetric": "http_server_request_duration_seconds_bucket{job=\"sundial_nodes\",route=\"submit\"}"
+    },
+    {
+      "id": "inclusion_latency",
+      "kind": "latency",
+      "objectiveSeconds": 20,
+      "description": "Mempool-accepted to committed inclusion latency (commitment window span; p95 target per scalability plan).",
+      "bucketMetric": "tx_ingress_to_commit_duration_seconds_bucket{job=\"sundial_nodes\"}"
+    },
+    {
+      "id": "node_availability",
+      "kind": "gauge_avg",
+      "objective": 0.999,
+      "alertThreshold": 0.9,
+      "description": "Prometheus scrape availability of the node exporter over the window.",
+      "expr": "avg_over_time(up{job=\"sundial_nodes\"}[$w])"
+    }
+  ]
+}
