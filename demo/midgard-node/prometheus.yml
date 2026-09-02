@@ -12,7 +12,7 @@ alerting:
           # - alertmanager:9093
 
 # Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
-# SLO recording/alert rules are generated from slo/slo.yml (see slo/gen-rules.mjs).
+# SLO recording/alert rules are generated from slo/slo.json (see slo/gen-rules.mjs).
 rule_files:
   - "/etc/prometheus/rules/*.yml"
 
