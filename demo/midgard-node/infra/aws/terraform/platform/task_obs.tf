@@ -223,49 +223,23 @@ resource "aws_ecs_task_definition" "loki" {
 
   container_definitions = jsonencode([
     {
-      name       = "loki"
-      image      = var.loki_image
-      essential  = true
-      user       = "0"
-      entryPoint = ["/bin/sh", "-ec"]
+      name      = "loki"
+      image     = var.loki_image
+      essential = true
+      # grafana/loki images ship no shell (distroless-style), so config
+      # overrides must be plain CLI flags on top of the image's baked-in
+      # /etc/loki/local-config.yaml, not a shell heredoc. That default
+      # already matches our EFS layout (path_prefix/chunks/rules under
+      # /loki, schema_config, inmemory ring) — only retention/compaction
+      # are new here.
       command = [
-        <<-CMD
-          cat >/etc/loki/config.yaml <<'CFG'
-          auth_enabled: false
-          server:
-            http_listen_port: 3100
-          common:
-            instance_addr: 127.0.0.1
-            path_prefix: /loki
-            storage:
-              filesystem:
-                chunks_directory: /loki/chunks
-                rules_directory: /loki/rules
-            replication_factor: 1
-            ring:
-              kvstore:
-                store: inmemory
-          schema_config:
-            configs:
-              - from: 2020-10-24
-                store: tsdb
-                object_store: filesystem
-                schema: v13
-                index:
-                  prefix: index_
-                  period: 24h
-          limits_config:
-            retention_period: ${var.loki_retention_days * 24}h
-          compactor:
-            working_directory: /loki/compactor
-            compaction_interval: 10m
-            retention_enabled: true
-            retention_delete_delay: 2h
-            delete_request_store: filesystem
-          CFG
-
-          exec /usr/bin/loki -config.file=/etc/loki/config.yaml
-        CMD
+        "-config.file=/etc/loki/local-config.yaml",
+        "-store.retention=${var.loki_retention_days * 24}h",
+        "-compactor.working-directory=/loki/compactor",
+        "-compactor.compaction-interval=10m",
+        "-compactor.retention-enabled=true",
+        "-compactor.retention-delete-delay=2h",
+        "-compactor.delete-request-store=filesystem",
       ]
       portMappings = [{ containerPort = 3100, hostPort = 0, protocol = "tcp" }]
       mountPoints  = [{ sourceVolume = "loki-data", containerPath = "/loki", readOnly = false }]
