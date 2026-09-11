@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
 import {
+  createRawSubmitInterceptor,
   handleRawSubmitRequest,
   type XaddFn,
 } from "@/services/raw-submit-interceptor.js";
@@ -204,6 +205,160 @@ describe("handleRawSubmitRequest", () => {
 
     expect(onEnqueued).not.toHaveBeenCalled();
     expect(onRejected).not.toHaveBeenCalled();
+  });
+
+  it("reports status codes and durations via onResponse", () => {
+    const req = makeReq();
+    const res = makeRes();
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+    const onResponse = vi.fn();
+
+    handleRawSubmitRequest(req, res, xadd, onEnqueued, onRejected, onResponse);
+    fireBody(req, "deadbeef");
+
+    expect(onResponse).toHaveBeenCalledWith(200, expect.any(Number));
+  });
+
+  it("reports 400 via onResponse for invalid hex", () => {
+    const req = makeReq();
+    const res = makeRes();
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+    const onResponse = vi.fn();
+
+    handleRawSubmitRequest(req, res, xadd, onEnqueued, onRejected, onResponse);
+    fireBody(req, "not-hex!");
+
+    expect(onResponse).toHaveBeenCalledWith(400, expect.any(Number));
+  });
+
+  it("reports 500 via onResponse when xadd fails", () => {
+    const req = makeReq();
+    const res = makeRes();
+    const xadd = makeXadd(null, new Error("redis down"));
+    const { onEnqueued, onRejected } = makeCallbacks();
+    const onResponse = vi.fn();
+
+    handleRawSubmitRequest(req, res, xadd, onEnqueued, onRejected, onResponse);
+    fireBody(req, "ff");
+
+    expect(onResponse).toHaveBeenCalledWith(500, expect.any(Number));
+  });
+
+  it("works without an onResponse callback", () => {
+    const req = makeReq();
+    const res = makeRes();
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+
+    expect(() => {
+      handleRawSubmitRequest(req, res, xadd, onEnqueued, onRejected);
+      fireBody(req, "deadbeef");
+    }).not.toThrow();
+  });
+
+  it("handles a request stream error: rejects, responds 400 once", () => {
+    const req = makeReq();
+    const res = makeRes();
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+    const onResponse = vi.fn();
+
+    handleRawSubmitRequest(req, res, xadd, onEnqueued, onRejected, onResponse);
+    req.emit("error", new Error("socket hang up"));
+
+    expect(onRejected).toHaveBeenCalledOnce();
+    expect(res.writeHead).toHaveBeenCalledWith(400, expect.any(Object));
+    expect(JSON.parse(res.body)).toEqual({ error: "Request read error" });
+    expect(onResponse).toHaveBeenCalledWith(400, expect.any(Number));
+    expect(xadd).not.toHaveBeenCalled();
+  });
+
+  it("ignores a request error once the response has already ended", () => {
+    const req = makeReq();
+    const res = makeRes();
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+
+    handleRawSubmitRequest(req, res, xadd, onEnqueued, onRejected);
+    fireBody(req, "deadbeef");
+    expect(onEnqueued).toHaveBeenCalledOnce();
+
+    (res as unknown as { writableEnded: boolean }).writableEnded = true;
+    onRejected.mockClear();
+    req.emit("error", new Error("late error"));
+
+    expect(onRejected).not.toHaveBeenCalled();
+  });
+});
+
+// --- createRawSubmitInterceptor (real export) ---
+
+describe("createRawSubmitInterceptor", () => {
+  it("intercepts POST /submit on a real server and reports via onResponse", () => {
+    const fakeServer = new EventEmitter() as unknown as Server;
+    const requestListener = vi.fn();
+    const closeListener = vi.fn();
+    fakeServer.on("request", requestListener);
+    fakeServer.on("close", closeListener);
+
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+    const onResponse = vi.fn();
+
+    const interceptor = createRawSubmitInterceptor({
+      xadd,
+      onEnqueued,
+      onRejected,
+      onResponse,
+    });
+    interceptor.attachToServer(fakeServer);
+
+    const submitReq = makeReq("POST", "/submit");
+    const submitRes = makeRes();
+    fakeServer.emit("request", submitReq, submitRes);
+    expect(requestListener).not.toHaveBeenCalled();
+
+    fireBody(submitReq, "aa");
+    expect(xadd).toHaveBeenCalled();
+    expect(onEnqueued).toHaveBeenCalledOnce();
+    expect(onResponse).toHaveBeenCalledWith(200, expect.any(Number));
+
+    // Non-/submit POST requests pass through to registered listeners.
+    const otherReq = makeReq("POST", "/other");
+    fakeServer.emit("request", otherReq, submitRes);
+    expect(requestListener).toHaveBeenCalledWith(otherReq, submitRes);
+
+    // GET / passes through too.
+    const getReq = makeReq("GET", "/");
+    fakeServer.emit("request", getReq, submitRes);
+    expect(requestListener).toHaveBeenCalledWith(getReq, submitRes);
+
+    // Non-request events pass through unmodified.
+    fakeServer.emit("close");
+    expect(closeListener).toHaveBeenCalled();
+  });
+
+  it("works without an onResponse callback configured", () => {
+    const fakeServer = new EventEmitter() as unknown as Server;
+    const xadd = makeXadd("1-0");
+    const { onEnqueued, onRejected } = makeCallbacks();
+
+    const interceptor = createRawSubmitInterceptor({
+      xadd,
+      onEnqueued,
+      onRejected,
+    });
+    interceptor.attachToServer(fakeServer);
+
+    const submitReq = makeReq("POST", "/submit");
+    const submitRes = makeRes();
+    expect(() => {
+      fakeServer.emit("request", submitReq, submitRes);
+      fireBody(submitReq, "aa");
+    }).not.toThrow();
+    expect(onEnqueued).toHaveBeenCalledOnce();
   });
 });
 
