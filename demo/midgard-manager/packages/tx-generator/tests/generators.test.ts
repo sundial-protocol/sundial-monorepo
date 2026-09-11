@@ -91,7 +91,7 @@ vi.mock('@midgard-manager/tx-builder', () => {
 // Mock the node client
 vi.mock('../src/lib/client/node-client', () => {
   return {
-    MidgardNodeClient: vi.fn().mockImplementation(() => {
+    MidgardNodeClient: vi.fn().mockImplementation(function () {
       return {
         submitTransaction: vi.fn().mockResolvedValue({ txId: 'mock_tx_id' }),
         isAvailable: vi.fn().mockResolvedValue(true),

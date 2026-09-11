@@ -16,6 +16,8 @@
     "listen": "pnpm run build && node dist/index.cjs listen",
     "init": "pnpm run build && node dist/index.cjs init",
     "test": "NODE_ENV=emulator vitest run --config vitest.config.ts",
+    "slo:gen": "node slo/gen-rules.mjs",
+    "slo:check": "node slo/gen-rules.mjs && promtool check rules rules/slo-recording.rules.yml rules/slo-alerts.rules.yml && promtool test rules rules/tests/slo.test.yml && git diff --exit-code -- rules/",
     "docker:up:node": "bash -c 'docker compose rm -sf node || true; docker compose --profile split up -d node-api node-tx-processor node-sequencer'",
     "docker:up:postgres": "docker compose up -d postgres",
     "docker:up:redis": "docker compose up -d redis",
@@ -130,7 +132,7 @@
     "level": "^10.0.0",
     "memory-level": "^3.1.0",
     "rimraf": "^6.1.3",
-    "vitest": "3.2.6"
+    "vitest": "4.1.11"
   },
   "devDependencies": {
     "@commander-js/extra-typings": "^13.1.0",

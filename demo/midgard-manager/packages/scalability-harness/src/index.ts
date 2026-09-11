@@ -129,3 +129,6 @@ export type {
 export { buildTierSummary } from './analysis/tier-summary.js';
 export type { ReportInput } from './report/markdown.js';
 export { renderReport } from './report/markdown.js';
+
+// Retrospective reliability reporting (calendar-window SLO compliance report).
+export * from './reliability/index.js';

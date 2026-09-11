@@ -83,8 +83,17 @@ resource "aws_ecs_task_definition" "prometheus" {
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   volume {
-    name      = "prometheus-data"
-    host_path = "/var/lib/prometheus"
+    name = "prometheus-data"
+
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.mpt.id
+      transit_encryption = "ENABLED"
+
+      authorization_config {
+        access_point_id = aws_efs_access_point.prometheus_data.id
+        iam             = "DISABLED"
+      }
+    }
   }
 
   container_definitions = jsonencode([
@@ -92,13 +101,26 @@ resource "aws_ecs_task_definition" "prometheus" {
       name       = "prometheus"
       image      = var.prometheus_image
       essential  = true
+      user       = "0"
       entryPoint = ["/bin/sh", "-ec"]
       command = [
         <<-CMD
+          mkdir -p /etc/prometheus/rules
+
+          # SLO recording + alert rules, generated from slo/slo.json by
+          # slo/gen-rules.mjs and committed to demo/midgard-node/rules/.
+          # Delivered base64-encoded so the multi-line YAML survives the
+          # HCL/heredoc round-trip without indentation damage.
+          echo "${base64encode(file("${path.module}/../../../../rules/slo-recording.rules.yml"))}" | base64 -d >/etc/prometheus/rules/slo-recording.rules.yml
+          echo "${base64encode(file("${path.module}/../../../../rules/slo-alerts.rules.yml"))}" | base64 -d >/etc/prometheus/rules/slo-alerts.rules.yml
+
           cat >/etc/prometheus/prometheus.yml <<'CFG'
           global:
             scrape_interval: 15s
             evaluation_interval: 15s
+
+          rule_files:
+            - /etc/prometheus/rules/*.yml
 
           scrape_configs:
             - job_name: prometheus
@@ -133,7 +155,9 @@ resource "aws_ecs_task_definition" "prometheus" {
           exec /bin/prometheus \
             --config.file=/etc/prometheus/prometheus.yml \
             --storage.tsdb.path=/prometheus \
-            --storage.tsdb.retention.time=${var.prometheus_retention}
+            --storage.tsdb.retention.time=${var.prometheus_retention} \
+            --storage.tsdb.retention.size=${var.prometheus_retention_size} \
+            --web.enable-admin-api
         CMD
       ]
       portMappings = [{ containerPort = 9090, hostPort = 9090, protocol = "tcp" }]
@@ -168,7 +192,10 @@ resource "aws_ecs_service" "prometheus" {
     container_port = 9090
   }
 
-  depends_on = [aws_ecs_cluster_capacity_providers.main]
+  depends_on = [
+    aws_ecs_cluster_capacity_providers.main,
+    aws_efs_mount_target.mpt,
+  ]
 }
 
 resource "aws_ecs_task_definition" "loki" {
@@ -181,16 +208,65 @@ resource "aws_ecs_task_definition" "loki" {
   task_role_arn            = aws_iam_role.ecs_task.arn
 
   volume {
-    name      = "loki-data"
-    host_path = "/var/lib/loki"
+    name = "loki-data"
+
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.mpt.id
+      transit_encryption = "ENABLED"
+
+      authorization_config {
+        access_point_id = aws_efs_access_point.loki_data.id
+        iam             = "DISABLED"
+      }
+    }
   }
 
   container_definitions = jsonencode([
     {
-      name         = "loki"
-      image        = var.loki_image
-      essential    = true
-      command      = ["-config.file=/etc/loki/local-config.yaml"]
+      name       = "loki"
+      image      = var.loki_image
+      essential  = true
+      user       = "0"
+      entryPoint = ["/bin/sh", "-ec"]
+      command = [
+        <<-CMD
+          cat >/etc/loki/config.yaml <<'CFG'
+          auth_enabled: false
+          server:
+            http_listen_port: 3100
+          common:
+            instance_addr: 127.0.0.1
+            path_prefix: /loki
+            storage:
+              filesystem:
+                chunks_directory: /loki/chunks
+                rules_directory: /loki/rules
+            replication_factor: 1
+            ring:
+              kvstore:
+                store: inmemory
+          schema_config:
+            configs:
+              - from: 2020-10-24
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+          limits_config:
+            retention_period: ${var.loki_retention_days * 24}h
+          compactor:
+            working_directory: /loki/compactor
+            compaction_interval: 10m
+            retention_enabled: true
+            retention_delete_delay: 2h
+            delete_request_store: filesystem
+          CFG
+
+          exec /usr/bin/loki -config.file=/etc/loki/config.yaml
+        CMD
+      ]
       portMappings = [{ containerPort = 3100, hostPort = 0, protocol = "tcp" }]
       mountPoints  = [{ sourceVolume = "loki-data", containerPath = "/loki", readOnly = false }]
       logConfiguration = {
@@ -223,7 +299,10 @@ resource "aws_ecs_service" "loki" {
     container_port = 3100
   }
 
-  depends_on = [aws_ecs_cluster_capacity_providers.main]
+  depends_on = [
+    aws_ecs_cluster_capacity_providers.main,
+    aws_efs_mount_target.mpt,
+  ]
 }
 
 resource "aws_ecs_task_definition" "alloy" {
@@ -379,11 +458,13 @@ resource "aws_ecs_task_definition" "grafana" {
 
           # Download dashboard JSON from S3 (uses ECS task role credentials)
           if command -v aws >/dev/null 2>&1; then
-            aws s3 cp "s3://${aws_s3_bucket.grafana_assets.bucket}/dashboard.json" \
-              /var/lib/grafana/dashboards/dashboard.json \
-              --region ${var.aws_region} 2>/dev/null \
-              && echo "[grafana-init] dashboard downloaded from S3" \
-              || echo "[grafana-init] warning: dashboard download failed; starting without it"
+            for name in dashboard.json reliability.json; do
+              aws s3 cp "s3://${aws_s3_bucket.grafana_assets.bucket}/$name" \
+                "/var/lib/grafana/dashboards/$name" \
+                --region ${var.aws_region} 2>/dev/null \
+                && echo "[grafana-init] $name downloaded from S3" \
+                || echo "[grafana-init] warning: $name download failed; starting without it"
+            done
           fi
 
           # Fix ownership so grafana user (UID 472) can read provisioning files

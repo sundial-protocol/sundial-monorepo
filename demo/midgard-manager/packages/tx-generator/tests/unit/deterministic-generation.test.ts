@@ -14,10 +14,12 @@ const { mockSubmitTransaction, mockIsAvailable, mockOneToOne, mockMultiOutput } 
 );
 
 vi.mock('../../src/lib/client/node-client', () => ({
-  MidgardNodeClient: vi.fn().mockImplementation(() => ({
-    submitTransaction: mockSubmitTransaction,
-    isAvailable: mockIsAvailable,
-  })),
+  MidgardNodeClient: vi.fn().mockImplementation(function () {
+    return {
+      submitTransaction: mockSubmitTransaction,
+      isAvailable: mockIsAvailable,
+    };
+  }),
 }));
 
 vi.mock('../../src/lib/generators/index.js', () => ({

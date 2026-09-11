@@ -531,11 +531,15 @@ ensure_grafana_assets() {
 
   [[ -d "${grafana_dir}" ]] || die "grafana directory not found: ${grafana_dir}"
 
-  local dashboard_json="${grafana_dir}/dashboard.json"
-  [[ -f "${dashboard_json}" ]] || die "dashboard.json not found: ${dashboard_json}"
+  local dashboards=("dashboard.json" "reliability.json")
+  for name in "${dashboards[@]}"; do
+    [[ -f "${grafana_dir}/${name}" ]] || die "${name} not found: ${grafana_dir}/${name}"
+  done
 
   if [[ "${DRY_RUN}" == "true" ]]; then
-    log "[dry-run] aws s3 cp ${dashboard_json} s3://${bucket}/dashboard.json --region ${AWS_PLATFORM_REGION}"
+    for name in "${dashboards[@]}"; do
+      log "[dry-run] aws s3 cp ${grafana_dir}/${name} s3://${bucket}/${name} --region ${AWS_PLATFORM_REGION}"
+    done
     return 0
   fi
 
@@ -543,8 +547,10 @@ ensure_grafana_assets() {
     die "grafana assets bucket does not exist: ${bucket} — run tofu apply first"
   fi
 
-  aws s3 cp "${dashboard_json}" "s3://${bucket}/dashboard.json" --region "${AWS_PLATFORM_REGION}"
-  log "uploaded dashboard.json to s3://${bucket}/dashboard.json"
+  for name in "${dashboards[@]}"; do
+    aws s3 cp "${grafana_dir}/${name}" "s3://${bucket}/${name}" --region "${AWS_PLATFORM_REGION}"
+    log "uploaded ${name} to s3://${bucket}/${name}"
+  done
 }
 
 case "${ACTION}" in

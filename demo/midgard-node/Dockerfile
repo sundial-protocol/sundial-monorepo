@@ -23,5 +23,9 @@ WORKDIR /app
 COPY --chown=node:node --from=build /deploy .
 COPY --chown=node:node --from=build /workspace/midgard-node/dist ./dist
 ENV NODE_ENV=production
+# Build provenance surfaced as the midgard_node_build_info metric. Pass with
+# `docker build --build-arg MIDGARD_NODE_COMMIT=$(git rev-parse --short HEAD)`.
+ARG MIDGARD_NODE_COMMIT=unknown
+ENV MIDGARD_NODE_COMMIT=${MIDGARD_NODE_COMMIT}
 USER node
 CMD ["node", "./dist/index.cjs", "listen"]

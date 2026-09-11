@@ -313,6 +313,17 @@ const commitBlockDurationHistogram = Metric.histogram(
   "Histogram of block commitment worker duration in seconds (success or failure)",
 ).register();
 
+// Inclusion latency: how long the commitment window spanned before this block
+// was committed. Equivalently, the age of the oldest event included in the
+// block (a conservative upper bound on per-tx mempool-accepted -> committed
+// latency). Complements the last-value commitment_window_age_seconds gauge with
+// a distribution for p50/p95/p99 reporting.
+const txIngressToCommitDurationHistogram = Metric.histogram(
+  "tx_ingress_to_commit_duration_seconds",
+  MetricBoundaries.exponential({ start: 0.5, factor: 2, count: 13 }),
+  "Histogram of commitment window span in seconds per committed block (inclusion latency upper bound)",
+).register();
+
 export const blockCommitmentMetrics = {
   commitBlockNumTxGauge,
   commitBlockEventsSizeGauge,
@@ -328,6 +339,7 @@ export const blockCommitmentMetrics = {
   commitmentWindowAgeSecondsGauge,
   commitmentBatchWaitSkipsCounter,
   commitBlockDurationHistogram,
+  txIngressToCommitDurationHistogram,
   ...blocksDbSeedingMetrics,
 } as const;
 
@@ -432,6 +444,12 @@ export const buildAndSubmitCommitmentBlockAction = () =>
           commitmentWindowAgeSecondsGauge,
           (commitmentWindow?.windowAgeMs ?? 0) / 1000,
         );
+        if (commitmentWindow?.windowAgeMs !== undefined) {
+          yield* Metric.update(
+            txIngressToCommitDurationHistogram,
+            commitmentWindow.windowAgeMs / 1000,
+          );
+        }
         yield* Metric.incrementBy(
           commitmentWindowTxRequestsDeferredCounter,
           BigInt(txRequestsDeferredInWindow),

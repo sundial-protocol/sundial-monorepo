@@ -36,8 +36,11 @@ rds_final_snapshot_identifier = "sundial-node-testnet-final"
 
 network = "Preprod"
 
-prometheus_retention = "3d"
-loki_retention_days  = 3
+# Retention sized for backward reliability reporting (closed calendar windows
+# plus margin). Data now lives on EFS, so it survives task rescheduling.
+prometheus_retention      = "120d"
+prometheus_retention_size = "40GB"
+loki_retention_days       = 120
 
 # Faucet wallet. Flip faucet_enabled to true once the faucet-seed-phrase and
 # faucet-api-key secrets exist in Secrets Manager under sundial-node/testnet/.
