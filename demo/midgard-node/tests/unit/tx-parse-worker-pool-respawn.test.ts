@@ -25,7 +25,7 @@ vi.mock("node:worker_threads", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:worker_threads")>();
   return {
     ...actual,
-    Worker: vi.fn().mockImplementation(() => {
+    Worker: vi.fn().mockImplementation(function () {
       const worker = new FakeWorker();
       createdWorkers.push(worker);
       return worker;
