@@ -40,7 +40,7 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "@effect/vitest": "^0.29.0",
-    "vitest": "3.2.6"
+    "vitest": "4.1.11"
   },
   "overrides": {
     "@cardano-sdk/core": "0.46.12",
