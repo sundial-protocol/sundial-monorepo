@@ -290,7 +290,9 @@ export function renderMarkdown(input: RenderInput, opts: { public: boolean }): s
     out.push('| --- | --- |');
     for (const s of data.slo) {
       const q = s.aggregate.ratio?.query ?? s.aggregate['0.95']?.query ?? '';
-      out.push(`| \`${s.id}\` | \`${q.replace(/\|/g, '\\|')}\` |`);
+      // Escape backslashes first so a literal '\' in the query cannot combine
+      // with the following escape to un-escape a table pipe.
+      out.push(`| \`${s.id}\` | \`${q.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')}\` |`);
     }
     out.push('');
   }
@@ -342,7 +344,7 @@ export function renderHtml(markdown: string, title: string): string {
       continue;
     }
     flushTable();
-    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    const h = line.match(/^(#{1,6}) (.*)$/);
     if (h) {
       html.push(`<h${h[1].length}>${inlineHtml(esc(h[2]))}</h${h[1].length}>`);
       continue;
@@ -377,9 +379,12 @@ ${html.join('\n')}
 }
 
 function inlineHtml(s: string): string {
+  // Character classes exclude the opening delimiters ('[', '(') as well as the
+  // closing ones so a run of unmatched '![' / '((' cannot force a quadratic
+  // rescan across every start position.
   return s
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/!\[([^\][]*)\]\(([^()]+)\)/g, '<img alt="$1" src="$2">')
+    .replace(/\[([^\][]+)\]\(([^()]+)\)/g, '<a href="$2">$1</a>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 }
