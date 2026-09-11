@@ -38,24 +38,24 @@ Submodules are listed below.
     </td>
     <td>
       <!-- badge:e2e:start -->
-<img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-passing-brightgreen?style=flat-square" />
+<img alt="E2E Tests" src="https://img.shields.io/badge/e2e%20tests-failing-red?style=flat-square" />
 <!-- badge:e2e:end -->
     </td>
   </tr>
   <tr>
     <td>
       <!-- badge:node-coverage:start -->
-<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-72.3%25-orange?style=flat-square" />
+<img alt="Node Coverage" src="https://img.shields.io/badge/node%20coverage-81.7%25-yellowgreen?style=flat-square" />
 <!-- badge:node-coverage:end -->
     </td>
     <td>
       <!-- badge:sdk-coverage:start -->
-<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-77.7%25-orange?style=flat-square" />
+<img alt="SDK Coverage" src="https://img.shields.io/badge/sdk%20coverage-82.2%25-yellowgreen?style=flat-square" />
 <!-- badge:sdk-coverage:end -->
     </td>
     <td>
       <!-- badge:ts-coverage:start -->
-<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-82.3%25-yellowgreen?style=flat-square" />
+<img alt="TS Coverage" src="https://img.shields.io/badge/ts%20coverage-87.5%25-yellowgreen?style=flat-square" />
 <!-- badge:ts-coverage:end -->
     </td>
     <td>
