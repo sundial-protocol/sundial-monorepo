@@ -414,19 +414,30 @@ resource "aws_ecs_task_definition" "grafana" {
           # Cloud Map SRV records use instance-id subdomains as targets (no A records),
           # so DNS-based resolution does not work. DiscoverInstances returns the actual
           # EC2 private IP and host port directly.
+          # Prometheus may start after Grafana and register a few seconds later, so
+          # retry for up to 5 minutes. On 2026-09-11 a single lookup ran 10 s too
+          # early and the datasource stayed on localhost for six weeks.
           PROMETHEUS_URL=""
           if command -v aws >/dev/null 2>&1; then
-            PROM_DATA=$(aws servicediscovery discover-instances \
-              --namespace-name ${var.private_dns_namespace_name} \
-              --service-name prometheus \
-              --region ${var.aws_region} \
-              --query 'Instances[0].[Attributes.AWS_INSTANCE_IPV4, Attributes.AWS_INSTANCE_PORT]' \
-              --output text 2>/dev/null)
-            PROM_IP=$(printf '%s' "$PROM_DATA" | awk '{print $1}')
-            PROM_PORT=$(printf '%s' "$PROM_DATA" | awk '{print $2}')
-            if [ -n "$PROM_IP" ] && [ "$PROM_IP" != "None" ]; then
-              PROMETHEUS_URL="http://$PROM_IP:$PROM_PORT"
-            fi
+            for attempt in $(seq 1 30); do
+              PROM_DATA=$(aws servicediscovery discover-instances \
+                --namespace-name ${var.private_dns_namespace_name} \
+                --service-name prometheus \
+                --region ${var.aws_region} \
+                --query 'Instances[0].[Attributes.AWS_INSTANCE_IPV4, Attributes.AWS_INSTANCE_PORT]' \
+                --output text 2>/dev/null)
+              PROM_IP=$(printf '%s' "$PROM_DATA" | awk '{print $1}')
+              PROM_PORT=$(printf '%s' "$PROM_DATA" | awk '{print $2}')
+              if [ -n "$PROM_IP" ] && [ "$PROM_IP" != "None" ]; then
+                PROMETHEUS_URL="http://$PROM_IP:$PROM_PORT"
+                break
+              fi
+              echo "[grafana-init] Prometheus not registered yet (attempt $attempt/30)"
+              sleep 10
+            done
+          fi
+          if [ -z "$PROMETHEUS_URL" ]; then
+            echo "[grafana-init] warning: Prometheus lookup failed; falling back to localhost, panels will be empty"
           fi
           PROMETHEUS_URL="$${PROMETHEUS_URL:-http://localhost:9090}"
           echo "[grafana-init] Prometheus URL: $PROMETHEUS_URL"
