@@ -1,6 +1,14 @@
 # OSV Scanner configuration
 # https://google.github.io/osv-scanner/configuration/
 
+# Vulnerabilities accepted for now. Each entry expires, so the scan fails again
+# and the decision is revisited.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2027-01-31
+reason = "deepmerge <=4.3.1 has no patched release (advisory published 2026-09-18). It reaches us only through jest-config, which midgard-ts uses to merge its own test configuration, so no untrusted input reaches mergeObject(). Jest 30 still depends on it. Remove once deepmerge or jest ships a fix."
+
 # License overrides for packages whose license cannot be resolved from the
 # public registry (private/internal packages or packages missing a license
 # field despite having a LICENSE file on disk).
