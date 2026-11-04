@@ -425,7 +425,7 @@ resource "aws_ecs_task_definition" "grafana" {
                 --service-name prometheus \
                 --region ${var.aws_region} \
                 --query 'Instances[0].[Attributes.AWS_INSTANCE_IPV4, Attributes.AWS_INSTANCE_PORT]' \
-                --output text 2>/dev/null)
+                --output text 2>/dev/null) || PROM_DATA=""
               PROM_IP=$(printf '%s' "$PROM_DATA" | awk '{print $1}')
               PROM_PORT=$(printf '%s' "$PROM_DATA" | awk '{print $2}')
               if [ -n "$PROM_IP" ] && [ "$PROM_IP" != "None" ]; then
@@ -517,6 +517,11 @@ resource "aws_ecs_service" "grafana" {
   desired_count        = var.observability_desired_count
   launch_type          = "EC2"
   force_new_deployment = true
+
+  # The init script retries the Prometheus lookup for up to 5 minutes before
+  # Grafana starts listening, and the ALB marks a target unhealthy after 90 s.
+  # Cover the retries plus the aws-cli install and Grafana's own startup.
+  health_check_grace_period_seconds = 420
 
   deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 200
