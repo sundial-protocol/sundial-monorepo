@@ -50,3 +50,11 @@ faucet_cooldown_seconds            = 86400
 faucet_daily_ip_limit              = 5
 faucet_min_balance_lovelace        = "100000000"
 faucet_genesis_allocation_lovelace = "10000000000000"
+
+# The node reads L1 through Blockfrost's free tier (50,000 requests a day). At the
+# 10-11 s defaults it ran out every evening around 19:00 UTC and was not ready
+# until the midnight reset. 30 s should keep it under the limit. Live since
+# 2026-10-29 as task definition sundial-node-testnet-node:12.
+wait_between_block_submissions_ms  = 30000
+wait_between_user_event_fetches_ms = 30000
+wait_between_merge_txs_ms          = 30000

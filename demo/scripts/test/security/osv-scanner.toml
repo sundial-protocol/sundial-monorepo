@@ -9,6 +9,16 @@ id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2027-01-31
 reason = "deepmerge <=4.3.1 has no patched release (advisory published 2026-09-18). It reaches us only through jest-config, which midgard-ts uses to merge its own test configuration, so no untrusted input reaches mergeObject(). Jest 30 still depends on it. Remove once deepmerge or jest ships a fix."
 
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2027-01-31
+reason = "glob 13.0.6 keeps walking after an AbortSignal fires (advisory published 2026-10-30, fixed only in glob 14). It reaches us only through dev tooling (jest-config, jest-runtime, @jest/reporters, rimraf, test-exclude), which pass our own fixed patterns and never rely on a signal to bound a walk. jest 30 and test-exclude still require glob ^13. Remove once they accept glob 14."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-01-31
+reason = "minimatch pattern amplification with optimizationLevel >= 2 (advisory published 2026-10-30, fixed only in minimatch 11). minimatch 10 reaches us through glob, typescript-eslint and test-exclude, and minimatch 3 through eslint 9 and @eslint/eslintrc; all are dev tooling matching our own patterns, never user input. minimatch 3 has no optimizationLevel option, so it looks unaffected despite the advisory's range. Remove once those packages accept minimatch 11."
+
 # License overrides for packages whose license cannot be resolved from the
 # public registry (private/internal packages or packages missing a license
 # field despite having a LICENSE file on disk).
