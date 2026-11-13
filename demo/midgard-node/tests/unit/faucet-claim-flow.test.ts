@@ -237,6 +237,7 @@ beforeEach(() => {
 });
 
 const baseConfig = {
+  ADMIT_UNEVALUATED_SCRIPTS: false,
   FAUCET_ENABLED: true,
   FAUCET_API_KEY: "key",
   FAUCET_ADDRESS: "FAUCET_ADDR_BECH32",

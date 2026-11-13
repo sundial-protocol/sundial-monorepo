@@ -62,6 +62,22 @@ export function cmlToMidgard(cmlTx: CML.Transaction): Transaction {
     );
   }
 
+  // --- Collateral is not supported ---
+  // Midgard has no collateral (a transaction that fails script evaluation is
+  // rejected, never included), and the native format has no field for it.
+  // Dropping it silently would change the transaction id, so the node would
+  // reject the transaction later with a confusing E_TX_HASH_MISMATCH.
+  const collateralInputs = body.collateral_inputs();
+  if (
+    (collateralInputs !== undefined && collateralInputs.len() > 0) ||
+    body.collateral_return() !== undefined ||
+    body.total_collateral() !== undefined
+  ) {
+    throw new ConversionError(
+      "Collateral (collateral_inputs, collateral_return, total_collateral) is not supported in Midgard; build the transaction without it",
+    );
+  }
+
   // --- Withdrawals ---
   // Non-zero ADA withdrawals are forbidden.
   // Zero-ADA withdrawals (withdraw-zero trick) with script credentials
@@ -401,7 +417,7 @@ function cmlMintToMidgard(cmlMint: CML.Mint): Mint {
   return result;
 }
 
-function midgardMintToCml(mint: Mint): CML.Mint {
+export function midgardMintToCml(mint: Mint): CML.Mint {
   const cmlMint = CML.Mint.new();
   for (const [pidBytes, assetList] of mint) {
     const pid = CML.ScriptHash.from_raw_bytes(pidBytes);
