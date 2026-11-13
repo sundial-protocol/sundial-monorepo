@@ -342,6 +342,82 @@ describe("NodeConfig", () => {
     { timeout: 10000 },
   );
 
+  const admitScriptsProvider = (network: string, admit?: string) =>
+    ConfigProvider.fromMap(
+      new Map([
+        ["L1_PROVIDER", "Kupmios"],
+        ["L1_BLOCKFROST_API_URL", "http://localhost:1337"],
+        ["L1_BLOCKFROST_KEY", "blockfrost-key"],
+        ["L1_OGMIOS_KEY", "ogmios-key"],
+        ["L1_KUPO_KEY", "kupo-key"],
+        ["L1_OPERATOR_SEED_PHRASE", "seed phrase operator"],
+        [
+          "L1_OPERATOR_SEED_PHRASE_FOR_BLOCK_COMMITMENT",
+          "seed phrase block commitment",
+        ],
+        ["L1_OPERATOR_SEED_PHRASE_FOR_MERGE_TX", "seed phrase merge tx"],
+        ["NETWORK", network],
+        ["TESTNET_GENESIS_WALLET_SEED_PHRASE_A", "seed phrase a"],
+        ["TESTNET_GENESIS_WALLET_SEED_PHRASE_B", "seed phrase b"],
+        ["TESTNET_GENESIS_WALLET_SEED_PHRASE_C", "seed phrase c"],
+        ...(admit === undefined
+          ? []
+          : [["ADMIT_UNEVALUATED_SCRIPTS", admit] as [string, string]]),
+      ]),
+    );
+  const loadWith = (provider: ConfigProvider.ConfigProvider) =>
+    Effect.either(
+      Effect.gen(function* () {
+        return yield* NodeConfig;
+      }).pipe(
+        Effect.provide(
+          NodeConfig.layer.pipe(
+            Layer.provide(Layer.setConfigProvider(provider)),
+          ),
+        ),
+      ),
+    );
+
+  it.effect(
+    "leaves ADMIT_UNEVALUATED_SCRIPTS off by default",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* loadWith(admitScriptsProvider("Preview"));
+        expect(result._tag).toBe("Right");
+        if (result._tag === "Right") {
+          expect(result.right.ADMIT_UNEVALUATED_SCRIPTS).toBe(false);
+        }
+      }),
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "allows ADMIT_UNEVALUATED_SCRIPTS on a testnet",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* loadWith(admitScriptsProvider("Preprod", "true"));
+        expect(result._tag).toBe("Right");
+        if (result._tag === "Right") {
+          expect(result.right.ADMIT_UNEVALUATED_SCRIPTS).toBe(true);
+        }
+      }),
+    { timeout: 10000 },
+  );
+
+  it.effect(
+    "refuses ADMIT_UNEVALUATED_SCRIPTS on Mainnet",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* loadWith(admitScriptsProvider("Mainnet", "true"));
+        expect(result._tag).toBe("Left");
+        if (result._tag === "Left") {
+          expect(result.left).toBeInstanceOf(ConfigError);
+          expect(result.left.message).toContain("ADMIT_UNEVALUATED_SCRIPTS");
+        }
+      }),
+    { timeout: 10000 },
+  );
+
   it.effect(
     "fails when SUBMIT_SIGN_TIMEOUT_RECOVERY_MAX_RETRIES is negative",
     () => {

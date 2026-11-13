@@ -55,6 +55,7 @@ type NodeConfigDep = {
   MEMPOOL_MPT_DB_PATH: string;
   LUCID_INIT_MAX_RETRIES: number;
   GENESIS_UTXOS: UTxO[];
+  ADMIT_UNEVALUATED_SCRIPTS: boolean;
   FAUCET_ENABLED: boolean;
   FAUCET_SEED_PHRASE: string;
   FAUCET_API_KEY: string;
@@ -260,6 +261,22 @@ const makeConfig = Effect.gen(function* () {
         }),
     });
 
+  // Stage one of script support: admit mints and Plutus V3 scripts without
+  // evaluating them. Anyone can mint any token while this is on, so it is for
+  // testnets only. See PhaseAConfig.admitUnevaluatedScripts in midgard-ts.
+  const admitUnevaluatedScripts = yield* Config.boolean(
+    "ADMIT_UNEVALUATED_SCRIPTS",
+  ).pipe(Config.withDefault(false));
+  if (admitUnevaluatedScripts && network === "Mainnet") {
+    return yield* Effect.fail(
+      new ConfigError({
+        message:
+          "ADMIT_UNEVALUATED_SCRIPTS=true is not allowed on Mainnet: scripts are not evaluated, so anyone could mint any token",
+        cause: undefined,
+        fieldsAndValues: [["ADMIT_UNEVALUATED_SCRIPTS", "true"]],
+      }),
+    );
+  }
   const faucetEnabled = yield* Config.boolean("FAUCET_ENABLED").pipe(
     Config.withDefault(false),
   );
@@ -609,6 +626,7 @@ const makeConfig = Effect.gen(function* () {
     MEMPOOL_MPT_DB_PATH: mempoolMptDbPath,
     LUCID_INIT_MAX_RETRIES: lucidInitMaxRetries,
     GENESIS_UTXOS: network === "Mainnet" ? [] : genesisUtxos,
+    ADMIT_UNEVALUATED_SCRIPTS: admitUnevaluatedScripts,
     FAUCET_ENABLED: faucetEnabled,
     FAUCET_SEED_PHRASE: faucetSeedPhrase,
     FAUCET_API_KEY: faucetApiKey,

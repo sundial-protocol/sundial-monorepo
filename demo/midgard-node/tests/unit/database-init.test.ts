@@ -232,6 +232,7 @@ const mockNodeConfigLayer = Layer.succeed(
     MEMPOOL_MPT_DB_PATH: "midgard-mempool-mpt-db",
     LUCID_INIT_MAX_RETRIES: 0,
     GENESIS_UTXOS: [],
+    ADMIT_UNEVALUATED_SCRIPTS: false,
     FAUCET_ENABLED: false,
     FAUCET_SEED_PHRASE: "",
     FAUCET_API_KEY: "",

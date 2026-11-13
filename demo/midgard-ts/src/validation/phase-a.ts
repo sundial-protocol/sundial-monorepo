@@ -6,7 +6,8 @@
  *
  * Rules enforced here:
  *   R2  - tx hash integrity
- *   R3  - unsupported fields absent (redeemers, plutus_v3_scripts, script_data_hash)
+ *   R3  - unsupported fields absent (redeemers, plutus_v3_scripts, script_data_hash);
+ *          skipped when config.admitUnevaluatedScripts is set
  *   R4  - at least one spend input
  *   R5  - no duplicate inputs within the transaction
  *   R6  - output structure validity (non-negative coin)
@@ -17,7 +18,7 @@
  *   R15 - native scripts present and valid
  *   R19 - is_valid must be true
  *   R20 - no auxiliary data hash
- *   R23 - no minting
+ *   R23 - no minting; skipped when config.admitUnevaluatedScripts is set
  *   R24 - network_id matches config
  *
  * Rules implicitly satisfied by the Transaction type (no dedicated check):
@@ -109,39 +110,42 @@ function validateOne(
     );
   }
 
-  // R23 - no minting
-  // TODO: R23 from the tx-submission says you can not mint? You should be though, no?
-  if (body.mint !== undefined && body.mint.length > 0) {
-    return reject(
-      txId,
-      RejectCodes.MintForbidden,
-      "mint field must be absent or empty",
-    );
-  }
+  // R23 and R3 are skipped when config.admitUnevaluatedScripts is set (stage
+  // one of script support: mints and Plutus V3 scripts are admitted without
+  // evaluation; see PhaseAConfig). Phase two validation will evaluate them.
+  if (config.admitUnevaluatedScripts !== true) {
+    // R23 - no minting
+    if (body.mint !== undefined && body.mint.length > 0) {
+      return reject(
+        txId,
+        RejectCodes.MintForbidden,
+        "mint field must be absent or empty",
+      );
+    }
 
-  // R3 - unsupported witness-set fields
-  // TODO: R3 from the tx-submission says plutus_v3_scripts is unsupported? You should be able to run the plutus_v3_scripts though, no?
-  if (tx.witness_set.redeemers !== undefined) {
-    return reject(txId, RejectCodes.UnsupportedFieldNonEmpty, "redeemers");
-  }
-  if (
-    tx.witness_set.plutus_v3_scripts !== undefined &&
-    tx.witness_set.plutus_v3_scripts.length > 0
-  ) {
-    return reject(
-      txId,
-      RejectCodes.UnsupportedFieldNonEmpty,
-      "plutus_v3_scripts",
-    );
-  }
+    // R3 - unsupported witness-set fields
+    if (tx.witness_set.redeemers !== undefined) {
+      return reject(txId, RejectCodes.UnsupportedFieldNonEmpty, "redeemers");
+    }
+    if (
+      tx.witness_set.plutus_v3_scripts !== undefined &&
+      tx.witness_set.plutus_v3_scripts.length > 0
+    ) {
+      return reject(
+        txId,
+        RejectCodes.UnsupportedFieldNonEmpty,
+        "plutus_v3_scripts",
+      );
+    }
 
-  // R3 - unsupported body fields
-  if (body.script_data_hash !== undefined) {
-    return reject(
-      txId,
-      RejectCodes.UnsupportedFieldNonEmpty,
-      "script_data_hash",
-    );
+    // R3 - unsupported body fields
+    if (body.script_data_hash !== undefined) {
+      return reject(
+        txId,
+        RejectCodes.UnsupportedFieldNonEmpty,
+        "script_data_hash",
+      );
+    }
   }
 
   // R24 - network_id must match config when present

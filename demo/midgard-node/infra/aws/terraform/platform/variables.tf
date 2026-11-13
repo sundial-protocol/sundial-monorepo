@@ -230,6 +230,12 @@ variable "private_dns_namespace_name" {
 # .../faucet-api-key) and funds a dedicated faucet wallet at genesis. The
 # non-secret economic knobs below are passed as plain task environment.
 # ---------------------------------------------------------------------------
+variable "admit_unevaluated_scripts" {
+  description = "Admit transactions that mint or carry Plutus V3 scripts without evaluating them (stage one of script support). Anyone can mint any token while this is on; the node refuses it on Mainnet."
+  type        = bool
+  default     = false
+}
+
 variable "faucet_enabled" {
   description = "Enable the dedicated, genesis-funded faucet wallet."
   type        = bool
