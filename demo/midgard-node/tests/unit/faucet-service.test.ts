@@ -41,6 +41,7 @@ describe("Faucet.processClaim guard branches", () => {
 
   it("fails with DISABLED when enabled but the faucet wallet is unconfigured", async () => {
     const result = await runClaim(input, {
+      ADMIT_UNEVALUATED_SCRIPTS: false,
       FAUCET_ENABLED: true,
       FAUCET_API_KEY: "key",
       FAUCET_ADDRESS: "",
@@ -54,6 +55,7 @@ describe("Faucet.processClaim guard branches", () => {
 
   it("rejects an unparseable recipient address before any payout", async () => {
     const result = await runClaim(input, {
+      ADMIT_UNEVALUATED_SCRIPTS: false,
       FAUCET_ENABLED: true,
       FAUCET_API_KEY: "key",
       FAUCET_ADDRESS: "addr_test1_faucet",

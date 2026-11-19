@@ -113,6 +113,16 @@ export type PhaseAConfig = {
    * Defaults to 1 (mainnet).
    */
   readonly cardanoNetwork?: number;
+  /**
+   * Stage one of script support: admit transactions that mint, or carry
+   * redeemers, Plutus V3 scripts and a script_data_hash, WITHOUT evaluating
+   * any script (R3 and R23 are skipped). Nothing checks a minting policy, so
+   * anyone can mint any token while this is on. Off by default; meant for
+   * a testnet that needs Charms transactions to land before script
+   * evaluation (phase two validation) exists. Phase B still counts minted
+   * and burned value in value preservation (R12).
+   */
+  readonly admitUnevaluatedScripts?: boolean;
 };
 
 export type PhaseBConfig = {

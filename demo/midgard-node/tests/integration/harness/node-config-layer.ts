@@ -84,6 +84,7 @@ export const makeTestNodeConfigLayer = (opts: TestNodeConfigOptions = {}) => {
       MEMPOOL_MPT_DB_PATH: mempoolPath,
       LUCID_INIT_MAX_RETRIES: 0,
       GENESIS_UTXOS: opts.genesisUtxos ?? [],
+      ADMIT_UNEVALUATED_SCRIPTS: false,
       FAUCET_ENABLED: false,
       FAUCET_SEED_PHRASE: "",
       FAUCET_API_KEY: "",

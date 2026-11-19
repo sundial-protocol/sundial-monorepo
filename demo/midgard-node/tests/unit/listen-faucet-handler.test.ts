@@ -33,6 +33,7 @@ const runHandler = (request: Request, faucetEnabled = true) =>
     ),
     Effect.provide(
       makeTestNodeConfigLayer({
+        ADMIT_UNEVALUATED_SCRIPTS: false,
         FAUCET_ENABLED: faucetEnabled,
         FAUCET_API_KEY: faucetEnabled ? API_KEY : "",
       }),

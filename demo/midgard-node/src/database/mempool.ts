@@ -174,6 +174,7 @@ const defaultPhaseAConfig = (nodeConfig: NodeConfig["Type"]): PhaseAConfig => {
     // Cardano min-fee defaults currently used by Midgard transactions.
     minFeeA: 44n,
     minFeeB: 155381n,
+    admitUnevaluatedScripts: nodeConfig.ADMIT_UNEVALUATED_SCRIPTS,
   };
 };
 

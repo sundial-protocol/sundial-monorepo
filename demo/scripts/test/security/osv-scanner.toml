@@ -19,6 +19,11 @@ id = "GHSA-g3hv-75wg-m249"
 ignoreUntil = 2027-01-31
 reason = "minimatch pattern amplification with optimizationLevel >= 2 (advisory published 2026-10-30, fixed only in minimatch 11). minimatch 10 reaches us through glob, typescript-eslint and test-exclude, and minimatch 3 through eslint 9 and @eslint/eslintrc; all are dev tooling matching our own patterns, never user input. minimatch 3 has no optimizationLevel option, so it looks unaffected despite the advisory's range. Remove once those packages accept minimatch 11."
 
+[[IgnoredVulns]]
+id = "GHSA-chp3-j5qr-2vfr"
+ignoreUntil = 2027-01-31
+reason = "@effect/platform makeCookie() lets ';' through in name, domain and path, so untrusted input there can append Set-Cookie attributes (advisory published 2026-11-10, fixed in 0.97.1). No code in this repo builds cookies (no makeCookie, Cookies or setCookie use), so no input reaches it. 0.96.1 is the node's own dependency and 0.97.x needs effect ^3.22 and new versions of the whole @effect family, a separate upgrade; 0.71.7 comes from @lucid-evolution/provider, whose latest release (0.4.8) still requires ^0.71.3. Remove after that upgrade, once lucid-evolution accepts 0.97."
+
 # License overrides for packages whose license cannot be resolved from the
 # public registry (private/internal packages or packages missing a license
 # field despite having a LICENSE file on disk).

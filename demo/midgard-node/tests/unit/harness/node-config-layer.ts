@@ -69,6 +69,7 @@ export const makeTestNodeConfigLayer = (
       ),
       LUCID_INIT_MAX_RETRIES: 0,
       GENESIS_UTXOS: [],
+      ADMIT_UNEVALUATED_SCRIPTS: false,
       FAUCET_ENABLED: false,
       FAUCET_SEED_PHRASE: "",
       FAUCET_API_KEY: "",

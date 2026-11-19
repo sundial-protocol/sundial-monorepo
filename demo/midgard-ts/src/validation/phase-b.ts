@@ -11,14 +11,14 @@
  *   R8   - no double spend across accepted transactions
  *   R8b  - every reference input exists in UTxO state (not spent by same tx)
  *   R10  - validity interval compatible with current time
- *   R12  - value preservation: Σinputs - fee = Σoutputs
+ *   R12  - value preservation: Σinputs + minted - fee = Σoutputs + burned
  *   R16  - input-witness consistency (pubkey → vkey witness, script → native script)
  *   R17  - no dependency cycles
  *   R18  - cascade-reject descendants of any rejected transaction
  */
 
 import * as CML from "@dcspark/cardano-multiplatform-lib-nodejs";
-import { midgardValueToCml } from "../cardano";
+import { midgardMintToCml, midgardValueToCml } from "../cardano";
 import {
   PhaseAAccepted,
   PhaseBConfig,
@@ -346,12 +346,25 @@ const validateCandidateAgainstState = (
     }
   }
 
-  // R12 - value preservation: (Σinputs - fee) - Σoutputs = 0
-  // Phase A hard-rejects non-empty mint, so minted/burned values are zero here.
+  // R12 - value preservation: (Σinputs + minted - fee) - (Σoutputs + burned) = 0
+  // Mint is non-empty only when Phase A ran with admitUnevaluatedScripts.
   try {
-    const inputSum = sumCmlValues(inputCmlValues);
+    const mint = candidate.tx.body.mint;
+    const cmlMint =
+      mint !== undefined && mint.length > 0
+        ? midgardMintToCml(mint)
+        : undefined;
+    const minted =
+      cmlMint !== undefined
+        ? CML.Value.new(0n, cmlMint.as_positive_multiasset())
+        : CML.Value.zero();
+    const burned =
+      cmlMint !== undefined
+        ? CML.Value.new(0n, cmlMint.as_negative_multiasset())
+        : CML.Value.zero();
+    const inputSum = sumCmlValues(inputCmlValues).checked_add(minted);
     const lhs = inputSum.checked_sub(CML.Value.from_coin(candidate.fee));
-    const delta = lhs.checked_sub(candidate.outputSum);
+    const delta = lhs.checked_sub(candidate.outputSum.checked_add(burned));
     if (!delta.is_zero()) {
       return fail(
         RejectCodes.ValueNotPreserved,
